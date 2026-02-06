@@ -1,0 +1,38 @@
+[project]
+dependencies = [
+    "accelerate==0.33.0",
+    "datasets==2.20.0",
+    "GPUtil==1.4.0", 
+    "evaluate==0.4.2",
+    "bitsandbytes==0.44.1",
+    "huggingface-hub==0.24.5",
+    "jiwer==3.0.4",
+    "lm_eval==0.4.4", 
+    "tqdm==4.66.5",
+    "transformers==4.43.2"
+]
+name = "lillama"
+version = "0.1.0"
+description = ""
+authors = [{name = "Yaya Sy", email = "yayasysco@gmail.com"}]
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+   "Development Status :: 3 - Alpha",
+   "License :: OSI Approved :: MIT License",
+   "Programming Language :: Python :: 3.8",
+   "Programming Language :: Python :: 3.9"
+]
+
+[tool.setuptools]
+package-dir = {"lillama" = "src"}
+packages = ["lillama", "lillama.data", "lillama.evaluation", "lillama.lillama"]
+
+[project.scripts]
+lillama-sharegpt = "lillama.data.sharegpt:main"
+lillama-alpaca = "lillama.data.alpaca:main"
+lillama-distill = "lillama.lillama.main:main"
+
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"

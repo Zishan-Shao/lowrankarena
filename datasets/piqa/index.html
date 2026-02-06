@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+    <head>
+        <title>Old Page</title>
+     <meta charset="UTF-8" />
+     <meta http-equiv="refresh" content="0; URL=https://github.com/ybisk/ybisk.github.io/tree/master/piqa" />
+   </head>
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+          (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+                              })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-8024377-2', 'auto');
+      ga('send', 'pageview');
+
+  </script>
+
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <meta name="theme-color" content="#ffffff">
+
+  <title>PIQA: Physical Interaction - Question Answering</title>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css"
+        integrity="sha384-Smlep5jCw/wG7hdkwQ/Z5nLIefveQRIY9nfy6xoR1uRYBtpZgI6339F5dgvm/e9B" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css?family=Monoton" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:100,300,400,500,700" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Permanent+Marker" rel="stylesheet">
+  <style>
+    .performanceTable tr.human-row {
+      background: #f5f5f5;
+    }
+    .performanceTable tr.random-row {
+      background: #fafafa;
+    }
+    .performanceTable {
+      margin: 10px 0px;
+    }
+    .performanceTable .institution {
+      font-style: italic;
+      font-weight: 300;
+    }
+    .performanceTable .date {
+      font-weight: normal;
+      background-color: #777;
+      display: inline;
+      padding: .2em .6em .3em;
+      font-size: 75%;
+      line-height: 1;
+      color: #fff;
+      text-align: center;
+      white-space: nowrap;
+      vertical-align: baseline;
+      border-radius: .25em;
+    }
+    .performanceTable td,
+    .performanceTable th {
+      text-align: center;
+      max-width: 250px;
+    }
+  </style>
+  <link rel="icon" type="image/png" href="../icon.png">
+</head>
+<body>
+
+<div class="bg-dark">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark container">
+    <img src="PIQA.png" alt="PIQA logo" id="piqalogo" class="img-responsive" width="50">
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarCollapse">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item">
+          <a href="https://arxiv.org/abs/1911.11641"><div class="nav-item-header"> </div><div class="nav-link">Paper</div></a>
+        </li>
+        <li class="nav-item">
+          <a href="data/"><div class="nav-item-header"> </div><div class="nav-link">Download</div></a>
+        </li>
+        <li class="nav-item">
+        <a href="https://leaderboard.allenai.org/physicaliqa/"><div class="nav-item-header"> </div><div class="nav-link">DARPA Leaderboard</div></a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+</div>
+
+<main role="main" class="container" style="padding-top:15px">
+  <div class="row">
+    <div class="col-lg-5">
+      <div class="card box-shadow card-body">
+
+        <h5>Physical Interaction: Question Answering</h5>
+        <p>PIQA was designed to investigate the physical knowledge of existing models.  To what extent are current approaches actually learning about the world?
+        </p>
+        <a href="https://arxiv.org/abs/1911.11641">
+          <button class="btn btn-secondary" style="width:100%">Read our paper on arXiv&raquo;</button>
+        </a>
+        <br>
+        <a href="data/">
+          <button class="btn btn-primary" style="width:100%">Download data&raquo;</button>
+        </a>
+
+        <hr>
+
+        <h3>Submitting to the leaderboard</h3>
+
+        <p>Submission is simple.  Please email your predictions.</p>
+        <table><tr><td width=10pt bgcolor=#f5f5f5></td><td bgcolor=#f5f5f5>
+          <p>To: ybisk--_--cs.cmu.edu</p>
+          <p>Subject: [PIQA Leaderboard Submission]</p>
+          <p>Body:
+            <ol>
+              <li>A predictions lst file (one prediction per line)</li>
+              <li>A name for your model</li>
+              <li>Your team name (including your affiliation)</li>
+              <li>Optionally: A github repo or paper link.</li>
+            </ol>
+          </p>
+          </td><tr></table>
+          <br>
+          <p>I'll try to get back to you within a few days, usually sooner. Teams can only submit results from a model once every 7 days. Additionally, we reserve the right to not score any of your submissions if you cheat -- for instance, fake names / email addresses and multiple submissions under those names.</p>
+        <hr>
+          <h3>Citation</h3>
+          <code><font size=2 color="black">
+          @inproceedings{Bisk2020,<br>
+          &nbsp;&nbsp;author = {Yonatan Bisk and Rowan Zellers and <br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ronan Le Bras and Jianfeng Gao<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and Yejin Choi},<br>
+          &nbsp;&nbsp;title = {PIQA: Reasoning about Physical Commonsense in<br> 
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Natural Language},<br>
+          &nbsp;&nbsp;booktitle = {Thirty-Fourth AAAI Conference on<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Artificial Intelligence},<br>
+          &nbsp;&nbsp;year = {2020},<br>
+          }
+          </font></code>
+        <hr>
+          <h3>License</h3>
+          <p><a href=https://opensource.org/licenses/AFL-3.0>Academic Free License ("AFL") v. 3.0</a>
+          </p>
+        <hr>
+          <h3>Questions?</h3>
+          <p>Please email me</p>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card box-shadow card-body">
+
+        <h3>PIQA Leaderboard</h3>
+        <p>Physical IQA is a binary choice task, often better viewed as a set of two (Goal, Solution) pairs</p>
+          <ul>
+        <li><b>Goal</b> To separate egg whites from the yolk using a water bottle, you should ...</li>
+        <li><b>Solution 1</b> <i>Squeeze</i> the water bottle and press it against the yolk. <i>Release</i>, which creates suction and lifts the yolk. </li>
+        <li><b>Solution 2</b> <i>Place</i> the water bottle and press it against the yolk. <i>Keep pushing</i>, which creates suction and lifts the yolk.</li>
+          </ul>
+        <p>Evaluation is a simple accuracy prediction over this binary task.
+        </p>
+        <table class="table performanceTable">
+          <tbody>
+          <tr>
+            <th>Rank</th>
+            <th>Model</th>
+            <th>Accuracy</th>
+          </tr>
+          <tr class="human-row">
+            <td></td>
+            <td>Human Performance<br><a href="https://yonatanbisk.com/PIQA/">(Bisk et al. '20)</a></td>
+            <td>94.9</td>
+          </tr>
+        <tr>
+          <td>1</td>
+          <td><a href='https://github.com/benchen4395/QA/blob/main/README.md'>DeBERTa-xxlarge</a>          <p class="institution">Alibaba Group ICBU Tech</p></td>
+          <td>83.5</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><a href='https://arxiv.org/abs/2005.14165'>GPT-3</a>          <p class="institution">OpenAI</p></td>
+          <td>82.8*</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Anonymous          <p class="institution">Anonymous</p></td>
+          <td>79.0</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>RoBERTa-Large          <p class="institution">Baseline<br>lr 1e-5, 8 ep, 4/batch/GPU (4x V100), max seq 150</p></td>
+          <td>77.1</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><a href='https://arxiv.org/abs/2004.05483'>Zero-shot GPT-XL self-talk with GPT-medium</a>          <p class="institution">AI2</p></td>
+          <td>69.5</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>OpenAI GPT          <p class="institution">Baseline</p></td>
+          <td>69.2</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><a href='https://arxiv.org/abs/2004.05483'>Zero-shot GPT-XL with COMET</a>          <p class="institution">AI2</p></td>
+          <td>68.4</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>BERT-Large          <p class="institution">Baseline<br>lr 1e-5, 8 ep, 6/batch/GPU (4x V100), max seq 150</p></td>
+          <td>66.8</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><a href='https://arxiv.org/abs/2004.05483'>Zero-shot GPT-XL</a>          <p class="institution">AI2</p></td>
+          <td>63.4</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td>Majority Class          <p class="institution"></p></td>
+          <td>50.4</td>
+        </tr>
+          <tr class="random-row">
+            <td> </td>
+            <td>Random Performance</td>
+            <td>50.0</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+  <footer class="footer">
+    <div class="container">
+      Stolen and maintained by <a href="https://yonatanbisk.com">Yonatan Bisk</a> 
+    </div>
+  </footer>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+        integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+        crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/js/bootstrap.min.js"
+        integrity="sha384-o+RDsa0aLu++PJvFqy8fFScvbHFLtbvScb8AjopnFD+iEQ7wo/CG0xlczd+2O/em"
+        crossorigin="anonymous"></script>
+</body>
+
+</html>

@@ -1,0 +1,163 @@
+{
+  "model": "/home/zs89/FlashSVDTrain/checkpoints/llama_2_7b_hf_act_lora_mixedwhiten_mixedlora_0.4_enhanced.pt",
+  "device": "cuda",
+  "batch_size": 8,
+  "dtype": "bfloat16",
+  "limit": null,
+  "tasks": [
+    "openbookqa",
+    "arc_easy",
+    "arc_challenge",
+    "winogrande",
+    "hellaswag",
+    "piqa",
+    "mathqa"
+  ],
+  "template_profile": "realistic",
+  "templates": {
+    "plain": {
+      "tasks": {
+        "openbookqa": {
+          "acc": 22.2,
+          "acc_norm": 35.4
+        },
+        "arc_easy": {
+          "acc": 52.45614035087719,
+          "acc_norm": 46.31578947368421
+        },
+        "arc_challenge": {
+          "acc": 27.4247491638796,
+          "acc_norm": 34.11371237458194
+        },
+        "winogrande": {
+          "acc": 50.19731649565904,
+          "acc_norm": 50.51302288871349
+        },
+        "hellaswag": {
+          "acc": 39.62358095996813,
+          "acc_norm": 49.183429595698065
+        },
+        "piqa": {
+          "acc": 68.60718171926007,
+          "acc_norm": 70.45701849836779
+        },
+        "mathqa": {
+          "acc": 17.363128491620113,
+          "acc_norm": 25.00558659217877
+        }
+      },
+      "mean_acc": 39.69601388303773,
+      "std_acc": 17.173115474605584,
+      "mean_acc_norm": 44.42693706046061,
+      "std_acc_norm": 13.658250333335507
+    },
+    "qa": {
+      "tasks": {
+        "openbookqa": {
+          "acc": 44.2,
+          "acc_norm": 48.4
+        },
+        "arc_easy": {
+          "acc": 56.31578947368421,
+          "acc_norm": 48.421052631578945
+        },
+        "arc_challenge": {
+          "acc": 29.431438127090303,
+          "acc_norm": 30.76923076923077
+        },
+        "winogrande": {
+          "acc": 49.48697711128651,
+          "acc_norm": 50.355169692186266
+        },
+        "hellaswag": {
+          "acc": 27.24556861183031,
+          "acc_norm": 27.833100975901214
+        },
+        "piqa": {
+          "acc": 61.262241566920565,
+          "acc_norm": 60.50054406964092
+        },
+        "mathqa": {
+          "acc": 20.201117318435752,
+          "acc_norm": 24.960893854748605
+        }
+      },
+      "mean_acc": 41.163304601321094,
+      "std_acc": 14.554446888822834,
+      "mean_acc_norm": 41.6057131418981,
+      "std_acc_norm": 12.59446033082519
+    },
+    "mc_letters": {
+      "tasks": {
+        "openbookqa": {
+          "acc": 48.6,
+          "acc_norm": 48.6
+        },
+        "arc_easy": {
+          "acc": 57.719298245614034,
+          "acc_norm": 57.719298245614034
+        },
+        "arc_challenge": {
+          "acc": 40.13377926421405,
+          "acc_norm": 40.13377926421405
+        },
+        "winogrande": {
+          "acc": 51.302288871349646,
+          "acc_norm": 51.302288871349646
+        },
+        "hellaswag": {
+          "acc": 25.034853614817766,
+          "acc_norm": 25.034853614817766
+        },
+        "piqa": {
+          "acc": 58.8683351468988,
+          "acc_norm": 58.8683351468988
+        },
+        "mathqa": {
+          "acc": 21.027932960893853,
+          "acc_norm": 21.027932960893853
+        }
+      },
+      "mean_acc": 43.24092687196974,
+      "std_acc": 14.051318785568883,
+      "mean_acc_norm": 43.24092687196974,
+      "std_acc_norm": 14.051318785568883
+    },
+    "instruction": {
+      "tasks": {
+        "openbookqa": {
+          "acc": 46.8,
+          "acc_norm": 50.2
+        },
+        "arc_easy": {
+          "acc": 59.473684210526315,
+          "acc_norm": 59.473684210526315
+        },
+        "arc_challenge": {
+          "acc": 36.78929765886288,
+          "acc_norm": 36.78929765886288
+        },
+        "winogrande": {
+          "acc": 49.80268350434096,
+          "acc_norm": 50.27624309392265
+        },
+        "hellaswag": {
+          "acc": 25.921131248755227,
+          "acc_norm": 24.975104560844454
+        },
+        "piqa": {
+          "acc": 60.93579978237214,
+          "acc_norm": 59.84766050054407
+        },
+        "mathqa": {
+          "acc": 20.737430167597765,
+          "acc_norm": 24.804469273743017
+        }
+      },
+      "mean_acc": 42.92286093892219,
+      "std_acc": 14.53877884464042,
+      "mean_acc_norm": 43.76663704263477,
+      "std_acc_norm": 13.889577492589153
+    }
+  }
+}
