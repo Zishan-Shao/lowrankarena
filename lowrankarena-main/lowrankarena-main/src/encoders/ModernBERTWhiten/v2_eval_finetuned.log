@@ -1,0 +1,89 @@
+Map:   0%|          | 0/872 [00:00<?, ? examples/s]Map: 100%|██████████| 872/872 [00:00<00:00, 12939.98 examples/s]
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+BATCH_SIZE: 32  RANK_ATTN: 29  RANK_FF: 230  RANK_WO: 192
+Calibrating input covariances (Whitening for ModernBERT)…
+Type             MiB
+----------------------
+Dense          149.8
+Low-rank       209.1
+----------------------
+TOTAL          358.9
+low-rank model storage with GPU redundancy: 1114.5 MiB
+Persistent low-rank model storage (ModernBERT Whitening v1):  358.9 MiB
+
+================================================================================
+Loading dense teacher model for v2 local update...
+================================================================================
+✅ Teacher model loaded
+
+================================================================================
+SVD-LLM v2: Local Update (CONSERVATIVE - Vo + V2 only)
+================================================================================
+  📊 Local update starting (CONSERVATIVE: Vo + V2 only) - GPU memory: 994.0 MiB
+[v2-conservative] updated Vo + V2 at layer 0 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 1 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 2 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 3 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 4 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 5 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 6 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 7 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 8 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 9 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 10 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 11 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 12 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 13 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 14 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 15 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 16 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 17 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 18 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 19 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 20 (gate/input NOT updated)
+[v2-conservative] updated Vo + V2 at layer 21 (gate/input NOT updated)
+
+  📊 Local update completed (CONSERVATIVE):
+    • Start memory: 994.0 MiB
+    • End memory: 994.0 MiB
+    • Peak memory during update: 1286.4 MiB
+    • Net change: +0.0 MiB
+  ⚠️  Note: Final peak will include both local update and inference phases
+  ✅  Updated: Vo (attn output) + V2 (FFN down)
+  ❌  Skipped: V_gate, V_input (avoiding GeGLU coupling)
+
+✅ Local update complete!
+
+================================================================================
+Releasing teacher model...
+================================================================================
+  📊 Memory after teacher release: 405.3 MiB
+
+================================================================================
+Evaluating v2 model...
+================================================================================
+
+ModernBERT Whitening v2 | acc=0.8583 | peak =1286.4 MiB |  450.2 ms/b
+  (Peak before eval: 1286.4 MiB, Peak during eval: 721.5 MiB)
+
+  ✅ v2 Strategy: CONSERVATIVE (updated Vo + V2 only)
+  ❌ Not updated: V_gate, V_input (avoiding GeGLU coupling)

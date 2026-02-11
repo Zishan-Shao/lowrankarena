@@ -1,0 +1,87 @@
+==========================================
+Small Rank Comparison Test
+==========================================
+
+Model: textattack/bert-base-uncased-SST-2
+Task: sst2
+Ranks: 32 64 128 256
+Methods: SVD, FWSVD
+Backends: naive, flashsvd
+Output: eval_results/encoder_runs_small_ranks_comparison.csv
+
+[1/16] svd rank=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=32  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5089
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=52.87 ms/batch  throughput=605.3 samples/s  peak_mem=223.8 MB
+
+[csv] Appended row to eval_results/encoder_runs_small_ranks_comparison.csv
+
+[1/16] ✅ Completed
+
+[2/16] svd rank=32 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=32  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5089
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=389.39 ms/batch  throughput=82.2 samples/s  peak_mem=133.9 MB
+
+[csv] Appended row to eval_results/encoder_runs_small_ranks_comparison.csv
+
+[2/16] ✅ Completed
+
+[3/16] fwsvd rank=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=32  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[fwsvd] Building Fisher-weighted helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5089
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=87.02 ms/batch  throughput=367.7 samples/s  peak_mem=232.0 MB
+
+[csv] Appended row to eval_results/encoder_runs_small_ranks_comparison.csv
+
+[3/16] ✅ Completed
+
+[4/16] fwsvd rank=32 backend=flashsvd
+-----------------------------------

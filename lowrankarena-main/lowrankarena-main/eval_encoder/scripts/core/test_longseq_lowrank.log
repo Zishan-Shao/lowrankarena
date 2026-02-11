@@ -1,0 +1,495 @@
+==========================================
+Long Sequence + Low Rank Benchmark
+==========================================
+
+Model: textattack/bert-base-uncased-SST-2
+Task: sst2
+
+Test 1: Long Sequences (seq=512, batch=32)
+Test 2: Large Batches (seq=128, batch=128)
+Test 3: Extreme (seq=1024, batch=16)
+
+Ranks: 32, 64 (aggressive compression)
+Methods: SVD, DRONE (best performers)
+Backends: naive, flashsvd
+
+Output: eval_results/final/longseq_lowrank_benchmark.csv
+
+
+==========================================
+Test 1: Long Sequences (seq=512, batch=32)
+==========================================
+
+[1/24] svd rank=32 seq=512 batch=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=32  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5089
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=221.09 ms/batch  throughput=144.7 samples/s  peak_mem=941.8 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[1/24] ✅ Completed
+
+[2/24] svd rank=32 seq=512 batch=32 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=32  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5089
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=211.18 ms/batch  throughput=151.5 samples/s  peak_mem=293.9 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[2/24] ✅ Completed
+
+[3/24] drone rank=32 seq=512 batch=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=32  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=512
+[drone] Building data-aware helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+[drone] Calibrating input covariances ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.6674
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=217.95 ms/batch  throughput=146.8 samples/s  peak_mem=941.8 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[3/24] ✅ Completed
+
+[4/24] drone rank=32 seq=512 batch=32 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=32  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=512
+[drone] Building data-aware helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+[drone] Calibrating input covariances ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.6674
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=204.64 ms/batch  throughput=156.4 samples/s  peak_mem=293.9 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[4/24] ✅ Completed
+
+[5/24] svd rank=64 seq=512 batch=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=64  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5223
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=245.99 ms/batch  throughput=130.1 samples/s  peak_mem=974.0 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[5/24] ✅ Completed
+
+[6/24] svd rank=64 seq=512 batch=32 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=64  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5234
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=240.68 ms/batch  throughput=133.0 samples/s  peak_mem=333.7 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[6/24] ✅ Completed
+
+[7/24] drone rank=64 seq=512 batch=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=64  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=512
+[drone] Building data-aware helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[drone] Calibrating input covariances ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.7143
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=240.01 ms/batch  throughput=133.3 samples/s  peak_mem=974.4 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[7/24] ✅ Completed
+
+[8/24] drone rank=64 seq=512 batch=32 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=64  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=512
+[drone] Building data-aware helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[drone] Calibrating input covariances ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.7132
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=233.83 ms/batch  throughput=136.9 samples/s  peak_mem=334.0 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[8/24] ✅ Completed
+
+
+==========================================
+Test 2: Large Batches (seq=128, batch=128)
+==========================================
+
+[9/24] svd rank=32 seq=128 batch=128 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=32  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 7 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5094
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=133.67 ms/batch  throughput=957.6 samples/s  peak_mem=641.8 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[9/24] ✅ Completed
+
+[10/24] svd rank=32 seq=128 batch=128 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=32  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 7 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5094
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=98.74 ms/batch  throughput=1296.3 samples/s  peak_mem=281.9 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[10/24] ✅ Completed
+
+[11/24] drone rank=32 seq=128 batch=128 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=32  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 7 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=512 (4 batches × 128)
+        seed=0, seq_len=128
+[drone] Building data-aware helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+[drone] Calibrating input covariances ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.6815
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=132.48 ms/batch  throughput=966.2 samples/s  peak_mem=641.8 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[11/24] ✅ Completed
+
+[12/24] drone rank=32 seq=128 batch=128 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=32  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 7 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=512 (4 batches × 128)
+        seed=0, seq_len=128
+[drone] Building data-aware helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+[drone] Calibrating input covariances ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.6826
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=99.28 ms/batch  throughput=1289.3 samples/s  peak_mem=281.9 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[12/24] ✅ Completed
+
+[13/24] svd rank=64 seq=128 batch=128 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=64  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 7 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5231
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=148.67 ms/batch  throughput=861.0 samples/s  peak_mem=672.5 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[13/24] ✅ Completed
+
+[14/24] svd rank=64 seq=128 batch=128 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=64  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 7 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5242
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=127.06 ms/batch  throughput=1007.4 samples/s  peak_mem=347.1 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[14/24] ✅ Completed
+
+[15/24] drone rank=64 seq=128 batch=128 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=64  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 7 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=512 (4 batches × 128)
+        seed=0, seq_len=128
+[drone] Building data-aware helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[drone] Calibrating input covariances ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.6957
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=148.60 ms/batch  throughput=861.3 samples/s  peak_mem=676.1 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[15/24] ✅ Completed
+
+[16/24] drone rank=64 seq=128 batch=128 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=64  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 7 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=512 (4 batches × 128)
+        seed=0, seq_len=128
+[drone] Building data-aware helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[drone] Calibrating input covariances ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.6957
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=130.07 ms/batch  throughput=984.1 samples/s  peak_mem=350.5 MB
+
+[csv] Appended row to eval_results/final/longseq_lowrank_benchmark.csv
+
+[16/24] ✅ Completed
+
+
+==========================================
+Test 3: Extreme (seq=1024, batch=16)
+==========================================
+
+[17/24] svd rank=32 seq=1024 batch=16 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=32  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 55 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=32, rank_ff=32, rank_wo=32) ...
+
+[eval] Computing task metric ...
+Traceback (most recent call last):
+  File "/mnt/e/learning/SVD-Benchmark/lowrankarena/lowrankarena-main/lowrankarena-main/eval_encoder/run_encoder_benchmark.py", line 1043, in <module>
+    main()
+  File "/mnt/e/learning/SVD-Benchmark/lowrankarena/lowrankarena-main/lowrankarena-main/eval_encoder/run_encoder_benchmark.py", line 969, in main
+    metric_name, metric_value = evaluate_task(model, loader, args.task, args.device)
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wwh/miniconda3/envs/flashsvd/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/e/learning/SVD-Benchmark/lowrankarena/lowrankarena-main/lowrankarena-main/eval_encoder/run_encoder_benchmark.py", line 637, in evaluate_task
+    logits = model(
+             ^^^^^^
+  File "/home/wwh/miniconda3/envs/flashsvd/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wwh/miniconda3/envs/flashsvd/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wwh/miniconda3/envs/flashsvd/lib/python3.12/site-packages/transformers/models/bert/modeling_bert.py", line 1481, in forward
+    outputs = self.bert(
+              ^^^^^^^^^^
+  File "/home/wwh/miniconda3/envs/flashsvd/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wwh/miniconda3/envs/flashsvd/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wwh/miniconda3/envs/flashsvd/lib/python3.12/site-packages/transformers/models/bert/modeling_bert.py", line 930, in forward
+    buffered_token_type_ids_expanded = buffered_token_type_ids.expand(batch_size, seq_length)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: The expanded size of the tensor (1024) must match the existing size (512) at non-singleton dimension 1.  Target sizes: [16, 1024].  Tensor sizes: [1, 512]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: The expanded size of the tensor (1024) must match the existing size (512) at non-singleton dimension 1.  Target sizes: [16, 1024].  Tensor sizes: [1, 512]

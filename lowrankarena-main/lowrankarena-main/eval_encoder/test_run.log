@@ -1,0 +1,379 @@
+Starting comprehensive test suite...
+Results will be saved to: eval_results/comprehensive_test_results.csv
+
+==========================================
+Test 1/9: Dense (baseline)
+==========================================
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : dense  rank=None  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9263
+
+[perf] Warmup=5  Measure=20 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:      0.0 MB
+  Inference phase:      291.2 MB
+  Overall peak:         291.2 MB
+============================================================
+[perf] latency=37.99 ms/batch  throughput=842.4 samples/s  peak_mem=291.2 MB
+
+[csv] Appended row to eval_results/comprehensive_test_results.csv
+
+==========================================
+Test 2/9: SVD (rank=64, naive)
+==========================================
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=64  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[compress] Peak memory during compression: 274.9 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5223
+
+[perf] Warmup=5  Measure=20 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:    274.9 MB
+  Inference phase:      255.2 MB
+  Overall peak:         274.9 MB
+============================================================
+[perf] latency=33.72 ms/batch  throughput=949.0 samples/s  peak_mem=274.9 MB
+
+[csv] Appended row to eval_results/comprehensive_test_results.csv
+
+==========================================
+Test 3/9: SVD (rank=128, naive)
+==========================================
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=128  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=128, rank_wo=128) ...
+[compress] Peak memory during compression: 274.9 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5893
+
+[perf] Warmup=5  Measure=20 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:    274.9 MB
+  Inference phase:      269.2 MB
+  Overall peak:         274.9 MB
+============================================================
+[perf] latency=35.63 ms/batch  throughput=898.2 samples/s  peak_mem=274.9 MB
+
+[csv] Appended row to eval_results/comprehensive_test_results.csv
+
+==========================================
+Test 4/9: SVD (rank=128, flashsvd)
+==========================================
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=128  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=128, rank_wo=128) ...
+[compress] Peak memory during compression: 274.9 MB
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5893
+
+[perf] Warmup=5  Measure=20 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:    274.9 MB
+  Inference phase:      187.3 MB
+  Overall peak:         274.9 MB
+============================================================
+[perf] latency=44.87 ms/batch  throughput=713.2 samples/s  peak_mem=274.9 MB
+
+[csv] Appended row to eval_results/comprehensive_test_results.csv
+
+==========================================
+Test 5/9: FWSVD (rank=128, naive)
+==========================================
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=128  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=128, rank_wo=128) ...
+[compress] Peak memory during compression: 1534.6 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.6016
+
+[perf] Warmup=5  Measure=20 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   1534.6 MB
+  Inference phase:      276.3 MB
+  Overall peak:        1534.6 MB
+============================================================
+[perf] latency=34.43 ms/batch  throughput=929.5 samples/s  peak_mem=1534.6 MB
+
+[csv] Appended row to eval_results/comprehensive_test_results.csv
+
+==========================================
+Test 6/9: DRONE (rank=128, naive)
+==========================================
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=128  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[drone] Building data-aware helpers (rank_attn=64, rank_ff=128, rank_wo=128) ...
+[drone] Calibrating input covariances ...
+[compress] Peak memory during compression: 1322.8 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.7824
+
+[perf] Warmup=5  Measure=20 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   1322.8 MB
+  Inference phase:      270.3 MB
+  Overall peak:        1322.8 MB
+============================================================
+[perf] latency=34.91 ms/batch  throughput=916.7 samples/s  peak_mem=1322.8 MB
+
+[csv] Appended row to eval_results/comprehensive_test_results.csv
+
+==========================================
+Test 7/9: AdaSVD (budget=0.2, naive)
+==========================================
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : adasvd  rank=None  budget=0.2  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[adasvd] Running adaptive rank selection (budget=0.2) ...
+Replacing 74 Linear layers with MaskedSVDLinear...
+Training AdaSVD hypernetwork for 400 steps (budget=0.2)...
+  Step   0 | Loss: 1917.7139 | Task: 0.6934 | Budget: 14.0689 | Align: 51012.7383 | Ratio: 0.950 | Target: 0.200
+  Step  50 | Loss: 418.2563 | Task: 0.6855 | Budget: 0.5975 | Align: 35782.4570 | Ratio: 0.355 | Target: 0.200
+  Step 100 | Loss: 129.1412 | Task: 0.6934 | Budget: 0.2987 | Align: 9857.3086 | Ratio: 0.309 | Target: 0.200
+  Step 150 | Loss: 89.3763 | Task: 0.6934 | Budget: 0.1934 | Align: 6933.9771 | Ratio: 0.288 | Target: 0.200
+  Step 200 | Loss: 64.6622 | Task: 0.6938 | Budget: 0.1235 | Align: 5161.3579 | Ratio: 0.270 | Target: 0.200
+  Step 250 | Loss: 51.8741 | Task: 0.6958 | Budget: 0.0894 | Align: 4223.7817 | Ratio: 0.260 | Target: 0.200
+  Step 300 | Loss: 42.3174 | Task: 0.6948 | Budget: 0.0692 | Align: 3470.1030 | Ratio: 0.253 | Target: 0.200
+  Step 350 | Loss: 34.5828 | Task: 0.6885 | Budget: 0.0534 | Align: 2855.2712 | Ratio: 0.246 | Target: 0.200
+Finalizing masks and extracting ranks...
+Saved ranks to: ars_out/ranks.json
+Saved budget report to: ars_out/budget_report.json
+  Target: 0.200 | Achieved: 0.197
+[adasvd] Median rank from ARS: 103
+[adasvd] Reloading original model for compression...
+[adasvd] Compressing with naive backend (FWSVDBlock) using ranks from ars_out/ranks.json
+Loaded 74 per-operation ranks from ars_out/ranks.json
+Replacing 12 layers with FWSVDBlock (naive backend)...
+[adasvd] Model compressed with AdaSVD naive backend
+[compress] Peak memory during compression: 2299.3 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5067
+
+[perf] Warmup=5  Measure=20 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   2299.3 MB
+  Inference phase:     1066.4 MB
+  Overall peak:        2299.3 MB
+============================================================
+[perf] latency=131.14 ms/batch  throughput=244.0 samples/s  peak_mem=2299.3 MB
+
+[csv] Appended row to eval_results/comprehensive_test_results.csv
+
+==========================================
+Test 8/9: AdaSVD (budget=0.3, naive)
+==========================================
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : adasvd  rank=None  budget=0.3  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[adasvd] Running adaptive rank selection (budget=0.3) ...
+Replacing 74 Linear layers with MaskedSVDLinear...
+Training AdaSVD hypernetwork for 400 steps (budget=0.3)...
+  Step   0 | Loss: 980.5129 | Task: 0.6934 | Budget: 4.6969 | Align: 51012.7383 | Ratio: 0.950 | Target: 0.300
+  Step  50 | Loss: 341.1104 | Task: 0.6890 | Budget: 0.5676 | Align: 28366.3145 | Ratio: 0.526 | Target: 0.300
+  Step 100 | Loss: 118.0365 | Task: 0.5903 | Budget: 0.2694 | Align: 9050.9043 | Ratio: 0.456 | Target: 0.300
+  Step 150 | Loss: 82.0602 | Task: 0.5190 | Budget: 0.1720 | Align: 6433.6431 | Ratio: 0.424 | Target: 0.300
+  Step 200 | Loss: 59.1113 | Task: 0.5347 | Budget: 0.1151 | Align: 4706.4463 | Ratio: 0.402 | Target: 0.300
+  Step 250 | Loss: 46.1063 | Task: 0.5649 | Budget: 0.0818 | Align: 3735.7361 | Ratio: 0.386 | Target: 0.300
+  Step 300 | Loss: 38.7236 | Task: 0.5469 | Budget: 0.0643 | Align: 3174.8518 | Ratio: 0.376 | Target: 0.300
+  Step 350 | Loss: 32.7438 | Task: 0.5811 | Budget: 0.0500 | Align: 2716.0051 | Ratio: 0.367 | Target: 0.300
+Finalizing masks and extracting ranks...
+Saved ranks to: ars_out/ranks.json
+Saved budget report to: ars_out/budget_report.json
+  Target: 0.300 | Achieved: 0.296
+[adasvd] Median rank from ARS: 147
+[adasvd] Reloading original model for compression...
+[adasvd] Compressing with naive backend (FWSVDBlock) using ranks from ars_out/ranks.json
+Loaded 74 per-operation ranks from ars_out/ranks.json
+Replacing 12 layers with FWSVDBlock (naive backend)...
+[adasvd] Model compressed with AdaSVD naive backend
+[compress] Peak memory during compression: 2299.3 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5625
+
+[perf] Warmup=5  Measure=20 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   2299.3 MB
+  Inference phase:     1079.8 MB
+  Overall peak:        2299.3 MB
+============================================================
+[perf] latency=134.28 ms/batch  throughput=238.3 samples/s  peak_mem=2299.3 MB
+
+[csv] Appended row to eval_results/comprehensive_test_results.csv
+
+==========================================
+Test 9/9: AdaSVD (budget=0.3, flashsvd)
+==========================================
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : adasvd  rank=None  budget=0.3  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[adasvd] Running adaptive rank selection (budget=0.3) ...
+Replacing 74 Linear layers with MaskedSVDLinear...
+Training AdaSVD hypernetwork for 400 steps (budget=0.3)...
+  Step   0 | Loss: 980.5129 | Task: 0.6934 | Budget: 4.6969 | Align: 51012.7383 | Ratio: 0.950 | Target: 0.300
+  Step  50 | Loss: 341.1104 | Task: 0.6890 | Budget: 0.5676 | Align: 28366.3145 | Ratio: 0.526 | Target: 0.300
+  Step 100 | Loss: 118.0365 | Task: 0.5903 | Budget: 0.2694 | Align: 9050.9043 | Ratio: 0.456 | Target: 0.300
+  Step 150 | Loss: 82.0602 | Task: 0.5190 | Budget: 0.1720 | Align: 6433.6431 | Ratio: 0.424 | Target: 0.300
+  Step 200 | Loss: 59.1113 | Task: 0.5347 | Budget: 0.1151 | Align: 4706.4463 | Ratio: 0.402 | Target: 0.300
+  Step 250 | Loss: 46.1063 | Task: 0.5649 | Budget: 0.0818 | Align: 3735.7361 | Ratio: 0.386 | Target: 0.300
+  Step 300 | Loss: 38.7236 | Task: 0.5469 | Budget: 0.0643 | Align: 3174.8518 | Ratio: 0.376 | Target: 0.300
+  Step 350 | Loss: 32.7438 | Task: 0.5811 | Budget: 0.0500 | Align: 2716.0051 | Ratio: 0.367 | Target: 0.300
+Finalizing masks and extracting ranks...
+Saved ranks to: ars_out/ranks.json
+Saved budget report to: ars_out/budget_report.json
+  Target: 0.300 | Achieved: 0.296
+[adasvd] Median rank from ARS: 147
+[adasvd] Reloading original model for compression...
+[adasvd] Compressing with FlashSVD backend (Triton kernels) using ranks from ars_out/ranks.json
+Loaded 74 per-operation ranks from ars_out/ranks.json
+[FlashSVD Per-Op Strategy] budget=0.3 >= 0.3, using adaptive ranks
+Replacing 12 layers with FlashSVDBlock (ffn_kernel=v1)...
+[adasvd] Model compressed with AdaSVD flashsvd backend
+[compress] Peak memory during compression: 2299.3 MB
+[backend] AdaSVD already using FlashSVD backend (applied during compression)
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5625
+
+[perf] Warmup=5  Measure=20 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   2299.3 MB
+  Inference phase:     1010.6 MB
+  Overall peak:        2299.3 MB
+============================================================
+[perf] latency=143.20 ms/batch  throughput=223.5 samples/s  peak_mem=2299.3 MB
+
+[csv] Appended row to eval_results/comprehensive_test_results.csv
+
+==========================================
+All tests completed!
+==========================================
+
+Results saved to: eval_results/comprehensive_test_results.csv
+
+Summary:
+timestamp,model_id,task,dataset_split,dataset_size,seq_len,batch_size,dtype,method,rank,budget,scope,backend,seed,calib_dataset,calib_split,calib_samples,calib_batches,calib_seed,calib_seq_len,metric_name,metric_value,latency_ms,throughput_sps,peak_mem_infer_mb,peak_mem_e2e_mb,peak_mem_mb,param_ratio,notes,git_commit
+2026-02-11T11:49:04  textattack/bert-base-uncased-SST-2  sst2  validation  872  128  32  fp16  dense             qkv+ffn  naive     0                               accuracy  0.926339  37.99   842.4  291.2   291.2   291.2   1.0000  Dense baseline              886d557
+2026-02-11T11:49:16  textattack/bert-base-uncased-SST-2  sst2  validation  872  128  32  fp16  svd     64        qkv+ffn  naive     0                               accuracy  0.522321  33.72   949.0  255.2   274.9   274.9   0.1250  SVD rank=64 naive           886d557
+2026-02-11T11:49:31  textattack/bert-base-uncased-SST-2  sst2  validation  872  128  32  fp16  svd     128       qkv+ffn  naive     0                               accuracy  0.589286  35.63   898.2  269.2   274.9   274.9   0.2500  SVD rank=128 naive          886d557
+2026-02-11T11:49:43  textattack/bert-base-uncased-SST-2  sst2  validation  872  128  32  fp16  svd     128       qkv+ffn  flashsvd  0                               accuracy  0.589286  44.87   713.2  187.3   274.9   274.9   0.2500  SVD rank=128 flashsvd       886d557
+2026-02-11T11:50:01  textattack/bert-base-uncased-SST-2  sst2  validation  872  128  32  fp16  fwsvd   128       qkv+ffn  naive     0  sst2  train  128  4  0  128  accuracy  0.601562  34.43   929.5  276.3   1534.6  1534.6  0.2500  FWSVD rank=128 naive        886d557
+2026-02-11T11:50:15  textattack/bert-base-uncased-SST-2  sst2  validation  872  128  32  fp16  drone   128       qkv+ffn  naive     0  sst2  train  128  4  0  128  accuracy  0.782366  34.91   916.7  270.3   1322.8  1322.8  0.2500  DRONE rank=128 naive        886d557
+2026-02-11T11:51:48  textattack/bert-base-uncased-SST-2  sst2  validation  872  128  32  fp16  adasvd       0.2  qkv+ffn  naive     0  sst2  train  128  4  0  128  accuracy  0.506696  131.14  244.0  1066.4  2299.3  2299.3  0.1966  AdaSVD budget=0.2 naive     886d557
+2026-02-11T11:53:20  textattack/bert-base-uncased-SST-2  sst2  validation  872  128  32  fp16  adasvd       0.3  qkv+ffn  naive     0  sst2  train  128  4  0  128  accuracy  0.562500  134.28  238.3  1079.8  2299.3  2299.3  0.2962  AdaSVD budget=0.3 naive     886d557
+2026-02-11T11:54:52  textattack/bert-base-uncased-SST-2  sst2  validation  872  128  32  fp16  adasvd       0.3  qkv+ffn  flashsvd  0  sst2  train  128  4  0  128  accuracy  0.562500  143.20  223.5  1010.6  2299.3  2299.3  0.2962  AdaSVD budget=0.3 flashsvd  886d557
+
+To view detailed results:
+  cat eval_results/comprehensive_test_results.csv | column -t -s,
+
+To extract peak memory columns:
+  cat eval_results/comprehensive_test_results.csv | cut -d, -f1,9,24,25,26
+  # Fields: timestamp, method, peak_mem_infer_mb, peak_mem_e2e_mb, peak_mem_mb

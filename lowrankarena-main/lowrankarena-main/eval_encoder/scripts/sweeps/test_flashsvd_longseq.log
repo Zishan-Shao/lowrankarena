@@ -1,0 +1,350 @@
+==========================================
+FlashSVD Long Sequence + Large Batch Test
+==========================================
+
+Model: textattack/bert-base-uncased-SST-2
+Task: sst2
+Output: eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+Test Configurations:
+  1. Short seq (128), Small batch (32)  - Baseline
+  2. Long seq (512), Small batch (32)
+  3. Long seq (512), Large batch (64)
+  4. Very Long seq (1024), Large batch (64)
+
+[1/12] svd seq=128 batch=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=512  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.8951
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=42.32 ms/batch  throughput=756.1 samples/s  peak_mem=360.2 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[1/12] ✅ Completed
+
+[2/12] svd seq=128 batch=32 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=512  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.8951
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=148.49 ms/batch  throughput=215.5 samples/s  peak_mem=276.3 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[2/12] ✅ Completed
+
+[3/12] fwsvd seq=128 batch=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=512  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9219
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=42.90 ms/batch  throughput=745.9 samples/s  peak_mem=367.4 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[3/12] ✅ Completed
+
+[4/12] fwsvd seq=128 batch=32 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=512  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9230
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=146.11 ms/batch  throughput=219.0 samples/s  peak_mem=283.1 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[4/12] ✅ Completed
+
+[5/12] svd seq=512 batch=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=512  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+Map:   0%|          | 0/872 [00:00<?, ? examples/s]Map: 100%|██████████| 872/872 [00:00<00:00, 6044.80 examples/s]Map: 100%|██████████| 872/872 [00:00<00:00, 5863.67 examples/s]
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.8951
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=271.32 ms/batch  throughput=117.9 samples/s  peak_mem=1088.4 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[5/12] ✅ Completed
+
+[6/12] svd seq=512 batch=32 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=512  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.8951
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=687.17 ms/batch  throughput=46.6 samples/s  peak_mem=440.5 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[6/12] ✅ Completed
+
+[7/12] fwsvd seq=512 batch=32 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=512  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+Map:   0%|          | 0/67349 [00:00<?, ? examples/s]Map:   1%|▏         | 1000/67349 [00:00<00:11, 6009.20 examples/s]Map:   3%|▎         | 2000/67349 [00:00<00:09, 6716.30 examples/s]Map:   4%|▍         | 3000/67349 [00:00<00:09, 6963.12 examples/s]Map:   6%|▌         | 4000/67349 [00:00<00:08, 7115.61 examples/s]Map:   7%|▋         | 5000/67349 [00:00<00:08, 7316.09 examples/s]Map:   9%|▉         | 6000/67349 [00:00<00:08, 7413.99 examples/s]Map:  10%|█         | 7000/67349 [00:00<00:08, 7480.44 examples/s]Map:  12%|█▏        | 8000/67349 [00:01<00:07, 7472.47 examples/s]Map:  13%|█▎        | 9000/67349 [00:01<00:07, 7468.24 examples/s]Map:  15%|█▍        | 10000/67349 [00:01<00:09, 6030.39 examples/s]Map:  16%|█▋        | 11000/67349 [00:01<00:08, 6440.67 examples/s]Map:  18%|█▊        | 12000/67349 [00:01<00:08, 6703.44 examples/s]Map:  19%|█▉        | 13000/67349 [00:01<00:07, 6964.20 examples/s]Map:  21%|██        | 14000/67349 [00:02<00:07, 7130.67 examples/s]Map:  22%|██▏       | 15000/67349 [00:02<00:07, 7217.55 examples/s]Map:  24%|██▍       | 16000/67349 [00:02<00:07, 7290.93 examples/s]Map:  25%|██▌       | 17000/67349 [00:02<00:06, 7379.76 examples/s]Map:  27%|██▋       | 18000/67349 [00:02<00:06, 7522.20 examples/s]Map:  28%|██▊       | 19000/67349 [00:02<00:06, 7503.47 examples/s]Map:  30%|██▉       | 20000/67349 [00:02<00:06, 7495.87 examples/s]Map:  31%|███       | 21000/67349 [00:02<00:06, 7480.76 examples/s]Map:  33%|███▎      | 22000/67349 [00:03<00:06, 7513.01 examples/s]Map:  34%|███▍      | 23000/67349 [00:03<00:05, 7473.52 examples/s]Map:  36%|███▌      | 24000/67349 [00:03<00:05, 7457.28 examples/s]Map:  37%|███▋      | 25000/67349 [00:03<00:05, 7466.22 examples/s]Map:  39%|███▊      | 26000/67349 [00:03<00:05, 7455.42 examples/s]Map:  40%|████      | 27000/67349 [00:03<00:06, 6154.66 examples/s]Map:  42%|████▏     | 28000/67349 [00:03<00:06, 6493.92 examples/s]Map:  43%|████▎     | 29000/67349 [00:04<00:05, 6787.69 examples/s]Map:  45%|████▍     | 30000/67349 [00:04<00:05, 6951.84 examples/s]Map:  46%|████▌     | 31000/67349 [00:04<00:05, 7082.70 examples/s]Map:  48%|████▊     | 32000/67349 [00:04<00:04, 7195.66 examples/s]Map:  49%|████▉     | 33000/67349 [00:04<00:04, 7274.48 examples/s]Map:  50%|█████     | 34000/67349 [00:04<00:04, 7308.37 examples/s]Map:  52%|█████▏    | 35000/67349 [00:04<00:04, 7405.89 examples/s]Map:  53%|█████▎    | 36000/67349 [00:05<00:04, 7480.25 examples/s]Map:  55%|█████▍    | 37000/67349 [00:05<00:04, 7494.36 examples/s]Map:  56%|█████▋    | 38000/67349 [00:05<00:03, 7474.92 examples/s]Map:  58%|█████▊    | 39000/67349 [00:05<00:03, 7449.69 examples/s]Map:  59%|█████▉    | 40000/67349 [00:05<00:03, 7456.06 examples/s]Map:  61%|██████    | 41000/67349 [00:05<00:03, 7471.61 examples/s]Map:  62%|██████▏   | 42000/67349 [00:05<00:03, 7466.76 examples/s]Map:  64%|██████▍   | 43000/67349 [00:05<00:03, 7475.28 examples/s]Map:  65%|██████▌   | 44000/67349 [00:06<00:03, 7514.64 examples/s]Map:  67%|██████▋   | 45000/67349 [00:06<00:02, 7520.92 examples/s]Map:  68%|██████▊   | 46000/67349 [00:06<00:03, 6155.99 examples/s]Map:  70%|██████▉   | 47000/67349 [00:06<00:03, 6515.20 examples/s]Map:  71%|███████▏  | 48000/67349 [00:06<00:02, 6807.29 examples/s]Map:  73%|███████▎  | 49000/67349 [00:06<00:02, 6941.15 examples/s]Map:  74%|███████▍  | 50000/67349 [00:07<00:02, 6972.97 examples/s]Map:  76%|███████▌  | 51000/67349 [00:07<00:02, 6984.20 examples/s]Map:  77%|███████▋  | 52000/67349 [00:07<00:02, 6857.82 examples/s]Map:  79%|███████▊  | 53000/67349 [00:07<00:02, 6826.38 examples/s]Map:  80%|████████  | 54000/67349 [00:07<00:01, 6845.93 examples/s]Map:  82%|████████▏ | 55000/67349 [00:07<00:01, 6725.43 examples/s]Map:  83%|████████▎ | 56000/67349 [00:07<00:01, 6756.42 examples/s]Map:  85%|████████▍ | 57000/67349 [00:08<00:01, 6852.39 examples/s]Map:  86%|████████▌ | 58000/67349 [00:08<00:01, 7029.32 examples/s]Map:  88%|████████▊ | 59000/67349 [00:08<00:01, 7160.82 examples/s]Map:  89%|████████▉ | 60000/67349 [00:08<00:01, 7256.10 examples/s]Map:  91%|█████████ | 61000/67349 [00:08<00:00, 7299.88 examples/s]Map:  92%|█████████▏| 62000/67349 [00:08<00:00, 5710.50 examples/s]Map:  94%|█████████▎| 63000/67349 [00:08<00:00, 6093.53 examples/s]Map:  95%|█████████▌| 64000/67349 [00:09<00:00, 6364.62 examples/s]Map:  97%|█████████▋| 65000/67349 [00:09<00:00, 6610.27 examples/s]Map:  98%|█████████▊| 66000/67349 [00:09<00:00, 6815.69 examples/s]Map:  99%|█████████▉| 67000/67349 [00:09<00:00, 6985.10 examples/s]Map: 100%|██████████| 67349/67349 [00:09<00:00, 7009.64 examples/s]
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=512
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9185
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=275.95 ms/batch  throughput=116.0 samples/s  peak_mem=1099.3 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[7/12] ✅ Completed
+
+[8/12] fwsvd seq=512 batch=32 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=512  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=512
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9185
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=693.21 ms/batch  throughput=46.2 samples/s  peak_mem=451.4 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[8/12] ✅ Completed
+
+[9/12] svd seq=512 batch=64 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=512  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 14 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.8971
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=629.11 ms/batch  throughput=101.7 samples/s  peak_mem=1960.7 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[9/12] ✅ Completed
+
+[10/12] svd seq=512 batch=64 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=512  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 14 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.8971
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=1475.80 ms/batch  throughput=43.4 samples/s  peak_mem=664.9 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[10/12] ✅ Completed
+
+[11/12] fwsvd seq=512 batch=64 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=512  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 14 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=256 (4 batches × 64)
+        seed=0, seq_len=512
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9203
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=8157.84 ms/batch  throughput=7.8 samples/s  peak_mem=1969.3 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[11/12] ✅ Completed
+
+[12/12] fwsvd seq=512 batch=64 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=512  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp16  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 14 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=256 (4 batches × 64)
+        seed=0, seq_len=512
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9214
+
+[perf] Warmup=10  Measure=50 steps ...
+[perf] latency=19469.60 ms/batch  throughput=3.3 samples/s  peak_mem=673.5 MB
+
+[csv] Appended row to eval_results/encoder_runs_flashsvd_longseq_test.csv
+
+[12/12] ✅ Completed
+
+==========================================
+Long Sequence Test Completed!
+==========================================
+
+Results Summary:
+-----------------------------------
+svd    seq=128  batch=32  naive     |  Acc=89.51%  |  Mem=  360.2   MB  |  Lat=          42.32    ms  |            Throughput=  756.1  s/s
+svd    seq=128  batch=32  flashsvd  |  Acc=89.51%  |  Mem=  276.3   MB  |  Lat=          148.49   ms  |            Throughput=  215.5  s/s
+fwsvd  seq=128  batch=32  naive     |  Acc=92.19%  |  Mem=  367.4   MB  |  Lat=          42.90    ms  |            Throughput=  745.9  s/s
+fwsvd  seq=128  batch=32  flashsvd  |  Acc=92.30%  |  Mem=  283.1   MB  |  Lat=          146.11   ms  |            Throughput=  219.0  s/s
+svd    seq=512  batch=32  naive     |  Acc=89.51%  |  Mem=  1088.4  MB  |  Lat=          271.32   ms  |            Throughput=  117.9  s/s
+svd    seq=512  batch=32  flashsvd  |  Acc=89.51%  |  Mem=  440.5   MB  |  Lat=          687.17   ms  |            Throughput=  46.6   s/s
+fwsvd  seq=512  batch=32  naive     |  Acc=91.85%  |  Mem=  1099.3  MB  |  Lat=          275.95   ms  |            Throughput=  116.0  s/s
+fwsvd  seq=512  batch=32  flashsvd  |  Acc=91.85%  |  Mem=  451.4   MB  |  Lat=          693.21   ms  |            Throughput=  46.2   s/s
+svd    seq=512  batch=64  naive     |  Acc=89.71%  |  Mem=  1960.7  MB  |  Lat=          629.11   ms  |            Throughput=  101.7  s/s
+svd    seq=512  batch=64  flashsvd  |  Acc=89.71%  |  Mem=  664.9   MB  |  Lat=          1475.80  ms  |            Throughput=  43.4   s/s
+fwsvd  seq=512  batch=64  naive     |  Acc=92.03%  |  Mem=  1969.3  MB  |  Lat=          8157.84  ms  |            Throughput=  7.8    s/s
+fwsvd  seq=512  batch=64  flashsvd  |  Acc=92.14%  |  Mem=  673.5   MB  |  Lat=19469.60  ms       |   Throughput=  3.3          s/s    
+
+✅ Done!

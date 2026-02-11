@@ -1,0 +1,7 @@
+{
+  "target_budget": 0.1,
+  "achieved_ratio": 0.10196476356387278,
+  "total_params": 8720640,
+  "original_model_params": 85526016,
+  "num_operations": 74
+}
