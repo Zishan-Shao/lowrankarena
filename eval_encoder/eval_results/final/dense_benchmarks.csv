@@ -1,0 +1,2 @@
+timestamp,model_id,task,dataset_split,dataset_size,seq_len,batch_size,dtype,method,rank,budget,scope,backend,seed,calib_dataset,calib_split,calib_samples,calib_batches,calib_seed,calib_seq_len,metric_name,metric_value,latency_ms,throughput_sps,peak_mem_mb,notes,git_commit,param_ratio
+2026-02-09T11:36:33,textattack/bert-base-uncased-SST-2,sst2,validation,872,128,32,fp16,dense,,,qkv+ffn,naive,0,,,,,,,accuracy,0.926339,32.89,973.0,291.2,,886d557,

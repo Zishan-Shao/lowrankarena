@@ -1,0 +1,165 @@
+{
+  "model": "Qinsi1/DobiSVD-Llama-2-7b-hf-0.4",
+  "device": "cuda",
+  "batch_size": 8,
+  "dtype": "bfloat16",
+  "limit": null,
+  "tasks": [
+    "openbookqa",
+    "arc_easy",
+    "arc_challenge",
+    "winogrande",
+    "hellaswag",
+    "piqa",
+    "mathqa"
+  ],
+  "template_profile": "realistic",
+  "templates": {
+    "plain": {
+      "tasks": {
+        "openbookqa": {
+          "acc": 15.4,
+          "acc_norm": 22.6
+        },
+        "arc_easy": {
+          "acc": 24.736842105263158,
+          "acc_norm": 22.280701754385966
+        },
+        "arc_challenge": {
+          "acc": 24.414715719063544,
+          "acc_norm": 29.096989966555185
+        },
+        "winogrande": {
+          "acc": 50.19731649565904,
+          "acc_norm": 49.96053670086819
+        },
+        "hellaswag": {
+          "acc": 25.771758613821948,
+          "acc_norm": 24.935271858195577
+        },
+        "piqa": {
+          "acc": 52.66594124047878,
+          "acc_norm": 48.476605005440696
+        },
+        "mathqa": {
+          "acc": 14.815642458100559,
+          "acc_norm": 17.608938547486034
+        }
+      },
+      "mean_acc": 29.714602376055293,
+      "std_acc": 14.35073564077674,
+      "mean_acc_norm": 30.70843483327595,
+      "std_acc_norm": 12.134058713969393
+    },
+    "qa": {
+      "tasks": {
+        "openbookqa": {
+          "acc": 15.6,
+          "acc_norm": 23.0
+        },
+        "arc_easy": {
+          "acc": 27.017543859649123,
+          "acc_norm": 25.087719298245613
+        },
+        "arc_challenge": {
+          "acc": 23.076923076923077,
+          "acc_norm": 27.090301003344482
+        },
+        "winogrande": {
+          "acc": 50.27624309392265,
+          "acc_norm": 50.03946329913181
+        },
+        "hellaswag": {
+          "acc": 25.662218681537542,
+          "acc_norm": 25.044811790479983
+        },
+        "piqa": {
+          "acc": 52.557127312295975,
+          "acc_norm": 48.25897714907508
+        },
+        "mathqa": {
+          "acc": 14.905027932960893,
+          "acc_norm": 18.189944134078214
+        }
+      },
+      "mean_acc": 29.870726279612757,
+      "std_acc": 14.296311272027706,
+      "mean_acc_norm": 30.9587452391936,
+      "std_acc_norm": 11.796876998982693
+    },
+    "mc_letters": {
+      "tasks": {
+        "openbookqa": {
+          "acc": 25.2,
+          "acc_norm": 25.2
+        },
+        "arc_easy": {
+          "acc": 20.70175438596491,
+          "acc_norm": 20.70175438596491
+        },
+        "arc_challenge": {
+          "acc": 27.759197324414714,
+          "acc_norm": 27.759197324414714
+        },
+        "winogrande": {
+          "acc": 49.56590370955012,
+          "acc_norm": 49.56590370955012
+        },
+        "hellaswag": {
+          "acc": 24.815773750248955,
+          "acc_norm": 24.815773750248955
+        },
+        "piqa": {
+          "acc": 49.61915125136017,
+          "acc_norm": 49.61915125136017
+        },
+        "mathqa": {
+          "acc": 16.022346368715084,
+          "acc_norm": 16.022346368715084
+        }
+      },
+      "mean_acc": 30.526303827179134,
+      "std_acc": 12.550277656235474,
+      "mean_acc_norm": 30.526303827179134,
+      "std_acc_norm": 12.550277656235474
+    },
+    "instruction": {
+      "tasks": {
+        "openbookqa": {
+          "acc": 14.6,
+          "acc_norm": 23.4
+        },
+        "arc_easy": {
+          "acc": 24.56140350877193,
+          "acc_norm": 24.56140350877193
+        },
+        "arc_challenge": {
+          "acc": 28.762541806020067,
+          "acc_norm": 28.762541806020067
+        },
+        "winogrande": {
+          "acc": 49.96053670086819,
+          "acc_norm": 50.43409629044988
+        },
+        "hellaswag": {
+          "acc": 25.61242780322645,
+          "acc_norm": 25.46305516829317
+        },
+        "piqa": {
+          "acc": 52.17627856365615,
+          "acc_norm": 48.5854189336235
+        },
+        "mathqa": {
+          "acc": 14.59217877094972,
+          "acc_norm": 18.30167597765363
+        }
+      },
+      "mean_acc": 30.037909593356073,
+      "std_acc": 14.218306488182366,
+      "mean_acc_norm": 31.35831309783031,
+      "std_acc_norm": 11.84518753851122
+    }
+  },
+  "padding_side": "right",
+  "fix_pad_query_mask": true
+}
