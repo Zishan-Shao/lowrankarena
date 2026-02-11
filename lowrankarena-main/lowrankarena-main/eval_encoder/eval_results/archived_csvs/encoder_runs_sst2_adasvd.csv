@@ -1,6 +1,0 @@
-timestamp,model_id,task,dataset_split,dataset_size,seq_len,batch_size,dtype,method,rank,budget,scope,backend,seed,calib_dataset,calib_split,calib_samples,calib_batches,calib_seed,calib_seq_len,metric_name,metric_value,latency_ms,throughput_sps,peak_mem_mb,param_ratio,notes,git_commit
-2026-02-09T12:38:26,bert-base-uncased,sst2,validation,872,128,32,fp16,adasvd,,0.3,qkv+ffn,naive,0,sst2,train,128,4,0,128,accuracy,0.545759,55.79,573.5,673.4,0.3000,,886d557
-2026-02-09T12:41:20,bert-base-uncased,sst2,validation,872,128,32,fp16,adasvd,,0.4,qkv+ffn,naive,0,sst2,train,128,4,0,128,accuracy,0.545759,55.72,574.3,673.4,0.4000,,886d557
-2026-02-09T12:44:14,bert-base-uncased,sst2,validation,872,128,32,fp16,adasvd,,0.5,qkv+ffn,naive,0,sst2,train,128,4,0,128,accuracy,0.543527,56.55,565.8,673.4,0.5000,,886d557
-2026-02-09T12:47:08,bert-base-uncased,sst2,validation,872,128,32,fp16,adasvd,,0.6,qkv+ffn,naive,0,sst2,train,128,4,0,128,accuracy,0.545759,56.24,569.0,673.4,0.6000,,886d557
-2026-02-09T12:50:02,bert-base-uncased,sst2,validation,872,128,32,fp16,adasvd,,0.7,qkv+ffn,naive,0,sst2,train,128,4,0,128,accuracy,0.537946,56.22,569.2,673.4,0.7000,,886d557
