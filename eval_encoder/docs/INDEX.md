@@ -13,6 +13,12 @@ docs/
 ├── README.md                 # Main documentation entry point
 ├── INDEX.md                  # This file
 │
+├── archived/                 # Archived planning docs and old reports
+│   ├── EVAL_ENCODER_CSV_ENHANCEMENT_SUMMARY.md
+│   ├── EVAL_ENCODER_ENHANCEMENT_PLAN.md
+│   ├── PEAK_MEMORY_AUDIT.md
+│   └── PEAK_MEMORY_FIX_SUMMARY.md
+│
 ├── modernbert/              # ModernBERT SVD-LLM Implementation
 │   ├── EVALUATION_FINETUNED.md
 │   ├── EVALUATION_RESULTS.md
@@ -218,6 +224,12 @@ For detailed analysis, see [development/adasvd-bug-analysis.md](development/adas
 ---
 
 ## 🔄 Recent Updates
+
+### 2026-02-12
+- ✅ Running complete fp32 benchmark suite (36 tests)
+- ✅ Archived old README.md as README_fp16.md
+- ✅ Organized docs/ directory (moved planning docs to archived/)
+- 🔄 Preparing README.md update with fp32 results
 
 ### 2026-02-11
 - ✅ Added ModernBERT SVD-LLM v1 & v2 complete implementation

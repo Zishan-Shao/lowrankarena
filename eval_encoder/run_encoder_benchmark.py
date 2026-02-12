@@ -69,7 +69,7 @@ def parse_args():
     # backend
     p.add_argument("--backend", choices=["naive", "flashsvd"], default="naive")
     # logging / perf
-    p.add_argument("--out_csv", default="eval_results/encoder_runs.csv")
+    p.add_argument("--out_csv", default="eval_encoder/eval_results/encoder_runs.csv")
     p.add_argument("--notes", default="")
     p.add_argument("--warmup_steps", type=int, default=10)
     p.add_argument("--measure_steps", type=int, default=50)
@@ -632,9 +632,8 @@ def evaluate_task(model, loader, task, device):
 
     cfg = TASK_CFG[task]
     metric_name = cfg["metric_name"]
-    metric = load_metric("accuracy")
+    metric = load_metric(metric_name)
 
-    total, steps = 0.0, 0
     model.eval()
     for batch in loader:
         batch = {k: v.to(device) for k, v in batch.items()}
@@ -643,12 +642,11 @@ def evaluate_task(model, loader, task, device):
             attention_mask=batch["attention_mask"],
         ).logits
         preds = torch.argmax(logits, dim=-1)
-        total += metric.compute(
+        metric.add_batch(
             predictions=preds.cpu(), references=batch["labels"].cpu()
-        )["accuracy"]
-        steps += 1
+        )
 
-    return metric_name, total / max(steps, 1)
+    return metric_name, metric.compute()[metric_name]
 
 
 # ═══════════════════════════════════════════════════════════════════════════

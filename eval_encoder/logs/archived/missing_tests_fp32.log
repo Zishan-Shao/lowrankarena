@@ -1,0 +1,365 @@
+===================================
+Missing Tests for fp32 Benchmark
+===================================
+Running 10 missing test configurations
+  - Dense baseline (no compression)
+  - SVD rank=64, 256
+  - FWSVD rank=64, 256
+  - DRONE rank=512
+
+Starting missing tests at Thu Feb 12 11:26:16 EST 2026
+
+=== Dense Baseline ===
+
+Running: Dense baseline (no compression)
+  method=dense (no compression)
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : dense  rank=None  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9263
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:      0.0 MB
+  Inference phase:      560.9 MB
+  Overall peak:         560.9 MB
+============================================================
+[perf] latency=108.07 ms/batch  throughput=296.1 samples/s  peak_mem=560.9 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: Dense baseline (no compression)
+
+=== SVD Missing Tests ===
+
+Running: SVD rank=64 flashsvd
+  method=svd rank=64 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=64  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[compress] Peak memory during compression: 472.5 MB
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5234
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:    472.5 MB
+  Inference phase:      465.2 MB
+  Overall peak:         472.5 MB
+============================================================
+[perf] latency=56.99 ms/batch  throughput=561.5 samples/s  peak_mem=472.5 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: SVD rank=64 flashsvd
+
+Running: SVD rank=256 naive
+  method=svd rank=256 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=256  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=256, rank_wo=256) ...
+[compress] Peak memory during compression: 473.1 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.7109
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:    473.1 MB
+  Inference phase:      688.2 MB
+  Overall peak:         688.2 MB
+============================================================
+[perf] latency=95.56 ms/batch  throughput=334.9 samples/s  peak_mem=688.2 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: SVD rank=256 naive
+
+Running: SVD rank=256 flashsvd
+  method=svd rank=256 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : svd  rank=256  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[svd] Building plain SVD helpers (rank_attn=64, rank_ff=256, rank_wo=256) ...
+[compress] Peak memory during compression: 473.1 MB
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.7087
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:    473.1 MB
+  Inference phase:      508.2 MB
+  Overall peak:         508.2 MB
+============================================================
+[perf] latency=118.46 ms/batch  throughput=270.1 samples/s  peak_mem=508.2 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: SVD rank=256 flashsvd
+
+=== FWSVD Missing Tests ===
+
+Running: FWSVD rank=64 naive
+  method=fwsvd rank=64 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=64  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[compress] Peak memory during compression: 2944.5 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5089
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   2944.5 MB
+  Inference phase:      981.3 MB
+  Overall peak:        2944.5 MB
+============================================================
+[perf] latency=74.47 ms/batch  throughput=429.7 samples/s  peak_mem=2944.5 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: FWSVD rank=64 naive
+
+Running: FWSVD rank=64 flashsvd
+  method=fwsvd rank=64 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=64  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=64, rank_wo=64) ...
+[compress] Peak memory during compression: 2944.5 MB
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.5089
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   2944.5 MB
+  Inference phase:      801.3 MB
+  Overall peak:        2944.5 MB
+============================================================
+[perf] latency=56.83 ms/batch  throughput=563.1 samples/s  peak_mem=2944.5 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: FWSVD rank=64 flashsvd
+
+Running: FWSVD rank=256 naive
+  method=fwsvd rank=256 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=256  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=256, rank_wo=256) ...
+[compress] Peak memory during compression: 2944.5 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.7868
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   2944.5 MB
+  Inference phase:     1040.1 MB
+  Overall peak:        2944.5 MB
+============================================================
+[perf] latency=94.61 ms/batch  throughput=338.2 samples/s  peak_mem=2944.5 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: FWSVD rank=256 naive
+
+Running: FWSVD rank=256 flashsvd
+  method=fwsvd rank=256 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : fwsvd  rank=256  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[fwsvd] Building Fisher-weighted helpers (rank_attn=64, rank_ff=256, rank_wo=256) ...
+[compress] Peak memory during compression: 2944.5 MB
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.7868
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   2944.5 MB
+  Inference phase:      860.1 MB
+  Overall peak:        2944.5 MB
+============================================================
+[perf] latency=117.76 ms/batch  throughput=271.7 samples/s  peak_mem=2944.5 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: FWSVD rank=256 flashsvd
+
+=== DRONE Missing Tests ===
+
+Running: DRONE rank=512 naive
+  method=drone rank=512 backend=naive
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=512  budget=None  scope=qkv+ffn
+  backend  : naive
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[drone] Building data-aware helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+[drone] Calibrating input covariances ...
+[compress] Peak memory during compression: 1528.7 MB
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9185
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   1528.7 MB
+  Inference phase:      707.6 MB
+  Overall peak:        1528.7 MB
+============================================================
+[perf] latency=126.73 ms/batch  throughput=252.5 samples/s  peak_mem=1528.7 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: DRONE rank=512 naive
+
+Running: DRONE rank=512 flashsvd
+  method=drone rank=512 backend=flashsvd
+-----------------------------------
+=== Encoder Benchmark ===
+  model_id : textattack/bert-base-uncased-SST-2
+  task     : sst2
+  method   : drone  rank=512  budget=None  scope=qkv+ffn
+  backend  : flashsvd
+  dtype    : fp32  device=cuda
+
+[load] Model loaded: 109.5M params  arch=bert
+[data] Validation: 872 samples, 28 batches (split=validation)
+[calib] Calibration data:
+        dataset=sst2, split=train
+        samples=128 (4 batches × 32)
+        seed=0, seq_len=128
+[drone] Building data-aware helpers (rank_attn=64, rank_ff=512, rank_wo=512) ...
+[drone] Calibrating input covariances ...
+[compress] Peak memory during compression: 1528.7 MB
+[flashsvd] Patched 12 encoder layers with FlashSVD kernels.
+
+[eval] Computing task metric ...
+[eval] accuracy = 0.9185
+
+[perf] Warmup=10  Measure=50 steps ...
+
+============================================================
+Memory Usage Summary:
+  Compression phase:   1528.7 MB
+  Inference phase:      527.6 MB
+  Overall peak:        1528.7 MB
+============================================================
+[perf] latency=280.24 ms/batch  throughput=114.2 samples/s  peak_mem=1528.7 MB
+
+[csv] Appended row to eval_results/encoder_runs.csv
+✓ Test completed: DRONE rank=512 flashsvd
+
+===================================
+✓ All missing tests completed!
+===================================
+Total tests: 10
+Duration: 3m 37s
+Completed at: Thu Feb 12 11:29:53 EST 2026
+===================================

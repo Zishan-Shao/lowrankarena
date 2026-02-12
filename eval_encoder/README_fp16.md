@@ -109,65 +109,53 @@ eval_encoder/
 
 ## 📊 Detailed Benchmark Results
 
-### 🔬 Comprehensive Performance Overview (Seq=128, Batch=32, FP32)
+### 🔬 Comprehensive Performance Overview (Seq=128, Batch=32)
 
-**Complete comparison of all compression methods using FP32 precision.**
-**Note**: Previous FP16 results archived in [README_fp16.md](README_fp16.md)
+**Complete comparison of all compression methods with FlashSVD memory savings highlighted.**
 
 | Method | Rank/Budget | Backend | Accuracy | Latency (ms) | Throughput (sps) | Infer Mem (MB) | Δ Mem (vs Naive) | Param Ratio |
 |--------|-------------|---------|----------|--------------|------------------|----------------|------------------|-------------|
-| dense | - | - | 92.43% | 123.0 | 260.2 | 561 | - | 100.00% |
-| svd | 32 | naive | 50.92% | 75.6 | 423.3 | 611 | - | 6.25% |
-| svd | 32 | flashsvd | 50.92% | 50.3 | 635.8 | 431 | -180 (-29.5%) | 6.25% |
-| svd | 64 | naive | 52.29% | 101.7 | 314.7 | 645 | - | 12.50% |
-| svd | 64 | flashsvd | 52.41% | 72.6 | 441.0 | 465 | -180 (-27.9%) | 12.50% |
-| svd | 128 | naive | 58.72% | 105.8 | 302.3 | 667 | - | 25.00% |
-| svd | 128 | flashsvd | 58.60% | 94.9 | 337.2 | 487 | -180 (-27.0%) | 25.00% |
-| svd | 256 | naive | 70.99% | 124.3 | 257.4 | 688 | - | 50.00% |
-| svd | 256 | flashsvd | 70.76% | 151.9 | 210.7 | 508 | -180 (-26.2%) | 50.00% |
-| svd | 512 | naive | 89.56% | 167.0 | 191.6 | 764 | - | 100.00% |
-| svd | 512 | flashsvd | 89.56% | 360.1 | 88.9 | 584 | -180 (-23.6%) | 100.00% |
-| fwsvd | 32 | naive | 50.92% | 77.5 | 413.1 | 945 | - | 6.25% |
-| fwsvd | 32 | flashsvd | 50.92% | 49.9 | 640.8 | 765 | -180 (-19.0%) | 6.25% |
-| fwsvd | 64 | naive | 50.92% | 97.0 | 330.1 | 981 | - | 12.50% |
-| fwsvd | 64 | flashsvd | 50.92% | 72.5 | 441.5 | 801 | -180 (-18.3%) | 12.50% |
-| fwsvd | 128 | naive | 66.97% | 106.0 | 302.0 | 1003 | - | 25.00% |
-| fwsvd | 128 | flashsvd | 67.09% | 93.8 | 341.3 | 823 | -180 (-18.0%) | 25.00% |
-| fwsvd | 256 | naive | 79.13% | 124.6 | 256.8 | 1040 | - | 50.00% |
-| fwsvd | 256 | flashsvd | 79.13% | 155.1 | 206.3 | 860 | -180 (-17.3%) | 50.00% |
-| fwsvd | 512 | naive | 92.20% | 163.9 | 195.2 | 1089 | - | 100.00% |
-| fwsvd | 512 | flashsvd | 92.32% | 360.9 | 88.7 | 910 | -180 (-16.5%) | 100.00% |
-| drone | 32 | naive | 71.67% | 77.6 | 412.4 | 455 | - | 6.25% |
-| drone | 32 | flashsvd | 71.90% | 48.8 | 655.7 | 275 | -180 (-39.6%) | 6.25% |
-| drone | 64 | naive | 73.74% | 97.9 | 327.0 | 497 | - | 12.50% |
-| drone | 64 | flashsvd | 73.74% | 71.7 | 446.5 | 317 | -180 (-36.2%) | 12.50% |
-| drone | 128 | naive | 77.98% | 104.4 | 306.4 | 535 | - | 25.00% |
-| drone | 128 | flashsvd | 77.98% | 93.2 | 343.5 | 355 | -180 (-33.6%) | 25.00% |
-| drone | 256 | naive | 88.65% | 121.6 | 263.1 | 588 | - | 50.00% |
-| drone | 256 | flashsvd | 88.65% | 148.5 | 215.5 | 408 | -180 (-30.6%) | 50.00% |
-| drone | 512 | naive | 91.97% | 162.5 | 196.9 | 708 | - | 100.00% |
-| drone | 512 | flashsvd | 91.97% | 358.8 | 89.2 | 528 | -180 (-25.4%) | 100.00% |
-| adasvd | 0.1 | naive | 50.92% | 141.6 | 225.9 | 1055 | - | 10.19% |
-| adasvd | 0.1 | flashsvd | 52.52% | 107.0 | 299.0 | 968 | -87 (-8.2%) | 10.19% |
-| adasvd | 0.2 | naive | 50.69% | 129.7 | 246.7 | 1085 | - | 19.65% |
-| adasvd | 0.2 | flashsvd | 52.64% | 151.6 | 211.1 | 1015 | -70 (-6.5%) | 19.65% |
-| adasvd | 0.3 | naive | 56.19% | 159.7 | 200.4 | 1098 | - | 29.63% |
-| adasvd | 0.3 | flashsvd | 56.19% | 169.8 | 188.4 | 1029 | -69 (-6.3%) | 29.63% |
-| adasvd | 0.4 | naive | 64.56% | 171.9 | 186.2 | 1107 | - | 39.50% |
-| adasvd | 0.4 | flashsvd | 64.45% | 214.3 | 149.3 | 1036 | -70 (-6.3%) | 39.50% |
-| adasvd | 0.5 | naive | 78.78% | 180.1 | 177.7 | 1117 | - | 48.98% |
-| adasvd | 0.5 | flashsvd | 78.90% | 218.6 | 146.4 | 1047 | -71 (-6.3%) | 48.98% |
-| adasvd | 0.6 | naive | 83.95% | 160.5 | 199.3 | 1132 | - | 57.96% |
-| adasvd | 0.6 | flashsvd | 83.95% | 234.2 | 136.6 | 1061 | -71 (-6.3%) | 57.96% |
-| adasvd | 0.7 | naive | 85.44% | 160.0 | 200.0 | 1147 | - | 66.77% |
-| adasvd | 0.7 | flashsvd | 85.44% | 272.1 | 117.6 | 1075 | -72 (-6.3%) | 66.77% |
+| svd | 32 | naive | 50.89% | 24.6 | 1302.3 | 224 | - | 6.25% |
+| svd | 32 | flashsvd | 50.89% | 22.1 | 1444.4 | 134 | -90 (-40.2%) | 6.25% |
+| svd | 64 | naive | 52.23% | 33.7 | 949.0 | 255 | - | 12.50% |
+| svd | 128 | naive | 58.93% | 35.6 | 898.2 | 269 | - | 25.00% |
+| svd | 128 | flashsvd | 58.93% | 44.9 | 713.2 | 187 | -82 (-30.4%) | 25.00% |
+| svd | 512 | naive | 89.51% | 42.1 | 760.0 | 360 | - | 100.00% |
+| svd | 512 | flashsvd | 89.51% | 148.0 | 216.2 | 276 | -84 (-23.3%) | 100.00% |
+| fwsvd | 32 | naive | 50.89% | 23.9 | 1340.4 | 232 | - | 6.25% |
+| fwsvd | 32 | flashsvd | 50.89% | 22.3 | 1434.6 | 142 | -90 (-38.8%) | 6.25% |
+| fwsvd | 128 | naive | 60.16% | 34.4 | 929.5 | 276 | - | 25.00% |
+| fwsvd | 512 | naive | 92.19% | 42.0 | 761.9 | 367 | - | 100.00% |
+| fwsvd | 512 | flashsvd | 92.30% | 145.0 | 220.7 | 283 | -84 (-22.9%) | 100.00% |
+| drone | 32 | naive | 72.10% | 26.5 | 1206.1 | 224 | - | 6.25% |
+| drone | 32 | flashsvd | 72.10% | 23.8 | 1345.9 | 134 | -90 (-40.2%) | 6.25% |
+| drone | 64 | naive | 74.11% | 31.4 | 1020.7 | 256 | - | 12.50% |
+| drone | 64 | flashsvd | 74.11% | 32.4 | 987.4 | 176 | -80 (-31.3%) | 12.50% |
+| drone | 128 | naive | 78.24% | 33.1 | 966.5 | 270 | - | 25.00% |
+| drone | 128 | flashsvd | 78.24% | 41.1 | 778.8 | 190 | -81 (-29.9%) | 25.00% |
+| drone | 256 | naive | 88.62% | 36.1 | 885.5 | 305 | - | 50.00% |
+| drone | 256 | flashsvd | 88.73% | 68.1 | 469.8 | 222 | -83 (-27.2%) | 50.00% |
+| adasvd | 0.1 | naive | 50.89% | 106.5 | 300.5 | 1044 | - | 10.20% |
+| adasvd | 0.1 | flashsvd | 52.46% | 64.9 | 493.1 | 963 | -80 (-7.7%) | 10.20% |
+| adasvd | 0.2 | naive | 50.67% | 117.6 | 272.2 | 1066 | - | 19.66% |
+| adasvd | 0.2 | flashsvd | 53.35% | 81.8 | 391.3 | 999 | -68 (-6.3%) | 19.66% |
+| adasvd | 0.3 | naive | 56.25% | 127.7 | 250.5 | 1080 | - | 29.62% |
+| adasvd | 0.3 | flashsvd | 56.25% | 135.9 | 235.5 | 1011 | -69 (-6.4%) | 29.62% |
+| adasvd | 0.4 | naive | 63.73% | 134.5 | 238.0 | 1093 | - | 39.50% |
+| adasvd | 0.4 | flashsvd | 63.73% | 156.6 | 204.4 | 1023 | -69 (-6.3%) | 39.50% |
+| adasvd | 0.5 | naive | 79.24% | 136.2 | 235.0 | 1112 | - | 48.96% |
+| adasvd | 0.5 | flashsvd | 79.35% | 181.4 | 176.4 | 1042 | -70 (-6.3%) | 48.96% |
+| adasvd | 0.6 | naive | 83.48% | 138.8 | 230.6 | 1120 | - | 58.01% |
+| adasvd | 0.6 | flashsvd | 83.48% | 218.6 | 146.4 | 1048 | -72 (-6.4%) | 58.01% |
+| adasvd | 0.7 | naive | 85.16% | 146.0 | 219.2 | 1126 | - | 66.78% |
+| adasvd | 0.7 | flashsvd | 85.04% | 223.9 | 142.9 | 1054 | -72 (-6.4%) | 66.78% |
 
-**Key Highlights (FP32):**
-- 🎯 **Dense baseline**: 92.43% accuracy @ 123.0ms latency, 561 MB memory
-- ⚡ **Best latency**: SVD R=32 FlashSVD achieves **50.3ms** (2.4× faster than dense)
-- 🏆 **Best accuracy**: FWSVD R=512 reaches **92.32%** (matches dense baseline)
-- 💾 **Best memory efficiency**: DRONE R=32 FlashSVD saves **180 MB (-39.6%)** vs Naive
-- 📊 **Memory pattern (FP32)**: FlashSVD consistently saves 180MB (18-40%) across all methods
+**Key Highlights:**
+- 🎯 **Best memory savings**: DRONE R=32 FlashSVD saves **90 MB (40.2%)** vs Naive
+- ⚡ **Best latency**: SVD/FWSVD R=32 FlashSVD achieves **22ms** (ultra-low latency)
+- 🏆 **Best accuracy**: FWSVD R=512 reaches **92.3%** (dense baseline: ~91-92%)
+- 💡 **AdaSVD sweet spot**: Budget=0.1 with FlashSVD (52.5% acc, 493 sps, -80 MB mem)
+- 📊 **Memory savings pattern**: Fixed-rank methods (22-40%) > AdaSVD (6-8%)
 
 ---
 
@@ -178,39 +166,36 @@ eval_encoder/
 | **GPU** | NVIDIA GeForce RTX 4060 Laptop GPU (8 GB) |
 | **CPU** | Intel Core i7-13650HX (13th Gen) |
 | **CUDA Driver** | 581.29 |
-| **PyTorch** | 2.8.0+cu129 |
 | **Framework** | PyTorch + Triton |
 | **Model** | `textattack/bert-base-uncased-SST-2` |
 | **Task** | SST-2 Sentiment Classification |
 | **Batch Size** | 32 |
-| **Sequence Length** | 128 |
-| **Dtype** | **FP32** |
-| **Test Date** | 2026-02-12 |
+| **Dtype** | FP16 |
 
 ### AdaSVD: Budget vs Performance
 
 | Budget | Backend | Accuracy | Latency (ms) | Throughput (sps) | Infer Memory (MB) | Param Ratio |
 |--------|---------|----------|--------------|------------------|-------------------|-------------|
-| 0.1 | flashsvd | 52.52% | 107.0 | 299.0 | 968 | 10.19% |
-| 0.1 | naive | 50.92% | 141.6 | 225.9 | 1055 | 10.19% |
-| 0.2 | flashsvd | 52.64% | 151.6 | 211.1 | 1015 | 19.65% |
-| 0.2 | naive | 50.69% | 129.7 | 246.7 | 1085 | 19.65% |
-| 0.3 | flashsvd | 56.19% | 169.8 | 188.4 | 1029 | 29.63% |
-| 0.3 | naive | 56.19% | 159.7 | 200.4 | 1098 | 29.63% |
-| 0.4 | flashsvd | 64.45% | 214.3 | 149.3 | 1037 | 39.50% |
-| 0.4 | naive | 64.56% | 171.9 | 186.2 | 1107 | 39.50% |
-| 0.5 | flashsvd | 78.90% | 218.6 | 146.4 | 1047 | 48.98% |
-| 0.5 | naive | 78.78% | 180.1 | 177.7 | 1117 | 48.98% |
-| 0.6 | flashsvd | 83.95% | 234.2 | 136.6 | 1061 | 57.96% |
-| 0.6 | naive | 83.95% | 160.5 | 199.3 | 1132 | 57.96% |
-| 0.7 | flashsvd | 85.44% | 272.1 | 117.6 | 1075 | 66.77% |
-| 0.7 | naive | 85.44% | 160.0 | 200.0 | 1147 | 66.77% |
+| 0.1 | flashsvd | 52.46% | 64.9 | 493.1 | 963 | 10.20% |
+| 0.1 | naive | 50.89% | 106.5 | 300.5 | 1044 | 10.20% |
+| 0.2 | flashsvd | 53.35% | 81.8 | 391.3 | 999 | 19.66% |
+| 0.2 | naive | 50.67% | 117.6 | 272.2 | 1066 | 19.66% |
+| 0.3 | flashsvd | 56.25% | 130.0 | 246.6 | 1011 | 29.62% |
+| 0.3 | naive | 56.25% | 123.7 | 259.0 | 1080 | 29.62% |
+| 0.4 | flashsvd | 63.73% | 156.6 | 204.4 | 1023 | 39.50% |
+| 0.4 | naive | 63.73% | 134.5 | 238.0 | 1093 | 39.50% |
+| 0.5 | flashsvd | 79.35% | 184.6 | 173.4 | 1042 | 48.96% |
+| 0.5 | naive | 79.24% | 136.1 | 235.2 | 1112 | 48.96% |
+| 0.6 | flashsvd | 83.48% | 218.6 | 146.4 | 1048 | 58.01% |
+| 0.6 | naive | 83.48% | 138.8 | 230.6 | 1120 | 58.01% |
+| 0.7 | flashsvd | 85.04% | 223.9 | 142.9 | 1054 | 66.78% |
+| 0.7 | naive | 85.16% | 146.0 | 219.2 | 1126 | 66.78% |
 
 **Key Observations:**
 - ✅ Budget control now accurate (0.1→10.2%, 0.3→29.6%, 0.5→49.0%)
-- ⚡ **FlashSVD reduces latency at low budgets**: 107.0ms vs 141.6ms @ budget=0.1 (24% faster)
-- ⚠️ **Latency increases at high budgets**: 272.1ms vs 160.0ms @ budget=0.7 (70% slower)
-- 💾 FlashSVD reduces inference memory by **6-8% across all budgets**
+- ⚡ **FlashSVD reduces latency at low budgets**: 64.9ms vs 106.5ms @ budget=0.1 (39% faster)
+- ⚠️ **Latency increases at high budgets**: 223.9ms vs 146.0ms @ budget=0.7 (53% slower)
+- 💾 FlashSVD reduces inference memory by **8-23% across all budgets**
 
 ### Long Sequence Performance (R=512)
 
@@ -314,6 +299,5 @@ If you use this benchmark in your research, please cite:
 
 ---
 
-**Last Updated**: 2026-02-12
-**Data Source**: `../eval_results/encoder_runs.csv` (FP32 tests from 2026-02-12)
-**Previous FP16 Data**: Archived in [README_fp16.md](README_fp16.md)
+**Last Updated**: 2026-02-11
+**Data Source**: `eval_results/complete_e2e_retest.csv`
