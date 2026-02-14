@@ -4,87 +4,31 @@ from tqdm import tqdm
 import os
 
 from datautils import get_eval_loaders
-from lm_eval.base import BaseLM
+#from lm_eval.base import BaseLM
 from lm_eval import evaluator
+from lm_eval.api.model import LM as BaseLM
 from datasets import load_dataset
 import time
 import re
 
+# change the one with newer version as HFLM already implemented methods
+from lm_eval.models.huggingface import HFLM
 
-class EvalLM(BaseLM):
-    def __init__(
-        self,
-        model,
-        tokenizer,
-        # device="cuda:0",
-        batch_size=1,
-    ):
-        super().__init__()
 
-        # assert isinstance(device, str)
-        assert isinstance(batch_size, int)
+TASKS = ["wikitext", "c4", "openbookqa", "arc_easy", "arc_challenge",
+         "hellaswag", "winogrande", "piqa", "mathqa"]
 
-        # self._device = torch.device(device)
-        self._device = model.device
+class EvalLM(HFLM):
+    def __init__(self, model, tokenizer, batch_size=1, seqlen=2048):
+        super().__init__(
+            pretrained=model,
+            tokenizer=tokenizer,
+            batch_size=batch_size,
+            device=str(model.device),
+        )
+        # compatibility with old ASVD eval code
+        self.seqlen = seqlen
 
-        # self.model = model.to(self.device)
-        self.model = model
-        self.model.eval()
-
-        self.tokenizer = tokenizer
-
-        self.vocab_size = self.tokenizer.vocab_size
-
-        self.batch_size_per_gpu = batch_size  # todo: adaptive batch size
-
-        self.seqlen = 2048
-
-    @property
-    def eot_token_id(self):
-        # we use EOT because end of *text* is more accurate for what we're doing than end of *sentence*
-        return self.tokenizer.eos_token_id
-
-    @property
-    def max_length(self):
-        try:
-            return self.model.config.n_ctx
-        except AttributeError:
-            # gptneoconfig doesn't have n_ctx apparently
-            return self.model.config.max_position_embeddings
-
-    @property
-    def max_gen_toks(self):
-        return 256
-
-    @property
-    def batch_size(self):
-        # TODO: fix multi-gpu
-        return self.batch_size_per_gpu  # * gpus
-
-    @property
-    def device(self):
-        # TODO: fix multi-gpu
-        return self._device
-
-    def tok_encode(self, string: str):
-        return self.tokenizer.encode(string, add_special_tokens=False)
-
-    def tok_decode(self, tokens):
-        return self.tokenizer.decode(tokens)
-
-    def _model_call(self, inps):
-        """
-        inps: a torch tensor of shape [batch, sequence]
-        the size of sequence may vary from call to call
-
-        returns: a torch tensor of shape [batch, sequence, vocab] with the
-        logits returned from the model
-        """
-        with torch.no_grad():
-            return self.model(inps)[0][:, :, :50257]
-
-    def _model_generate(self, context, max_length, eos_token_id):
-        return self.model.generate(context, max_length=max_length, eos_token_id=eos_token_id, do_sample=False)
 
 
 @torch.no_grad()
@@ -128,99 +72,139 @@ def evaluate_model(
     use_bos=False,
 ):
     """
-    model: model name
+    model: huggingface model object (possibly decomposed)
     limit: number of test samples for debug, set to -1 is no limit
-    tasks: str tasks are split by ,
-    num_fewshot: Number of examples in few-shot context
-    eval_ppl: str datasets are split by , such as 'wikitext2,ptb,c4'
+    tasks: str, tasks split by ',' (e.g. "arc_easy,hellaswag")
+    num_fewshot: number of examples in few-shot context
+    eval_ppl: str datasets split by ',' (e.g. "wikitext2,ptb,c4")
     """
-    lm = EvalLM(model, tokenizer, batch_size=batch_size)
+
     results = {}
+
+    # -----------------------
+    # Perplexity evaluation
+    # -----------------------
     if eval_ppl:
-        for dataset in eval_ppl.split(","):
-            cache_testloader = f"/tmp/{dataset}_testloader_{model_name.replace('/', '_')}_all.cache"
-            if os.path.exists(cache_testloader):
-                testloader = torch.load(cache_testloader)
-                # print(f"load calibration from {cache_testloader}")
-            else:
+        base_seqlen = 2048
+        device = model.device
+
+        use_cache = getattr(model.config, "use_cache", False)
+        if hasattr(model.config, "use_cache"):
+            model.config.use_cache = False
+        model.eval()
+
+        for dataset in [d.strip() for d in eval_ppl.split(",") if d.strip()]:
+            seqlen = base_seqlen - (1 if use_bos else 0)
+
+            # Cache only the input_ids tensor so torch.load works safely under PyTorch >=2.6
+            cache_testenc = f"/tmp/{dataset}_input_ids_{model_name.replace('/', '_')}.pt"
+            testenc = None
+            if os.path.exists(cache_testenc):
+                try:
+                    testenc = torch.load(cache_testenc)
+                    if not torch.is_tensor(testenc):
+                        testenc = None
+                except Exception:
+                    testenc = None
+
+            if testenc is None:
                 testloader = get_eval_loaders(dataset, tokenizer)
-                torch.save(testloader, cache_testloader)
-            # print(dataset)
-            testenc = testloader.input_ids
-            if use_bos:
-                lm.seqlen -= 1
-            nsamples = testenc.numel() // lm.seqlen
-            use_cache = lm.model.config.use_cache
-            lm.model.config.use_cache = False
-            lm.model.eval()
+                testenc = testloader.input_ids
+                torch.save(testenc, cache_testenc)
+
+            nsamples = testenc.numel() // seqlen
             nlls = []
 
             for i in tqdm(range(nsamples)):
-                batch = testenc[:, (i * lm.seqlen) : ((i + 1) * lm.seqlen)].to(lm.device)
+                batch = testenc[:, (i * seqlen) : ((i + 1) * seqlen)].to(device)
+
                 if use_bos:
-                    bos_tokens_tensor = torch.tensor([[tokenizer.bos_token_id]] * batch.size(dim=0)).to(lm.device)
-                    batch = torch.cat([bos_tokens_tensor, batch], dim=1)
-                outputs = lm.model.model(batch)
-                hidden_states = outputs[0]  # .to(lm.model.lm_head.weight.device)
-                if use_bos:
-                    hidden_states = hidden_states[:, 1:, :]
-                logits = lm.model.lm_head(hidden_states)  # .contiguous()
-                shift_logits = logits[:, :-1, :]  # .contiguous()
-                shift_labels = testenc[:, (i * lm.seqlen) : ((i + 1) * lm.seqlen)][:, 1:].to(lm.device)
+                    bos_tokens_tensor = torch.full(
+                        (batch.size(0), 1),
+                        tokenizer.bos_token_id,
+                        dtype=batch.dtype,
+                        device=device,
+                    )
+                    batch_in = torch.cat([bos_tokens_tensor, batch], dim=1)
+                    logits = model(input_ids=batch_in).logits
+                    logits = logits[:, 1:, :]  # drop BOS position
+                else:
+                    logits = model(input_ids=batch).logits
+
+                shift_logits = logits[:, :-1, :].contiguous()
+                shift_labels = batch[:, 1:].contiguous().to(device)
+
                 loss_fct = nn.CrossEntropyLoss()
                 loss = loss_fct(
                     shift_logits.view(-1, shift_logits.size(-1)),
                     shift_labels.view(-1),
                 )
-                neg_log_likelihood = loss.float() * lm.seqlen
+                neg_log_likelihood = loss.float() * seqlen
                 nlls.append(neg_log_likelihood)
+
                 if i == limit:
                     break
-                # if i == 1:
-                #     print(
-                #         "memory_allocated",
-                #         i,
-                #         torch.cuda.memory_allocated() / 1024 / 1024,
-                #         "max memory_allocated",
-                #         torch.cuda.max_memory_allocated() / 1024**2,
-                #     )
 
-            ppl = torch.exp(torch.stack(nlls).sum() / (len(nlls) * lm.seqlen))
+            ppl = torch.exp(torch.stack(nlls).sum() / (len(nlls) * seqlen))
             print(dataset, ppl.item())
-            lm.model.config.use_cache = use_cache
             results[dataset] = ppl.item()
+
+        if hasattr(model.config, "use_cache"):
+            model.config.use_cache = use_cache
+
+    # -----------------------
+    # Downstream task eval (lm-eval-harness)
+    # -----------------------
     if tasks == "longbench":
-        from tools.eval_longbench import eval_longbench, full_longeval_datasets, small_longeval_datasets
+        from tools.eval_longbench import eval_longbench, full_longeval_datasets
 
         longbench_results = eval_longbench(model, tokenizer, model_name, datasets=full_longeval_datasets)
         results.update(longbench_results)
         tasks = ""
     elif tasks == "small_longbench":
-        from tools.eval_longbench import eval_longbench, full_longeval_datasets, small_longeval_datasets
+        from tools.eval_longbench import eval_longbench, small_longeval_datasets
 
         longbench_results = eval_longbench(model, tokenizer, model_name, datasets=small_longeval_datasets)
         results.update(longbench_results)
         tasks = ""
     elif tasks == "mmlu":
+        # keep original behavior if you rely on these exact task IDs
         tasks = "hendrycksTest-abstract_algebra,hendrycksTest-anatomy,hendrycksTest-astronomy,hendrycksTest-business_ethics,hendrycksTest-clinical_knowledge,hendrycksTest-college_biology,hendrycksTest-college_chemistry,hendrycksTest-college_computer_science,hendrycksTest-college_mathematics,hendrycksTest-college_medicine,hendrycksTest-college_physics,hendrycksTest-computer_security,hendrycksTest-conceptual_physics,hendrycksTest-econometrics,hendrycksTest-electrical_engineering,hendrycksTest-elementary_mathematics,hendrycksTest-formal_logic,hendrycksTest-global_facts,hendrycksTest-high_school_biology,hendrycksTest-high_school_chemistry,hendrycksTest-high_school_computer_science,hendrycksTest-high_school_european_history,hendrycksTest-high_school_geography,hendrycksTest-high_school_government_and_politics,hendrycksTest-high_school_macroeconomics,hendrycksTest-high_school_mathematics,hendrycksTest-high_school_microeconomics,hendrycksTest-high_school_physics,hendrycksTest-high_school_psychology,hendrycksTest-high_school_statistics,hendrycksTest-high_school_us_history,hendrycksTest-high_school_world_history,hendrycksTest-human_aging,hendrycksTest-human_sexuality,hendrycksTest-international_law,hendrycksTest-jurisprudence,hendrycksTest-logical_fallacies,hendrycksTest-machine_learning,hendrycksTest-management,hendrycksTest-marketing,hendrycksTest-medical_genetics,hendrycksTest-miscellaneous,hendrycksTest-moral_disputes,hendrycksTest-moral_scenarios,hendrycksTest-nutrition,hendrycksTest-philosophy,hendrycksTest-prehistory,hendrycksTest-professional_accounting,hendrycksTest-professional_law,hendrycksTest-professional_medicine,hendrycksTest-professional_psychology,hendrycksTest-public_relations,hendrycksTest-security_studies,hendrycksTest-sociology,hendrycksTest-us_foreign_policy,hendrycksTest-virology,hendrycksTest-world_religions"
     elif tasks == "llmqat":
-        # tasks = "boolq,piqa,hellaswag,winogrande,arc_easy,arc_challenge,openbookqa"
         tasks = "lambada_openai,openbookqa"
-    if tasks != "":
+
+    tasks = tasks.strip() if isinstance(tasks, str) else tasks
+    if tasks:
+        # only build the lm-eval wrapper if we actually run tasks
+        lm = EvalLM(model, tokenizer, batch_size=batch_size)
+
+        task_list = [t.strip() for t in str(tasks).split(",") if t.strip()]
         t_results = evaluator.simple_evaluate(
             lm,
-            tasks=tasks.split(","),
+            tasks=task_list,
             batch_size=batch_size,
             num_fewshot=num_fewshot,
             limit=None if limit == -1 else limit,
-            no_cache=True,
+            log_samples=False,
         )
-        t_results = t_results["results"]
-        acc_list = [t_results[key]["acc"] for key in t_results.keys() if "acc" in t_results[key]]
-        t_results["mean"] = sum(acc_list) / len(acc_list)
-        results.update(t_results)
-        print(results)
-        # print mean
-        print(f"\n\n===== mean acc: {sum(acc_list)/len(acc_list)} =====\n\n")
+
+        if t_results and "results" in t_results:
+            t_results = t_results["results"]
+            # mean over acc / acc_norm metrics when present
+            acc_list = []
+            for _task_name, metrics in t_results.items():
+                if not isinstance(metrics, dict):
+                    continue
+                if "acc_norm" in metrics:
+                    acc_list.append(metrics["acc_norm"])
+                elif "acc" in metrics:
+                    acc_list.append(metrics["acc"])
+
+            if len(acc_list) > 0:
+                t_results["mean"] = sum(acc_list) / len(acc_list)
+                print(f"===== mean acc: {t_results['mean']} =====")
+
+            results.update(t_results)
+            print(results)
 
     return results

@@ -11,7 +11,13 @@ doc https://huggingface.co/docs/datasets/loading
 doc https://huggingface.co/docs/datasets/process
 doc https://huggingface.co/blog/llama2#how-to-prompt-llama-2
 """
-
+# Added for PTB dataset of new version 4.4.0
+PTB_URL_BASE = "https://raw.githubusercontent.com/wojzaremba/lstm/master/data/"
+PTB_FILES = {
+    "train": PTB_URL_BASE + "ptb.train.txt",
+    "validation": PTB_URL_BASE + "ptb.valid.txt",
+    "test": PTB_URL_BASE + "ptb.test.txt",
+}
 
 def set_seed(seed):
     np.random.seed(seed)
@@ -121,8 +127,8 @@ def get_calib_data(name, tokenizer, model_id, nsamples, seqlen=2048, seed=3, use
         traindata = load_dataset("wikitext", "wikitext-2-raw-v1", split="train")
         tot_text = "\n\n".join(traindata["text"])
     elif name == "ptb":
-        traindata = load_dataset("ptb_text_only", "penn_treebank", split="train")
-        tot_text = "\n\n".join(traindata["sentence"])
+        traindata = load_dataset("text", data_files=PTB_FILES, split="train")
+        tot_text = "\n\n".join(traindata["text"])
     elif name == "alpaca":
         # this is for chat models
         data_path = "data/alpaca_data.json"
@@ -170,13 +176,10 @@ def get_eval_loaders(name, tokenizer):
         testenc = tokenizer("\n\n".join(testdata["text"]), return_tensors="pt")
         return testenc
     if "ptb" in name:
-        valdata = load_dataset(
-            "ptb_text_only",
-            "penn_treebank",
-            split="validation",
-        )
-        testenc = tokenizer("\n\n".join(valdata["sentence"]), return_tensors="pt")
+        valdata = load_dataset("text", data_files=PTB_FILES, split="validation")
+        testenc = tokenizer("\n\n".join(valdata["text"]), return_tensors="pt")
         return testenc
+
     if "c4" in name:
         testdata = load_dataset(
             "allenai/c4",
