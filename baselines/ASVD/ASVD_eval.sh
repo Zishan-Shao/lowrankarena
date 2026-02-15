@@ -26,5 +26,14 @@ CUDA_VISIBLE_DEVICES=0 python huggingface_repos/build_asvd_repo.py \
 export ASVD_MODEL="baselines/ASVD/huggingface_repos/Llama-2-7b-hf-asvd40"
 CUDA_VISIBLE_DEVICES=0 python eval_results/eval_benchmarks.py   --model "$ASVD_MODEL" --limit 20 --device cuda --batch_size 4 --dtype bfloat16
 
+# just use lm_eval
+CUDA_VISIBLE_DEVICES=0 python eval_results/eval_benchmarks.py \
+  --model "$ASVD_MODEL" \
+  --device cuda \
+  --batch_size 4 \
+  --dtype bfloat16 \
+  --limit 50 \
+  --use_lm_eval \
+  --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa
 
 
