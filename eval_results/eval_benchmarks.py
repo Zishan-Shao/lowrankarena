@@ -36,12 +36,13 @@ except Exception:
 from tqdm import tqdm
 
 # Ensure repo root on PYTHONPATH
+# Ensure repo root is on PYTHONPATH
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-if _THIS_DIR not in sys.path:
-    sys.path.insert(0, _THIS_DIR)
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 from utils.model_utils import get_model_from_huggingface, get_model_from_local
-from evaluater import ppl_eval
 
 '''
 A. 纯 lm-eval (最可比)
@@ -532,7 +533,7 @@ def _parse_mathqa_options(opt_str: str) -> Tuple[List[str], Dict[str, int]]:
     buf = opt_str
     # Split on letter) occurrences
     import re
-    parts = re.split(r"\s*([A-Ea-e])\)\s*", buf)
+    parts = re.split(r"\s*([A-Ea-e])\s*\)\s*", buf)
     # parts like ['', 'A', 'optA', 'B', 'optB', ...]
     for i in range(1, len(parts), 2):
         lab = parts[i].upper()
@@ -594,6 +595,9 @@ def eval_mathqa(model, tokenizer, device: str, batch_size: int, limit: Optional[
         opt = ex.get('options', '')
         correct = ex.get('correct') or ex.get('label') or 'A'
         choices, map_l = _parse_mathqa_options(opt)
+        if not choices:
+            continue
+
         idx = map_l.get(str(correct).upper(), 0)
         items.append({'prompt': q.strip() + '\nAnswer:', 'choices': choices, 'answer_idx': idx})
     return _eval_dataset_mc(model, tokenizer, items, device, batch_size, limit, desc="MathQA")
@@ -841,10 +845,9 @@ def main():
     print("\nResults (accuracy, %):")
     for k in order:
         v = results.get(k, float('nan'))
-        if isinstance(v, float):
-            print(f"{k}: {v:.2f}")
-        else:
-            print(f"{k}: {v}")
+        
+        print(f"{k}: {v:.2f}")
+
 
 
 if __name__ == '__main__':

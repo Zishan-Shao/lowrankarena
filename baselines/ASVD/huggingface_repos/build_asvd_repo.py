@@ -21,9 +21,11 @@ def main(args):
     # Load model
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 
+    # new version of transformers only do dtype
     model = AutoModelForCausalLM.from_pretrained(
-        model_id, device_map="auto", torch_dtype=torch.float16, trust_remote_code=True
+        model_id, device_map="auto", dtype=torch.float16, trust_remote_code=True
     )
+    
 
     # sensitivity calibration
     calib_loader = get_calib_data(args.calib_dataset, tokenizer, model_id, 256)
@@ -182,6 +184,26 @@ if __name__ == "__main__":
         "--eval_mmlu",
         action="store_true",
         help="evaluate mmlu",
+    )
+
+    # These args are referenced inside sensitivity/binary_search, so they must
+    # exist even if you are not using KV-cache compression.
+    parser.add_argument(
+        "--compress_kv_cache",
+        action="store_true",
+        help="compress kv cache by asvd for k_proj and v_proj",
+    )
+    parser.add_argument(
+        "--kv_cache_ratio_target",
+        type=float,
+        default=-1,
+        help="kv cache ratio",
+    )
+    parser.add_argument(
+        "--rank_align",
+        type=int,
+        default=1,
+        help="align rank in SVD",
     )
     parser.add_argument(
         "--sigma_fuse",
