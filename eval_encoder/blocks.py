@@ -28,9 +28,12 @@ class BertLayerShim(nn.Module):
 class NaiveSVDBlock(nn.Module):
     """Low-rank BERT encoder layer executed with standard PyTorch matmul/einsum.
 
-    Factorises Q, K, V (per-head), attention-output projection, and FFN
-    intermediate / output projections using caller-supplied factorisation
-    callables (plain SVD, FWSVD, DRONE, ...).
+    Factorises Q, K, V, attention-output projection, and FFN projections using
+    caller-supplied factorisation callables (plain SVD, FWSVD, DRONE, ...).
+
+    QKV Mode:
+        - "per_head": Per-head factorisation (rank limited to dh=64 for BERT-base)
+        - "full": Full-matrix factorisation (paper-style, rank can be 256+)
 
     Parameter layout matches the existing repo convention so that
     ``FlashSVDBlock`` in flashsvd_backend.py can share the same tensors.
@@ -44,6 +47,7 @@ class NaiveSVDBlock(nn.Module):
         svd_per_head_fn: Callable,
         svd_low_rank_fn: Callable,
         rank_wo: int = 768,
+        qkv_mode: str = "per_head",
     ):
         super().__init__()
         cfg = hf_layer.attention.self
@@ -51,19 +55,64 @@ class NaiveSVDBlock(nn.Module):
         H = cfg.num_attention_heads
         dh = d_model // H
 
-        # --- Q / K / V per-head factorisation ---
-        WqT = cfg.query.weight.data.t()
-        WkT = cfg.key.weight.data.t()
-        WvT = cfg.value.weight.data.t()
-        bq = cfg.query.bias.data.view(1, H, 1, dh)
-        bk = cfg.key.bias.data.view(1, H, 1, dh)
-        bv = cfg.value.bias.data.view(1, H, 1, dh)
+        # Store for forward
+        self.num_heads = H
+        self.qkv_mode = qkv_mode
 
-        Uq, Vq = svd_per_head_fn(WqT, rank_attn)
-        Uk, Vk = svd_per_head_fn(WkT, rank_attn)
-        Uv, Vv = svd_per_head_fn(WvT, rank_attn)
+        if qkv_mode == "per_head":
+            # --- Q / K / V per-head factorisation (original) ---
+            WqT = cfg.query.weight.data.t()
+            WkT = cfg.key.weight.data.t()
+            WvT = cfg.value.weight.data.t()
+            bq = cfg.query.bias.data.view(1, H, 1, dh)
+            bk = cfg.key.bias.data.view(1, H, 1, dh)
+            bv = cfg.value.bias.data.view(1, H, 1, dh)
 
-        # --- FFN factorisation ---
+            Uq, Vq = svd_per_head_fn(WqT, rank_attn)
+            Uk, Vk = svd_per_head_fn(WkT, rank_attn)
+            Uv, Vv = svd_per_head_fn(WvT, rank_attn)
+
+            # Store as parameters [1, H, dm, R] convention
+            self.Pq = nn.Parameter(Uq.unsqueeze(0))
+            self.Vq = nn.Parameter(Vq.unsqueeze(0))
+            self.bq = nn.Parameter(bq)
+            self.Pk = nn.Parameter(Uk.unsqueeze(0))
+            self.Vk = nn.Parameter(Vk.unsqueeze(0))
+            self.bk = nn.Parameter(bk)
+            self.Pv = nn.Parameter(Uv.unsqueeze(0))
+            self.Vv = nn.Parameter(Vv.unsqueeze(0))
+            self.bv = nn.Parameter(bv)
+
+        elif qkv_mode == "full":
+            # --- Q / K / V full-matrix factorisation (paper-style) ---
+            Wq = cfg.query.weight.data.t()   # [dm, dm]
+            Wk = cfg.key.weight.data.t()
+            Wv = cfg.value.weight.data.t()
+
+            bq_full = cfg.query.bias.data    # [dm]
+            bk_full = cfg.key.bias.data
+            bv_full = cfg.value.bias.data
+
+            Uq, Vq = svd_low_rank_fn(Wq, rank_attn)   # U: [dm, r], V: [r, dm]
+            Uk, Vk = svd_low_rank_fn(Wk, rank_attn)
+            Uv, Vv = svd_low_rank_fn(Wv, rank_attn)
+
+            self.Uq = nn.Parameter(Uq)
+            self.Vq = nn.Parameter(Vq)
+            self.bq_full = nn.Parameter(bq_full)
+
+            self.Uk = nn.Parameter(Uk)
+            self.Vk = nn.Parameter(Vk)
+            self.bk_full = nn.Parameter(bk_full)
+
+            self.Uv = nn.Parameter(Uv)
+            self.Vv = nn.Parameter(Vv)
+            self.bv_full = nn.Parameter(bv_full)
+
+        else:
+            raise ValueError(f"Unknown qkv_mode: {qkv_mode}. Must be 'per_head' or 'full'.")
+
+        # --- FFN factorisation (same for both modes) ---
         Wi = hf_layer.intermediate.dense.weight.data.t()
         bi = hf_layer.intermediate.dense.bias.data
         WoT = hf_layer.output.dense.weight.data.t()
@@ -72,21 +121,10 @@ class NaiveSVDBlock(nn.Module):
         U1, V1 = svd_low_rank_fn(Wi, rank_ff)
         U2, V2 = svd_low_rank_fn(WoT, rank_ff)
 
-        # --- Attention output projection ---
+        # --- Attention output projection (same for both modes) ---
         Wo_full = hf_layer.attention.output.dense.weight.data
         bo_attn = hf_layer.attention.output.dense.bias.data
         Uo, Vo = svd_low_rank_fn(Wo_full.t(), rank_wo)
-
-        # --- Store as parameters  [1, H, dm, R] convention ---
-        self.Pq = nn.Parameter(Uq.unsqueeze(0))
-        self.Vq = nn.Parameter(Vq.unsqueeze(0))
-        self.bq = nn.Parameter(bq)
-        self.Pk = nn.Parameter(Uk.unsqueeze(0))
-        self.Vk = nn.Parameter(Vk.unsqueeze(0))
-        self.bk = nn.Parameter(bk)
-        self.Pv = nn.Parameter(Uv.unsqueeze(0))
-        self.Vv = nn.Parameter(Vv.unsqueeze(0))
-        self.bv = nn.Parameter(bv)
 
         self.Uo = nn.Parameter(Uo)
         self.Vo = nn.Parameter(Vo)
@@ -105,19 +143,33 @@ class NaiveSVDBlock(nn.Module):
     # -----------------------------------------------------------------
     def forward(self, x, mask=None):
         B, M, dm = x.shape
-        _, H, _, R = self.Pq.shape
+        H = self.num_heads
         dh = dm // H
         scale = 1.0 / math.sqrt(dh)
 
-        def project(x, P, V, b):
-            tmp = torch.einsum("bmd,hdr->bhmr", x, P)
-            return torch.einsum("bhmr,hrd->bhmd", tmp, V) + b
+        if self.qkv_mode == "per_head":
+            # --- Per-head mode (original) ---
+            def project(x, P, V, b):
+                tmp = torch.einsum("bmd,hdr->bhmr", x, P)
+                return torch.einsum("bhmr,hrd->bhmd", tmp, V) + b
 
-        Q = project(x, self.Pq[0], self.Vq[0], self.bq)
-        K = project(x, self.Pk[0], self.Vk[0], self.bk)
-        V = project(x, self.Pv[0], self.Vv[0], self.bv)
+            Q = project(x, self.Pq[0], self.Vq[0], self.bq)
+            K = project(x, self.Pk[0], self.Vk[0], self.bk)
+            V = project(x, self.Pv[0], self.Vv[0], self.bv)
 
-        # --- standard scaled-dot-product attention ---
+        elif self.qkv_mode == "full":
+            # --- Full-matrix mode (paper-style) ---
+            # Q = (x @ Uq) @ Vq + bq_full, then reshape to [B, H, M, dh]
+            Q = (x @ self.Uq) @ self.Vq + self.bq_full
+            K = (x @ self.Uk) @ self.Vk + self.bk_full
+            V = (x @ self.Uv) @ self.Vv + self.bv_full
+
+            # Reshape to multi-head format
+            Q = Q.view(B, M, H, dh).transpose(1, 2)  # [B, H, M, dh]
+            K = K.view(B, M, H, dh).transpose(1, 2)
+            V = V.view(B, M, H, dh).transpose(1, 2)
+
+        # --- Standard scaled-dot-product attention (same for both modes) ---
         logits = torch.einsum("bhmd,bhnd->bhmn", Q, K) * scale
         if mask is not None:
             m = mask.view(B, 1, 1, M).to(torch.bool)
@@ -125,11 +177,11 @@ class NaiveSVDBlock(nn.Module):
         A = torch.softmax(logits, dim=-1)
         attn = torch.einsum("bhmn,bhnd->bhmd", A, V)
 
-        # --- output projection + LN ---
+        # --- Output projection + LN (same for both modes) ---
         attn = attn.transpose(1, 2).reshape(B, M, dm)
         x1 = self.ln1(x + (attn @ self.Uo) @ self.Vo + self.bo_attn)
 
-        # --- FFN ---
+        # --- FFN (same for both modes) ---
         mid = x1 @ self.U1
         midV = mid @ self.V1
         midA = F.gelu(midV + self.b1)

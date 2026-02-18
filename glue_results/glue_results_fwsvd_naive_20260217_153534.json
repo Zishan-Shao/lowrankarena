@@ -1,0 +1,91 @@
+{
+  "timestamp": "20260217_153534",
+  "config": {
+    "model_id": "bert-base-uncased",
+    "use_task_models": true,
+    "task_model_prefix": "textattack",
+    "tasks": [
+      "rte"
+    ],
+    "method": "fwsvd",
+    "rank": 300,
+    "rank_attn": 256,
+    "rank_ffn": 256,
+    "rank_wo": 256,
+    "retention": null,
+    "budget": null,
+    "qkv_mode": "full",
+    "backend": "naive",
+    "calib_batches": 4,
+    "learning_rate": 2e-05,
+    "num_epochs": 3,
+    "batch_size": 32,
+    "warmup_ratio": 0.1,
+    "max_grad_norm": 1.0,
+    "weight_decay": 0.01,
+    "seq_len": 128,
+    "seed": 42,
+    "skip_compression": true,
+    "skip_finetuning": true,
+    "checkpoint": "models/rte/fwsvd_ra256_rf256_rw256_full_naive",
+    "reuse_checkpoint": false,
+    "output_dir": "glue_results",
+    "save_models": false
+  },
+  "checkpoint": "models/rte/fwsvd_ra256_rf256_rw256_full_naive",
+  "results": [
+    {
+      "task": "rte",
+      "dataset": {
+        "train_size": 2490,
+        "val_size": 277,
+        "num_labels": 2,
+        "is_regression": false
+      },
+      "metrics": {
+        "primary_metric": "accuracy",
+        "initial": {
+          "accuracy": 0.5415162454873647
+        },
+        "final": {
+          "accuracy": 0.5415162454873647
+        },
+        "best_value": 0.5415162454873647,
+        "improvement": 0.0
+      },
+      "training": {
+        "num_epochs": 0,
+        "batch_size": 32,
+        "learning_rate": 2e-05,
+        "total_steps": 0,
+        "time_seconds": 6.279232740402222,
+        "time_minutes": 0.1046538790067037
+      },
+      "inference_speed": {
+        "throughput_samples_per_sec": 427.2308883675366,
+        "latency_ms_per_batch": 74.90095138549805,
+        "peak_memory_mb": 546.958984375
+      },
+      "initial_results": {
+        "accuracy": 0.5415162454873647
+      },
+      "final_results": {
+        "accuracy": 0.5415162454873647
+      },
+      "best_metric": "accuracy",
+      "best_value": 0.5415162454873647
+    }
+  ],
+  "summary": {
+    "G-Avg": {
+      "initial": 0.5415162454873647,
+      "final": 0.5415162454873647,
+      "improvement": 0.0
+    },
+    "A-Avg": {
+      "initial": 0.5415162454873647,
+      "final": 0.5415162454873647,
+      "improvement": 0.0
+    }
+  }
+}

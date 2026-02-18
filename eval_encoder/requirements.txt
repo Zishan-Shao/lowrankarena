@@ -1,0 +1,33 @@
+# ---- core (torch + triton) ----
+torch==2.8.0
+triton==3.4.0
+
+# ---- HF / NLP benchmark ----
+transformers==4.56.2
+datasets>=2.19.0
+evaluate==0.4.6
+accelerate>=0.33.0
+tokenizers>=0.20.0
+safetensors>=0.4.3
+
+# ---- scientific stack (important for SVD/whitening) ----
+numpy>=2.0.0,<3
+scipy>=1.11.0,<2
+pandas>=2.2.0
+scikit-learn>=1.4.0
+
+# ---- utilities ----
+tqdm>=4.66.0
+rich>=13.7.0
+pyyaml>=6.0.1
+packaging>=24.0
+regex>=2024.5.15
+
+# ---- experiment / logging (optional) ----
+matplotlib>=3.8.0
+seaborn>=0.13.2
+wandb>=0.17.0
+
+# ---- optional speedups (comment out if build fails) ----
+sentencepiece>=0.2.0
+protobuf>=4.25.0

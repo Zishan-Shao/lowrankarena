@@ -74,9 +74,9 @@ def train_adasvd_ranks(
 
     # Training loop
     print(f"Training AdaSVD hypernetwork for {steps} steps (budget={budget})...")
+    batch_iter = iter(calib_loader)
     for step in range(steps):
         # Get batch
-        batch_iter = iter(calib_loader)
         try:
             batch = next(batch_iter)
         except StopIteration:

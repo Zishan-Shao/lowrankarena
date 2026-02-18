@@ -1,6 +1,12 @@
 # Claude Code configuration and memory
 .claude/
 
+# Compressed and fine-tuned model checkpoints
+models/
+eval_encoder/models/
+eval_encoder/finetuned_models/
+eval_encoder/checkpoints/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -53,3 +59,19 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Docker files (for distribution only)
+eval_encoder/Dockerfile
+eval_encoder/docker-compose.yml
+eval_encoder/.dockerignore
+eval_encoder/scripts/docker/
+eval_encoder/docs/docker/
+
+# GLUE evaluation results (runtime generated)
+eval_encoder/glue_results/
+eval_encoder/logs/
+
+# Backup and archived files
+eval_encoder/archived/
+*.backup
+*_backup_*.csv

@@ -55,7 +55,7 @@ def parse_args():
     )
     # model / task
     p.add_argument("--model_id", default="bert-base-uncased")
-    p.add_argument("--task", choices=["sst2", "mnli"], default="sst2")
+    p.add_argument("--task", choices=["cola", "sst2", "mrpc", "qqp", "mnli", "qnli", "rte", "stsb"], default="sst2")
     p.add_argument("--seq_len", type=int, default=128)
     p.add_argument("--batch_size", type=int, default=32)
     p.add_argument("--dtype", choices=["fp32", "fp16", "bf16"], default="fp16")
@@ -63,9 +63,18 @@ def parse_args():
     p.add_argument("--seed", type=int, default=0)
     # compression
     p.add_argument("--method", choices=["dense", "svd", "fwsvd", "drone", "adasvd"], default="dense")
-    p.add_argument("--rank", type=int, default=None)
+    p.add_argument("--rank", type=int, default=None,
+                   help="Unified rank for all components (will be auto-clipped to component-specific max ranks)")
+    p.add_argument("--rank_attn", type=int, default=None,
+                   help="Rank for Q/K/V attention matrices (per-head). If specified, overrides --rank for attention.")
+    p.add_argument("--rank_ffn", type=int, default=None,
+                   help="Rank for FFN matrices (Wi, Wo). If specified, overrides --rank for FFN.")
+    p.add_argument("--rank_wo", type=int, default=None,
+                   help="Rank for attention output projection (Wo). If specified, overrides --rank for Wo.")
     p.add_argument("--budget", type=float, default=None)
     p.add_argument("--scope", choices=["qkv", "ffn", "qkv+ffn"], default="qkv+ffn")
+    p.add_argument("--qkv_mode", choices=["per_head", "full"], default="per_head",
+                   help="QKV factorization mode: 'per_head' (rank limited to dh=64) or 'full' (paper-style, rank can be 256+)")
     # backend
     p.add_argument("--backend", choices=["naive", "flashsvd"], default="naive")
     # logging / perf
@@ -90,6 +99,11 @@ def parse_args():
                    help="Which split to use for calibration (MUST be train, NOT validation)")
     p.add_argument("--calib_seed", type=int, default=None,
                    help="Random seed for calibration data sampling (default: same as --seed)")
+    # model saving
+    p.add_argument("--save_model", action="store_true",
+                   help="Save compressed model to disk for later fine-tuning")
+    p.add_argument("--save_dir", default="eval_encoder/models",
+                   help="Directory to save compressed models")
     return p.parse_args()
 
 
@@ -97,13 +111,38 @@ def parse_args():
 # Task configuration
 # ═══════════════════════════════════════════════════════════════════════════
 TASK_CFG = {
+    "cola": dict(
+        num_labels=2, val_split="validation", train_split="train",
+        sentence_keys=("sentence",), metric_name="matthews_correlation",
+    ),
     "sst2": dict(
         num_labels=2, val_split="validation", train_split="train",
         sentence_keys=("sentence",), metric_name="accuracy",
     ),
+    "mrpc": dict(
+        num_labels=2, val_split="validation", train_split="train",
+        sentence_keys=("sentence1", "sentence2"), metric_name="f1",
+    ),
+    "qqp": dict(
+        num_labels=2, val_split="validation", train_split="train",
+        sentence_keys=("question1", "question2"), metric_name="f1",
+    ),
     "mnli": dict(
         num_labels=3, val_split="validation_matched", train_split="train",
         sentence_keys=("premise", "hypothesis"), metric_name="accuracy",
+    ),
+    "qnli": dict(
+        num_labels=2, val_split="validation", train_split="train",
+        sentence_keys=("question", "sentence"), metric_name="accuracy",
+    ),
+    "rte": dict(
+        num_labels=2, val_split="validation", train_split="train",
+        sentence_keys=("sentence1", "sentence2"), metric_name="accuracy",
+    ),
+    "stsb": dict(
+        num_labels=1, val_split="validation", train_split="train",
+        sentence_keys=("sentence1", "sentence2"), metric_name="pearson",
+        is_regression=True,
     ),
 }
 
@@ -117,13 +156,19 @@ def load_model(model_id: str, task: str, dtype_str: str, device: str):
     from transformers import AutoConfig, AutoTokenizer, AutoModelForSequenceClassification
 
     cfg = TASK_CFG[task]
-    config = AutoConfig.from_pretrained(
-        model_id, num_labels=cfg["num_labels"], trust_remote_code=True,
-    )
+
+    # Load model without overriding config (preserves trained classification head)
     model = AutoModelForSequenceClassification.from_pretrained(
-        model_id, config=config, trust_remote_code=True,
+        model_id, trust_remote_code=True,
     )
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+
+    # Verify num_labels matches task requirements
+    expected_labels = cfg["num_labels"]
+    actual_labels = model.config.num_labels
+    if actual_labels != expected_labels:
+        print(f"[warning] Model has {actual_labels} labels, task expects {expected_labels}")
+        print(f"[warning] Using model's original configuration to preserve trained weights")
 
     pt_dtype = DTYPE_MAP[dtype_str]
     model = model.to(device=device, dtype=pt_dtype).eval()
@@ -184,11 +229,15 @@ def prepare_loader(task: str, tokenizer, seq_len: int, batch_size: int, split: s
     ds.set_format("torch")
 
     def collate(batch):
-        return {
+        result = {
             "input_ids":      torch.stack([x["input_ids"] for x in batch]),
             "attention_mask": torch.stack([x["attention_mask"] for x in batch]),
             "labels":         torch.tensor([x["label"] for x in batch]),
         }
+        # Add token_type_ids if present (for sentence pair tasks)
+        if "token_type_ids" in batch[0]:
+            result["token_type_ids"] = torch.stack([x["token_type_ids"] for x in batch])
+        return result
 
     return DataLoader(ds, batch_size=batch_size, shuffle=False, collate_fn=collate)
 
@@ -357,7 +406,9 @@ def _calibrate_covariances(model, loader, device, encoder_layers, max_batches=4)
         if seen >= max_batches:
             break
         batch = {k: v.to(device) for k, v in batch.items()}
-        model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+        # Pass all inputs except labels
+        model_inputs = {k: v for k, v in batch.items() if k != "labels"}
+        model(**model_inputs)
         seen += 1
 
     for h in handles:
@@ -455,7 +506,8 @@ def _build_adasvd(model, calib_loader, device, budget, arch, backend="naive"):
 # ═══════════════════════════════════════════════════════════════════════════
 # 3b) Apply compression to model
 # ═══════════════════════════════════════════════════════════════════════════
-def compress_model(model, method, rank, budget, scope, loader, device, calib_batches, calib_loader=None, backend="naive"):
+def compress_model(model, method, rank, budget, scope, loader, device, calib_batches, calib_loader=None, backend="naive",
+                   rank_attn=None, rank_ffn=None, rank_wo=None, qkv_mode="per_head"):
     """Replace encoder layers with SVD blocks in-place (BERT/RoBERTa/ModernBERT).
 
     Args:
@@ -471,21 +523,29 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
     H = model.config.num_attention_heads
     dh = dm // H
 
-    # Effective ranks based on scope
-    full_rank_attn = dh       # per-head full rank = min(dm, dh) = dh
-    full_rank_ff = dm         # full rank for FFN = min(dm, d_ff) = dm
-    full_rank_wo = dm         # full rank for attn output
+    # Choose full rank for attention by mode
+    full_rank_attn = dh if qkv_mode == "per_head" else dm
+    full_rank_ff = dm
+    full_rank_wo = dm
 
-    if rank is None and method != "adasvd":
-        raise ValueError(f"--rank is required for method={method}")
-
-    # For adasvd, rank will be determined during adaptive rank selection
+    # Pick ranks (fallback to legacy --rank)
+    base = rank
     if method != "adasvd":
-        rank_attn = min(rank, full_rank_attn) if "qkv" in scope else full_rank_attn
-        rank_ff = min(rank, full_rank_ff) if "ffn" in scope else full_rank_ff
-        rank_wo = min(rank, full_rank_wo) if "qkv" in scope else full_rank_wo
+        if base is None and (rank_attn is None or rank_ffn is None or rank_wo is None):
+            raise ValueError("Need --rank OR provide --rank_attn/--rank_ffn/--rank_wo")
+
+        r_attn = rank_attn if rank_attn is not None else base
+        r_ff = rank_ffn if rank_ffn is not None else base
+        r_wo = rank_wo if rank_wo is not None else base
+
+        # Apply scope + clamp
+        rank_attn = min(r_attn, full_rank_attn) if "qkv" in scope else full_rank_attn
+        rank_ff = min(r_ff, full_rank_ff) if "ffn" in scope else full_rank_ff
+        rank_wo = min(r_wo, full_rank_wo) if "qkv" in scope else full_rank_wo
+
+        print(f"[compress] qkv_mode={qkv_mode} ranks: attn={rank_attn}, ff={rank_ff}, wo={rank_wo}")
     else:
-        # Placeholder values for adasvd, will be overridden later
+        # For adasvd, rank will be determined during adaptive rank selection
         rank_attn = None
         rank_ff = None
         rank_wo = None
@@ -504,7 +564,7 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
             )
             return ModernBertLayerShim(blk).to(device).eval()
         else:
-            blk = NaiveSVDBlock(layer, r_attn, r_ff, per_head_fn, low_rank_fn, r_wo)
+            blk = NaiveSVDBlock(layer, r_attn, r_ff, per_head_fn, low_rank_fn, r_wo, qkv_mode=qkv_mode)
             return BertLayerShim(blk).to(device).eval()
 
     if method == "svd":
@@ -518,6 +578,7 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
             encoder_layers[i] = _make_block(
                 layer, per_head_fn, low_rank_fn, rank_attn, rank_ff, rank_wo,
             )
+            del layer  # Explicitly free original layer
 
     elif method == "fwsvd":
         if rank_attn is not None:
@@ -530,6 +591,7 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
             encoder_layers[i] = _make_block(
                 layer, per_head_fn, low_rank_fn, rank_attn, rank_ff, rank_wo,
             )
+            del layer  # Explicitly free original layer
 
     elif method == "drone":
         if rank_attn is not None:
@@ -539,30 +601,48 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
             print(f"[drone] Building data-aware helpers ...")
         layer_covs = _build_drone(model, calib_loader, device, arch, encoder_layers)
         H_heads = model.config.num_attention_heads
+
         for i, layer in enumerate(encoder_layers):
             lc = layer_covs[i]
 
-            def _per_head(Wt, r, _cov=lc["attn_in"], _H=H_heads):
-                return _data_aware_per_head(Wt, r, _cov, _H)
+            if qkv_mode == "per_head":
+                # Per-head mode: use per-head covariance
+                def _per_head(Wt, r, _cov=lc["attn_in"], _H=H_heads):
+                    return _data_aware_per_head(Wt, r, _cov, _H)
 
-            def _low_rank_attn_out(W, r, _cov=lc["attn_out"]):
-                return _data_aware_low_rank(W, r, _cov)
+                def _low_rank_ffn(W, r, _c_in=lc["ffn_in"], _c_out=lc["ffn_out"],
+                                  _c_attn_out=lc["attn_out"], _dm=dm):
+                    if W.shape[0] == _dm and W.shape[1] > _dm:
+                        return _data_aware_low_rank(W, r, _c_in)
+                    elif W.shape[0] > _dm:
+                        return _data_aware_low_rank(W, r, _c_out)
+                    else:
+                        return _data_aware_low_rank(W, r, _c_attn_out)
 
-            ffn_in_cov = lc["ffn_in"]
-            ffn_out_cov = lc["ffn_out"]
+            else:  # qkv_mode == "full"
+                # Full mode: QKV use full-matrix covariance (low_rank_fn handles all)
+                _per_head = None  # Won't be used (block's full branch only calls svd_low_rank_fn)
 
-            def _low_rank_ffn(W, r, _c_in=ffn_in_cov, _c_out=ffn_out_cov,
-                              _c_attn_out=lc["attn_out"], _dm=dm):
-                if W.shape[0] == _dm and W.shape[1] > _dm:
-                    return _data_aware_low_rank(W, r, _c_in)
-                elif W.shape[0] > _dm:
-                    return _data_aware_low_rank(W, r, _c_out)
-                else:
-                    return _data_aware_low_rank(W, r, _c_attn_out)
+                def _low_rank_ffn(W, r, _cov_attn=lc["attn_in"], _cov_ao=lc["attn_out"],
+                                  _cov_ff_in=lc["ffn_in"], _cov_ff_out=lc["ffn_out"], _dm=dm, _d_ff=d_ff):
+                    # QKV weights are [dm, dm]
+                    if W.shape == (_dm, _dm):
+                        return _data_aware_low_rank(W, r, _cov_attn)
+                    # Attention output Wo is also [dm, dm], use attn_out cov
+                    # (Note: Can't distinguish QKV from Wo by shape alone, but block calls in order)
+                    # FFN Wi: [dm, d_ff]
+                    if W.shape[0] == _dm and W.shape[1] == _d_ff:
+                        return _data_aware_low_rank(W, r, _cov_ff_in)
+                    # FFN Wo: [d_ff, dm]
+                    if W.shape[0] == _d_ff and W.shape[1] == _dm:
+                        return _data_aware_low_rank(W, r, _cov_ff_out)
+                    # Fallback (shouldn't happen)
+                    return _data_aware_low_rank(W, r, _cov_attn)
 
             encoder_layers[i] = _make_block(
                 layer, _per_head, _low_rank_ffn, rank_attn, rank_ff, rank_wo,
             )
+            del layer  # Explicitly free original layer
 
     elif method == "adasvd":
         if budget is None:
@@ -593,7 +673,7 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
         model = model.to(device).eval()
 
         # Step 3: Apply compression using refactored implementation
-        ada_refactored_path = os.path.join(_REPO_ROOT, "eval_encoder", "adasvd_refactored")
+        ada_refactored_path = os.path.join(_REPO_ROOT, "src", "encoders", "adasvd_refactored")
         if ada_refactored_path not in sys.path:
             sys.path.insert(0, ada_refactored_path)
 
@@ -616,10 +696,22 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
     else:
         raise ValueError(f"Unknown method: {method}")
 
-    # Fallback return (should not reach here)
-    return model
+    # Force garbage collection and defragment GPU memory before return
+    import gc
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        # Try to reduce fragmentation by moving model to CPU and back
+        print("[compress] Defragmenting GPU memory...")
+        model_device = next(model.parameters()).device
+        model = model.cpu()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        model = model.to(model_device)
+        print(f"[compress] Memory after defrag: {torch.cuda.memory_allocated()/1024**2:.1f} MB")
 
-    print(f"[compress] Done. Replaced {len(encoder_layers)} layers ({arch}).")
+    return model
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -628,25 +720,71 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
 @torch.no_grad()
 def evaluate_task(model, loader, task, device):
     """Return (metric_name, metric_value)."""
-    from evaluate import load as load_metric
-
     cfg = TASK_CFG[task]
     metric_name = cfg["metric_name"]
-    metric = load_metric(metric_name)
+    is_regression = cfg.get("is_regression", False)
+
+    # For regression tasks (STSB), compute metric manually
+    if is_regression:
+        all_preds = []
+        all_labels = []
+        model.eval()
+        for batch in loader:
+            batch = {k: v.to(device) for k, v in batch.items()}
+
+            # Prepare model inputs (exclude labels)
+            model_inputs = {k: v for k, v in batch.items() if k != "labels"}
+            logits = model(**model_inputs).logits
+
+            # For regression, use logits directly (not argmax)
+            preds = logits.squeeze(-1)
+            all_preds.extend(preds.cpu().tolist())
+            all_labels.extend(batch["labels"].cpu().tolist())
+
+        # Compute pearson correlation
+        import numpy as np
+        from scipy.stats import pearsonr
+        correlation, _ = pearsonr(all_preds, all_labels)
+        return metric_name, correlation
+
+    # For classification tasks
+    from evaluate import load as load_metric
+    # Use GLUE-specific metric for consistency
+    metric = load_metric("glue", task)
+
+    # Check if model needs label remapping for MNLI
+    # textattack/bert-base-uncased-MNLI uses non-standard mapping:
+    # Model: 0→contradiction, 1→entailment, 2→neutral
+    # GLUE:  0→entailment,    1→neutral,     2→contradiction
+    # Remapping needed: {0→2, 1→0, 2→1}
+    label_remap = None
+    if task == "mnli":
+        model_name = getattr(model.config, '_name_or_path', '')
+        if 'textattack' in model_name.lower():
+            label_remap = torch.tensor([2, 0, 1], dtype=torch.long, device=device)
+            print(f"[info] Applying label remapping for {model_name}: {{0→2, 1→0, 2→1}}")
 
     model.eval()
     for batch in loader:
         batch = {k: v.to(device) for k, v in batch.items()}
-        logits = model(
-            input_ids=batch["input_ids"],
-            attention_mask=batch["attention_mask"],
-        ).logits
+
+        # Prepare model inputs (exclude labels)
+        model_inputs = {k: v for k, v in batch.items() if k != "labels"}
+        logits = model(**model_inputs).logits
+
         preds = torch.argmax(logits, dim=-1)
+
+        # Apply label remapping if needed
+        if label_remap is not None:
+            preds = label_remap[preds]
+
         metric.add_batch(
             predictions=preds.cpu(), references=batch["labels"].cpu()
         )
 
-    return metric_name, metric.compute()[metric_name]
+    results = metric.compute()
+    # Return the primary metric for this task
+    return metric_name, results.get(metric_name, results.get(list(results.keys())[0]))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -675,8 +813,9 @@ def measure_performance(model, loader, device, warmup_steps, measure_steps, num_
         # Warmup with first batch
         batch = next(iter(loader))
         batch = {k: v.to(device) for k, v in batch.items()}
+        model_inputs = {k: v for k, v in batch.items() if k != "labels"}
         for _ in range(warmup_steps):
-            model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+            model(**model_inputs)
 
         if is_cuda:
             torch.cuda.synchronize()
@@ -691,7 +830,8 @@ def measure_performance(model, loader, device, warmup_steps, measure_steps, num_
         for batch in loader:
             batch = {k: v.to(device) for k, v in batch.items()}
             bs = batch["input_ids"].shape[0]
-            model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+            model_inputs = {k: v for k, v in batch.items() if k != "labels"}
+            model(**model_inputs)
             total_samples += bs
             num_batches += 1
 
@@ -711,6 +851,7 @@ def measure_performance(model, loader, device, warmup_steps, measure_steps, num_
     # Standard mode: fixed steps with multiple runs
     batch = next(iter(loader))
     batch = {k: v.to(device) for k, v in batch.items()}
+    model_inputs = {k: v for k, v in batch.items() if k != "labels"}
     bs = batch["input_ids"].shape[0]
 
     # Collect results from multiple runs
@@ -721,7 +862,7 @@ def measure_performance(model, loader, device, warmup_steps, measure_steps, num_
     for run_idx in range(num_runs):
         # warmup
         for _ in range(warmup_steps):
-            model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+            model(**model_inputs)
 
         if is_cuda:
             torch.cuda.synchronize()
@@ -729,7 +870,7 @@ def measure_performance(model, loader, device, warmup_steps, measure_steps, num_
 
         start = time.perf_counter()
         for _ in range(measure_steps):
-            model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+            model(**model_inputs)
         if is_cuda:
             torch.cuda.synchronize()
         elapsed = time.perf_counter() - start
@@ -770,23 +911,47 @@ CSV_FIELDS = [
     "peak_mem_infer_mb",  # Peak memory during inference only
     "peak_mem_e2e_mb",    # Peak memory end-to-end (compression + inference)
     "peak_mem_mb",        # Legacy: same as peak_mem_e2e_mb for backward compatibility
-    "param_ratio",  # Compression ratio: compressed_params / original_params
+    "param_ratio",        # Compression ratio: compressed_params / original_params (affected layers)
+    "original_params",    # Original model parameters (affected layers only)
+    "compressed_params",  # Compressed model parameters (affected layers only)
+    "total_param_ratio",  # Compression ratio for entire model
+    "total_original_params",   # Original total model parameters
+    "total_compressed_params", # Compressed total model parameters
     "notes", "git_commit",
 ]
 
 
 def _count_model_params(model):
-    """Count total trainable parameters in model"""
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    """Count total parameters in model"""
+    return sum(p.numel() for p in model.parameters())
 
 
-def _calculate_param_ratio(model, method, rank=None, budget=None, scope="qkv+ffn", arch="bert"):
+def _calculate_param_ratio(model, method, original_total_params, rank=None, budget=None, scope="qkv+ffn", arch="bert"):
     """
-    Calculate compression ratio (compressed_params / original_params).
-    Returns a float between 0 and 1.
+    Calculate compression ratio using ACTUAL parameter counts from the model.
+    Returns a tuple: (ratio, original_params, compressed_params, total_original, total_compressed)
+
+    Args:
+        model: The model (potentially compressed)
+        method: Compression method
+        original_total_params: Total parameter count of original dense model (before compression)
+        rank, budget, scope, arch: Compression configuration
+
+    Returns:
+        - ratio: compression ratio for affected layers
+        - original_params: affected layers' original size
+        - compressed_params: affected layers' compressed size
+        - total_original: entire model's original size
+        - total_compressed: entire model's actual size
+
+    This function counts real parameters in compressed layers (with U/V matrices)
+    and compares to what those layers would have been if kept dense.
     """
+    # Use the provided original total parameter count (before compression)
+    total_model_params = original_total_params
+
     if method == "dense":
-        return 1.0
+        return 1.0, total_model_params, total_model_params, total_model_params, total_model_params
 
     if method == "adasvd":
         # AdaSVD saves budget report with achieved_ratio
@@ -795,75 +960,64 @@ def _calculate_param_ratio(model, method, rank=None, budget=None, scope="qkv+ffn
             import json
             with open(budget_report_path) as f:
                 report = json.load(f)
-                return report["achieved_ratio"]
-        # Fallback: assume it matches the budget
-        return budget if budget is not None else 0.5
+                affected_ratio = report["achieved_ratio"]
+                affected_original = report["original_model_params"]
+                affected_compressed = report["total_params"]
+                # Calculate total model size (affected + unaffected)
+                unaffected_params = total_model_params - affected_original
+                total_compressed = affected_compressed + unaffected_params
+                return affected_ratio, affected_original, affected_compressed, total_model_params, total_compressed
 
-    # For SVD/FWSVD/DRONE: calculate based on rank
-    # Get model architecture info
-    if arch == "bert":
-        # BERT-base: 12 layers, hidden=768, num_heads=12, head_dim=64, intermediate=3072
-        num_layers = len(list(model.bert.encoder.layer))
-        hidden = model.config.hidden_size
-        intermediate = model.config.intermediate_size
-    elif arch == "roberta":
-        num_layers = len(list(model.roberta.encoder.layer))
-        hidden = model.config.hidden_size
-        intermediate = model.config.intermediate_size
-    elif arch == "modernbert":
-        num_layers = len(list(model.model.layers))
-        hidden = model.config.hidden_size
-        intermediate = model.config.intermediate_size
-    else:
-        # Unknown architecture, return 1.0
-        return 1.0
+    # Get encoder layers
+    _, encoder_layers = _detect_arch(model)
 
-    if rank is None:
-        return 1.0
+    total_original = 0  # What it would be if dense
+    total_compressed = 0  # What it actually is now
 
-    # Calculate compressed vs original params
-    total_original = 0
-    total_compressed = 0
+    for layer in encoder_layers:
+        # Check if this layer has SVD blocks (has a 'block' attribute)
+        if hasattr(layer, 'block'):
+            block = layer.block
 
-    for layer_idx in range(num_layers):
-        # QKV matrices
-        if "qkv" in scope:
-            # Q, K, V: each is [hidden, hidden]
-            for _ in range(3):  # Q, K, V
-                orig = hidden * hidden
-                comp = (hidden + hidden) * rank
-                total_original += orig
-                total_compressed += comp
+            # Count actual compressed parameters in this block
+            for name, param in block.named_parameters():
+                if param.requires_grad:
+                    total_compressed += param.numel()
 
-            # Wo (output projection): [hidden, hidden]
-            orig = hidden * hidden
-            comp = (hidden + hidden) * rank
-            total_original += orig
-            total_compressed += comp
+            # Estimate original dense size from model config
+            hidden = model.config.hidden_size
+            intermediate = getattr(model.config, "intermediate_size", hidden * 4)
+
+            # QKV + Wo (attention)
+            if "qkv" in scope:
+                total_original += 4 * hidden * hidden  # Q, K, V, Wo
+            else:
+                # If QKV not compressed, add its actual size
+                total_original += 4 * hidden * hidden
+
+            # FFN
+            if "ffn" in scope:
+                total_original += hidden * intermediate + intermediate * hidden
+            else:
+                total_original += hidden * intermediate + intermediate * hidden
         else:
-            # Keep QKV dense
-            for _ in range(3):
-                total_original += hidden * hidden
-                total_compressed += hidden * hidden
-            total_original += hidden * hidden
-            total_compressed += hidden * hidden
+            # Dense layer - count actual parameters
+            layer_params = sum(p.numel() for p in layer.parameters() if p.requires_grad)
+            total_original += layer_params
+            total_compressed += layer_params
 
-        # FFN matrices
-        if "ffn" in scope:
-            # FFN1: [hidden, intermediate]
-            orig1 = hidden * intermediate
-            comp1 = (hidden + intermediate) * rank
-            # FFN2: [intermediate, hidden]
-            orig2 = intermediate * hidden
-            comp2 = (intermediate + hidden) * rank
-            total_original += orig1 + orig2
-            total_compressed += comp1 + comp2
-        else:
-            # Keep FFN dense
-            total_original += hidden * intermediate + intermediate * hidden
-            total_compressed += hidden * intermediate + intermediate * hidden
+    # Calculate affected layers ratio
+    ratio = total_compressed / total_original if total_original > 0 else 1.0
 
-    return total_compressed / total_original if total_original > 0 else 1.0
+    # Calculate total model parameters
+    # total_original = affected layers' original size
+    # total_compressed = affected layers' compressed size
+    # unaffected_params = total_model_params - total_original
+    unaffected_params = total_model_params - total_original
+    total_model_original = total_model_params  # Entire model if dense
+    total_model_compressed = total_compressed + unaffected_params  # Compressed + unaffected
+
+    return ratio, total_original, total_compressed, total_model_original, total_model_compressed
 
 
 def _git_commit():
@@ -877,9 +1031,51 @@ def _git_commit():
 
 
 def write_csv_row(args, metric_name, metric_value,
-                  latency_ms, throughput_sps, peak_mem_infer_mb, peak_mem_e2e_mb, param_ratio, dataset_info, calib_info):
+                  latency_ms, throughput_sps, peak_mem_infer_mb, peak_mem_e2e_mb,
+                  param_ratio, original_params, compressed_params,
+                  total_ratio, total_original_params, total_compressed_params,
+                  dataset_info, calib_info):
     os.makedirs(os.path.dirname(args.out_csv) or ".", exist_ok=True)
-    write_header = not os.path.isfile(args.out_csv)
+    csv_exists = os.path.isfile(args.out_csv)
+    write_header = not csv_exists
+
+    # Check if existing CSV has correct header (with total_* fields)
+    if csv_exists:
+        try:
+            with open(args.out_csv, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                existing_fields = reader.fieldnames
+                # Check if new fields are present
+                missing_fields = [f for f in ["total_param_ratio", "total_original_params", "total_compressed_params"]
+                                 if f not in existing_fields]
+                if missing_fields:
+                    # Backup old CSV and rewrite with new header
+                    backup_path = args.out_csv.replace('.csv', '_backup_pre_v2.csv')
+                    import shutil
+                    shutil.copy2(args.out_csv, backup_path)
+                    print(f"[csv] ⚠️  Old CSV header detected (missing: {missing_fields})")
+                    print(f"[csv] 📦 Backed up to: {backup_path}")
+                    print(f"[csv] 🔧 Adding new columns to CSV...")
+
+                    # Read all existing rows
+                    with open(args.out_csv, 'r', encoding='utf-8') as old_f:
+                        reader = csv.DictReader(old_f)
+                        old_rows = list(reader)
+
+                    # Write with new header
+                    with open(args.out_csv, 'w', encoding='utf-8', newline='') as new_f:
+                        writer = csv.DictWriter(new_f, fieldnames=CSV_FIELDS)
+                        writer.writeheader()
+                        # Write old rows (missing fields will be empty)
+                        for old_row in old_rows:
+                            # Fill missing fields with empty values
+                            for field in CSV_FIELDS:
+                                if field not in old_row:
+                                    old_row[field] = ""
+                            writer.writerow(old_row)
+                    print(f"[csv] ✅ CSV updated with new header")
+        except Exception as e:
+            print(f"[csv] ⚠️  Could not check CSV header: {e}")
 
     # Determine if method needs calibration
     needs_calib = args.method in ["fwsvd", "drone", "adasvd", "adawhiten", "adafwsvd"]
@@ -913,7 +1109,14 @@ def write_csv_row(args, metric_name, metric_value,
         "peak_mem_infer_mb": f"{peak_mem_infer_mb:.1f}",
         "peak_mem_e2e_mb": f"{peak_mem_e2e_mb:.1f}",
         "peak_mem_mb": f"{peak_mem_e2e_mb:.1f}",  # Legacy field for backward compatibility
+        # Affected layers parameters
         "param_ratio": f"{param_ratio:.4f}",
+        "original_params": original_params,
+        "compressed_params": compressed_params,
+        # Total model parameters
+        "total_param_ratio": f"{total_ratio:.4f}",
+        "total_original_params": total_original_params,
+        "total_compressed_params": total_compressed_params,
         "notes": args.notes,
         "git_commit": _git_commit(),
     }
@@ -924,7 +1127,19 @@ def write_csv_row(args, metric_name, metric_value,
             w.writeheader()
         w.writerow(row)
 
-    print(f"\n[csv] Appended row to {args.out_csv}")
+    if not csv_exists:
+        print(f"\n[csv] ✅ Created new CSV: {args.out_csv}")
+        print(f"[csv] Header written with {len(CSV_FIELDS)} columns")
+    else:
+        print(f"\n[csv] ✅ Appended row to existing CSV: {args.out_csv}")
+
+    # Show total rows in CSV
+    try:
+        with open(args.out_csv, 'r') as f:
+            total_rows = sum(1 for _ in f) - 1  # Exclude header
+        print(f"[csv] Total data rows: {total_rows}")
+    except:
+        pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -941,15 +1156,32 @@ def main():
     print(f"=== Encoder Benchmark ===")
     print(f"  model_id : {args.model_id}")
     print(f"  task     : {args.task}")
-    print(f"  method   : {args.method}  rank={args.rank}  budget={args.budget}  scope={args.scope}")
+
+    # Show rank information (either unified or component-specific)
+    rank_info = f"rank={args.rank}"
+    if args.rank_attn is not None or args.rank_ffn is not None or args.rank_wo is not None:
+        rank_details = []
+        if args.rank_attn is not None:
+            rank_details.append(f"attn={args.rank_attn}")
+        if args.rank_ffn is not None:
+            rank_details.append(f"ffn={args.rank_ffn}")
+        if args.rank_wo is not None:
+            rank_details.append(f"wo={args.rank_wo}")
+        rank_info = f"rank=[{', '.join(rank_details)}]" if rank_details else rank_info
+
+    print(f"  method   : {args.method}  {rank_info}  budget={args.budget}  scope={args.scope}")
     print(f"  backend  : {args.backend}")
+    if args.qkv_mode == "full":
+        print(f"  qkv_mode : {args.qkv_mode} (paper-style full-matrix SVD)")
     print(f"  dtype    : {args.dtype}  device={args.device}")
     print()
 
     # 1) load model
     model, tokenizer = load_model(args.model_id, args.task, args.dtype, args.device)
     arch, _ = _detect_arch(model)
-    print(f"[load] Model loaded: {sum(p.numel() for p in model.parameters())/1e6:.1f}M params  arch={arch}")
+    # Save original total parameter count BEFORE compression (for accurate total_model_params calculation)
+    original_total_params = _count_model_params(model)
+    print(f"[load] Model loaded: {original_total_params/1e6:.1f}M params  arch={arch}")
 
     # 2) data
     loader = prepare_loader(args.task, tokenizer, args.seq_len, args.batch_size, split="validation")
@@ -1001,21 +1233,34 @@ def main():
     compression_peak_mb = 0.0
     if args.method != "dense":
         model = compress_model(model, args.method, args.rank, args.budget,
-                               args.scope, loader, args.device, args.calib_batches, calib_loader=calib_loader, backend=args.backend)
+                               args.scope, loader, args.device, args.calib_batches, calib_loader=calib_loader, backend=args.backend,
+                               rank_attn=args.rank_attn, rank_ffn=args.rank_ffn, rank_wo=args.rank_wo, qkv_mode=args.qkv_mode)
 
         # Capture peak memory during compression (includes calibration, SVD, etc.)
         if torch.cuda.is_available():
             compression_peak_mb = torch.cuda.max_memory_allocated() / 1024**2
             print(f"[compress] Peak memory during compression: {compression_peak_mb:.1f} MB")
 
+            # Clean up memory before inference measurement
+            print(f"[cleanup] Freeing calibration data and compressing cache...")
+            del calib_loader
+            calib_loader = None
+            import gc
+            gc.collect()
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+
+            # Check memory after cleanup
+            after_cleanup_mb = torch.cuda.memory_allocated() / 1024**2
+            print(f"[cleanup] Memory allocated after cleanup: {after_cleanup_mb:.1f} MB")
+
     # 4) backend
     if args.backend == "flashsvd":
         if args.method == "dense":
-            raise ValueError("--backend flashsvd requires a compression method "
-                             "(--method != dense).")
-        # For AdaSVD, FlashSVD backend is already applied during compression
-        # No need to call enable_flashsvd again
-        if args.method == "adasvd":
+            print("[backend] Warning: backend=flashsvd ignored for method=dense (no compression)")
+        elif args.method == "adasvd":
+            # For AdaSVD, FlashSVD backend is already applied during compression
+            # No need to call enable_flashsvd again
             print("[backend] AdaSVD already using FlashSVD backend (applied during compression)")
         else:
             from eval_encoder.flashsvd_backend import enable_flashsvd
@@ -1025,6 +1270,59 @@ def main():
     print("\n[eval] Computing task metric ...")
     metric_name, metric_value = evaluate_task(model, loader, args.task, args.device)
     print(f"[eval] {metric_name} = {metric_value:.4f}")
+
+    # 5.3) Save model if requested (including dense)
+    if args.save_model:
+        from pathlib import Path
+        import json
+
+        # Generate model name
+        # NOTE: Must match glue_pipeline.py's naming convention exactly
+        if args.method == "dense":
+            model_name = "dense_naive"
+        elif args.method == "adasvd":
+            model_name = f"{args.method}_b{args.budget}_{args.backend}"
+        else:
+            # For SVD-based methods, include rank and qkv_mode info in name
+            # Use component-specific naming if specified
+            if args.rank_attn is not None or args.rank_ffn is not None or args.rank_wo is not None:
+                ra = args.rank_attn if args.rank_attn is not None else args.rank
+                rf = args.rank_ffn if args.rank_ffn is not None else args.rank
+                rw = args.rank_wo if args.rank_wo is not None else args.rank
+                model_name = f"{args.method}_ra{ra}_rf{rf}_rw{rw}_{args.qkv_mode}_{args.backend}"
+            elif args.rank is not None:
+                model_name = f"{args.method}_r{args.rank}_{args.qkv_mode}_{args.backend}"
+            else:
+                model_name = f"{args.method}_rNone_{args.qkv_mode}_{args.backend}"
+
+        save_path = Path(args.save_dir) / model_name
+        save_path.mkdir(parents=True, exist_ok=True)
+
+        print(f"\n[save] Saving model to {save_path}")
+
+        # Save model and tokenizer
+        # Use safe_serialization=False for FlashSVD blocks with shared tensors
+        model.save_pretrained(save_path, safe_serialization=False)
+        tokenizer.save_pretrained(save_path)
+
+        # Save compression info
+        info = {
+            "method": args.method,
+            "rank": args.rank if args.method != "adasvd" else None,
+            "budget": args.budget if args.method == "adasvd" else None,
+            "backend": args.backend,
+            "task": args.task,
+            "model_id": args.model_id,
+            "accuracy_before_finetune": float(metric_value),
+            "dtype": args.dtype,
+            "seq_len": args.seq_len,
+        }
+
+        with open(save_path / "compression_info.json", "w") as f:
+            json.dump(info, f, indent=2)
+
+        print(f"[save] Model saved successfully")
+        print(f"[save] Accuracy before fine-tuning: {metric_value:.4f}")
 
     # 5.5) Reload model before performance measurement if requested
     # This ensures clean GPU state after calibration backward passes
@@ -1107,10 +1405,33 @@ def main():
                   f"throughput={throughput_sps:.1f} samples/s  "
                   f"peak_mem={overall_peak_mb:.1f} MB")
 
-    # 7) write CSV (with both inference and E2E peaks)
-    param_ratio = _calculate_param_ratio(model, args.method, args.rank, args.budget, args.scope, arch)
+    # 7) Calculate and display parameter compression ratio
+    param_ratio, original_params, compressed_params, total_original, total_compressed = _calculate_param_ratio(
+        model, args.method, original_total_params, args.rank, args.budget, args.scope, arch
+    )
+    total_ratio = total_compressed / total_original if total_original > 0 else 1.0
+
+    print(f"\n{'='*70}")
+    print(f"[param] Parameter Statistics:")
+    print(f"  Affected Layers:")
+    print(f"    Original:   {original_params:,} params")
+    print(f"    Compressed: {compressed_params:,} params")
+    print(f"    Ratio: {param_ratio:.4f} ({param_ratio*100:.2f}%)")
+    print(f"    Reduction: {(1-param_ratio)*100:.2f}% fewer parameters")
+    print(f"")
+    print(f"  Entire Model:")
+    print(f"    Original:   {total_original:,} params")
+    print(f"    Compressed: {total_compressed:,} params")
+    print(f"    Ratio: {total_ratio:.4f} ({total_ratio*100:.2f}%)")
+    print(f"    Reduction: {(1-total_ratio)*100:.2f}% fewer parameters")
+    print(f"{'='*70}\n")
+
+    # 8) write CSV (with both inference and E2E peaks)
     write_csv_row(args, metric_name, metric_value,
-                  latency_ms, throughput_sps, peak_mem_mb, overall_peak_mb, param_ratio, dataset_info, calib_info)
+                  latency_ms, throughput_sps, peak_mem_mb, overall_peak_mb,
+                  param_ratio, original_params, compressed_params,
+                  total_ratio, total_original, total_compressed,
+                  dataset_info, calib_info)
 
 
 if __name__ == "__main__":

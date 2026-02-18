@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+
+# Claude Code
+.claude
+.claude/
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+
+# 临时文件
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 大文件目录（不打包到镜像）
+eval_encoder/models/*
+eval_encoder/finetuned_models/*
+eval_encoder/glue_results/*
+eval_encoder/logs/*
+eval_encoder/eval_results/*.csv
+eval_encoder/eval_results/*.json
+
+# 保留目录结构标记
+!eval_encoder/models/.gitkeep
+!eval_encoder/glue_results/.gitkeep
+!eval_encoder/logs/.gitkeep
+
+# 归档和文档备份
+eval_encoder/archived/
+eval_encoder/docs/archived/
+*.backup
+*.bak
+
+# IDE
+.vscode
+.idea
+*.sublime-*
+
+# 其他
+.cache
+*.log

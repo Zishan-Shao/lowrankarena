@@ -1,0 +1,178 @@
+{
+  "timestamp": "20260217_134556",
+  "config": {
+    "model_id": "bert-base-uncased",
+    "use_task_models": true,
+    "task_model_prefix": "textattack/bert-base-uncased-",
+    "tasks": [
+      "rte",
+      "mrpc",
+      "cola"
+    ],
+    "method": "fwsvd",
+    "rank": 128,
+    "retention": null,
+    "budget": null,
+    "backend": "flashsvd",
+    "learning_rate": 2e-05,
+    "num_epochs": 3,
+    "batch_size": 32,
+    "warmup_ratio": 0.1,
+    "max_grad_norm": 1.0,
+    "weight_decay": 0.01,
+    "seq_len": 128,
+    "seed": 42,
+    "skip_compression": false,
+    "skip_finetuning": true,
+    "checkpoint": null,
+    "reuse_checkpoint": false,
+    "output_dir": "glue_results",
+    "save_models": false
+  },
+  "checkpoint": [
+    "models/rte/fwsvd_r128_flashsvd",
+    "models/mrpc/fwsvd_r128_flashsvd",
+    "models/cola/fwsvd_r128_flashsvd"
+  ],
+  "results": [
+    {
+      "task": "rte",
+      "dataset": {
+        "train_size": 2490,
+        "val_size": 277,
+        "num_labels": 2,
+        "is_regression": false
+      },
+      "metrics": {
+        "primary_metric": "accuracy",
+        "initial": {
+          "accuracy": 0.5740072202166066
+        },
+        "final": {
+          "accuracy": 0.5740072202166066
+        },
+        "best_value": 0.5740072202166066,
+        "improvement": 0.0
+      },
+      "training": {
+        "num_epochs": 0,
+        "batch_size": 32,
+        "learning_rate": 2e-05,
+        "total_steps": 0,
+        "time_seconds": 9.479950189590454,
+        "time_minutes": 0.15799916982650758
+      },
+      "inference_speed": {
+        "throughput_samples_per_sec": 468.3514670515342,
+        "latency_ms_per_batch": 68.32475662231445,
+        "peak_memory_mb": 347.365234375
+      },
+      "initial_results": {
+        "accuracy": 0.5740072202166066
+      },
+      "final_results": {
+        "accuracy": 0.5740072202166066
+      },
+      "best_metric": "accuracy",
+      "best_value": 0.5740072202166066
+    },
+    {
+      "task": "mrpc",
+      "dataset": {
+        "train_size": 3668,
+        "val_size": 408,
+        "num_labels": 2,
+        "is_regression": false
+      },
+      "metrics": {
+        "primary_metric": "f1",
+        "initial": {
+          "accuracy": 0.5245098039215687,
+          "f1": 0.6254826254826255
+        },
+        "final": {
+          "accuracy": 0.5245098039215687,
+          "f1": 0.6254826254826255
+        },
+        "best_value": 0.6254826254826255,
+        "improvement": 0.0
+      },
+      "training": {
+        "num_epochs": 0,
+        "batch_size": 32,
+        "learning_rate": 2e-05,
+        "total_steps": 0,
+        "time_seconds": 8.562724351882935,
+        "time_minutes": 0.14271207253138224
+      },
+      "inference_speed": {
+        "throughput_samples_per_sec": 462.64273504179226,
+        "latency_ms_per_batch": 69.16784286499023,
+        "peak_memory_mb": 347.365234375
+      },
+      "initial_results": {
+        "accuracy": 0.5245098039215687,
+        "f1": 0.6254826254826255
+      },
+      "final_results": {
+        "accuracy": 0.5245098039215687,
+        "f1": 0.6254826254826255
+      },
+      "best_metric": "f1",
+      "best_value": 0.6254826254826255
+    },
+    {
+      "task": "cola",
+      "dataset": {
+        "train_size": 8551,
+        "val_size": 1043,
+        "num_labels": 2,
+        "is_regression": false
+      },
+      "metrics": {
+        "primary_metric": "matthews_correlation",
+        "initial": {
+          "matthews_correlation": -0.020762314021496735
+        },
+        "final": {
+          "matthews_correlation": -0.020762314021496735
+        },
+        "best_value": -0.020762314021496735,
+        "improvement": 0.0
+      },
+      "training": {
+        "num_epochs": 0,
+        "batch_size": 32,
+        "learning_rate": 2e-05,
+        "total_steps": 0,
+        "time_seconds": 11.312068223953247,
+        "time_minutes": 0.18853447039922078
+      },
+      "inference_speed": {
+        "throughput_samples_per_sec": 456.9373607325175,
+        "latency_ms_per_batch": 70.03148078918457,
+        "peak_memory_mb": 347.365234375
+      },
+      "initial_results": {
+        "matthews_correlation": -0.020762314021496735
+      },
+      "final_results": {
+        "matthews_correlation": -0.020762314021496735
+      },
+      "best_metric": "matthews_correlation",
+      "best_value": -0.020762314021496735
+    }
+  ],
+  "summary": {
+    "G-Avg": {
+      "initial": 0.5630362295628278,
+      "final": 0.5630362295628278,
+      "improvement": 0.0
+    },
+    "A-Avg": {
+      "initial": 0.5492585120690876,
+      "final": 0.5492585120690876,
+      "improvement": 0.0
+    }
+  }
+}

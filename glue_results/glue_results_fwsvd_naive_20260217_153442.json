@@ -1,0 +1,49 @@
+{
+  "timestamp": "20260217_153442",
+  "config": {
+    "model_id": "bert-base-uncased",
+    "use_task_models": true,
+    "task_model_prefix": "textattack",
+    "tasks": [
+      "rte"
+    ],
+    "method": "fwsvd",
+    "rank": 300,
+    "rank_attn": 256,
+    "rank_ffn": 256,
+    "rank_wo": 256,
+    "retention": null,
+    "budget": null,
+    "qkv_mode": "full",
+    "backend": "naive",
+    "calib_batches": 4,
+    "learning_rate": 2e-05,
+    "num_epochs": 3,
+    "batch_size": 32,
+    "warmup_ratio": 0.1,
+    "max_grad_norm": 1.0,
+    "weight_decay": 0.01,
+    "seq_len": 128,
+    "seed": 42,
+    "skip_compression": true,
+    "skip_finetuning": true,
+    "checkpoint": "models/rte/fwsvd_ra256_rf256_rw256_full_naive",
+    "reuse_checkpoint": false,
+    "output_dir": "glue_results",
+    "save_models": false
+  },
+  "checkpoint": "models/rte/fwsvd_ra256_rf256_rw256_full_naive",
+  "results": [],
+  "summary": {
+    "G-Avg": {
+      "initial": 0.0,
+      "final": 0.0,
+      "improvement": 0.0
+    },
+    "A-Avg": {
+      "initial": 0.0,
+      "final": 0.0,
+      "improvement": 0.0
+    }
+  }
+}

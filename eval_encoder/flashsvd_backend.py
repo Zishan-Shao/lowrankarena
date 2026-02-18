@@ -16,6 +16,12 @@ import torch.nn.functional as F
 
 from eval_encoder.blocks import NaiveSVDBlock, BertLayerShim
 
+# Import MinimalSVDBlock if available (for models loaded from checkpoint)
+try:
+    from eval_encoder.load_compressed_model import MinimalSVDBlock
+except ImportError:
+    MinimalSVDBlock = None
+
 # ---------------------------------------------------------------------------
 # Lazy kernel imports – fail fast with a human-readable message
 # ---------------------------------------------------------------------------
@@ -29,13 +35,23 @@ def _import_kernels():
         return  # already imported
 
     # Ensure the encoder-kernel directory is importable
+    # Try local kernels first (for standalone/Docker deployment)
+    local_kernel_dir = os.path.join(os.path.dirname(__file__), "kernels")
+    # Fall back to repository structure
     _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    kernel_dir = os.path.join(_REPO_ROOT, "kernels", "encoder_kernels")
-    if not os.path.isdir(kernel_dir):
+    repo_kernel_dir = os.path.join(_REPO_ROOT, "kernels", "encoder_kernels")
+
+    if os.path.isdir(local_kernel_dir):
+        kernel_dir = local_kernel_dir
+    elif os.path.isdir(repo_kernel_dir):
+        kernel_dir = repo_kernel_dir
+    else:
         raise RuntimeError(
-            f"FlashSVD kernel directory not found: {kernel_dir}\n"
-            "Make sure you are running from the repository root."
+            f"FlashSVD kernel directory not found.\n"
+            f"Tried: {local_kernel_dir} and {repo_kernel_dir}\n"
+            "Make sure kernels are available."
         )
+
     if kernel_dir not in sys.path:
         sys.path.insert(0, kernel_dir)
 
@@ -186,14 +202,16 @@ def enable_flashsvd(model: nn.Module) -> nn.Module:
     patched = 0
     for i, layer in enumerate(encoder_layers):
         block = getattr(layer, "block", None)
-        if isinstance(block, NaiveSVDBlock):
+        # Support both NaiveSVDBlock (from compression) and MinimalSVDBlock (from checkpoint loading)
+        is_svd_block = isinstance(block, NaiveSVDBlock) or (MinimalSVDBlock and isinstance(block, MinimalSVDBlock))
+        if is_svd_block:
             flash_block = FlashSVDBlock(block)
             layer.block = flash_block
             patched += 1
 
     if patched == 0:
         raise RuntimeError(
-            "enable_flashsvd: no NaiveSVDBlock instances found. "
+            "enable_flashsvd: no NaiveSVDBlock or MinimalSVDBlock instances found. "
             "Did you run compression (--method != dense) before calling "
             "enable_flashsvd?"
         )
