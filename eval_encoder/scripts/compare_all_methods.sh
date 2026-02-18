@@ -100,11 +100,14 @@ else
 fi
 
 # Stages
-# Default: only test without fine-tuning (quick test)
-STAGES=("no_finetune")
-if [[ "${TWO_STAGE}" == "true" ]]; then
-  # Full test: both stages
+# pretrain_before_compress 模式下只有一个阶段：预训练→压缩→微调（必须微调）
+# 普通模式：默认只跑 no_finetune（快速验证），TWO_STAGE=true 时跑两阶段
+if [[ "${PRETRAIN_BEFORE_COMPRESS}" == "true" ]]; then
+  STAGES=("with_finetune")
+elif [[ "${TWO_STAGE}" == "true" ]]; then
   STAGES=("no_finetune" "with_finetune")
+else
+  STAGES=("no_finetune")
 fi
 
 # We'll collect JSON paths per (stage, backend, method)
