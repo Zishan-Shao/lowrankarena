@@ -328,6 +328,47 @@ def calculate_rank_from_retention(retention: float, model_id: str = "bert-base-u
 # Step 0 (optional): Pre-train base model before compression
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _write_pretrain_csv_row(pretrain_dir, task, metric_name, metric_value, args):
+    """Write pretrain baseline score directly to encoder_runs.csv."""
+    import csv as csv_mod
+    csv_path = "eval_encoder/eval_results/encoder_runs.csv"
+    # Match CSV_FIELDS from run_encoder_benchmark.py
+    fields = [
+        "timestamp", "model_id", "task", "dataset_split", "dataset_size",
+        "seq_len", "batch_size", "dtype",
+        "method", "rank", "budget", "scope", "backend", "seed",
+        "calib_dataset", "calib_split", "calib_samples", "calib_batches", "calib_seed", "calib_seq_len",
+        "metric_name", "metric_value",
+        "latency_ms", "throughput_sps",
+        "peak_mem_infer_mb", "peak_mem_e2e_mb", "peak_mem_mb",
+        "param_ratio", "original_params", "compressed_params",
+        "total_param_ratio", "total_original_params", "total_compressed_params",
+        "notes", "git_commit",
+    ]
+    row = {f: "" for f in fields}
+    row.update({
+        "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "model_id": str(pretrain_dir),
+        "task": task,
+        "dataset_split": "validation",
+        "seq_len": str(args.seq_len),
+        "batch_size": str(args.batch_size),
+        "dtype": "fp32",
+        "method": "pretrained_base",
+        "backend": "naive",
+        "seed": str(args.seed),
+        "metric_name": metric_name,
+        "metric_value": f"{metric_value:.6f}",
+        "notes": f"pretrain_before_compress epochs={args.num_epochs} lr={args.learning_rate}",
+    })
+    write_header = not Path(csv_path).exists()
+    with open(csv_path, "a", newline="") as f:
+        writer = csv_mod.DictWriter(f, fieldnames=fields)
+        if write_header:
+            writer.writeheader()
+        writer.writerow(row)
+    print(f"[pretrain] CSV row written: {metric_name}={metric_value:.4f} → {csv_path}")
+
 def pretrain_base_model(args, task: str) -> Path:
     """Fine-tune the base model (bert-base-uncased) on a task before compression.
 
@@ -456,24 +497,15 @@ def pretrain_base_model(args, task: str) -> Path:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    # Write pretrain score to encoder_runs.csv via run_encoder_benchmark.py --method dense
-    # This records the pretrained baseline in the same CSV as all other methods
+    # Write pretrain score directly to encoder_runs.csv (score already computed above)
     print(f"\n[pretrain] Recording pretrain score to CSV...")
-    csv_cmd = [
-        "python", "eval_encoder/run_encoder_benchmark.py",
-        "--model_id", str(pretrain_dir),
-        "--method", "dense",
-        "--backend", "naive",
-        "--task", task,
-        "--seq_len", str(args.seq_len),
-        "--batch_size", str(args.batch_size),
-        "--dtype", "fp32",
-        "--full_validation",
-        "--notes", "pretrained_base",
-    ]
-    result = subprocess.run(csv_cmd, capture_output=False)
-    if result.returncode != 0:
-        print(f"[warn] CSV recording failed (exit={result.returncode}), continuing anyway")
+    _write_pretrain_csv_row(
+        pretrain_dir=pretrain_dir,
+        task=task,
+        metric_name=cfg["metric"],
+        metric_value=best_metric_value,
+        args=args,
+    )
 
     return pretrain_dir, best_metric_value
 
