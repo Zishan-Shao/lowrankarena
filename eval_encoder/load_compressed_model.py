@@ -55,7 +55,6 @@ def load_compressed_model(
         # Dense model or model without compression info
         # Try to read config to get model_id
         print(f"[load] Loading model: {checkpoint_path.name}")
-        print(f"[info] No compression_info.json found, assuming dense/finetuned model")
 
         config_file = checkpoint_path / "config.json"
         if config_file.exists():
@@ -65,8 +64,21 @@ def load_compressed_model(
         else:
             model_id = "bert-base-uncased"
 
+        # Peek at state_dict keys to detect SVD checkpoints saved without compression_info.json
+        # (can happen when an older version of the code was used, or if the save was interrupted)
+        state_dict_path_peek = checkpoint_path / "pytorch_model.bin"
+        detected_method = "dense"
+        if state_dict_path_peek.exists():
+            sd_peek = torch.load(state_dict_path_peek, map_location="cpu")
+            if any((".block.Uq" in k or ".block.Pq" in k) for k in sd_peek.keys()):
+                detected_method = "svd"
+                print(f"[info] Detected SVD keys in checkpoint despite missing compression_info.json")
+                print(f"[info] Treating checkpoint as compressed model (method=svd, backend=naive)")
+            else:
+                print(f"[info] No compression_info.json found, assuming dense/finetuned model")
+
         comp_info = {
-            "method": "dense",
+            "method": detected_method,
             "backend": "naive",
             "rank": None,
             "model_id": model_id,

@@ -37,7 +37,7 @@ RANK_FFN="${RANK_FFN:-}"
 RANK_WO="${RANK_WO:-}"
 QKV_MODE="${QKV_MODE:-per_head}"  # per_head or full
 CALIB_BATCHES="${CALIB_BATCHES:-16}"  # Calibration batches for fwsvd/drone/adasvd (increased from 4)
-BUDGET="${BUDGET:-0.5}"
+BUDGET="${BUDGET:-0.6}"
 
 # Tasks (space-separated, required by glue_pipeline.py nargs="+")
 # All 8 GLUE tasks by default
@@ -160,14 +160,19 @@ run_one() {
   fi
 
   # Run
-  local start_ts end_ts dur
+  local start_ts end_ts dur run_exit
   start_ts=$(date +%s)
   (
     export "${env_prefix[@]}"
     bash eval_encoder/scripts/one_click_glue.sh
   ) 2>&1 | tee -a "${SUMMARY_LOG}"
+  run_exit="${PIPESTATUS[0]}"
   end_ts=$(date +%s)
   dur=$((end_ts - start_ts))
+  if [[ "${run_exit}" -ne 0 ]]; then
+    echo "❌ FAILED: stage=${stage} backend=${backend} method=${method} (exit=${run_exit}, ${dur}s)" | tee -a "${SUMMARY_LOG}"
+    return "${run_exit}"
+  fi
   echo "✅ Done: stage=${stage} backend=${backend} method=${method} (${dur}s)" | tee -a "${SUMMARY_LOG}"
 
   # Collect JSON
