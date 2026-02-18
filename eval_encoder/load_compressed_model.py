@@ -160,16 +160,20 @@ def load_compressed_model(
     )
 
     # Detect number of layers from state_dict
+    # Works for all architectures:
+    #   BERT/RoBERTa: "bert.encoder.layer.N.block.X"  → prefix = "bert.encoder.layer"
+    #   ModernBERT:   "model.layers.N.block.X"         → prefix = "model.layers"
+    prefix_with_dot = encoder_prefix + "."
+    prefix_len = len(prefix_with_dot)
     layer_indices = set()
     for key in state_dict.keys():
-        if f"{encoder_prefix}." in key:
-            parts = key.split(".")
-            for i, part in enumerate(parts):
-                if part == "layer" and i + 1 < len(parts):
-                    try:
-                        layer_indices.add(int(parts[i + 1]))
-                    except ValueError:
-                        pass
+        if key.startswith(prefix_with_dot):
+            rest = key[prefix_len:]          # "N.block.X"
+            idx_str = rest.split(".")[0]
+            try:
+                layer_indices.add(int(idx_str))
+            except ValueError:
+                pass
 
     num_layers = max(layer_indices) + 1 if layer_indices else 12
     print(f"[load] Found {num_layers} encoder layers")

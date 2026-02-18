@@ -438,8 +438,9 @@ def compress_model(args, task: str = None) -> Path:
             if args.rank_wo is not None:
                 cmd.extend(["--rank_wo", str(args.rank_wo)])
 
-            # Add base rank if no component-specific ranks and rank is specified
-            if args.rank is not None and args.rank_attn is None and args.rank_ffn is None and args.rank_wo is None:
+            # Always pass base rank when set — run_encoder_benchmark.py uses it
+            # as fallback for any component rank not explicitly specified
+            if args.rank is not None:
                 cmd.extend(["--rank", str(args.rank)])
 
         # Add qkv_mode

@@ -89,7 +89,8 @@ SEED="${SEED:-42}"
 # 输出配置
 OUTPUT_DIR="${OUTPUT_DIR:-${EVAL_ENCODER_PATH}/glue_results}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-RUN_NAME="${METHOD}_r${RANK}_${TIMESTAMP}"
+_RANK_LABEL="${RANK:-${RETENTION:+ret${RETENTION}}}"
+RUN_NAME="${METHOD}_r${_RANK_LABEL:-auto}_${TIMESTAMP}"
 LOG_FILE="${OUTPUT_DIR}/logs/${RUN_NAME}.log"
 
 # ═════════════════════════════════════════════════════════════════════════════
