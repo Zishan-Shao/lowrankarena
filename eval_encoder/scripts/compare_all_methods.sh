@@ -61,6 +61,7 @@ TWO_STAGE="${TWO_STAGE:-false}"
 # For full test: "flashsvd naive" (test both backends)
 BACKENDS="${BACKENDS:-naive}"
 MODEL_ID="${MODEL_ID:-bert-base-uncased}"
+PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS:-false}"
 
 # ------------------------- derived settings -----------------------------------
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
@@ -79,13 +80,24 @@ echo "════════════════════════�
 echo "" | tee -a "${SUMMARY_LOG}"
 
 # Methods configuration: method_name + extra env vars
-METHODS=(
-  "dense"
-  "svd"
-  "fwsvd"
-  "drone"
-  "adasvd"
-)
+# When PRETRAIN_BEFORE_COMPRESS=true, skip dense:
+#   the pretrain step already produces the dense fine-tuned baseline (recorded as pretrain_value)
+if [[ "${PRETRAIN_BEFORE_COMPRESS}" == "true" ]]; then
+  METHODS=(
+    "svd"
+    "fwsvd"
+    "drone"
+    "adasvd"
+  )
+else
+  METHODS=(
+    "dense"
+    "svd"
+    "fwsvd"
+    "drone"
+    "adasvd"
+  )
+fi
 
 # Stages
 # Default: only test without fine-tuning (quick test)
@@ -136,6 +148,7 @@ run_one() {
   env_prefix+=("SKIP_FINETUNING=${skip_finetuning}")
   env_prefix+=("SKIP_COMPRESSION=false")
   env_prefix+=("REUSE_CHECKPOINT=${reuse_checkpoint}")
+  env_prefix+=("PRETRAIN_BEFORE_COMPRESS=${PRETRAIN_BEFORE_COMPRESS}")
   env_prefix+=("NON_INTERACTIVE=true")
 
   # Add component-specific ranks if set

@@ -36,6 +36,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from transformers import (
+    AutoConfig,
+    AutoModelForSequenceClassification,
     AutoTokenizer,
     get_linear_schedule_with_warmup,
 )
@@ -235,6 +237,9 @@ def parse_args():
                         help="Existing checkpoint to use (if skip_compression)")
     parser.add_argument("--reuse_checkpoint", action="store_true",
                         help="Automatically reuse existing checkpoint if available (non-interactive)")
+    parser.add_argument("--pretrain_before_compress", action="store_true",
+                        help="Fine-tune base model on task first, then compress the fine-tuned model, "
+                             "then fine-tune the compressed model. Pipeline: base → finetune → compress → finetune")
 
     # Output configuration
     parser.add_argument("--output_dir", default="eval_encoder/glue_results")
@@ -320,6 +325,141 @@ def calculate_rank_from_retention(retention: float, model_id: str = "bert-base-u
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Step 0 (optional): Pre-train base model before compression
+# ═══════════════════════════════════════════════════════════════════════════
+
+def pretrain_base_model(args, task: str) -> Path:
+    """Fine-tune the base model (bert-base-uncased) on a task before compression.
+
+    Saves to eval_encoder/models/{task}/pretrained_base/.
+    Returns the path to the saved checkpoint.
+    """
+    print(f"\n{'='*70}")
+    print(f"STEP 0: Pre-training base model on {task.upper()}")
+    print("="*70)
+
+    pretrain_dir = Path("eval_encoder/models") / task / "pretrained_base"
+    pretrain_info_file = pretrain_dir / "pretrain_info.json"
+
+    # Reuse if already exists
+    if pretrain_dir.exists() and args.reuse_checkpoint:
+        print(f"[exists] Pre-trained checkpoint found: {pretrain_dir}")
+        print("[info] Reusing existing pre-trained checkpoint")
+        if pretrain_info_file.exists():
+            with open(pretrain_info_file) as f:
+                saved_info = json.load(f)
+            pretrain_metric = saved_info.get("best_metric_value", 0.0)
+            print(f"[info] Pre-trained {saved_info.get('metric', '?')}: {pretrain_metric:.4f}")
+        else:
+            pretrain_metric = 0.0
+        return pretrain_dir, pretrain_metric
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    cfg = GLUE_TASKS[task]
+    import time
+    start_time = time.time()
+
+    # Load base model with correct number of labels
+    print(f"[model] Loading base model: {args.model_id}")
+    config = AutoConfig.from_pretrained(args.model_id, num_labels=cfg["num_labels"])
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_id, config=config)
+    model = model.to(device)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_id)
+
+    # Prepare data
+    print(f"\n[data] Loading {task} dataset...")
+    train_loader, val_loader = prepare_data(task, tokenizer, args.seq_len, args.batch_size)
+    print(f"[data] Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
+
+    # Optimizer and scheduler
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=args.learning_rate,
+        weight_decay=args.weight_decay,
+    )
+    total_steps = len(train_loader) * args.num_epochs
+    warmup_steps = int(total_steps * args.warmup_ratio)
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=warmup_steps,
+        num_training_steps=total_steps,
+    )
+
+    # Initial evaluation
+    initial_results, _ = evaluate_task(model, val_loader, task, device)
+    print(f"[eval] Initial (base model): {initial_results}")
+
+    best_metric_value = initial_results.get(cfg["metric"], 0)
+    best_model_state = None
+
+    # Training loop
+    print(f"\n[train] Pre-training for {args.num_epochs} epochs...")
+    for epoch in range(args.num_epochs):
+        model.train()
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.num_epochs}")
+        for batch in pbar:
+            batch = {k: v.to(device) for k, v in batch.items()}
+            outputs = model(**batch)
+            loss = outputs.loss
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+            optimizer.step()
+            scheduler.step()
+            pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+
+        results, _ = evaluate_task(model, val_loader, task, device)
+        metric_value = results.get(cfg["metric"], 0)
+        print(f"\n[epoch {epoch+1}] Results: {results}")
+        if metric_value > best_metric_value:
+            best_metric_value = metric_value
+            best_model_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+            print(f"[epoch {epoch+1}] ✓ New best {cfg['metric']}: {best_metric_value:.4f}")
+
+    # Load best model
+    if best_model_state is not None:
+        model.load_state_dict({k: v.to(device) for k, v in best_model_state.items()})
+
+    # Final evaluation
+    final_results, _ = evaluate_task(model, val_loader, task, device)
+    elapsed = time.time() - start_time
+    print(f"\n[pretrain] Final results: {final_results}")
+    print(f"[pretrain] Best {cfg['metric']}: {best_metric_value:.4f}  ({elapsed/60:.1f} min)")
+
+    # Save
+    pretrain_dir.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(str(pretrain_dir), safe_serialization=False)
+    tokenizer.save_pretrained(str(pretrain_dir))
+
+    # Save pretrain metadata (so reuse can read the metric value)
+    pretrain_info = {
+        "task": task,
+        "model_id": args.model_id,
+        "metric": cfg["metric"],
+        "best_metric_value": best_metric_value,
+        "final_results": final_results,
+        "num_epochs": args.num_epochs,
+        "learning_rate": args.learning_rate,
+        "elapsed_seconds": elapsed,
+    }
+    with open(pretrain_dir / "pretrain_info.json", "w") as f:
+        json.dump(pretrain_info, f, indent=2)
+
+    print(f"[save] Pre-trained checkpoint saved to: {pretrain_dir}")
+    print(f"[save] Best {cfg['metric']}: {best_metric_value:.4f}")
+
+    # Cleanup
+    del optimizer, scheduler
+    model = model.cpu()
+    import gc
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    return pretrain_dir, best_metric_value
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Step 1: Compression
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -345,12 +485,14 @@ def get_task_model_id(task: str, args) -> str:
     return pretrained_models[0]
 
 
-def compress_model(args, task: str = None) -> Path:
+def compress_model(args, task: str = None, model_id_override: str = None) -> Path:
     """Compress model using run_encoder_benchmark.py
 
     Args:
         args: Command line arguments
         task: Specific task (if using task-specific models)
+        model_id_override: Local checkpoint path to compress instead of HuggingFace model
+                           (used when pretrain_before_compress=True)
     """
     print("\n" + "="*70)
     print("STEP 1: Model Compression")
@@ -361,9 +503,13 @@ def compress_model(args, task: str = None) -> Path:
         print(f"[skip] Using existing checkpoint: {checkpoint_path}")
         return checkpoint_path
 
-    # Get model ID (task-specific or base)
-    model_id = get_task_model_id(task, args) if task else args.model_id
-    print(f"[model] Using model: {model_id}")
+    # Get model ID: override (pre-trained local ckpt) > task-specific HF model > base model
+    if model_id_override:
+        model_id = model_id_override
+        print(f"[model] Compressing from local pre-trained checkpoint: {model_id}")
+    else:
+        model_id = get_task_model_id(task, args) if task else args.model_id
+        print(f"[model] Using model: {model_id}")
 
     # Calculate rank from retention rate if specified
     if args.retention is not None and args.method not in ["dense", "adasvd"]:
@@ -1062,18 +1208,32 @@ def run_pipeline(args):
         print(f"Batch size:  {args.batch_size}")
         print(f"LR:          {args.learning_rate}")
     print("="*70)
+    if args.pretrain_before_compress:
+        print(f"[mode] Pretrain-before-compress: base → finetune → compress → finetune")
 
-    # Step 1 & 2: For each task, compress task-specific model and fine-tune (or just evaluate)
+    # Step 0/1/2: For each task
     for task in args.tasks:
         try:
-            # Compress model (task-specific if enabled)
-            if args.use_task_models:
+            # Step 0 (optional): pre-train base model on task
+            model_id_override = None
+            pretrain_metric_value = None
+            if args.pretrain_before_compress:
+                pretrained_ckpt, pretrain_metric_value = pretrain_base_model(args, task)
+                model_id_override = str(pretrained_ckpt)
+
+            # Step 1: Compress model
+            if args.pretrain_before_compress:
+                # Always per-task when pretrain_before_compress (each task has its own pre-trained base)
+                print(f"\n[task] Compressing pre-trained model for: {task.upper()}")
+                checkpoint_path = compress_model(args, task=task, model_id_override=model_id_override)
+                checkpoint_paths.append(str(checkpoint_path))
+            elif args.use_task_models:
                 print(f"\n[task] Processing task-specific model for: {task.upper()}")
                 checkpoint_path = compress_model(args, task=task)
                 checkpoint_paths.append(str(checkpoint_path))
             else:
                 # Use shared compressed model for all tasks
-                if checkpoint_path is None:  # Compress once (handles first task or recovery from failure)
+                if checkpoint_path is None:
                     print(f"\n[shared] Compressing shared model (will be used for all tasks)")
                     checkpoint_path = compress_model(args, task=None)
                     checkpoint_paths.append(str(checkpoint_path))
@@ -1086,6 +1246,11 @@ def run_pipeline(args):
                 results = evaluate_compressed_model(checkpoint_path, task, args)
             else:
                 results = finetune_on_task(checkpoint_path, task, args)
+
+            # Inject pre-training metric if available
+            if pretrain_metric_value is not None:
+                results["metrics"]["pretrain_value"] = pretrain_metric_value
+                results["pretrain_value"] = pretrain_metric_value  # legacy field
 
             all_results.append(results)
         except Exception as e:
@@ -1138,11 +1303,16 @@ def run_pipeline(args):
         }, f, indent=2)
 
     # Print detailed summary
-    print("\n" + "="*100)
+    has_pretrain = any("pretrain_value" in r for r in all_results)
+
+    print("\n" + "="*115)
     print("GLUE Benchmark Detailed Results")
-    print("="*100)
-    print(f"{'Task':<8} | {'Metric':<18} | {'Initial':>7} | {'Final':>7} | {'Δ':>7} | {'Time':<8} | {'Throughput':<12} | {'Latency':<10}")
-    print("-"*100)
+    print("="*115)
+    if has_pretrain:
+        print(f"{'Task':<8} | {'Metric':<18} | {'Pretrain':>8} | {'Initial':>7} | {'Final':>7} | {'Δ':>7} | {'Time':<8} | {'Throughput':<12} | {'Latency':<10}")
+    else:
+        print(f"{'Task':<8} | {'Metric':<18} | {'Initial':>7} | {'Final':>7} | {'Δ':>7} | {'Time':<8} | {'Throughput':<12} | {'Latency':<10}")
+    print("-"*115)
     for result in all_results:
         task = result["task"]
         metric = result["best_metric"]
@@ -1156,8 +1326,13 @@ def run_pipeline(args):
         throughput = speed.get("throughput_samples_per_sec", 0)
         latency = speed.get("latency_ms_per_batch", 0)
 
-        print(f"{task.upper():<8} | {metric:<18} | {initial:7.4f} | {final:7.4f} | {improvement:+7.4f} | {train_time:6.1f}m | {throughput:8.1f} s/s | {latency:7.2f} ms")
-    print("="*100)
+        if has_pretrain:
+            pretrain = result.get("pretrain_value")
+            pretrain_str = f"{pretrain:8.4f}" if pretrain is not None else "       -"
+            print(f"{task.upper():<8} | {metric:<18} | {pretrain_str} | {initial:7.4f} | {final:7.4f} | {improvement:+7.4f} | {train_time:6.1f}m | {throughput:8.1f} s/s | {latency:7.2f} ms")
+        else:
+            print(f"{task.upper():<8} | {metric:<18} | {initial:7.4f} | {final:7.4f} | {improvement:+7.4f} | {train_time:6.1f}m | {throughput:8.1f} s/s | {latency:7.2f} ms")
+    print("="*115)
     print(f"\n{'Final Evaluation Scores':^100}")
     print("="*100)
     print(f"G-Avg (GLUE Average):")

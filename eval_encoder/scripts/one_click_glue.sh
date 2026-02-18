@@ -80,6 +80,7 @@ TASKS="${TASKS:-cola sst2 mrpc qqp mnli qnli rte stsb}"
 # 训练配置
 SKIP_FINETUNING="${SKIP_FINETUNING:-false}"   # 默认进行微调 (设为 true 可跳过微调,仅评估)
 REUSE_CHECKPOINT="${REUSE_CHECKPOINT:-true}"  # 自动重用现有 checkpoint (docker 环境必需)
+PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS:-false}"  # 先微调base model再压缩再微调
 NUM_EPOCHS="${NUM_EPOCHS:-3}"
 BATCH_SIZE="${BATCH_SIZE:-32}"                # Batch size (建议 32 以提高吞吐量)
 LEARNING_RATE="${LEARNING_RATE:-2e-5}"
@@ -294,6 +295,10 @@ EOF
 
     if [ "$REUSE_CHECKPOINT" = "true" ]; then
         CMD="$CMD --reuse_checkpoint"
+    fi
+
+    if [ "$PRETRAIN_BEFORE_COMPRESS" = "true" ]; then
+        CMD="$CMD --pretrain_before_compress"
     fi
 
     eval $CMD
