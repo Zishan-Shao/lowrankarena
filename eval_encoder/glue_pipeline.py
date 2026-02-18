@@ -456,6 +456,25 @@ def pretrain_base_model(args, task: str) -> Path:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
+    # Write pretrain score to encoder_runs.csv via run_encoder_benchmark.py --method dense
+    # This records the pretrained baseline in the same CSV as all other methods
+    print(f"\n[pretrain] Recording pretrain score to CSV...")
+    csv_cmd = [
+        "python", "eval_encoder/run_encoder_benchmark.py",
+        "--model_id", str(pretrain_dir),
+        "--method", "dense",
+        "--backend", "naive",
+        "--task", task,
+        "--seq_len", str(args.seq_len),
+        "--batch_size", str(args.batch_size),
+        "--dtype", "fp32",
+        "--full_validation",
+        "--notes", "pretrained_base",
+    ]
+    result = subprocess.run(csv_cmd, capture_output=False)
+    if result.returncode != 0:
+        print(f"[warn] CSV recording failed (exit={result.returncode}), continuing anyway")
+
     return pretrain_dir, best_metric_value
 
 
