@@ -420,8 +420,8 @@ def pretrain_base_model(args, task: str) -> Path:
     pretrain_dir = Path("eval_encoder/models") / task / "pretrained_base"
     pretrain_info_file = pretrain_dir / "pretrain_info.json"
 
-    # Reuse if already exists
-    if pretrain_dir.exists() and args.reuse_checkpoint:
+    # Reuse if already exists (pretrain is expensive and deterministic; always reuse)
+    if pretrain_dir.exists():
         print(f"[exists] Pre-trained checkpoint found: {pretrain_dir}")
         print("[info] Reusing existing pre-trained checkpoint")
         if pretrain_info_file.exists():
