@@ -100,12 +100,14 @@ else
 fi
 
 # Stages
-# pretrain_before_compress 模式下只有一个阶段：预训练→压缩→微调（必须微调）
-# 普通模式：默认只跑 no_finetune（快速验证），TWO_STAGE=true 时跑两阶段
-if [[ "${PRETRAIN_BEFORE_COMPRESS}" == "true" ]]; then
-  STAGES=("with_finetune")
-elif [[ "${TWO_STAGE}" == "true" ]]; then
+# TWO_STAGE=true 时跑两阶段（no_finetune 看压缩后精度，with_finetune 看微调后精度）
+# 普通模式：默认只跑 no_finetune（快速验证）
+# pretrain_before_compress 模式：默认只跑 with_finetune（必须微调才有意义）
+#   但若同时设置 TWO_STAGE=true，则也跑 no_finetune（观察压缩损失）
+if [[ "${TWO_STAGE}" == "true" ]]; then
   STAGES=("no_finetune" "with_finetune")
+elif [[ "${PRETRAIN_BEFORE_COMPRESS}" == "true" ]]; then
+  STAGES=("with_finetune")
 else
   STAGES=("no_finetune")
 fi
