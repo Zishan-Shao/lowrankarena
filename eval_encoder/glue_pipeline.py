@@ -1398,34 +1398,50 @@ def run_pipeline(args):
     # Print detailed summary
     has_pretrain = any("pretrain_value" in r for r in all_results)
 
-    print("\n" + "="*115)
-    print("GLUE Benchmark Detailed Results")
-    print("="*115)
     if has_pretrain:
-        print(f"{'Task':<8} | {'Metric':<18} | {'Pretrain':>8} | {'Initial':>7} | {'Final':>7} | {'Δ':>7} | {'Time':<8} | {'Throughput':<12} | {'Latency':<10}")
+        # pretrain_before_compress mode:
+        # Pretrain | Compressed | Finetuned | Δ(ft-pre)
+        # Δ = Finetuned - Pretrain (net effect vs original baseline)
+        W = 125
+        print("\n" + "="*W)
+        print("GLUE Benchmark Detailed Results  [mode: pretrain → compress → finetune]")
+        print("="*W)
+        print(f"{'Task':<8} | {'Metric':<18} | {'Pretrain':>8} | {'Compressed':>10} | {'Finetuned':>9} | {'Δ(ft-pre)':>9} | {'Time':<8} | {'Throughput':<12} | {'Latency':<10}")
+        print("-"*W)
+        for result in all_results:
+            task = result["task"]
+            metric = result["best_metric"]
+            pretrain  = result.get("pretrain_value")
+            compressed = result["initial_results"].get(metric, 0)   # after compress, before ft
+            finetuned  = result["best_value"]                        # after post-compress ft
+            delta = (finetuned - pretrain) if pretrain is not None else (finetuned - compressed)
+            train_time = result.get("training", {}).get("time_minutes", 0)
+            speed = result.get("inference_speed", {})
+            throughput = speed.get("throughput_samples_per_sec", 0)
+            latency = speed.get("latency_ms_per_batch", 0)
+            pre_str = f"{pretrain:8.4f}" if pretrain is not None else "       -"
+            print(f"{task.upper():<8} | {metric:<18} | {pre_str} | {compressed:10.4f} | {finetuned:9.4f} | {delta:+9.4f} | {train_time:6.1f}m | {throughput:8.1f} s/s | {latency:7.2f} ms")
+        print("="*W)
     else:
-        print(f"{'Task':<8} | {'Metric':<18} | {'Initial':>7} | {'Final':>7} | {'Δ':>7} | {'Time':<8} | {'Throughput':<12} | {'Latency':<10}")
-    print("-"*115)
-    for result in all_results:
-        task = result["task"]
-        metric = result["best_metric"]
-        initial = result["initial_results"].get(metric, 0)
-        final = result["final_results"].get(metric, 0)
-        improvement = final - initial
-        train_time = result.get("training", {}).get("time_minutes", 0)
-
-        # Get speed metrics
-        speed = result.get("inference_speed", {})
-        throughput = speed.get("throughput_samples_per_sec", 0)
-        latency = speed.get("latency_ms_per_batch", 0)
-
-        if has_pretrain:
-            pretrain = result.get("pretrain_value")
-            pretrain_str = f"{pretrain:8.4f}" if pretrain is not None else "       -"
-            print(f"{task.upper():<8} | {metric:<18} | {pretrain_str} | {initial:7.4f} | {final:7.4f} | {improvement:+7.4f} | {train_time:6.1f}m | {throughput:8.1f} s/s | {latency:7.2f} ms")
-        else:
-            print(f"{task.upper():<8} | {metric:<18} | {initial:7.4f} | {final:7.4f} | {improvement:+7.4f} | {train_time:6.1f}m | {throughput:8.1f} s/s | {latency:7.2f} ms")
-    print("="*115)
+        # Normal mode: Before FT | After FT | Δ
+        W = 115
+        print("\n" + "="*W)
+        print("GLUE Benchmark Detailed Results")
+        print("="*W)
+        print(f"{'Task':<8} | {'Metric':<18} | {'Before FT':>9} | {'After FT':>8} | {'Δ':>7} | {'Time':<8} | {'Throughput':<12} | {'Latency':<10}")
+        print("-"*W)
+        for result in all_results:
+            task = result["task"]
+            metric = result["best_metric"]
+            initial = result["initial_results"].get(metric, 0)
+            final = result["best_value"]
+            improvement = final - initial
+            train_time = result.get("training", {}).get("time_minutes", 0)
+            speed = result.get("inference_speed", {})
+            throughput = speed.get("throughput_samples_per_sec", 0)
+            latency = speed.get("latency_ms_per_batch", 0)
+            print(f"{task.upper():<8} | {metric:<18} | {initial:9.4f} | {final:8.4f} | {improvement:+7.4f} | {train_time:6.1f}m | {throughput:8.1f} s/s | {latency:7.2f} ms")
+        print("="*W)
     print(f"\n{'Final Evaluation Scores':^100}")
     print("="*100)
     print(f"G-Avg (GLUE Average):")
