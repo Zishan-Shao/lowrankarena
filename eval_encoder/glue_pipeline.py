@@ -237,7 +237,7 @@ def parse_args():
                         help="Automatically reuse existing checkpoint if available (non-interactive)")
 
     # Output configuration
-    parser.add_argument("--output_dir", default="glue_results")
+    parser.add_argument("--output_dir", default="eval_encoder/glue_results")
     parser.add_argument("--save_models", action="store_true",
                         help="Save fine-tuned models")
 
@@ -390,14 +390,14 @@ def compress_model(args, task: str = None) -> Path:
             model_name = f"{args.method}_rNone_{args.qkv_mode}_{args.backend}"
 
     # Use subdirectory structure when using task-specific models to prevent conflicts
-    # Structure: models/{task}/{model_name}
+    # Structure: eval_encoder/models/{task}/{model_name}
     # This allows each task to have its own checkpoint without name collisions
     if task and args.use_task_models:
-        checkpoint_path = Path("models") / task / model_name
-        save_dir = str(Path("models") / task)
+        checkpoint_path = Path("eval_encoder/models") / task / model_name
+        save_dir = str(Path("eval_encoder/models") / task)
     else:
-        checkpoint_path = Path("models") / model_name
-        save_dir = "models"
+        checkpoint_path = Path("eval_encoder/models") / model_name
+        save_dir = "eval_encoder/models"
 
     # Check if already exists
     if checkpoint_path.exists():
