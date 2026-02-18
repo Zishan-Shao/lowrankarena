@@ -102,6 +102,7 @@ dependencies:
       - orjson==3.11.3
       - packaging==25.0
       - pandas==2.3.3
+      - pyarrow==22.0.0
       - pillow==11.3.0
       - propcache==0.4.1
       - protobuf==6.33.2

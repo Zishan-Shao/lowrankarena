@@ -19,6 +19,40 @@ parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(current_path)
 
 
+def _safe_cholesky_spd(mat: torch.Tensor, base_eps: float = 1e-6, max_tries: int = 10) -> torch.Tensor:
+    """
+    Robust Cholesky for nearly-SPD matrices:
+    - symmetrize
+    - sanitize NaN/Inf
+    - try cholesky_ex
+    - if it fails, add increasing diagonal jitter until it succeeds
+    This avoids eigvalsh/eigh, which can fail to converge on ill-conditioned large matrices.
+    """
+    mat = (mat + mat.t()) * 0.5
+    mat = torch.nan_to_num(mat, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # Try without jitter first (fast path)
+    L, info = torch.linalg.cholesky_ex(mat)
+    if int(info.item()) == 0:
+        return L
+
+    eye = torch.eye(mat.shape[0], device=mat.device, dtype=mat.dtype)
+
+    dmean = mat.diag().abs().mean()
+    scale = float(dmean.item()) if torch.isfinite(dmean) and dmean.item() > 0 else 1.0
+
+    jitter = base_eps * scale
+    for _ in range(max_tries):
+        L, info = torch.linalg.cholesky_ex(mat + jitter * eye)
+        if int(info.item()) == 0:
+            return L
+        jitter *= 10.0
+
+    # Last resort: very large damping
+    return torch.linalg.cholesky(mat + jitter * eye)
+
+
+
 def _compat_enabled(key: str, default: bool = False) -> bool:
     """Check compatibility flags from environment.
 
@@ -118,11 +152,16 @@ def profle_svdllm(name, model, calib_loader, dev):
         x = input[0].detach()
         if x.dim() == 3:
             x = x.reshape(-1, x.shape[-1])
-        elif x.dim() == 2:
-            pass
-        else:
+        elif x.dim() != 2:
             x = x.view(-1, x.shape[-1])
-        x = x.to(dtype=torch.float64, device=dev)
+
+        if compat_whitening:
+            stats_dev = module._acc.device
+        else:
+            stats_dev = module._second.device
+
+        x = x.to(device=stats_dev, dtype=torch.float64)
+
         if compat_whitening:
             module._acc += x.t().matmul(x)
         else:
@@ -185,7 +224,7 @@ def profle_svdllm(name, model, calib_loader, dev):
                 cov = second / count - torch.outer(mean / count, mean / count)
                 cov = (cov + cov.t()) * 0.5
                 try:
-                    scaling = torch.linalg.cholesky(cov)
+                    scaling = _safe_cholesky_spd(cov, base_eps=1e-6, max_tries=12)
                 except Exception:
                     # First try scale-aware diagonal jitter
                     dmean = cov.diag().abs().mean().item()
@@ -239,8 +278,10 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
     use_cpu_buffers = True if str(dev).startswith('cuda') else False
     buf_device = torch.device('cpu') if use_cpu_buffers else dev
     pin = True if use_cpu_buffers else False
+    calib_seqlen = int(calib_loader[0]["input_ids"].shape[-1])
+    model.seqlen = calib_seqlen
     inps = torch.zeros(
-        (len(calib_loader), model.seqlen, model.config.hidden_size),
+        (len(calib_loader), calib.seqlen, model.config.hidden_size),
         dtype=dtype,
         device=buf_device,
         pin_memory=pin,
@@ -386,7 +427,7 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
                 cov = second / count - torch.outer(mean / count, mean / count)
                 cov = (cov + cov.t()) * 0.5
                 try:
-                    scaling = torch.linalg.cholesky(cov)
+                    scaling = _safe_cholesky_spd(cov, base_eps=1e-6, max_tries=12)
                 except Exception:
                     # First try scale-aware diagonal jitter
                     dmean = cov.diag().abs().mean().item()
@@ -918,6 +959,7 @@ if __name__ == '__main__':
     args.ratio = 1- args.ratio
     if args.step == 1:
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
+        model.seqlen = args.model_seq_len
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
         model = model.eval()
         if args.profiling_mat_path is None:
@@ -932,6 +974,7 @@ if __name__ == '__main__':
             torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_whitening_only_' + str(args.ratio) + '.pt')   # fp32
     elif args.step == 2:
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
+        model.seqlen = args.model_seq_len
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
         dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
         model = model.eval()

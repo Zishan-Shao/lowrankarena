@@ -65,11 +65,11 @@ CUDA_VISIBLE_DEVICES=3 python eval_general_ppl.py \
 '''
 
 # Ensure repo root is on PYTHONPATH
-_REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
-
-from utils.model_utils import get_model_from_local
+from utils.model_utils import get_model_from_local, get_model_from_huggingface
 from evaluater import ppl_eval
 
 
@@ -126,6 +126,7 @@ def _legacy_ppl_eval(
     label: str,
     max_batches: Optional[int] = None,
 ):
+
     """
     Legacy sample-mean PPL: mimic the provided baseline code.
     Uses input_ids[:, :-1], then shifts logits again, and normalizes by (num_samples * seqlen).
@@ -338,6 +339,14 @@ def main() -> None:
     )
     args = p.parse_args()
 
+    def _load_ours(ckpt_or_dir: str):
+        # If it's a repo checkpoint (.pt), use the repo loader
+        if ckpt_or_dir.endswith(".pt"):
+            return get_model_from_local(ckpt_or_dir)
+        # Otherwise treat it as HF model id OR local HF directory
+        return get_model_from_huggingface(ckpt_or_dir, hf_token=args.hf_token)
+
+
     if args.dobi_model:
         if args.dobi_remapping and args.dobi_unremapping:
             raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
@@ -465,7 +474,7 @@ def main() -> None:
         if not args.checkpoint or not args.dobi_model:
             raise ValueError("--compare_dobi requires both --checkpoint and --dobi_model.")
         print("[Compare] Evaluating our checkpoint...")
-        model, tokenizer = get_model_from_local(args.checkpoint)
+        model, tokenizer = _load_ours(args.checkpoint)
         _run_with_sets(model, tokenizer, label_prefix=f"{args.label} (ours)")
         print("[Compare] Evaluating Dobi checkpoint...")
         remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
@@ -490,7 +499,7 @@ def main() -> None:
         )
         _run_with_sets(model, tokenizer, label_prefix=args.label)
     else:
-        model, tokenizer = get_model_from_local(args.checkpoint)
+        model, tokenizer = _load_ours(args.checkpoint)
         _run_with_sets(model, tokenizer, label_prefix=args.label)
 
 

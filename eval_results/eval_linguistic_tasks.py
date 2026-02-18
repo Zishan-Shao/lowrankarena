@@ -14,7 +14,7 @@ _LM_EVAL_ROOT = os.path.join(_REPO_ROOT, "lm-evaluation-harness")
 if os.path.isdir(_LM_EVAL_ROOT) and _LM_EVAL_ROOT not in sys.path:
     sys.path.insert(0, _LM_EVAL_ROOT)
 
-from utils.model_utils import get_model_from_local
+from utils.model_utils import get_model_from_local, get_model_from_huggingface
 
 
 def _parse_tasks(s: str) -> List[str]:
@@ -222,6 +222,13 @@ def main() -> None:
         description="Evaluate linguistic tasks (lm-eval) for local or Dobi checkpoints."
     )
     p.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="HF model id or local directory (from save_pretrained). If provided, overrides --checkpoint.",
+    )
+
+    p.add_argument(
         "--checkpoint",
         type=str,
         default=None,
@@ -269,9 +276,9 @@ def main() -> None:
         if args.dobi_remapping and args.dobi_unremapping:
             raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
     else:
-        if not args.checkpoint:
-            raise ValueError("Please provide --checkpoint or --dobi_model.")
-        if not os.path.exists(args.checkpoint):
+        if not args.model and not args.checkpoint:
+            raise ValueError("Please provide --model, --checkpoint or --dobi_model.")
+        if args.checkpoint and not os.path.exists(args.checkpoint):
             raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
 
     if args.device.startswith("cuda") and not torch.cuda.is_available():
@@ -288,8 +295,12 @@ def main() -> None:
         )
         model_name = args.dobi_model
     else:
-        model, tokenizer = get_model_from_local(args.checkpoint)
-        model_name = args.checkpoint
+        if args.model:
+            model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
+            model_name = args.model
+        else:
+            model, tokenizer = get_model_from_local(args.checkpoint)
+            model_name = args.checkpoint
 
     model = _to_device(model, args.device, args.dtype)
     model.eval()
