@@ -627,8 +627,9 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
 
     # Use subdirectory structure when using task-specific models to prevent conflicts
     # Structure: eval_encoder/models/{task}/{model_name}
-    # This allows each task to have its own checkpoint without name collisions
-    if task and args.use_task_models:
+    # Also required when pretrain_before_compress (model_id_override set): each task
+    # has its own pretrained base, so compressed checkpoints must be task-specific too.
+    if task and (args.use_task_models or model_id_override is not None):
         checkpoint_path = Path("eval_encoder/models") / task / model_name
         save_dir = str(Path("eval_encoder/models") / task)
     else:
