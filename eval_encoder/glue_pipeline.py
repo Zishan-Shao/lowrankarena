@@ -471,7 +471,8 @@ def pretrain_base_model(args, task: str) -> Path:
     best_metric_value = initial_results.get(cfg["metric"], 0)
     best_model_state = None
 
-    # Training loop
+    # Training loop (ensure grad is enabled — finetune_on_task() disables it globally after cleanup)
+    torch.set_grad_enabled(True)
     print(f"\n[train] Pre-training for {args.num_epochs} epochs...")
     for epoch in range(args.num_epochs):
         model.train()
@@ -1057,7 +1058,8 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
     initial_results, initial_loss = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
     print(f"[eval] Before fine-tuning: {initial_results}")
 
-    # Training loop
+    # Training loop (ensure grad is enabled — previous task cleanup may have disabled it globally)
+    torch.set_grad_enabled(True)
     print(f"\n[train] Training for {args.num_epochs} epochs...")
     best_metric_value = initial_results.get(cfg["metric"], 0)
     best_model_state = None
