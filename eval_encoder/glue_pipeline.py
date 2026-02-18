@@ -328,11 +328,10 @@ def calculate_rank_from_retention(retention: float, model_id: str = "bert-base-u
 # Step 0 (optional): Pre-train base model before compression
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _write_pretrain_csv_row(pretrain_dir, task, metric_name, metric_value, args):
-    """Write pretrain baseline score directly to encoder_runs.csv."""
+def _write_csv_row(row_data: dict):
+    """Append a row to encoder_runs.csv, creating it with header if needed."""
     import csv as csv_mod
     csv_path = "eval_encoder/eval_results/encoder_runs.csv"
-    # Match CSV_FIELDS from run_encoder_benchmark.py
     fields = [
         "timestamp", "model_id", "task", "dataset_split", "dataset_size",
         "seq_len", "batch_size", "dtype",
@@ -346,7 +345,18 @@ def _write_pretrain_csv_row(pretrain_dir, task, metric_name, metric_value, args)
         "notes", "git_commit",
     ]
     row = {f: "" for f in fields}
-    row.update({
+    row.update(row_data)
+    write_header = not Path(csv_path).exists()
+    with open(csv_path, "a", newline="") as f:
+        writer = csv_mod.DictWriter(f, fieldnames=fields)
+        if write_header:
+            writer.writeheader()
+        writer.writerow(row)
+
+
+def _write_pretrain_csv_row(pretrain_dir, task, metric_name, metric_value, args):
+    """Write pretrain baseline score directly to encoder_runs.csv."""
+    _write_csv_row({
         "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "model_id": str(pretrain_dir),
         "task": task,
@@ -361,13 +371,41 @@ def _write_pretrain_csv_row(pretrain_dir, task, metric_name, metric_value, args)
         "metric_value": f"{metric_value:.6f}",
         "notes": f"pretrain_before_compress epochs={args.num_epochs} lr={args.learning_rate}",
     })
-    write_header = not Path(csv_path).exists()
-    with open(csv_path, "a", newline="") as f:
-        writer = csv_mod.DictWriter(f, fieldnames=fields)
-        if write_header:
-            writer.writeheader()
-        writer.writerow(row)
-    print(f"[pretrain] CSV row written: {metric_name}={metric_value:.4f} → {csv_path}")
+    print(f"[pretrain] CSV row written: {metric_name}={metric_value:.4f}")
+
+
+def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
+    """Write post-compression fine-tuning result to encoder_runs.csv."""
+    cfg = GLUE_TASKS[task]
+    metric_name = cfg["metric"]
+    best_value = results.get("best_value", results.get("metrics", {}).get("best_value", 0.0))
+
+    # Build rank/budget label from args
+    if args.method == "adasvd":
+        rank_str = ""
+        budget_str = str(args.budget) if args.budget is not None else ""
+    else:
+        rank_str = str(args.rank) if args.rank is not None else ""
+        budget_str = ""
+
+    _write_csv_row({
+        "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "model_id": str(checkpoint_path),
+        "task": task,
+        "dataset_split": "validation",
+        "seq_len": str(args.seq_len),
+        "batch_size": str(args.batch_size),
+        "dtype": "fp32",
+        "method": f"{args.method}_finetuned",
+        "rank": rank_str,
+        "budget": budget_str,
+        "backend": args.backend,
+        "seed": str(args.seed),
+        "metric_name": metric_name,
+        "metric_value": f"{best_value:.6f}",
+        "notes": f"post_compress_finetune epochs={args.num_epochs} lr={args.learning_rate}",
+    })
+    print(f"[finetune] CSV row written: {metric_name}={best_value:.4f}")
 
 def pretrain_base_model(args, task: str) -> Path:
     """Fine-tune the base model (bert-base-uncased) on a task before compression.
@@ -1302,6 +1340,10 @@ def run_pipeline(args):
             if pretrain_metric_value is not None:
                 results["metrics"]["pretrain_value"] = pretrain_metric_value
                 results["pretrain_value"] = pretrain_metric_value  # legacy field
+
+            # Write post-compression fine-tune result to CSV (if fine-tuning was done)
+            if not args.skip_finetuning:
+                _write_finetune_csv_row(checkpoint_path, task, results, args)
 
             all_results.append(results)
         except Exception as e:
