@@ -1405,6 +1405,11 @@ def main():
     print(f"  backend  : {args.backend}")
     if args.qkv_mode == "full":
         print(f"  qkv_mode : {args.qkv_mode} (paper-style full-matrix SVD)")
+        if args.backend == "flashsvd":
+            raise ValueError(
+                "--qkv_mode full is not compatible with --backend flashsvd. "
+                "FlashSVD kernels require per-head format (use --qkv_mode per_head)."
+            )
     print(f"  dtype    : {args.dtype}  device={args.device}")
     if args.calib_task and args.calib_task != args.task:
         print(f"  calib_task: {args.calib_task}  (cross-task calibration: eval={args.task})")
@@ -1545,7 +1550,7 @@ def main():
         if args.method == "dense":
             model_name = "dense_naive"
         elif args.method == "adasvd":
-            model_name = f"{args.method}_b{args.budget}_{args.backend}"
+            model_name = f"{args.method}_b{args.budget}_{args.qkv_mode}_{args.backend}"
         else:
             # For SVD-based methods, include rank and qkv_mode info in name
             # Use component-specific naming if specified

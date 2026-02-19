@@ -791,6 +791,13 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
         model_id = get_task_model_id(task, args) if task else args.model_id
         print(f"[model] Using model: {model_id}")
 
+    # Validate incompatible option combinations
+    if getattr(args, "qkv_mode", "per_head") == "full" and getattr(args, "backend", "naive") == "flashsvd":
+        raise ValueError(
+            "--qkv_mode full is not compatible with --backend flashsvd. "
+            "FlashSVD kernels require per-head format (use --qkv_mode per_head)."
+        )
+
     # Calculate rank from retention rate if specified
     if args.retention is not None and args.method not in ["dense", "adasvd"]:
         args.rank = calculate_rank_from_retention(args.retention, model_id)
@@ -799,7 +806,7 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
     # NOTE: Must match run_encoder_benchmark.py's naming convention exactly
     # No task suffix, no retention suffix (retention is just a way to calculate rank)
     if args.method == "adasvd":
-        model_name = f"{args.method}_b{args.budget}_{args.backend}"
+        model_name = f"{args.method}_b{args.budget}_{args.qkv_mode}_{args.backend}"
     elif args.method == "dense":
         model_name = "dense_naive"
     else:
