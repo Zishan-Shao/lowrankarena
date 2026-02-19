@@ -1756,7 +1756,7 @@ def run_pipeline(args):
                 print(f"\n[task] Compressing pre-trained model for: {task.upper()}")
                 checkpoint_path = compress_model(args, task=task, model_id_override=model_id_override)
                 checkpoint_paths.append(str(checkpoint_path))
-            elif args.use_task_models:
+            elif args.use_task_models or getattr(args, 'local_pretrained_dir', None):
                 print(f"\n[task] Processing task-specific model for: {task.upper()}")
                 checkpoint_path = compress_model(args, task=task)
                 checkpoint_paths.append(str(checkpoint_path))

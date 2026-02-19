@@ -291,9 +291,11 @@ EOF
     fi
 
     # Add task-specific model flag
-    # LOCAL_PRETRAINED_DIR takes priority over USE_TASK_MODELS (handled in glue_pipeline.py)
+    # When LOCAL_PRETRAINED_DIR is set, also pass --use_task_models so run_pipeline()
+    # uses per-task compression (not shared model). get_task_model_id() will then
+    # prefer the local path over HuggingFace.
     if [ -n "$LOCAL_PRETRAINED_DIR" ]; then
-        CMD="$CMD --local_pretrained_dir $LOCAL_PRETRAINED_DIR"
+        CMD="$CMD --local_pretrained_dir $LOCAL_PRETRAINED_DIR --use_task_models"
     elif [ "$USE_TASK_MODELS" = "true" ]; then
         CMD="$CMD --use_task_models --task_model_prefix $TASK_MODEL_PREFIX"
     fi
