@@ -425,9 +425,16 @@ def parse_args():
     # Validate rank/retention mutual exclusivity and set defaults
     if args.method != "adasvd" and args.method != "dense":
         if args.rank is None and args.retention is None:
-            # Default: rank=300
-            args.rank = 300
-            print(f"[info] Using default rank=300")
+            # Skip default if all component ranks are explicitly provided
+            _all_components_set = (
+                args.rank_attn is not None and
+                args.rank_ffn is not None and
+                args.rank_wo is not None
+            )
+            if not _all_components_set:
+                args.rank = 300
+                print(f"[info] Using default rank=300")
+            # else: all component ranks specified; global rank not needed
         elif args.rank is not None and args.retention is not None:
             parser.error("--rank and --retention are mutually exclusive. Please specify only one.")
         elif args.retention is not None:
@@ -563,7 +570,13 @@ def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
         rank_str = ""
         budget_str = str(args.budget) if args.budget is not None else ""
     else:
-        rank_str = str(args.rank) if args.rank is not None else ""
+        if args.rank_attn is not None or args.rank_ffn is not None or args.rank_wo is not None:
+            ra = args.rank_attn if args.rank_attn is not None else args.rank
+            rf = args.rank_ffn if args.rank_ffn is not None else args.rank
+            rw = args.rank_wo if args.rank_wo is not None else args.rank
+            rank_str = f"ra{ra}_rf{rf}_rw{rw}"
+        else:
+            rank_str = str(args.rank) if args.rank is not None else ""
         budget_str = ""
 
     ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
