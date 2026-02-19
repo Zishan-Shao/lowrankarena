@@ -24,6 +24,23 @@ if _REPO_ROOT not in sys.path:
 from eval_encoder.blocks import BertLayerShim, NaiveSVDBlock
 
 
+class _LowRankLinear(nn.Module):
+    """Drop-in for nn.Linear: W ≈ A @ Bt. Matches adasvd_origin compress_adasvd_naive."""
+    def __init__(self, A: torch.Tensor, Bt: torch.Tensor,
+                 bias: "torch.Tensor | None" = None):
+        super().__init__()
+        self.A    = nn.Parameter(A,  requires_grad=False)
+        self.Bt   = nn.Parameter(Bt, requires_grad=False)
+        self.bias = nn.Parameter(bias.detach().clone(),
+                                 requires_grad=False) if bias is not None else None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = x @ self.Bt.t() @ self.A.t()
+        if self.bias is not None:
+            out = out + self.bias
+        return out
+
+
 def load_compressed_model(
     checkpoint_path: str,
     device: str = "cuda",
@@ -170,6 +187,41 @@ def load_compressed_model(
         config=config,
         trust_remote_code=True,
     )
+
+    # ── AdaSVD-origin branch: _LowRankLinear format (A / Bt keys) ────────────
+    # adasvd_origin replaces every nn.Linear with _LowRankLinear(A, Bt).
+    # Checkpoint keys look like "bert.encoder.layer.0.attention.self.query.A".
+    # No ".block." prefix → the SVD-block reconstruction below would skip all layers.
+    has_lrl = any(k.endswith(".A") for k in state_dict.keys())
+    if has_lrl:
+        print("[load] Detected _LowRankLinear format (adasvd_origin) — restoring A/Bt layers")
+        replaced = 0
+        for name, module in list(base_model.named_modules()):
+            if not isinstance(module, nn.Linear):
+                continue
+            A_key  = f"{name}.A"
+            Bt_key = f"{name}.Bt"
+            if A_key not in state_dict or Bt_key not in state_dict:
+                continue
+            bias_val = state_dict.get(f"{name}.bias")
+            lrl = _LowRankLinear(state_dict[A_key], state_dict[Bt_key], bias_val)
+            *parts, last = name.split(".")
+            parent = base_model
+            for part in parts:
+                parent = getattr(parent, part)
+            setattr(parent, last, lrl)
+            replaced += 1
+        print(f"[load] Replaced {replaced} Linear ops with _LowRankLinear")
+        # Load all remaining params (embeddings, layernorms, classifier, pooler)
+        non_lrl = {k: v for k, v in state_dict.items()
+                   if not k.endswith(".A") and not k.endswith(".Bt")}
+        missing, unexpected = base_model.load_state_dict(non_lrl, strict=False)
+        if missing:
+            print(f"[warn] Missing keys after adasvd reload: {len(missing)}")
+        base_model = base_model.to(device=device, dtype=dtype).eval()
+        print(f"[load] adasvd model loaded: {sum(p.numel() for p in base_model.parameters())/1e6:.1f}M params")
+        return base_model, tokenizer, comp_info
+    # ── END adasvd-origin branch ──────────────────────────────────────────────
 
     # Detect number of layers from state_dict
     # Works for all architectures:
