@@ -263,44 +263,79 @@ def train_adasvd_ranks(
 
 # ── Compression functions (unchanged from adasvd_refactored) ─────────────────
 
+class _LowRankLinear(nn.Module):
+    """
+    Drop-in nn.Linear replacement: W ≈ A @ Bt where A=[out,r], Bt=[r,in].
+    Forward: x @ Bt.T @ A.T + bias  (= x @ W.T + bias at full rank).
+
+    Semantics match ARS exactly: ARS trains per-Linear full-matrix masked SVD;
+    we reconstruct the same full-matrix low-rank factorisation here.
+    No Triton kernels, no per-head reshaping — pure PyTorch matmul.
+    """
+    def __init__(self, A: torch.Tensor, Bt: torch.Tensor,
+                 bias: "torch.Tensor | None" = None):
+        super().__init__()
+        self.A    = nn.Parameter(A,  requires_grad=False)   # [out, r]
+        self.Bt   = nn.Parameter(Bt, requires_grad=False)   # [r,  in]
+        self.bias = nn.Parameter(bias.detach().clone(),
+                                 requires_grad=False) if bias is not None else None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        mid = x @ self.Bt.t()                             # [..., r]
+        out = mid @ self.A.t()                            # [..., out]
+        if self.bias is not None:
+            out = out + self.bias
+        return out
+
+
 def compress_adasvd_naive(
     model: PreTrainedModel,
     ranks_path: str,
     device: str = "cuda",
 ) -> PreTrainedModel:
-    """Compress model with AdaSVD using naive backend (standard PyTorch FWSVDBlock)."""
-    # Import from refactored (these are unchanged)
-    _refactored = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "adasvd_refactored"
-    )
-    if _refactored not in sys.path:
-        sys.path.insert(0, _refactored)
+    """
+    Compress model with AdaSVD naive backend: per-Linear full-matrix SVD.
 
-    from profile_svd import attach_fullnames, build_plain_svd_helpers, FWSVDBlock, LayerShim
+    Each nn.Linear in ranks_dict is replaced with _LowRankLinear(A, Bt) where
+    W ≈ A @ Bt, A = U_r * S_r  [out, r],  Bt = Vh_r  [r, in].
 
+    This matches ARS semantics exactly (ARS trained per-Linear masked SVD with
+    full-matrix rank budget).  The HF model structure (attention, FFN, pooler,
+    classifier) is preserved unchanged — no Triton kernels, no per-head
+    reshaping that would misinterpret the ARS per-op ranks.
+    """
     model = model.to(device).eval()
     with open(ranks_path, "r") as f:
         ranks_dict = json.load(f)
     print(f"[adasvd_origin] Loaded {len(ranks_dict)} per-op ranks from {ranks_path}")
 
-    attach_fullnames(model)
-    svd_per_head, svd_low_rank = build_plain_svd_helpers(model)
+    replaced = 0
+    for name, module in list(model.named_modules()):
+        if not isinstance(module, nn.Linear):
+            continue
+        rank = ranks_dict.get(name)
+        if rank is None:
+            continue  # pooler / classifier not in ARS → leave as-is
 
-    if hasattr(model, 'bert'):
-        encoder_layers = model.bert.encoder.layer
-    elif hasattr(model, 'roberta'):
-        encoder_layers = model.roberta.encoder.layer
-    else:
-        raise ValueError(f"Unsupported model type: {type(model)}")
+        W    = module.weight.data.float()           # [out, in]
+        rank = max(1, min(rank, min(W.shape)))      # clamp to valid range
 
-    print(f"[adasvd_origin] Replacing {len(encoder_layers)} layers with FWSVDBlock (naive) ...")
-    for i, layer in enumerate(encoder_layers):
-        block   = FWSVDBlock(layer, ranks_dict, svd_per_head, svd_low_rank)
-        shimmed = LayerShim(block)
-        encoder_layers[i] = shimmed.to(device).eval()
+        U, S, Vh = torch.linalg.svd(W, full_matrices=False)
+        A  = (U[:, :rank] * S[:rank]).to(module.weight.dtype)   # [out, r]
+        Bt = Vh[:rank, :].to(module.weight.dtype)               # [r,  in]
 
-    del svd_per_head, svd_low_rank
+        bias = module.bias  # None or Parameter
+        lrl  = _LowRankLinear(A, Bt, bias).to(device)
+
+        # Navigate to parent and swap the module
+        *parts, last = name.split(".")
+        parent = model
+        for part in parts:
+            parent = getattr(parent, part)
+        setattr(parent, last, lrl)
+        replaced += 1
+
+    print(f"[adasvd_origin] Replaced {replaced} Linear ops with LowRankLinear (naive, full-matrix SVD)")
     torch.cuda.empty_cache()
     return model
 
