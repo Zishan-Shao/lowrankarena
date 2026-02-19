@@ -376,6 +376,13 @@ def parse_args():
                              "Use this to calibrate on a different task than the one being evaluated. "
                              "E.g. --tasks hans anli_r1 --calib_task mnli: "
                              "evaluate on HANS/ANLI, but calibrate on MNLI train for all tasks.")
+    # AdaSVD-specific
+    parser.add_argument("--adasvd_calib_samples", type=int, default=4000,
+                        help="Max calibration samples for AdaSVD ARS (paper: ~4000, batch-level shuffle)")
+    parser.add_argument("--adasvd_steps", type=int, default=800,
+                        help="AdaSVD hypernetwork training steps (paper ARS default: 800)")
+    parser.add_argument("--adasvd_engineering_stable", action="store_true",
+                        help="Use learned alpha_z gate in PaperHN (ablation only, not paper-strict)")
 
     # Fine-tuning configuration
     parser.add_argument("--learning_rate", type=float, default=2e-5)
@@ -842,6 +849,10 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
     if args.method != "dense":
         if args.method == "adasvd":
             cmd.extend(["--budget", str(args.budget)])
+            cmd.extend(["--adasvd_calib_samples", str(args.adasvd_calib_samples)])
+            cmd.extend(["--adasvd_steps", str(args.adasvd_steps)])
+            if args.adasvd_engineering_stable:
+                cmd.append("--adasvd_engineering_stable")
         else:
             # Add component-specific ranks if specified
             if args.rank_attn is not None:

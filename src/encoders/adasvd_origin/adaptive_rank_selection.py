@@ -169,6 +169,11 @@ class PaperHN(nn.Module):
         self.gru = nn.GRU(input_size=gru_in_dim, hidden_size=hidden,
                           num_layers=1, batch_first=True)
         self.heads = nn.ModuleList([nn.Linear(hidden, r) for r in op_sizes])
+        # Bias init: sigmoid(-2.0) ≈ 0.12 → starts in low-rank regime.
+        # Default zero-init → sigmoid(0)≈0.5 (~half rank), which is too high
+        # and makes budget hard to reduce for small targets (e.g. budget=0.3).
+        for head in self.heads:
+            nn.init.constant_(head.bias, -2.0)
 
     def forward(self) -> List[torch.Tensor]:
         m_out  = self.meta_proj(self.meta)                                    # [L, feat_dim]
@@ -201,17 +206,34 @@ def replace_with_masked(model: nn.Module, device: str, rank_cap_per_op: List[int
     return model, ops
 
 # ---------------------------- Loss functions ---------------------------------
-def topk_like(mask: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
-    """Top-k binary mask aligned to s ordering. k clamped to [1, R] to avoid zero-gradient."""
+def topk_like(mask: torch.Tensor, s: torch.Tensor,
+              k_ref: torch.Tensor = None) -> torch.Tensor:
+    """Top-k binary mask aligned to s ordering.
+
+    k comes from k_ref.sum() if provided (e.g. hard mask), else from mask.sum().
+    Using k_ref=masks_hard breaks the self-referential lock where k is always
+    equal to the current soft sum — enabling budget loss to actually shrink k.
+    k clamped to [1, R] to avoid zero-gradient.
+    """
     with torch.no_grad():
-        k = int(mask.sum().detach().round().clamp(1, mask.numel()).item())
+        src = k_ref if k_ref is not None else mask
+        k = int(src.sum().detach().round().clamp(1, mask.numel()).item())
         idx = torch.arange(mask.numel(), device=mask.device)
         m_top = torch.zeros_like(mask)
         m_top[idx[:k]] = 1.0
     return m_top
 
-def alignment_loss(mask: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
-    m_top = topk_like(mask, s)
+def alignment_loss(mask: torch.Tensor, s: torch.Tensor,
+                   k_ref: torch.Tensor = None) -> torch.Tensor:
+    """Alignment loss (paper Eq.7 spirit).
+
+    mask: soft sigmoid — gradient flows through this.
+    k_ref: hard Gumbel-sigmoid mask (detached) — determines target k.
+    When k_ref is provided, k = k_ref.sum() instead of mask.sum(), so:
+      budget forces logits down → hard k decreases → alignment must pull
+      soft mask lower → feedback loop is unblocked.
+    """
+    m_top = topk_like(mask, s, k_ref=k_ref)
     return torch.sum(((mask - m_top) * s) ** 2)
 
 def parameter_budget(op_list: List[MaskedSVDLinear], masks: List[torch.Tensor],

@@ -166,8 +166,13 @@ def train_adasvd_ranks(
         # Budget loss: SOFT masks → scalar log (paper Eq.8)
         budget_loss = parameter_budget(op_list, masks_soft, budget)
 
-        # Alignment loss: SOFT masks → stable gradients (paper Eq.7 spirit)
-        align_loss = sum(alignment_loss(m, op.s) for op, m in zip(op_list, masks_soft))
+        # Alignment loss: k from HARD mask, gradient via SOFT mask (paper Eq.7 spirit).
+        # k_ref=m_hard.detach() breaks the self-lock: budget pushes logits down →
+        # hard k decreases → alignment must also pull soft mask lower → feedback unblocked.
+        align_loss = sum(
+            alignment_loss(m_soft, op.s, k_ref=m_hard.detach())
+            for op, m_soft, m_hard in zip(op_list, masks_soft, masks_hard)
+        )
 
         # Paper defaults: λ=16, γ=10
         loss = task_loss + 16.0 * budget_loss + 10.0 * align_loss
