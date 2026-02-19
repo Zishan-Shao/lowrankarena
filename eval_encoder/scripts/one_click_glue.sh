@@ -59,6 +59,8 @@ CALIB_BATCHES="${CALIB_BATCHES:-4}"    # 校准批次数 (fwsvd/drone/adasvd)
 BUDGET="${BUDGET:-0.6}"                # AdaSVD 预算 (仅当 METHOD=adasvd 时使用)
                                        # 推荐: 0.5 (保留50%参数) 或 0.6 (保留60%参数)
                                        # 注意: 0.3太激进，准确率会显著下降
+ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"  # ARS 校准样本数 (paper: ~4000)
+ADASVD_STEPS="${ADASVD_STEPS:-800}"                   # ARS 超网络训练步数 (paper: 800)
 BACKEND="${BACKEND:-naive}"            # 后端: naive, flashsvd
 NON_INTERACTIVE="${NON_INTERACTIVE:-true}"   # 非交互模式（默认true，跳过所有提示）
 
@@ -278,9 +280,11 @@ EOF
     CMD="$CMD --qkv_mode $QKV_MODE"
     CMD="$CMD --calib_batches $CALIB_BATCHES"
 
-    # Add budget for AdaSVD
+    # Add budget and ARS params for AdaSVD (calib_batches is ignored for adasvd_origin)
     if [ "$METHOD" = "adasvd" ]; then
         CMD="$CMD --budget $BUDGET"
+        CMD="$CMD --adasvd_calib_samples $ADASVD_CALIB_SAMPLES"
+        CMD="$CMD --adasvd_steps $ADASVD_STEPS"
     fi
 
     # Add task-specific model flag

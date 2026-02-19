@@ -36,8 +36,10 @@ RANK_ATTN="${RANK_ATTN:-}"        # Component-specific ranks (optional)
 RANK_FFN="${RANK_FFN:-}"
 RANK_WO="${RANK_WO:-}"
 QKV_MODE="${QKV_MODE:-per_head}"  # per_head or full
-CALIB_BATCHES="${CALIB_BATCHES:-16}"  # Calibration batches for fwsvd/drone/adasvd (increased from 4)
+CALIB_BATCHES="${CALIB_BATCHES:-16}"  # Calibration batches for fwsvd/drone (NOT used by adasvd_origin)
 BUDGET="${BUDGET:-0.6}"
+ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"  # ARS calibration samples (paper: ~4000)
+ADASVD_STEPS="${ADASVD_STEPS:-800}"                   # ARS hypernetwork training steps (paper: 800)
 
 # Tasks (space-separated, required by glue_pipeline.py nargs="+")
 # All 8 GLUE tasks by default
@@ -79,24 +81,15 @@ echo "TWO_STAGE=${TWO_STAGE}" | tee -a "${SUMMARY_LOG}"
 echo "════════════════════════════════════════════════════════════════════" | tee -a "${SUMMARY_LOG}"
 echo "" | tee -a "${SUMMARY_LOG}"
 
-# Methods configuration: method_name + extra env vars
-# When PRETRAIN_BEFORE_COMPRESS=true, skip dense:
-#   the pretrain step already produces the dense fine-tuned baseline (recorded as pretrain_value)
-if [[ "${PRETRAIN_BEFORE_COMPRESS}" == "true" ]]; then
-  METHODS=(
-    "svd"
-    "fwsvd"
-    "drone"
-    "adasvd"
-  )
+# If METHODS is provided (space-separated), use it. Otherwise use defaults.
+if [[ -n "${METHODS:-}" ]]; then
+  read -r -a METHODS <<< "${METHODS}"
 else
-  METHODS=(
-    "dense"
-    "svd"
-    "fwsvd"
-    "drone"
-    "adasvd"
-  )
+  if [[ "${PRETRAIN_BEFORE_COMPRESS}" == "true" ]]; then
+    METHODS=("svd" "fwsvd" "drone" "adasvd")
+  else
+    METHODS=("dense" "svd" "fwsvd" "drone" "adasvd")
+  fi
 fi
 
 # Stages
@@ -104,7 +97,10 @@ fi
 # 普通模式：默认只跑 no_finetune（快速验证）
 # pretrain_before_compress 模式：默认只跑 with_finetune（必须微调才有意义）
 #   但若同时设置 TWO_STAGE=true，则也跑 no_finetune（观察压缩损失）
-if [[ "${TWO_STAGE}" == "true" ]]; then
+# Override via STAGES env var: STAGES="with_finetune" or STAGES="no_finetune with_finetune"
+if [[ -n "${STAGES:-}" ]]; then
+  read -ra STAGES <<< "${STAGES}"
+elif [[ "${TWO_STAGE}" == "true" ]]; then
   STAGES=("no_finetune" "with_finetune")
 elif [[ "${PRETRAIN_BEFORE_COMPRESS}" == "true" ]]; then
   STAGES=("with_finetune")
@@ -173,6 +169,8 @@ run_one() {
 
   if [[ "${method}" == "adasvd" ]]; then
     env_prefix+=("BUDGET=${BUDGET}")
+    env_prefix+=("ADASVD_CALIB_SAMPLES=${ADASVD_CALIB_SAMPLES}")
+    env_prefix+=("ADASVD_STEPS=${ADASVD_STEPS}")
   elif [[ "${method}" == "svd" || "${method}" == "fwsvd" || "${method}" == "drone" ]]; then
     env_prefix+=("RANK=${RANK}")
   fi
