@@ -48,7 +48,7 @@ Fix 思路: `i_hat @ A` 前 `A_fp32 = A.float()`，结果 `.to(A.dtype)` 返回�
 
 ---
 
-## BoolQ label2id 曾反转 (2026-02) — 已修复
+## ✅ BoolQ label2id 曾反转 (2026-02) — 已修复
 
 **现象**: `howey/bert-base-uncased-boolq` 的 `id2label={0: 'LABEL_0', 1: 'LABEL_1'}`（通用名，无法自动识别）。
 Probe 确认：model class 0 = True (与 super_glue/boolq dataset 的 0=False 相反)。
@@ -337,7 +337,7 @@ This is a scientifically interesting compression side-effect: *de-adversarializa
 
 ---
 
-## AdaSVD (adasvd_origin) 重新实现记录 (2026-02)
+## ✅ AdaSVD (adasvd_origin) 重新实现记录 (2026-02)
 
 ### 背景
 
@@ -468,7 +468,7 @@ for m in base_model.modules():
 
 ---
 
-## AdaSVD Classifier/Pooler 被 ARS 压缩 (2026-02) — 已修复
+## ✅ AdaSVD Classifier/Pooler 被 ARS 压缩 (2026-02) — 已修复
 
 **现象**: CoLA 微调后 MCC 持续为 0，SST-2/MRPC 可以恢复但 CoLA 不行。
 
@@ -502,7 +502,7 @@ linear_list = [(n, m) for n, m in linear_list_all
 
 ---
 
-## AdaSVD 不支持 qkv_mode=full (2026-02) — 已修复
+## ✅ AdaSVD 不支持 qkv_mode=full (2026-02) — 已修复
 
 ### 现象
 
