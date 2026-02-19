@@ -132,8 +132,21 @@ def train_adasvd_ranks(
     # Pre-compute T_original once (only Linear layers, NOT embeddings/LayerNorm)
     T_original = sum(op.in_features * op.out_features for op in op_list)
 
+    # ratio_max: ratio_soft at FULL RANK (all singular values kept).
+    # Formula: sum((in+out)*Rcap) / sum(in*out). For square layers (M=N), this = 2.
+    # For BERT-base mix (square attn + rect FFN): ratio_max ≈ 1.50.
+    # Any ratio_soft > ratio_max indicates a formula inconsistency (e.g., wrong
+    # denominator or duplicate op counting), NOT just near-full-rank operation.
+    # op.rank_cap = effective rank cap stored in MaskedSVDLinear (= min(rank_cap, Rfull)).
+    # Using op.rank_cap (not a freshly-computed min(in,out)) ensures we stay consistent
+    # with what was actually passed to replace_with_masked.
+    T_max_fullrank = sum((op.in_features + op.out_features) * op.rank_cap for op in op_list)
+    ratio_max = T_max_fullrank / (T_original + 1e-12)
+    print(f"[ARS] ratio_max (full-rank SVD/dense) = {ratio_max:.3f}  "
+          f"(target budget = {budget:.3f})")
+
     # ── Step 7: Training loop ─────────────────────────────────────────────────
-    print(f"[ARS] Training PaperHN for {steps} steps (budget={budget}, λ=16, γ=10) ...")
+    print(f"[ARS] Training PaperHN for {steps} steps (budget={budget}, λ=100, γ=10) ...")
     batch_idx = 0
     for step in range(steps):
         batch = all_batches[batch_idx % len(all_batches)]
@@ -192,9 +205,15 @@ def train_adasvd_ranks(
                     (op.in_features + op.out_features) * torch.sigmoid(l).sum().item()
                     for op, l in zip(op_list, logits_list)
                 ) / T_original
+            # Sanity check: ratio_soft must never exceed ratio_max (full-rank SVD/dense).
+            # If it does, T or T_original formula is inconsistent (wrong units or dup ops).
+            assert ratio_soft <= ratio_max + 1e-2, (
+                f"ratio_soft={ratio_soft:.4f} exceeds ratio_max={ratio_max:.4f} — "
+                f"T or T_original definition is inconsistent (wrong units or duplicate ops)."
+            )
             print(f"  step={step:4d} | task={task_loss.item():.4f} "
                   f"| budget={budget_loss.item():.4f}(log) | align={align_loss.item():.4f} "
-                  f"| ratio_soft={ratio_soft:.3f} target={budget:.3f}")
+                  f"| ratio_soft={ratio_soft:.3f} target={budget:.3f} max={ratio_max:.3f}")
 
     # ── Step 8: Extract integer ranks from soft masks ─────────────────────────
     print("[ARS] Finalizing ranks from soft masks ...")

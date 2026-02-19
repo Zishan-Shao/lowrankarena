@@ -54,7 +54,8 @@ class MaskedSVDLinear(nn.Module):
         self.U = nn.Parameter(U[:, :R], requires_grad=False)      # [in,R]
         self.s = nn.Parameter(s[:R],   requires_grad=False)       # [R]
         self.V = nn.Parameter(V[:, :R], requires_grad=False)      # [out,R]
-        self.R = R
+        self.R         = R   # effective rank cap (= min(rank_cap, Rfull))
+        self.rank_cap  = R   # alias: explicit name for ratio_max computation
         self._current_mask = None
 
     def forward(self, x: torch.Tensor):
@@ -236,9 +237,18 @@ def alignment_loss(mask: torch.Tensor, s: torch.Tensor,
     When k_ref is provided, k = k_ref.sum() instead of mask.sum(), so:
       budget forces logits down → hard k decreases → alignment must pull
       soft mask lower → feedback loop is unblocked.
+
+    NOTE: s is normalized by its Frobenius norm (per-op) so that the loss
+    magnitude is scale-independent and stays in [0, 1]. Without this,
+    large singular values (BERT s_max ~ 30-50) make alignment 10^4–10^5×
+    stronger than budget_loss, completely suppressing budget control.
     """
     m_top = topk_like(mask, s, k_ref=k_ref)
-    return torch.sum(((mask - m_top) * s) ** 2)
+    # Normalize s to prevent singular-value-scale dominance over budget loss.
+    # frob_sq = ||s||² = sum(s_i²); dividing makes the loss dimensionless ([0,1]).
+    # detach(): s is frozen, but explicit detach keeps the computation graph clean.
+    frob_sq = s.detach().pow(2).sum().clamp(min=1e-12)
+    return torch.sum(((mask - m_top) * s) ** 2) / frob_sq
 
 def parameter_budget(op_list: List[MaskedSVDLinear], masks: List[torch.Tensor],
                      p: float) -> torch.Tensor:
