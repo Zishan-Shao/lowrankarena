@@ -55,7 +55,7 @@ def parse_args():
     )
     # model / task
     p.add_argument("--model_id", default="bert-base-uncased")
-    p.add_argument("--task", choices=list(TASK_CFG.keys()), default="sst2")
+    p.add_argument("--task", choices=["cola", "sst2", "mrpc", "qqp", "mnli", "qnli", "rte", "stsb"], default="sst2")
     p.add_argument("--seq_len", type=int, default=128)
     p.add_argument("--batch_size", type=int, default=32)
     p.add_argument("--dtype", choices=["fp32", "fp16", "bf16"], default="fp16")
@@ -99,17 +99,6 @@ def parse_args():
                    help="Which split to use for calibration (MUST be train, NOT validation)")
     p.add_argument("--calib_seed", type=int, default=None,
                    help="Random seed for calibration data sampling (default: same as --seed)")
-    p.add_argument("--calib_task", default=None, choices=list(TASK_CFG.keys()),
-                   help="Task to use for calibration data (default: same as --task). "
-                        "Use this to calibrate on a different task than the one being evaluated. "
-                        "E.g. --task hans --calib_task mnli: evaluate on HANS, calibrate on MNLI train.")
-    # AdaSVD-specific (paper-compliant adasvd_origin)
-    p.add_argument("--adasvd_calib_samples", type=int, default=4000,
-                   help="Max calibration samples for AdaSVD ARS (paper: ~4000, batch-level shuffle)")
-    p.add_argument("--adasvd_steps", type=int, default=800,
-                   help="AdaSVD hypernetwork training steps (paper ARS default: 800)")
-    p.add_argument("--adasvd_engineering_stable", action="store_true",
-                   help="Use learned alpha_z gate in PaperHN (ablation only, not paper-strict)")
     # model saving
     p.add_argument("--save_model", action="store_true",
                    help="Save compressed model to disk for later fine-tuning")
@@ -156,78 +145,6 @@ TASK_CFG = {
         is_regression=True,
     ),
 }
-
-TASK_CFG.update({
-    # ── SuperGLUE ──────────────────────────────────────────────────────────
-    "boolq": dict(
-        num_labels=2, val_split="validation", train_split="train",
-        sentence_keys=("passage", "question"), metric_name="accuracy",
-        dataset_name="super_glue", dataset_config="boolq",
-        # super_glue/boolq ClassLabel: 0=False, 1=True
-        canonical_label2id={"False": 0, "True": 1},
-        # Per-model remaps for models with generic LABEL_0/LABEL_1 naming.
-        # Probe confirmed: howey model has class 0=True, class 1=False → flip [1,0]
-        model_remap_overrides={"howey/bert-base-uncased-boolq": [1, 0]},
-    ),
-    "cb": dict(
-        num_labels=3, val_split="validation", train_split="train",
-        sentence_keys=("premise", "hypothesis"), metric_name="accuracy",
-        dataset_name="super_glue", dataset_config="cb",
-        # super_glue/cb ClassLabel: 0=entailment, 1=contradiction, 2=neutral
-        canonical_label2id={"entailment": 0, "contradiction": 1, "neutral": 2},
-        # textattack MNLI has generic LABEL_X; ordering: 0=contradiction, 1=entailment, 2=neutral
-        # CB dataset: 0=entailment, 1=contradiction, 2=neutral → remap [1,0,2]
-        model_remap_overrides={"textattack/bert-base-uncased-MNLI": [1, 0, 2]},
-    ),
-    "rte_sg": dict(
-        num_labels=2, val_split="validation", train_split="train",
-        sentence_keys=("premise", "hypothesis"), metric_name="accuracy",
-        dataset_name="super_glue", dataset_config="rte",
-        # super_glue/rte ClassLabel: 0=entailment, 1=not_entailment
-        canonical_label2id={"entailment": 0, "not_entailment": 1},
-    ),
-    "wic": dict(
-        num_labels=2, val_split="validation", train_split="train",
-        sentence_keys=("sentence1", "sentence2"), metric_name="accuracy",
-        dataset_name="super_glue", dataset_config="wic",
-        # super_glue/wic ClassLabel: 0=false, 1=true
-        canonical_label2id={"false": 0, "true": 1},
-    ),
-    # ── HANS ──────────────────────────────────────────────────────────────
-    "hans": dict(
-        num_labels=2, val_split="validation", train_split=None,
-        sentence_keys=("sentence1", "sentence2"), metric_name="accuracy",
-        dataset_name="hans", dataset_config=None,
-        label_map={"entailment": 0, "non_entailment": 1, "non-entailment": 1, "nonentailment": 1},
-        requires_label_fold=True,   # MNLI 3-class → HANS 2-class (no canonical_label2id needed)
-    ),
-    # ── ANLI ──────────────────────────────────────────────────────────────
-    # ANLI dataset ClassLabel: 0=e(ntailment), 1=n(eutral), 2=c(ontradiction)
-    # textattack MNLI: class 0=contradiction, 1=entailment, 2=neutral (LABEL_X generic names)
-    # model_remap_overrides covers the case where canonical name-matching can't auto-detect
-    # (remap [2,0,1]: contradiction→2, entailment→0, neutral→1)
-    "anli_r1": dict(
-        num_labels=3, val_split="test_r1", train_split="train_r1",
-        sentence_keys=("premise", "hypothesis"), metric_name="accuracy",
-        dataset_name="anli", dataset_config=None,
-        canonical_label2id={"entailment": 0, "neutral": 1, "contradiction": 2},
-        model_remap_overrides={"textattack/bert-base-uncased-MNLI": [2, 0, 1]},
-    ),
-    "anli_r2": dict(
-        num_labels=3, val_split="test_r2", train_split="train_r2",
-        sentence_keys=("premise", "hypothesis"), metric_name="accuracy",
-        dataset_name="anli", dataset_config=None,
-        canonical_label2id={"entailment": 0, "neutral": 1, "contradiction": 2},
-        model_remap_overrides={"textattack/bert-base-uncased-MNLI": [2, 0, 1]},
-    ),
-    "anli_r3": dict(
-        num_labels=3, val_split="test_r3", train_split="train_r3",
-        sentence_keys=("premise", "hypothesis"), metric_name="accuracy",
-        dataset_name="anli", dataset_config=None,
-        canonical_label2id={"entailment": 0, "neutral": 1, "contradiction": 2},
-        model_remap_overrides={"textattack/bert-base-uncased-MNLI": [2, 0, 1]},
-    ),
-})
 
 DTYPE_MAP = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
 
@@ -276,67 +193,16 @@ def _detect_arch(model):
 # ═══════════════════════════════════════════════════════════════════════════
 # 2) Dataset
 # ═══════════════════════════════════════════════════════════════════════════
-
-def _load_hans_dataset():
-    """
-    Load HANS evaluation set from GitHub (or local cache).
-    HuggingFace datasets library dropped loading-script support (>= 3.0),
-    so we fetch the original TSV directly.
-
-    Returns a HuggingFace Dataset with columns: gold_label, sentence1, sentence2.
-    """
-    import urllib.request
-    from datasets import Dataset as HFDataset
-
-    cache_path = os.path.join(os.path.expanduser("~/.cache"), "hans_eval.tsv")
-    if not os.path.exists(cache_path):
-        print("[hans] Downloading evaluation set from GitHub...")
-        url = "https://raw.githubusercontent.com/tommccoy1/hans/master/heuristics_evaluation_set.txt"
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "python"})
-            with urllib.request.urlopen(req, timeout=60) as r:
-                data = r.read().decode("utf-8")
-            with open(cache_path, "w", encoding="utf-8") as f:
-                f.write(data)
-            print(f"[hans] Cached to {cache_path}")
-        except Exception as e:
-            raise RuntimeError(
-                f"Cannot fetch HANS evaluation set from GitHub: {e}\n"
-                f"Please pre-download it manually and place it at: {cache_path}\n"
-                f"  wget -O {cache_path} "
-                f"https://raw.githubusercontent.com/tommccoy1/hans/master/heuristics_evaluation_set.txt"
-            ) from e
-    else:
-        print(f"[hans] Loading from cache: {cache_path}")
-
-    rows = []
-    with open(cache_path, encoding="utf-8") as f:
-        header = None
-        for line in f:
-            parts = line.rstrip("\n").split("\t")
-            if header is None:
-                header = parts
-                continue
-            row = dict(zip(header, parts))
-            rows.append({"gold_label": row["gold_label"],
-                         "sentence1": row["sentence1"],
-                         "sentence2": row["sentence2"]})
-
-    ds = HFDataset.from_list(rows)
-    print(f"[hans] Loaded {len(ds)} examples  (labels: {set(ds['gold_label'])})")
-    return ds
-
-
 def prepare_loader(task: str, tokenizer, seq_len: int, batch_size: int, split: str = "validation"):
     """
-    Prepare DataLoader for any supported task (GLUE / SuperGLUE / HANS / ANLI).
+    Prepare DataLoader for a specific task and split.
 
     Args:
-        task: Task name (key in TASK_CFG)
+        task: Task name (e.g., "sst2", "mnli")
         tokenizer: HuggingFace tokenizer
         seq_len: Maximum sequence length
         batch_size: Batch size
-        split: "train" or "validation"
+        split: Which split to load ("train" or "validation")
     """
     from datasets import load_dataset
     from torch.utils.data import DataLoader
@@ -347,24 +213,9 @@ def prepare_loader(task: str, tokenizer, seq_len: int, batch_size: int, split: s
     else:
         split_name = cfg["val_split"]
 
-    # Generic dataset loading
-    ds_name = cfg.get("dataset_name", "glue")
-    ds_cfg = cfg.get("dataset_config", task if ds_name == "glue" else None)
-
-    # HANS uses a loading script not supported by datasets >= 3.0; load directly from GitHub
-    if task == "hans":
-        raw = _load_hans_dataset()
-    elif ds_cfg is not None:
-        raw = load_dataset(ds_name, ds_cfg, split=split_name)
-    else:
-        raw = load_dataset(ds_name, split=split_name)
+    raw = load_dataset("glue", task, split=split_name)
 
     keys = cfg["sentence_keys"]
-    label_map = cfg.get("label_map", None)  # e.g. HANS string → int
-
-    # For HANS: gold_label is a string column; add integer "label" column
-    if label_map is not None and "gold_label" in raw.column_names:
-        raw = raw.map(lambda ex: {"label": label_map[ex["gold_label"]]})
 
     def tok_fn(batch):
         if len(keys) == 1:
@@ -377,15 +228,13 @@ def prepare_loader(task: str, tokenizer, seq_len: int, batch_size: int, split: s
     ds = raw.map(tok_fn, batched=True, remove_columns=remove)
     ds.set_format("torch")
 
-    is_regression = cfg.get("is_regression", False)
-
     def collate(batch):
         result = {
             "input_ids":      torch.stack([x["input_ids"] for x in batch]),
             "attention_mask": torch.stack([x["attention_mask"] for x in batch]),
-            "labels":         torch.stack([x["label"] for x in batch]) if is_regression
-                              else torch.tensor([x["label"] for x in batch]),
+            "labels":         torch.tensor([x["label"] for x in batch]),
         }
+        # Add token_type_ids if present (for sentence pair tasks)
         if "token_type_ids" in batch[0]:
             result["token_type_ids"] = torch.stack([x["token_type_ids"] for x in batch])
         return result
@@ -610,19 +459,11 @@ def _build_drone(model, calib_loader, device, arch, encoder_layers):
 
 
 # ---------- AdaSVD ----------
-def _build_adasvd(model, calib_loader, device, budget, arch, backend="naive",
-                  max_calib_samples=4000, steps=800, engineering_stable=False,
-                  seed=0):
-    """Run adaptive rank selection (paper-compliant PaperHN) and return a ranks dict.
+def _build_adasvd(model, calib_loader, device, budget, arch, backend="naive"):
+    """Run adaptive rank selection and return a ranks dict.
 
     Args:
-        calib_loader: Full training DataLoader — NOT truncated by --calib_batches.
-                      train_adasvd_ranks() handles its own batch-level shuffle/slice.
-        backend: "naive" or "flashsvd"
-        max_calib_samples: Max calibration samples (paper: ~4000)
-        steps: HN training steps (paper: 800)
-        engineering_stable: If True, use alpha_z gate in PaperHN (ablation)
-        seed: Random seed for reproducible calibration shuffle
+        backend: "naive" or "flashsvd" - affects which implementation to use
     """
     if arch == "modernbert":
         raise RuntimeError(
@@ -630,17 +471,17 @@ def _build_adasvd(model, calib_loader, device, budget, arch, backend="naive",
             "Use --method dense, --method svd, or a BERT/RoBERTa model."
         )
 
-    # Use paper-compliant adasvd_origin implementation
-    ada_origin_path = os.path.join(_REPO_ROOT, "src", "encoders", "adasvd_origin")
-    if ada_origin_path not in sys.path:
-        sys.path.insert(0, ada_origin_path)
+    # Use refactored AdaSVD implementation
+    ada_refactored_path = os.path.join(_REPO_ROOT, "src", "encoders", "adasvd_refactored")
+    if ada_refactored_path not in sys.path:
+        sys.path.insert(0, ada_refactored_path)
 
     try:
         from adasvd_wrapper import train_adasvd_ranks
     except ImportError as e:
         raise RuntimeError(
-            f"Cannot import from adasvd_origin: {e}\n"
-            f"Path: {ada_origin_path}"
+            f"Cannot import from adasvd_refactored: {e}\n"
+            f"Path: {ada_refactored_path}"
         ) from e
 
     # Train and save ranks
@@ -650,11 +491,8 @@ def _build_adasvd(model, calib_loader, device, budget, arch, backend="naive",
         calib_loader=calib_loader,
         budget=budget,
         output_dir=output_dir,
-        steps=steps,
-        max_calib_samples=max_calib_samples,
-        engineering_stable=engineering_stable,
-        seed=seed,
-        device=device,
+        steps=400,
+        device=device
     )
 
     # Save ranks_path for later use
@@ -669,9 +507,7 @@ def _build_adasvd(model, calib_loader, device, budget, arch, backend="naive",
 # 3b) Apply compression to model
 # ═══════════════════════════════════════════════════════════════════════════
 def compress_model(model, method, rank, budget, scope, loader, device, calib_batches, calib_loader=None, backend="naive",
-                   rank_attn=None, rank_ffn=None, rank_wo=None, qkv_mode="per_head",
-                   adasvd_full_loader=None, adasvd_max_calib_samples=4000,
-                   adasvd_steps=800, adasvd_engineering_stable=False, adasvd_seed=0):
+                   rank_attn=None, rank_ffn=None, rank_wo=None, qkv_mode="per_head"):
     """Replace encoder layers with SVD blocks in-place (BERT/RoBERTa/ModernBERT).
 
     Args:
@@ -814,15 +650,8 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
         print(f"[adasvd] Running adaptive rank selection (budget={budget}) ...")
 
         # Step 1: Train hypernetwork and generate ranks.json
-        # Use adasvd_full_loader if provided (full training split, untruncated).
-        # adasvd_full_loader bypasses --calib_batches; train_adasvd_ranks() does
-        # its own batch-level shuffle and slices to --adasvd_calib_samples.
-        ars_loader = adasvd_full_loader if adasvd_full_loader is not None else calib_loader
-        ranks = _build_adasvd(model, ars_loader, device, budget, arch, backend=backend,
-                              max_calib_samples=adasvd_max_calib_samples,
-                              steps=adasvd_steps,
-                              engineering_stable=adasvd_engineering_stable,
-                              seed=adasvd_seed)
+        # Note: This modifies the model in-place with MaskedSVDLinear
+        ranks = _build_adasvd(model, calib_loader, device, budget, arch, backend=backend)
         vals = [v for v in ranks.values() if v > 0]
         median_rank = sorted(vals)[len(vals) // 2] if vals else rank or 64
         print(f"[adasvd] Median rank from ARS: {median_rank}")
@@ -843,10 +672,10 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
         model = AutoModelForSequenceClassification.from_pretrained(model_id_or_path, config=config)
         model = model.to(device).eval()
 
-        # Step 3: Apply compression using paper-compliant adasvd_origin
-        ada_origin_path = os.path.join(_REPO_ROOT, "src", "encoders", "adasvd_origin")
-        if ada_origin_path not in sys.path:
-            sys.path.insert(0, ada_origin_path)
+        # Step 3: Apply compression using refactored implementation
+        ada_refactored_path = os.path.join(_REPO_ROOT, "src", "encoders", "adasvd_refactored")
+        if ada_refactored_path not in sys.path:
+            sys.path.insert(0, ada_refactored_path)
 
         from adasvd_wrapper import compress_adasvd_naive, compress_adasvd_flashsvd
 
@@ -890,12 +719,10 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
 # ═══════════════════════════════════════════════════════════════════════════
 @torch.no_grad()
 def evaluate_task(model, loader, task, device):
-    """Return (metric_name, metric_value). Supports GLUE / SuperGLUE / HANS / ANLI."""
+    """Return (metric_name, metric_value)."""
     cfg = TASK_CFG[task]
     metric_name = cfg["metric_name"]
     is_regression = cfg.get("is_regression", False)
-    ds_name = cfg.get("dataset_name", "glue")
-    requires_label_fold = cfg.get("requires_label_fold", False)
 
     # For regression tasks (STSB), compute metric manually
     if is_regression:
@@ -922,93 +749,41 @@ def evaluate_task(model, loader, task, device):
 
     # For classification tasks
     from evaluate import load as load_metric
+    # Use GLUE-specific metric for consistency
+    metric = load_metric("glue", task)
 
-    # Choose metric loader based on dataset source
-    # MVP: use generic accuracy for all non-GLUE tasks (super_glue/hans/anli) for stability
-    if ds_name == "glue":
-        metric = load_metric("glue", task)
-    else:
-        # SuperGLUE, HANS, ANLI — generic accuracy (sufficient for compression trend analysis)
-        metric = load_metric("accuracy")
-
-    # ── Canonical label remap ────────────────────────────────────────────────
-    # Automatically aligns model output class indices with the dataset's label ordering.
-    # Uses "canonical_label2id" from task config (the dataset's ground-truth ordering).
-    # Example: BoolQ model id2label={0:"True",1:"False"}, dataset 0=False 1=True
-    #          → remap [1,0] — flips predictions so accuracy measures the right thing.
-    canon = cfg.get("canonical_label2id")
+    # Check if model needs label remapping for MNLI
+    # textattack/bert-base-uncased-MNLI uses non-standard mapping:
+    # Model: 0→contradiction, 1→entailment, 2→neutral
+    # GLUE:  0→entailment,    1→neutral,     2→contradiction
+    # Remapping needed: {0→2, 1→0, 2→1}
     label_remap = None
-    if canon is not None:
-        model_id2label = getattr(model.config, 'id2label', {})
-        if model_id2label:
-            try:
-                canon_lower = {k.lower(): v for k, v in canon.items()}
-                n = len(model_id2label)
-                remap_dict = {
-                    int(i): canon_lower[str(name).lower()]
-                    for i, name in model_id2label.items()
-                    if str(name).lower() in canon_lower
-                }
-                if len(remap_dict) == n:
-                    remap_list = [remap_dict[i] for i in range(n)]
-                    if remap_list != list(range(n)):
-                        label_remap = torch.tensor(remap_list, dtype=torch.long, device=device)
-            except Exception as e:
-                print(f"[eval] Warning: could not build canonical remap: {e}")
-
-    # Fallback: per-model override for models with generic LABEL_X id2label
-    if label_remap is None:
-        overrides = cfg.get("model_remap_overrides", {})
-        _model_name = getattr(model.config, '_name_or_path', '')
-        for model_key, remap_list in overrides.items():
-            if model_key.lower() in _model_name.lower() or _model_name.lower() in model_key.lower():
-                label_remap = torch.tensor(remap_list, dtype=torch.long, device=device)
-                break
-
-    # Legacy fallback: MNLI textattack hardcoded remap (in case canonical doesn't catch it)
-    if task == "mnli" and label_remap is None:
+    if task == "mnli":
         model_name = getattr(model.config, '_name_or_path', '')
         if 'textattack' in model_name.lower():
             label_remap = torch.tensor([2, 0, 1], dtype=torch.long, device=device)
-
-    # ── Sanity logging ───────────────────────────────────────────────────────
-    _id2label = getattr(model.config, 'id2label', {})
-    _num_labels = getattr(model.config, 'num_labels', '?')
-    print(f"[eval] id2label={_id2label}  num_labels={_num_labels}")
-    if label_remap is not None:
-        print(f"[eval] label_remap={label_remap.tolist()}  (canonical={canon})")
-    else:
-        print(f"[eval] label_remap=None  (labels already canonical or no canonical defined)")
-    if requires_label_fold:
-        print(f"[eval] fold_rule: mnli_3→{task}_2  (pred==1→0=entailment, else→1=non_entailment)")
+            print(f"[info] Applying label remapping for {model_name}: {{0→2, 1→0, 2→1}}")
 
     model.eval()
     for batch in loader:
         batch = {k: v.to(device) for k, v in batch.items()}
 
+        # Prepare model inputs (exclude labels)
         model_inputs = {k: v for k, v in batch.items() if k != "labels"}
         logits = model(**model_inputs).logits
 
         preds = torch.argmax(logits, dim=-1)
 
+        # Apply label remapping if needed
         if label_remap is not None:
             preds = label_remap[preds]
-
-        # HANS: fold MNLI 3-class → 2-class
-        # textattack MNLI: 0=contradiction, 1=entailment, 2=neutral
-        # HANS target:     0=entailment,    1=non_entailment
-        if requires_label_fold:
-            preds = torch.where(
-                preds == 1,
-                torch.zeros_like(preds),
-                torch.ones_like(preds)
-            )
 
         metric.add_batch(
             predictions=preds.cpu(), references=batch["labels"].cpu()
         )
 
     results = metric.compute()
+    # Return the primary metric for this task
     return metric_name, results.get(metric_name, results.get(list(results.keys())[0]))
 
 
@@ -1131,9 +906,6 @@ CSV_FIELDS = [
     "method", "rank", "budget", "scope", "backend", "seed",
     # Calibration info (for FWSVD/Whiten/Ada methods)
     "calib_dataset", "calib_split", "calib_samples", "calib_batches", "calib_seed", "calib_seq_len",
-    # Cross-task display: "mnli:train → hans:validation" — convenience for debugging
-    "calib_source",   # e.g. "mnli:train"
-    "eval_target",    # e.g. "hans:validation"
     "metric_name", "metric_value",
     "latency_ms", "throughput_sps",
     "peak_mem_infer_mb",  # Peak memory during inference only
@@ -1330,10 +1102,6 @@ def write_csv_row(args, metric_name, metric_value,
         "calib_batches": calib_info.get("batches", "") if needs_calib else "",
         "calib_seed": calib_info.get("seed", "") if needs_calib else "",
         "calib_seq_len": calib_info.get("seq_len", "") if needs_calib else "",
-        # Cross-task display fields (e.g. "mnli:train → hans:validation")
-        "calib_source": (f"{calib_info.get('dataset','')}:{calib_info.get('split','')}"
-                         if needs_calib and calib_info else ""),
-        "eval_target": f"{args.task}:{dataset_info.get('split', '')}",
         "metric_name": metric_name,
         "metric_value": f"{metric_value:.6f}",
         "latency_ms": f"{latency_ms:.2f}",
@@ -1406,8 +1174,6 @@ def main():
     if args.qkv_mode == "full":
         print(f"  qkv_mode : {args.qkv_mode} (paper-style full-matrix SVD)")
     print(f"  dtype    : {args.dtype}  device={args.device}")
-    if args.calib_task and args.calib_task != args.task:
-        print(f"  calib_task: {args.calib_task}  (cross-task calibration: eval={args.task})")
     print()
 
     # 1) load model
@@ -1428,24 +1194,11 @@ def main():
 
     # 2b) calibration data (for methods that need it)
     # IMPORTANT: Calibration MUST use training data, NOT validation!
-    # --calib_task allows calibrating on a different task than the one being evaluated
-    # (e.g. --task hans --calib_task mnli: evaluate on HANS, calibrate on MNLI train)
     calib_loader = None
     calib_info = {}
     calib_seed = args.calib_seed if args.calib_seed is not None else args.seed
 
-    # Resolve calibration task (defaults to eval task)
-    calib_task = args.calib_task or args.task
-    calib_cfg = TASK_CFG[calib_task]
-
     if args.method in ["fwsvd", "drone", "adasvd", "adawhiten", "adafwsvd"]:
-        if calib_cfg.get("train_split") is None:
-            raise ValueError(
-                f"Calibration task '{calib_task}' has no train split and cannot be used for "
-                f"calibration-based methods (fwsvd/drone/adasvd). "
-                + (f"Use --calib_task <task_with_train_split> (e.g. --calib_task mnli)."
-                   if calib_task == args.task else "")
-            )
         if args.calib_split != "train":
             raise ValueError(
                 f"ERROR: Calibration must use training data! "
@@ -1458,12 +1211,12 @@ def main():
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(calib_seed)
 
-        calib_loader = prepare_loader(calib_task, tokenizer, args.seq_len, args.batch_size, split=args.calib_split)
-        calib_split_name = calib_cfg["train_split"]
+        calib_loader = prepare_loader(args.task, tokenizer, args.seq_len, args.batch_size, split=args.calib_split)
+        calib_split_name = cfg["train_split"]
         actual_calib_samples = min(args.calib_batches * args.batch_size, len(calib_loader.dataset))
 
         calib_info = {
-            "dataset": calib_task,
+            "dataset": args.task,
             "split": calib_split_name,
             "samples": actual_calib_samples,
             "batches": args.calib_batches,
@@ -1471,36 +1224,17 @@ def main():
             "seq_len": args.seq_len,
         }
 
-        if calib_task != args.task:
-            print(f"[calib] Cross-task calibration: eval={args.task}, calib={calib_task}")
         print(f"[calib] Calibration data:")
-        print(f"        dataset={calib_task}, split={calib_split_name}")
+        print(f"        dataset={args.task}, split={calib_split_name}")
         print(f"        samples={actual_calib_samples} ({args.calib_batches} batches × {args.batch_size})")
         print(f"        seed={calib_seed}, seq_len={args.seq_len}")
 
     # 3) compress
-    # For AdaSVD: build a separate full loader (untruncated by --calib_batches).
-    # train_adasvd_ranks() does its own batch-level shuffle and slices to
-    # --adasvd_calib_samples, so this loader must cover the full training split.
-    adasvd_full_loader = None
-    if args.method == "adasvd" and calib_loader is not None:
-        adasvd_full_loader = prepare_loader(
-            calib_task, tokenizer, args.seq_len, args.batch_size,
-            split=args.calib_split,
-        )
-
     compression_peak_mb = 0.0
     if args.method != "dense":
         model = compress_model(model, args.method, args.rank, args.budget,
-                               args.scope, loader, args.device, args.calib_batches,
-                               calib_loader=calib_loader, backend=args.backend,
-                               rank_attn=args.rank_attn, rank_ffn=args.rank_ffn,
-                               rank_wo=args.rank_wo, qkv_mode=args.qkv_mode,
-                               adasvd_full_loader=adasvd_full_loader,
-                               adasvd_max_calib_samples=getattr(args, 'adasvd_calib_samples', 4000),
-                               adasvd_steps=getattr(args, 'adasvd_steps', 800),
-                               adasvd_engineering_stable=getattr(args, 'adasvd_engineering_stable', False),
-                               adasvd_seed=calib_seed)
+                               args.scope, loader, args.device, args.calib_batches, calib_loader=calib_loader, backend=args.backend,
+                               rank_attn=args.rank_attn, rank_ffn=args.rank_ffn, rank_wo=args.rank_wo, qkv_mode=args.qkv_mode)
 
         # Capture peak memory during compression (includes calibration, SVD, etc.)
         if torch.cuda.is_available():
