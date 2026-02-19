@@ -174,8 +174,8 @@ def train_adasvd_ranks(
             for op, m_soft, m_hard in zip(op_list, masks_soft, masks_hard)
         )
 
-        # Paper defaults: λ=16, γ=10
-        loss = task_loss + 16.0 * budget_loss + 10.0 * align_loss
+        # λ=100 (budget强主导), γ=10 (alignment辅助)
+        loss = task_loss + 100.0 * budget_loss + 10.0 * align_loss
 
         loss.backward()
         optimizer.step()
