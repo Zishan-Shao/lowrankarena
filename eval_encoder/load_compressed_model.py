@@ -216,8 +216,12 @@ def load_compressed_model(
         non_lrl = {k: v for k, v in state_dict.items()
                    if not k.endswith(".A") and not k.endswith(".Bt")}
         missing, unexpected = base_model.load_state_dict(non_lrl, strict=False)
-        if missing:
-            print(f"[warn] Missing keys after adasvd reload: {len(missing)}")
+        # A/Bt are already set in _LowRankLinear constructor — expected to be "missing" here.
+        real_missing = [k for k in missing if not k.endswith(".A") and not k.endswith(".Bt")]
+        if real_missing:
+            print(f"[warn] Truly missing keys after adasvd reload: {len(real_missing)}")
+            for k in real_missing[:10]:
+                print(f"  - {k}")
         base_model = base_model.to(device=device, dtype=dtype).eval()
         print(f"[load] adasvd model loaded: {sum(p.numel() for p in base_model.parameters())/1e6:.1f}M params")
         return base_model, tokenizer, comp_info
