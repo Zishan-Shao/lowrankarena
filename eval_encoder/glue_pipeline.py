@@ -1414,6 +1414,10 @@ def _append_flashsvd_csv_row(task, comp_info, speed_metrics, metric_name, metric
     flash_row['peak_mem_e2e_mb']   = f"{_pmb:.1f}"
     flash_row['peak_mem_mb']       = f"{_pmb:.1f}"  # legacy field
 
+    # DictReader may produce a None key for rows that have more columns than the header.
+    # Strip it before writing to avoid "dict contains fields not in fieldnames: None".
+    flash_row.pop(None, None)
+
     with open(csv_path, 'a', newline='', encoding='utf-8') as f:
         writer = csv_mod.DictWriter(f, fieldnames=fieldnames)
         writer.writerow(flash_row)
