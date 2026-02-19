@@ -209,8 +209,16 @@ def enable_flashsvd(model: nn.Module) -> nn.Module:
     patched = 0
     for i, layer in enumerate(encoder_layers):
         block = getattr(layer, "block", None)
-        # Support both NaiveSVDBlock (from compression) and MinimalSVDBlock (from checkpoint loading)
-        is_svd_block = isinstance(block, NaiveSVDBlock) or (MinimalSVDBlock and isinstance(block, MinimalSVDBlock))
+        # Support both NaiveSVDBlock (from compression) and MinimalSVDBlock (from checkpoint loading).
+        # isinstance() may fail if adasvd_wrapper imported blocks via a different sys.path entry
+        # (module aliasing: "blocks.NaiveSVDBlock" vs "eval_encoder.blocks.NaiveSVDBlock").
+        # Duck-typing fallback ensures correctness regardless of import path.
+        _cls_name = type(block).__name__ if block is not None else ""
+        is_svd_block = (
+            isinstance(block, NaiveSVDBlock)
+            or (MinimalSVDBlock and isinstance(block, MinimalSVDBlock))
+            or _cls_name in ("NaiveSVDBlock", "MinimalSVDBlock")
+        )
         if is_svd_block:
             flash_block = FlashSVDBlock(block)
             layer.block = flash_block

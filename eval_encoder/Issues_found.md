@@ -474,6 +474,81 @@ linear_list = [(n, m) for n, m in linear_list_all
 
 ---
 
+## AdaSVD 不支持 qkv_mode=full (2026-02) — 已修复
+
+### 现象
+
+运行 `--method adasvd --backend flashsvd --qkv_mode full` 时，`enable_flashsvd()` 抛出：
+
+```
+RuntimeError: enable_flashsvd: no NaiveSVDBlock or MinimalSVDBlock instances found.
+```
+
+或（早期版本）：
+
+```
+AttributeError: 'NaiveSVDBlock' object has no attribute 'Pq'
+```
+
+### 根因
+
+`NaiveSVDBlock` 在两种模式下存储参数的属性名不同：
+
+| `qkv_mode` | Q 的属性 | 形状 |
+|------------|----------|------|
+| `per_head` | `Pq`, `Vq` | `[1, H, dm, R]`, `[1, H, R, dh]` |
+| `full` | `Uq`, `Vq` | `[dm, r]`, `[r, dm]` |
+
+`flashsvd_backend.FlashSVDBlock.__init__` 直接访问 `naive_block.Pq`——full 模式下该属性不存在。
+
+FlashSVD Triton kernel（`flashsvdattn.py`）本身也只支持 per-head 分块格式：输入张量需要 `[B, H, M, R]` 形状，full-matrix format 无法映射。
+
+### AdaSVD 的特殊情况
+
+ARS（Adaptive Rank Selection）输出的 ranks 是**全矩阵语义**（如 Q=270，对 768×768 矩阵）。
+旧的 `compress_adasvd_flashsvd` 通过 `adasvd_refactored/profile_flashsvd.py` 的 `FlashSVDBlock` 使用这些 ranks，
+新版改为创建 `NaiveSVDBlock`，需要明确模式：
+
+- `qkv_mode=full`：全矩阵 SVD，rank 可达 768，不兼容 FlashSVD
+- `qkv_mode=per_head`：每 head 单独 SVD，rank 上限 64（`dh`），兼容 FlashSVD
+
+ARS rank（如 270）在 per-head 路径中被 `min(rank, dh)` 截断到 64，即 full-rank per-head。
+这与 budget=0.5 时各层 Q/K/V rank 均超过 64 的观测一致（见 MEMORY.md AdaSVD 章节）。
+
+### 修复
+
+**1. `compress_adasvd_flashsvd` 硬编码 `qkv_mode="per_head"`**（`adasvd_origin/adasvd_wrapper.py`）：
+```python
+block = NaiveSVDBlock(
+    layer, rank_attn=min(q_rank, dh), rank_ff=ff_rank,
+    svd_per_head_fn=_svd_per_head, svd_low_rank_fn=_svd_low_rank,
+    rank_wo=wo_rank,
+    qkv_mode="per_head",   # always per_head for FlashSVD compatibility
+)
+```
+
+**2. 早期 ValueError 拦截**（`run_encoder_benchmark.py` 和 `glue_pipeline.py`）：
+```python
+if args.qkv_mode == "full" and args.backend == "flashsvd":
+    raise ValueError(
+        "--qkv_mode full is not compatible with --backend flashsvd. "
+        "FlashSVD kernels require per-head format (use --qkv_mode per_head)."
+    )
+```
+
+在模型加载前报错，避免浪费时间和 GPU 内存。
+
+### 兼容矩阵（更新）
+
+| 方法 | qkv_mode=per_head + naive | qkv_mode=per_head + flashsvd | qkv_mode=full + naive | qkv_mode=full + flashsvd |
+|------|--------------------------|------------------------------|-----------------------|--------------------------|
+| svd / fwsvd / drone | ✅ | ✅ | ✅ | ❌ → ValueError |
+| adasvd | ✅（per-head 截断） | ✅（per-head 截断） | ✅（_LowRankLinear） | ❌ → ValueError |
+
+注：adasvd + `qkv_mode=full` + naive 使用 `compress_adasvd_naive`（`_LowRankLinear`，全矩阵语义），不受此限制。
+
+---
+
 ## Phase 1 Dense Baselines (2026-02)
 
 Verified with correct label remaps. All results use `full_validation=True`.
