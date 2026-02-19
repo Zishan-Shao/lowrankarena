@@ -95,8 +95,20 @@ SEED="${SEED:-42}"
 # 输出配置
 OUTPUT_DIR="${OUTPUT_DIR:-${EVAL_ENCODER_PATH}/glue_results}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-_RANK_LABEL="${RANK:-${RETENTION:+ret${RETENTION}}}"
-RUN_NAME="${METHOD}_r${_RANK_LABEL:-auto}_${TIMESTAMP}"
+# Build rank label for log filename:
+# - If component ranks specified, use ra/rf/rw format
+# - Else if global RANK set, use rRANK
+# - Else if RETENTION set, use retRETENTION
+# - Else "auto"
+if [ -n "$RANK_ATTN" ] || [ -n "$RANK_FFN" ] || [ -n "$RANK_WO" ]; then
+    _RA="${RANK_ATTN:-${RANK:-auto}}"
+    _RF="${RANK_FFN:-${RANK:-auto}}"
+    _RW="${RANK_WO:-${RANK:-auto}}"
+    _RANK_LABEL="ra${_RA}_rf${_RF}_rw${_RW}"
+else
+    _RANK_LABEL="${RANK:-${RETENTION:+ret${RETENTION}}}"
+fi
+RUN_NAME="${METHOD}_${_RANK_LABEL:-rauto}_${TIMESTAMP}"
 LOG_FILE="${OUTPUT_DIR}/logs/${RUN_NAME}.log"
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -179,10 +191,10 @@ main() {
 Configuration:
 ──────────────────────────────────────
   Method:        $METHOD
-  Rank:          ${RANK:-auto (from retention)}
-  Rank Attn:     ${RANK_ATTN:-same as rank}
-  Rank FFN:      ${RANK_FFN:-same as rank}
-  Rank Wo:       ${RANK_WO:-same as rank}
+  Rank (global): ${RANK:-N/A}
+  Rank Attn:     ${RANK_ATTN:-${RANK:-N/A}}
+  Rank FFN:      ${RANK_FFN:-${RANK:-N/A}}
+  Rank Wo:       ${RANK_WO:-${RANK:-N/A}}
   Retention:     ${RETENTION:-N/A}
   QKV Mode:      $QKV_MODE
   Calib Batches: $CALIB_BATCHES
