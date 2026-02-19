@@ -946,7 +946,7 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
 
     print(f"\n[cmd] {' '.join(cmd)}\n")
 
-    # Run compression
+    # Run compression (naive — also saves checkpoint)
     result = subprocess.run(cmd, capture_output=False)
 
     if result.returncode != 0:
@@ -1366,6 +1366,59 @@ def benchmark_inference_speed(model, val_loader, device, warmup_steps=10, measur
         "peak_memory_mb": peak_memory_mb,
     }
 
+def _append_flashsvd_csv_row(task, comp_info, speed_metrics, metric_name, metric_value,
+                              csv_path="eval_encoder/eval_results/encoder_runs.csv"):
+    """Append a flashsvd benchmark row to encoder_runs.csv.
+
+    Finds the most recent naive row matching (model_id, task, method) and copies
+    all parameter/dataset fields — only backend, speed metrics, and accuracy differ.
+    FlashSVD shares parameters with naive, so param counts are identical.
+    """
+    import csv as csv_mod
+    if not os.path.exists(csv_path):
+        print(f"[csv] Skipping flashsvd row: {csv_path} not found")
+        return
+
+    model_id = comp_info.get('model_id', '')
+    method   = comp_info.get('method', '')
+
+    with open(csv_path, 'r', newline='', encoding='utf-8') as f:
+        reader = csv_mod.DictReader(f)
+        fieldnames = reader.fieldnames
+        rows = list(reader)
+
+    # Find the last naive row that matches this model/task/method
+    matching_row = None
+    for row in reversed(rows):
+        if (row.get('model_id') == model_id and
+                row.get('task') == task and
+                row.get('method') == method and
+                row.get('backend') == 'naive'):
+            matching_row = row
+            break
+
+    if matching_row is None:
+        print(f"[csv] Skipping flashsvd row: no matching naive row for "
+              f"model={model_id} task={task} method={method}")
+        return
+
+    # Build flashsvd row: copy naive row, update only what differs
+    flash_row = dict(matching_row)
+    flash_row['timestamp']        = datetime.now().isoformat(timespec='seconds')
+    flash_row['backend']          = 'flashsvd'
+    flash_row['metric_value']     = f"{metric_value:.6f}"
+    flash_row['latency_ms']       = f"{speed_metrics['latency_ms_per_batch']:.2f}"
+    flash_row['throughput_sps']   = f"{speed_metrics['throughput_samples_per_sec']:.1f}"
+    _pmb = speed_metrics['peak_memory_mb']
+    flash_row['peak_mem_infer_mb'] = f"{_pmb:.1f}"
+    flash_row['peak_mem_e2e_mb']   = f"{_pmb:.1f}"
+    flash_row['peak_mem_mb']       = f"{_pmb:.1f}"  # legacy field
+
+    with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+        writer = csv_mod.DictWriter(f, fieldnames=fieldnames)
+        writer.writerow(flash_row)
+    print(f"[csv] ✅ FlashSVD row appended to {csv_path}")
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # FlashSVD save / restore helpers
@@ -1459,8 +1512,18 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     results_naive, loss = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
     print(f"[eval] naive: {results_naive}")
 
-    # Evaluate with flashsvd backend (SVD methods only; FlashSVD shares weights → same accuracy)
+    # Benchmark naive speed (before enabling FlashSVD)
+    print(f"\n{'='*70}")
+    print("STEP 3a: Inference Speed Benchmark (naive)")
+    print("="*70)
+    speed_metrics_naive = benchmark_inference_speed(
+        model, val_loader, device,
+        warmup_steps=10, measure_steps=50
+    )
+
+    # Evaluate + benchmark with flashsvd backend (SVD methods only)
     results_flashsvd = None
+    speed_metrics_flash = None
     if _comp_method != 'dense':
         try:
             from eval_encoder.flashsvd_backend import enable_flashsvd
@@ -1468,6 +1531,14 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
             print(f"\n[eval] Evaluating with flashsvd backend...")
             results_flashsvd, _ = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
             print(f"[eval] flashsvd: {results_flashsvd}")
+
+            print(f"\n{'='*70}")
+            print("STEP 3b: Inference Speed Benchmark (flashsvd)")
+            print("="*70)
+            speed_metrics_flash = benchmark_inference_speed(
+                model, val_loader, device,
+                warmup_steps=10, measure_steps=50
+            )
         except RuntimeError as e:
             print(f"[eval] FlashSVD unavailable: {e}")
 
@@ -1486,19 +1557,17 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     print(f"Time:    {eval_time:.1f} seconds")
     print("="*70)
 
-    # Benchmark inference speed
-    print(f"\n{'='*70}")
-    print("STEP 3: Inference Speed Benchmark")
-    print("="*70)
-    speed_metrics = benchmark_inference_speed(
-        model, val_loader, device,
-        warmup_steps=10, measure_steps=50
-    )
-
     # Since no fine-tuning, initial = final
     metric_value = results_naive.get(cfg["metric"], 0)
     metric_value_flash = (results_flashsvd.get(cfg["metric"], 0)
                           if results_flashsvd is not None else None)
+
+    # Write flashsvd row to CSV
+    if results_flashsvd is not None and speed_metrics_flash is not None:
+        _append_flashsvd_csv_row(
+            task, comp_info, speed_metrics_flash,
+            cfg["metric"], metric_value_flash,
+        )
 
     return {
         "task": task,
@@ -1528,7 +1597,9 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
             "time_seconds": eval_time,
             "time_minutes": eval_time / 60,
         },
-        "inference_speed": speed_metrics,
+        "inference_speed": speed_metrics_naive,
+        "inference_speed_naive": speed_metrics_naive,
+        "inference_speed_flashsvd": speed_metrics_flash,
         # Legacy fields for backward compatibility
         "initial_results": results_naive,
         "initial_results_naive": results_naive,
