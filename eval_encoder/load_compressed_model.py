@@ -222,8 +222,16 @@ def load_compressed_model(
             print(f"[warn] Truly missing keys after adasvd reload: {len(real_missing)}")
             for k in real_missing[:10]:
                 print(f"  - {k}")
+        # Enable gradients on A/Bt so the factorised encoder can be fine-tuned.
+        # (requires_grad=False was set for inference-only benchmarking in compress_adasvd_naive)
+        for m in base_model.modules():
+            if isinstance(m, _LowRankLinear):
+                m.A.requires_grad_(True)
+                m.Bt.requires_grad_(True)
         base_model = base_model.to(device=device, dtype=dtype).eval()
-        print(f"[load] adasvd model loaded: {sum(p.numel() for p in base_model.parameters())/1e6:.1f}M params")
+        trainable = sum(p.numel() for p in base_model.parameters() if p.requires_grad)
+        total     = sum(p.numel() for p in base_model.parameters())
+        print(f"[load] adasvd model loaded: {total/1e6:.1f}M params ({trainable/1e6:.1f}M trainable)")
         return base_model, tokenizer, comp_info
     # ── END adasvd-origin branch ──────────────────────────────────────────────
 
