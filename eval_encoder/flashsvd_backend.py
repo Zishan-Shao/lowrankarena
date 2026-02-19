@@ -116,21 +116,28 @@ class FlashSVDBlock(nn.Module):
     # -----------------------------------------------------------------
     def forward(self, x, mask=None):
         B, M, dm = x.shape
-        # Pq stored as [1, H, dm, R]
-        Pq = self.Pq[0]  # [H, dm, R]
+        # Pq stored as [1, H, dm, R] (NaiveSVDBlock) or [H, dm, R] (profile_flashsvd checkpoint)
+        Pq = self.Pq[0] if self.Pq.ndim == 4 else self.Pq  # [H, dm, R]
+        Pk = self.Pk[0] if self.Pk.ndim == 4 else self.Pk
+        Pv = self.Pv[0] if self.Pv.ndim == 4 else self.Pv
         H = Pq.shape[0]
         R = Pq.shape[2]
         dh = dm // H
 
         # --- project x into low-rank space per head ---
         tmp_q = torch.einsum("bmd,hdr->bhmr", x, Pq).contiguous()
-        tmp_k = torch.einsum("bmd,hdr->bhmr", x, self.Pk[0]).contiguous()
-        tmp_v = torch.einsum("bmd,hdr->bhmr", x, self.Pv[0]).contiguous()
+        tmp_k = torch.einsum("bmd,hdr->bhmr", x, Pk).contiguous()
+        tmp_v = torch.einsum("bmd,hdr->bhmr", x, Pv).contiguous()
+
+        # Vq stored as [1, H, R, dh] (NaiveSVDBlock) or [H, R, dh] (profile_flashsvd checkpoint)
+        Vq_b = self.Vq[0] if self.Vq.ndim == 4 else self.Vq  # [H, R, dh]
+        Vk_b = self.Vk[0] if self.Vk.ndim == 4 else self.Vk
+        Vv_b = self.Vv[0] if self.Vv.ndim == 4 else self.Vv
 
         # expand V / bias to [B, H, ...] for the Triton kernel
-        Vq_f = self.Vq[0].expand(B, H, R, dh)
-        Vk_f = self.Vk[0].expand(B, H, R, dh)
-        Vv_f = self.Vv[0].expand(B, H, R, dh)
+        Vq_f = Vq_b.expand(B, H, R, dh)
+        Vk_f = Vk_b.expand(B, H, R, dh)
+        Vv_f = Vv_b.expand(B, H, R, dh)
         bq_f = self._bq_sq.expand(B, H, dh)
         bk_f = self._bk_sq.expand(B, H, dh)
         bv_f = self._bv_sq.expand(B, H, dh)

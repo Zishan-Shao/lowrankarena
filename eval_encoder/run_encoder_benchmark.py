@@ -1524,11 +1524,9 @@ def main():
     if args.backend == "flashsvd":
         if args.method == "dense":
             print("[backend] Warning: backend=flashsvd ignored for method=dense (no compression)")
-        elif args.method == "adasvd":
-            # For AdaSVD, FlashSVD backend is already applied during compression
-            # No need to call enable_flashsvd again
-            print("[backend] AdaSVD already using FlashSVD backend (applied during compression)")
         else:
+            # AdaSVD now creates NaiveSVDBlock instances (no longer uses
+            # adasvd_refactored/profile_flashsvd); enable_flashsvd works uniformly.
             from eval_encoder.flashsvd_backend import enable_flashsvd
             enable_flashsvd(model)
 

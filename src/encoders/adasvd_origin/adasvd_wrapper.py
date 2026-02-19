@@ -356,22 +356,36 @@ def compress_adasvd_naive(
 def compress_adasvd_flashsvd(
     model: PreTrainedModel,
     ranks_path: str,
-    ffn_kernel: str = "v1",
+    ffn_kernel: str = "v1",  # kept for API compatibility, no longer used
     device: str = "cuda",
 ) -> PreTrainedModel:
-    """Compress model with AdaSVD using FlashSVD backend (Triton kernels)."""
+    """Compress model with AdaSVD using NaiveSVDBlock (FlashSVD-compatible).
+
+    adasvd_refactored/profile_flashsvd is deprecated.  This function now creates
+    NaiveSVDBlock instances (per-head format) so that enable_flashsvd() in
+    run_encoder_benchmark.py can later convert them to FlashSVDBlock (Triton
+    kernels from kernels/encoder_kernels/).
+
+    Per-layer adaptive ranks from ARS are applied to Q/K/V (capped to head_dim),
+    attention output projection, and FFN.  For FlashSVD Q/K/V rank uniformity
+    the Q rank is used for all three within each layer.
+    """
     import numpy as np
 
-    _refactored = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "adasvd_refactored"
+    # Locate eval_encoder for NaiveSVDBlock / BertLayerShim
+    # __file__ lives at: <repo>/src/encoders/adasvd_origin/adasvd_wrapper.py
+    # dirname ×4 = repo root
+    _repo_root = os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__))
+            )
+        )
     )
-    if _refactored not in sys.path:
-        sys.path.insert(0, _refactored)
-
-    from profile_flashsvd import (
-        attach_fullnames, build_plain_svd_helpers, FlashSVDBlock, LayerShim
-    )
+    _eval_encoder = os.path.join(_repo_root, "eval_encoder")
+    if _eval_encoder not in sys.path:
+        sys.path.insert(0, _eval_encoder)
+    from blocks import NaiveSVDBlock, BertLayerShim
 
     model = model.to(device).eval()
     with open(ranks_path, "r") as f:
@@ -393,23 +407,60 @@ def compress_adasvd_flashsvd(
         else:
             print(f"[adasvd_origin] FlashSVD per-op ranks (budget={target_budget:.2f})")
 
-    attach_fullnames(model)
-    svd_per_head, svd_low_rank = build_plain_svd_helpers(model)
-
     if hasattr(model, 'bert'):
         encoder_layers = model.bert.encoder.layer
+        prefix = "bert.encoder.layer"
     elif hasattr(model, 'roberta'):
         encoder_layers = model.roberta.encoder.layer
+        prefix = "roberta.encoder.layer"
     else:
         raise ValueError(f"Unsupported model type: {type(model)}")
 
-    print(f"[adasvd_origin] Replacing {len(encoder_layers)} layers with FlashSVDBlock (ffn={ffn_kernel}) ...")
+    d_model = model.config.hidden_size
+    H       = model.config.num_attention_heads
+    dh      = d_model // H
+
+    def _svd_per_head(Wt: torch.Tensor, rank: int):
+        """Per-head SVD: Wt [dm, dm] → (Us [H, dm, r], Vs [H, r, dh])"""
+        rank = min(rank, dh)
+        Wt3  = Wt.view(d_model, H, dh)
+        Us, Vs = [], []
+        for h in range(H):
+            Wh = Wt3[:, h, :].float()
+            U, S, Vh = torch.linalg.svd(Wh, full_matrices=False)
+            Us.append((U[:, :rank] * S[:rank]).to(Wt.dtype))
+            Vs.append(Vh[:rank, :].to(Wt.dtype))
+        return torch.stack(Us, 0), torch.stack(Vs, 0)
+
+    def _svd_low_rank(W: torch.Tensor, rank: int):
+        Wf = W.float()
+        U, S, Vh = torch.linalg.svd(Wf, full_matrices=False)
+        return (U[:, :rank] * S[:rank]).to(W.dtype), Vh[:rank, :].to(W.dtype)
+
+    print(f"[adasvd_origin] Replacing {len(encoder_layers)} layers with NaiveSVDBlock (per-head, adaptive ranks) ...")
     for i, layer in enumerate(encoder_layers):
-        block   = FlashSVDBlock(layer, ranks_dict, svd_per_head, svd_low_rank, ffn_kernel=ffn_kernel)
-        shimmed = LayerShim(block)
+        # Retrieve per-op adaptive ranks; fall back to dh / d_model if key absent
+        q_rank  = ranks_dict.get(f"{prefix}.{i}.attention.self.query",  dh)
+        wo_rank = ranks_dict.get(f"{prefix}.{i}.attention.output.dense", d_model)
+        ff_rank = ranks_dict.get(f"{prefix}.{i}.intermediate.dense",     d_model)
+
+        # Per-head SVD caps rank at dh; use Q rank for K/V (FlashSVD uniformity)
+        rank_attn = min(q_rank, dh)
+        rank_wo   = wo_rank
+        rank_ff   = ff_rank
+
+        block   = NaiveSVDBlock(
+            layer,
+            rank_attn=rank_attn,
+            rank_ff=rank_ff,
+            svd_per_head_fn=_svd_per_head,
+            svd_low_rank_fn=_svd_low_rank,
+            rank_wo=rank_wo,
+            qkv_mode="per_head",
+        )
+        shimmed = BertLayerShim(block)
         encoder_layers[i] = shimmed.to(device).eval()
 
-    del svd_per_head, svd_low_rank
     torch.cuda.empty_cache()
     return model
 
