@@ -549,10 +549,14 @@ def _write_pretrain_csv_row(pretrain_dir, task, metric_name, metric_value, args)
 
 
 def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
-    """Write post-compression fine-tuning result to encoder_runs.csv."""
+    """Write post-compression fine-tuning result to encoder_runs.csv.
+
+    Writes two rows when flashsvd accuracy is available: one for naive, one for flashsvd.
+    """
     cfg = ALL_TASKS[task]
     metric_name = cfg["metric"]
-    best_value = results.get("best_value", results.get("metrics", {}).get("best_value", 0.0))
+    best_value_naive = results.get("best_value", results.get("metrics", {}).get("best_value", 0.0))
+    best_value_flash = results.get("best_value_flashsvd")
 
     # Build rank/budget label from args
     if args.method == "adasvd":
@@ -562,8 +566,9 @@ def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
         rank_str = str(args.rank) if args.rank is not None else ""
         budget_str = ""
 
-    _write_csv_row({
-        "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    base_row = {
+        "timestamp": ts,
         "model_id": str(checkpoint_path),
         "task": task,
         "dataset_split": "validation",
@@ -573,13 +578,24 @@ def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
         "method": f"{args.method}_finetuned",
         "rank": rank_str,
         "budget": budget_str,
-        "backend": args.backend,
         "seed": str(args.seed),
-        "metric_name": metric_name,
-        "metric_value": f"{best_value:.6f}",
         "notes": f"post_compress_finetune epochs={args.num_epochs} lr={args.learning_rate}",
-    })
-    print(f"[finetune] CSV row written: {metric_name}={best_value:.4f}")
+    }
+
+    # Row 1: naive backend
+    _write_csv_row({**base_row,
+                    "backend": "naive",
+                    "metric_name": metric_name,
+                    "metric_value": f"{best_value_naive:.6f}"})
+    print(f"[finetune] CSV row written (naive):    {metric_name}={best_value_naive:.4f}")
+
+    # Row 2: flashsvd backend (only if successfully measured)
+    if best_value_flash is not None:
+        _write_csv_row({**base_row,
+                        "backend": "flashsvd",
+                        "metric_name": metric_name,
+                        "metric_value": f"{best_value_flash:.6f}"})
+        print(f"[finetune] CSV row written (flashsvd): {metric_name}={best_value_flash:.4f}")
 
 def pretrain_base_model(args, task: str) -> Path:
     """Fine-tune the base model (bert-base-uncased) on a task before compression.
@@ -1338,6 +1354,61 @@ def benchmark_inference_speed(model, val_loader, device, warmup_steps=10, measur
     }
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# FlashSVD save / restore helpers
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _get_encoder_layers(model):
+    """Return encoder layer list for BERT / RoBERTa models (None for others)."""
+    if hasattr(model, 'bert'):
+        return model.bert.encoder.layer
+    if hasattr(model, 'roberta'):
+        return model.roberta.encoder.layer
+    return None
+
+
+def _enable_flashsvd_save(model):
+    """Enable FlashSVD in-place; return saved (layer, naive_block) pairs for restore.
+
+    The FlashSVDBlock shares all nn.Parameter objects with the original NaiveSVDBlock
+    (no copies), so the saved naive_block references remain valid after training.
+    """
+    from eval_encoder.flashsvd_backend import enable_flashsvd
+    layers = _get_encoder_layers(model)
+    saved = []
+    if layers is not None:
+        for layer in layers:
+            block = getattr(layer, 'block', None)
+            if block is not None and type(block).__name__ in ('NaiveSVDBlock', 'MinimalSVDBlock'):
+                saved.append((layer, block))
+    enable_flashsvd(model)
+
+    # Verify parameter identity: FlashSVDBlock must hold the SAME Parameter objects
+    # as NaiveSVDBlock (not copies). If this assert fires, FlashSVDBlock.__init__
+    # started copying tensors — training would NOT update the flash block's weights.
+    _SHARED = ('Pq', 'Vq', 'Pk', 'Vk', 'Pv', 'Vv', 'Uo', 'Vo', 'U1', 'V1', 'U2', 'V2')
+    for layer, naive_block in saved[:1]:   # one layer is enough to catch the bug
+        flash_block = layer.block
+        for attr in _SHARED:
+            n_p = getattr(naive_block, attr, None)
+            f_p = getattr(flash_block, attr, None)
+            if n_p is not None and f_p is not None:
+                assert id(n_p) == id(f_p), (
+                    f"[BUG] FlashSVDBlock.{attr} is a COPY, not a reference to NaiveSVDBlock.{attr}. "
+                    f"Training will NOT update FlashSVD weights. Check FlashSVDBlock.__init__."
+                )
+
+    return saved
+
+
+def _restore_naive(saved):
+    """Restore NaiveSVDBlock instances saved by _enable_flashsvd_save (undo FlashSVD swap)."""
+    for layer, naive_block in saved:
+        layer.block = naive_block
+    if saved:
+        print(f"[flashsvd] Restored {len(saved)} layers to NaiveSVDBlock (for training).")
+
+
 def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     """Evaluate compressed model on a specific GLUE task WITHOUT fine-tuning."""
     print(f"\n{'='*70}")
@@ -1358,11 +1429,6 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         dtype=torch.float32,
     )
 
-    # Apply backend (eval-only; no gradient flow needed here)
-    if getattr(args, 'backend', 'naive') == 'flashsvd':
-        from eval_encoder.flashsvd_backend import enable_flashsvd
-        enable_flashsvd(model)
-
     # Prepare data
     print(f"\n[data] Loading {task} dataset...")
     train_loader, val_loader = prepare_data(task, tokenizer, args.seq_len, args.batch_size)
@@ -1373,11 +1439,26 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     train_size = len(train_loader.dataset) if train_loader is not None else 0
     val_size = len(val_loader.dataset)
 
-    # Evaluation (no fine-tuning)
-    print(f"\n[eval] Evaluating compressed model...")
+    # Evaluate with naive backend (always first)
     original_model_id = comp_info.get('model_id', None)
-    results, loss = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
-    print(f"[eval] Results: {results}")
+    _comp_method = comp_info.get('method', args.method)
+    print(f"\n[eval] Evaluating with naive backend...")
+    results_naive, loss = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
+    print(f"[eval] naive: {results_naive}")
+
+    # Evaluate with flashsvd backend (SVD methods only; FlashSVD shares weights → same accuracy)
+    results_flashsvd = None
+    if _comp_method != 'dense':
+        try:
+            from eval_encoder.flashsvd_backend import enable_flashsvd
+            enable_flashsvd(model)
+            print(f"\n[eval] Evaluating with flashsvd backend...")
+            results_flashsvd, _ = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
+            print(f"[eval] flashsvd: {results_flashsvd}")
+        except RuntimeError as e:
+            print(f"[eval] FlashSVD unavailable: {e}")
+
+    results = results_naive
 
     # Record end time
     end_time = time.time()
@@ -1386,7 +1467,9 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     print(f"\n{'='*70}")
     print(f"Evaluation Complete: {task.upper()}")
     print("="*70)
-    print(f"Results: {results}")
+    print(f"Naive:    {results_naive}")
+    if results_flashsvd is not None:
+        print(f"FlashSVD: {results_flashsvd}")
     print(f"Time:    {eval_time:.1f} seconds")
     print("="*70)
 
@@ -1400,7 +1483,9 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     )
 
     # Since no fine-tuning, initial = final
-    metric_value = results.get(cfg["metric"], 0)
+    metric_value = results_naive.get(cfg["metric"], 0)
+    metric_value_flash = (results_flashsvd.get(cfg["metric"], 0)
+                          if results_flashsvd is not None else None)
 
     return {
         "task": task,
@@ -1412,9 +1497,14 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         },
         "metrics": {
             "primary_metric": cfg["metric"],
-            "initial": results,
-            "final": results,  # Same as initial (no fine-tuning)
+            "initial": results_naive,
+            "initial_naive": results_naive,
+            "initial_flashsvd": results_flashsvd,
+            "final": results_naive,
+            "final_naive": results_naive,
+            "final_flashsvd": results_flashsvd,
             "best_value": metric_value,
+            "best_value_flashsvd": metric_value_flash,
             "improvement": 0.0,  # No improvement without fine-tuning
         },
         "training": {
@@ -1427,10 +1517,15 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         },
         "inference_speed": speed_metrics,
         # Legacy fields for backward compatibility
-        "initial_results": results,
-        "final_results": results,
+        "initial_results": results_naive,
+        "initial_results_naive": results_naive,
+        "initial_results_flashsvd": results_flashsvd,
+        "final_results": results_naive,
+        "final_results_naive": results_naive,
+        "final_results_flashsvd": results_flashsvd,
         "best_metric": cfg["metric"],
         "best_value": metric_value,
+        "best_value_flashsvd": metric_value_flash,
     }
 
 
@@ -1501,10 +1596,35 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
         print(f"[train] eval label_remap:  {_eval_remap.tolist()}")
         print(f"[train] train label_remap: {train_label_remap.tolist()} (inverted for training alignment)")
 
-    # Initial evaluation
-    print(f"\n[eval] Initial evaluation...")
+    # Initial evaluation — naive backend
+    _comp_method = comp_info.get('method', args.method)
+    print(f"\n[eval] Initial evaluation (naive)...")
     initial_results, initial_loss = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
-    print(f"[eval] Before fine-tuning: {initial_results}")
+    initial_results_naive = initial_results
+    print(f"[eval] Before fine-tuning (naive): {initial_results}")
+
+    # Initial evaluation — flashsvd backend (save/restore keeps naive blocks for training)
+    initial_results_flashsvd = None
+    if _comp_method != 'dense':
+        try:
+            _saved_blocks = _enable_flashsvd_save(model)
+            print(f"\n[eval] Initial evaluation (flashsvd)...")
+            initial_results_flashsvd, _ = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
+            print(f"[eval] Before fine-tuning (flashsvd): {initial_results_flashsvd}")
+            _restore_naive(_saved_blocks)   # restore NaiveSVDBlock for gradient-based training
+        except RuntimeError as e:
+            print(f"[eval] FlashSVD unavailable for initial eval: {e}")
+
+    # Safety check: ensure no FlashSVDBlock is present before training.
+    # Triton kernels don't support autograd; training through them would silently
+    # produce zero gradients or crash.
+    from eval_encoder.flashsvd_backend import FlashSVDBlock as _FSB
+    _flash_found = [type(m).__name__ for m in model.modules()
+                    if isinstance(m, _FSB) or type(m).__name__ == 'FlashSVDBlock']
+    assert not _flash_found, (
+        f"FlashSVDBlock found in model before training: {_flash_found}. "
+        "_restore_naive() must be called before the training loop."
+    )
 
     # Training loop (ensure grad is enabled — previous task cleanup may have disabled it globally)
     torch.set_grad_enabled(True)
@@ -1605,15 +1725,25 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
 
     print("="*70)
 
-    # Apply backend for inference benchmark.
-    # Training always runs with naive backend (Triton kernels don't support
-    # autograd); we switch to flashsvd here, after the optimizer is gone,
-    # so the throughput measurement reflects the correct execution path.
-    if getattr(args, 'backend', 'naive') == 'flashsvd':
-        from eval_encoder.flashsvd_backend import enable_flashsvd
-        enable_flashsvd(model)
+    # Enable FlashSVD for final accuracy eval and throughput benchmark.
+    # Training always runs naive (Triton kernels don't support autograd).
+    # We switch here, after the optimizer is gone, so both accuracy and
+    # throughput measurements reflect the real FlashSVD execution path.
+    final_results_naive = final_results
+    final_results_flashsvd = None
+    if _comp_method != 'dense':
+        try:
+            from eval_encoder.flashsvd_backend import enable_flashsvd
+            enable_flashsvd(model)
+            model.eval()                    # ensure dropout is off for accuracy measurement
+            torch.set_grad_enabled(False)   # no gradients needed past this point
+            print(f"\n[eval] Final evaluation (flashsvd)...")
+            final_results_flashsvd, _ = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
+            print(f"[eval] After fine-tuning (flashsvd): {final_results_flashsvd}")
+        except RuntimeError as e:
+            print(f"[eval] FlashSVD unavailable for final eval: {e}")
 
-    # Benchmark inference speed
+    # Benchmark inference speed (FlashSVD already enabled if available)
     print(f"\n{'='*70}")
     print("STEP 3: Inference Speed Benchmark (Clean Inference State)")
     print("="*70)
@@ -1622,10 +1752,15 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
         warmup_steps=10, measure_steps=50
     )
 
-    # Calculate improvement for primary metric
-    initial_primary = initial_results.get(cfg["metric"], 0)
-    final_primary = final_results.get(cfg["metric"], 0)
+    # Calculate improvement for primary metric (naive → naive)
+    initial_primary = initial_results_naive.get(cfg["metric"], 0)
+    final_primary = final_results_naive.get(cfg["metric"], 0)
     improvement = final_primary - initial_primary
+
+    final_metric_flashsvd = (final_results_flashsvd.get(cfg["metric"], 0)
+                              if final_results_flashsvd is not None else None)
+    initial_metric_flashsvd = (initial_results_flashsvd.get(cfg["metric"], 0)
+                                if initial_results_flashsvd is not None else None)
 
     return {
         "task": task,
@@ -1637,9 +1772,14 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
         },
         "metrics": {
             "primary_metric": cfg["metric"],
-            "initial": initial_results,
-            "final": final_results,
+            "initial": initial_results_naive,
+            "initial_naive": initial_results_naive,
+            "initial_flashsvd": initial_results_flashsvd,
+            "final": final_results_naive,
+            "final_naive": final_results_naive,
+            "final_flashsvd": final_results_flashsvd,
             "best_value": best_metric_value,
+            "best_value_flashsvd": final_metric_flashsvd,
             "improvement": improvement,
         },
         "training": {
@@ -1652,10 +1792,15 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
         },
         "inference_speed": speed_metrics,
         # Legacy fields for backward compatibility
-        "initial_results": initial_results,
-        "final_results": final_results,
+        "initial_results": initial_results_naive,
+        "initial_results_naive": initial_results_naive,
+        "initial_results_flashsvd": initial_results_flashsvd,
+        "final_results": final_results_naive,
+        "final_results_naive": final_results_naive,
+        "final_results_flashsvd": final_results_flashsvd,
         "best_metric": cfg["metric"],
         "best_value": best_metric_value,
+        "best_value_flashsvd": final_metric_flashsvd,
     }
 
 
@@ -1889,23 +2034,31 @@ def run_pipeline(args):
         print("="*W)
     else:
         # Normal mode: Before FT | After FT | Δ
-        W = 115
+        W = 138
         print("\n" + "="*W)
         print("GLUE Benchmark Detailed Results")
         print("="*W)
-        print(f"{'Task':<8} | {'Metric':<18} | {'Before FT':>9} | {'After FT':>8} | {'Δ':>7} | {'Time':<8} | {'Throughput':<12} | {'Latency':<10}")
+        print(f"{'Task':<8} | {'Metric':<12} | {'Pre-N':>7} | {'Pre-F':>7} | {'Post-N':>7} | {'Post-F':>7} | {'Δ(N)':>7} | {'Δ(F)':>7} | {'Time':<7} | {'Throughput':<12} | {'Latency':<10}")
         print("-"*W)
         for result in all_results:
             task = result["task"]
             metric = result["best_metric"]
-            initial = result["initial_results"].get(metric, 0)
-            final = result["best_value"]
-            improvement = final - initial
+            pre_n = (result.get("initial_results_naive") or result["initial_results"]).get(metric, 0)
+            _pfd = result.get("initial_results_flashsvd")
+            pre_f = _pfd.get(metric, 0) if _pfd is not None else None
+            post_n = (result.get("final_results_naive") or result["final_results"]).get(metric, 0)
+            _qfd = result.get("final_results_flashsvd")
+            post_f = _qfd.get(metric, 0) if _qfd is not None else None
+            delta_n = post_n - pre_n
+            delta_f = (post_f - pre_f) if (pre_f is not None and post_f is not None) else None
             train_time = result.get("training", {}).get("time_minutes", 0)
             speed = result.get("inference_speed", {})
             throughput = speed.get("throughput_samples_per_sec", 0)
             latency = speed.get("latency_ms_per_batch", 0)
-            print(f"{task.upper():<8} | {metric:<18} | {initial:9.4f} | {final:8.4f} | {improvement:+7.4f} | {train_time:6.1f}m | {throughput:8.1f} s/s | {latency:7.2f} ms")
+            pre_f_s  = f"{pre_f:7.4f}"  if pre_f  is not None else "    N/A"
+            post_f_s = f"{post_f:7.4f}" if post_f is not None else "    N/A"
+            delta_f_s = f"{delta_f:+7.4f}" if delta_f is not None else "    N/A"
+            print(f"{task.upper():<8} | {metric:<12} | {pre_n:7.4f} | {pre_f_s} | {post_n:7.4f} | {post_f_s} | {delta_n:+7.4f} | {delta_f_s} | {train_time:5.1f}m | {throughput:8.1f} s/s | {latency:7.2f} ms")
         print("="*W)
     print(f"\n{'Final Evaluation Scores':^100}")
     print("="*100)

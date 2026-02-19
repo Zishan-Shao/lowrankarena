@@ -209,13 +209,20 @@ def enable_flashsvd(model: nn.Module) -> nn.Module:
         )
 
     patched = 0
+    already_flash = 0
     for i, layer in enumerate(encoder_layers):
         block = getattr(layer, "block", None)
+        _cls_name = type(block).__name__ if block is not None else ""
+
+        # Idempotency: skip layers that are already FlashSVDBlock
+        if _cls_name == "FlashSVDBlock" or isinstance(block, FlashSVDBlock):
+            already_flash += 1
+            continue
+
         # Support both NaiveSVDBlock (from compression) and MinimalSVDBlock (from checkpoint loading).
         # isinstance() may fail if adasvd_wrapper imported blocks via a different sys.path entry
         # (module aliasing: "blocks.NaiveSVDBlock" vs "eval_encoder.blocks.NaiveSVDBlock").
         # Duck-typing fallback ensures correctness regardless of import path.
-        _cls_name = type(block).__name__ if block is not None else ""
         is_svd_block = (
             isinstance(block, NaiveSVDBlock)
             or (MinimalSVDBlock and isinstance(block, MinimalSVDBlock))
@@ -226,12 +233,15 @@ def enable_flashsvd(model: nn.Module) -> nn.Module:
             layer.block = flash_block
             patched += 1
 
-    if patched == 0:
+    if patched == 0 and already_flash == 0:
         raise RuntimeError(
             "enable_flashsvd: no NaiveSVDBlock or MinimalSVDBlock instances found. "
             "Did you run compression (--method != dense) before calling "
             "enable_flashsvd?"
         )
 
-    print(f"[flashsvd] Patched {patched} encoder layers with FlashSVD kernels.")
+    if already_flash > 0 and patched == 0:
+        print(f"[flashsvd] Already enabled ({already_flash} layers) — no-op.")
+    else:
+        print(f"[flashsvd] Patched {patched} encoder layers with FlashSVD kernels.")
     return model
