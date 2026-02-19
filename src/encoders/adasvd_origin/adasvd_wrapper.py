@@ -372,7 +372,9 @@ def compress_adasvd_flashsvd(
     """
     import numpy as np
 
-    # Locate eval_encoder for NaiveSVDBlock / BertLayerShim
+    # Import NaiveSVDBlock / BertLayerShim via the same module path that
+    # flashsvd_backend.py uses ("eval_encoder.blocks"), so isinstance() checks
+    # in enable_flashsvd() work correctly.
     # __file__ lives at: <repo>/src/encoders/adasvd_origin/adasvd_wrapper.py
     # dirname ×4 = repo root
     _repo_root = os.path.dirname(
@@ -382,10 +384,9 @@ def compress_adasvd_flashsvd(
             )
         )
     )
-    _eval_encoder = os.path.join(_repo_root, "eval_encoder")
-    if _eval_encoder not in sys.path:
-        sys.path.insert(0, _eval_encoder)
-    from blocks import NaiveSVDBlock, BertLayerShim
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
+    from eval_encoder.blocks import NaiveSVDBlock, BertLayerShim
 
     model = model.to(device).eval()
     with open(ranks_path, "r") as f:
