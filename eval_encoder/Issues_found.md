@@ -233,6 +233,137 @@ This is a scientifically interesting compression side-effect: *de-adversarializa
 
 ---
 
+## AdaSVD (adasvd_origin) 重新实现记录 (2026-02)
+
+### 背景
+
+`adasvd_origin` 是论文 NAACL 2024 paper-compliant 的 ARS（Adaptive Rank Selection）实现，
+与 `adasvd_refactored` 的区别在于使用 `PaperHN`（固定随机 z buffer + LayerNorm + meta_proj + GRU）。
+
+---
+
+### Bug 1：one-sided log budget loss 无法从下方推动 ratio（已修复）
+
+**现象**：Paper Eq.8 采用单侧 log 形式 `log(clamp(T, min=Tmax)/Tmax)`，当 ratio_soft < budget 时梯度为 0，ratio 永远无法上升到 target。
+
+**根因**：`PaperHN` 初始 head.bias = -2.0（sigmoid ≈ 12%），远低于任何 budget，而单侧 loss 对 T < Tmax 无梯度，无法推动 ratio 上升。
+
+**修复**（`adaptive_rank_selection.py` PaperHN.__init__）：
+```python
+init_p = float(max(0.55, min(0.95, budget + 0.15)))
+init_bias = math.log(init_p / (1.0 - init_p))
+for head in self.heads:
+    nn.init.constant_(head.bias, init_bias)
+```
+让初始 ratio_soft 略高于 budget，使 loss 从第 0 步就有向下梯度。
+
+---
+
+### Bug 2：alignment_loss 量级压制 budget_loss（已修复）
+
+**现象**：ratio_soft 稳定上升（0.976 → 1.4），budget_loss 也上升，alignment 梯度完全压制 budget 梯度。
+
+**根因**：BERT singular values `s_max ≈ 30–50`，`((mask - m_top) * s)^2` 量级约 `50^2 = 2500`；
+而 budget_loss 量级 `O(1)`，alignment 强于 budget 约 **67,000×**。
+
+**修复**（`adaptive_rank_selection.py` alignment_loss）：
+```python
+frob_sq = s.detach().pow(2).sum().clamp(min=1e-12)
+return torch.sum(((mask - m_top) * s) ** 2) / frob_sq
+```
+归一化使 alignment_loss 无量纲（范围 [0,1]），与 budget_loss 量级对齐。
+
+---
+
+### Bug 3：ratio_max 边界断言设置错误（已修复）
+
+**现象**：ratio_soft 偶尔超过 1.0，原始断言 `assert ratio_soft <= 1.01` 会误报。
+
+**根因**：SVD 表示用 `(M+N)×R` 个参数，dense 用 `M×N`；
+对 BERT-base（square attn + rect FFN），full-rank SVD ratio_max ≈ 1.50 > 1。
+
+**修复**（`adasvd_wrapper.py` 训练循环）：
+```python
+T_max_fullrank = sum((op.in_features + op.out_features) * op.rank_cap for op in op_list)
+ratio_max = T_max_fullrank / (T_original + 1e-12)
+assert ratio_soft <= ratio_max + 1e-2, f"ratio_soft={ratio_soft:.4f} > ratio_max={ratio_max:.4f}"
+```
+
+---
+
+### Bug 4：compress_adasvd_naive 用 FWSVDBlock 导致 F1=0（已修复）
+
+**现象**：ARS 训练收敛（ratio_soft → target），但压缩后 MRPC F1=0.0。
+
+**根因**：旧 `compress_adasvd_naive` 调用 `profile_svd.py` 的 `FWSVDBlock`，该 block：
+1. 导入 `flash_attn_triton`（Triton kernel，attention mask 约定不同）
+2. 用 `svd_per_head` 把 ARS 全矩阵 rank（最大 768）当作 per-head rank（最大 64）使用 → 所有层退化为 full rank
+
+**修复**（`adasvd_wrapper.py`）：弃用 FWSVDBlock，改用 `_LowRankLinear` 直接逐 Linear 替换：
+```python
+class _LowRankLinear(nn.Module):
+    """W ≈ A @ Bt; forward: x @ Bt.T @ A.T + bias"""
+    def __init__(self, A, Bt, bias=None):
+        ...
+def compress_adasvd_naive(model, ranks_path, device="cuda"):
+    # For each nn.Linear in ranks_dict: SVD → A=[out,r], Bt=[r,in] → _LowRankLinear
+    ...
+```
+
+---
+
+### Bug 5：load_compressed_model.py 不认识 _LowRankLinear checkpoint（已修复）
+
+**现象**：fine-tuning 阶段加载 adasvd checkpoint 时打印 `[warn] Layer N missing SVD parameters, skipping`（全部 12 层），加载后精度等于 dense baseline。
+
+**根因**：`load_compressed_model.py` 只识别 `.block.Pq` / `.block.Uq` 参数名，
+而 `_LowRankLinear` 保存的是 `.A` / `.Bt`，没有 `.block.` 前缀。
+
+**修复**（`load_compressed_model.py`）：在 SVD block 重建逻辑前插入 adasvd 分支：
+```python
+has_lrl = any(k.endswith(".A") for k in state_dict.keys())
+if has_lrl:
+    # 遍历 base_model 的 nn.Linear，找到 state_dict 里有对应 .A/.Bt 的就替换
+    for name, module in list(base_model.named_modules()):
+        if isinstance(module, nn.Linear) and f"{name}.A" in state_dict:
+            setattr(parent, last, _LowRankLinear(A, Bt, bias))
+    base_model.load_state_dict(non_lrl_keys, strict=False)
+    return base_model, tokenizer, comp_info
+```
+
+`missing_keys` 报告 148 条（= 74 层 × 2 个 A/Bt）为**预期行为**，不是错误。
+
+---
+
+### Bug 6：fine-tuning 时 A/Bt 被冻结导致 MCC/F1=0（已修复）
+
+**现象**：加载 adasvd checkpoint 后 fine-tuning 3 epochs，loss 下降但 MCC 始终 0.0。
+
+**根因**：`_LowRankLinear` 构造时设置 `requires_grad=False`（为 inference benchmark 设计），
+fine-tuning 只更新了 classifier + LayerNorm，encoder 特征完全冻结。
+
+**修复**（`load_compressed_model.py` adasvd 分支末尾）：
+```python
+for m in base_model.modules():
+    if isinstance(m, _LowRankLinear):
+        m.A.requires_grad_(True)
+        m.Bt.requires_grad_(True)
+```
+
+---
+
+### 涉及文件汇总
+
+| 文件 | 修改内容 |
+|------|---------|
+| `src/encoders/adasvd_origin/adaptive_rank_selection.py` | PaperHN bias init；alignment_loss Frobenius 归一化；MaskedSVDLinear.rank_cap 属性 |
+| `src/encoders/adasvd_origin/adasvd_wrapper.py` | ratio_max 断言；`_LowRankLinear` 类；新版 `compress_adasvd_naive` |
+| `eval_encoder/load_compressed_model.py` | `_LowRankLinear` 类定义；adasvd checkpoint 加载分支；fine-tuning requires_grad 解冻 |
+| `eval_encoder/scripts/one_click_glue.sh` | 新增 `ADASVD_CALIB_SAMPLES` / `ADASVD_STEPS` env → python args 穿透 |
+| `eval_encoder/scripts/compare_all_methods.sh` | `METHODS` / `STAGES` env 覆盖支持；adasvd 传递 ARS 参数 |
+
+---
+
 ## Phase 1 Dense Baselines (2026-02)
 
 Verified with correct label remaps. All results use `full_validation=True`.
