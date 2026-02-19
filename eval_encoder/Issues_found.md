@@ -233,6 +233,82 @@ This is a scientifically interesting compression side-effect: *de-adversarializa
 
 ---
 
+## Per-Head vs Full-Matrix SVD：语义边界与后端兼容性 (2026-02)
+
+### 定义
+
+| 模式 | 对象 | rank 上限 | 参数形状 |
+|------|------|-----------|---------|
+| `per_head` | 每个 attention head 单独 SVD（64×64） | `head_dim = 64` | `Pq: [H, dh, R]` |
+| `full` | 整个 Q/K/V 矩阵 SVD（768×768） | `d_model = 768` | `Pq: [dm, R]` 或 `[1, H, dm, R]` |
+
+---
+
+### 问题 1：per_head 模式下 rank > head_dim 静默退化为 full rank
+
+**现象**：`--rank 128 --qkv_mode per_head` 时，BERT-base（head_dim=64）实际每头只保留 64 个奇异值，效果等价于不压缩。
+
+**根因**：`torch.linalg.svd(W_head)` 其中 `W_head` shape 为 `[64, 64]`，最多 64 个奇异值。
+`rank=128` 被 clamp 到 64，SVD 完全重建原矩阵，无压缩效果。
+
+**影响范围**：所有使用 per_head 模式且 rank ≥ 64 的 svd / fwsvd / drone 结果。
+
+**正确用法**：per_head 模式 rank 应 ≤ 63；论文常用 r=32 或 r=48。
+
+---
+
+### 问题 2：full 模式的 rank 由 ARS 全矩阵语义决定，不能混用 per_head 后端
+
+**现象**：`adasvd_origin` ARS 输出的 ranks（如 Q=270, K=180, V=90）是 **全矩阵语义**（对 768×768 矩阵），
+若误传入 per_head 路径（FWSVDBlock / `svd_per_head`），每头 rank = 270/H = 22.5 → 截断为 22，
+等价于对全矩阵做非常低秩压缩，信息大量丢失。
+
+**原始 Bug（已修复）**：旧版 `compress_adasvd_naive` 调用 `build_plain_svd_helpers()` 的
+`svd_per_head` 路径，把全矩阵 rank 当 per-head rank 使用 → MRPC F1=0。
+
+**修复**：`_LowRankLinear` 直接对整个 `nn.Linear.weight`（768×768）做 SVD，不经过任何 per-head 拆分。
+
+---
+
+### 问题 3：FlashSVD 后端仅支持 per_head 模式
+
+**根因**：FlashSVD Triton kernel（`flashsvdattn.py`）内部按 head 分块计算，
+要求 Q/K/V 的 rank 相同且为 per-head 语义。
+
+**具体限制**：
+- `profile_flashsvd.py:194`：从 `Pq` 提取 R，统一应用到所有 V 矩阵
+- `utils_mask.py:69`：使用单一 `r_dim` 覆盖所有 Q/K/V tile
+
+**推论**：adasvd + FlashSVD 的组合不能直接使用 per-op adaptive ranks，
+必须用 **median rank 策略**（见 adasvd_wrapper.py compress_adasvd_flashsvd）统一各层 rank。
+
+---
+
+### 各方法与模式的兼容矩阵
+
+| 方法 | per_head | full | FlashSVD 后端 |
+|------|----------|------|--------------|
+| svd | ✅ rank≤63 | ✅ | ✅（per_head only） |
+| fwsvd | ✅ rank≤63 | ✅ | ✅（per_head only） |
+| drone | ✅ rank≤63 | ✅ | ✅（per_head only） |
+| adasvd | ❌ 语义不匹配 | ✅ | ⚠️ 需 median rank 策略 |
+
+---
+
+### 推荐配置
+
+```bash
+# svd/fwsvd/drone：per_head，rank 控制在 head_dim 以内
+--qkv_mode per_head --rank 32   # 合理
+--qkv_mode per_head --rank 128  # ❌ 静默无压缩
+
+# adasvd：始终 full-matrix，naive backend
+--method adasvd --backend naive --budget 0.5  # ✅
+--method adasvd --backend flashsvd            # ⚠️ 自动 median rank
+```
+
+---
+
 ## AdaSVD (adasvd_origin) 重新实现记录 (2026-02)
 
 ### 背景
