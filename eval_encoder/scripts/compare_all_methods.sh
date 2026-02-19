@@ -259,36 +259,40 @@ except Exception as e:
 
 tasks_order = ["cola","sst2","mrpc","qqp","mnli","qnli","rte","stsb"]
 task_hdr = {
-    "cola": "CoLA(MCC)",
-    "sst2": "SST-2(Acc)",
-    "mrpc": "MRPC(F1)",
-    "qqp":  "QQP(F1)",
-    "mnli": "MNLI(Acc)",
-    "qnli": "QNLI(Acc)",
-    "rte":  "RTE(Acc)",
-    "stsb": "STS-B(Pearson)",
+    "cola": "CoLA",
+    "sst2": "SST-2",
+    "mrpc": "MRPC",
+    "qqp":  "QQP",
+    "mnli": "MNLI",
+    "qnli": "QNLI",
+    "rte":  "RTE",
+    "stsb": "STS-B",
 }
 
 def load(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def best_value_for_task(res):
-    # glue_pipeline emits best_value
+def _get(res, key, fallback_keys=()):
+    """Get a float value from a result dict, trying fallback keys if needed."""
     if not res:
         return None
-    v = res.get("best_value")
+    v = res.get(key)
     if v is None:
-        # fallback: use final of primary_metric
+        for fk in fallback_keys:
+            v = res.get(fk)
+            if v is not None:
+                break
+    if v is None:
+        # last resort: use final of primary_metric
         metrics = res.get("metrics", {})
         pm = metrics.get("primary_metric")
-        if pm and "final" in metrics and pm in metrics["final"]:
+        if pm and "final" in metrics and pm in metrics.get("final", {}):
             return float(metrics["final"][pm])
         return None
     return float(v)
 
 def stage_backend_maps(mp):
-    """Parse stage:backend:method keys into nested dict"""
     out = {}
     for k, v in mp.items():
         parts = k.split(":")
@@ -297,35 +301,76 @@ def stage_backend_maps(mp):
             out.setdefault(stage, {}).setdefault(backend, {})[method] = v
     return out
 
-def print_table(stage, backend, mm):
+def fmt(v):
+    return "-    " if v is None else f"{v:.4f}"
+
+def print_table(stage, mm):
+    """Print one table per stage showing both naive (N) and flashsvd (F) accuracy."""
     methods_order = ["dense","svd","fwsvd","drone","adasvd"]
-    headers = ["Method"] + [task_hdr[t] for t in tasks_order] + ["G-Avg","A-Avg","JSON"]
-    print("="*110)
-    print(f"Stage: {stage}  |  Backend: {backend}")
-    print("="*110)
-    print(" | ".join(headers))
-    print("-"*110)
+    W = 10 + len(tasks_order) * 14 + 20
+    print("=" * W)
+    print(f"Stage: {stage}   (N = naive backend, F = flashsvd backend)")
+    print("=" * W)
+    # Header
+    hdr = f"{'Method':<9}"
+    for t in tasks_order:
+        hdr += f"  {task_hdr[t]:>11}"
+    hdr += f"  {'G-Avg':>6}  {'A-Avg':>6}"
+    print(hdr)
+    print(f"{'':9}" + "".join(f"  {'N':>5} {'F':>5}" for _ in tasks_order) +
+          f"  {'N':>3} {'F':>3}  {'N':>3} {'F':>3}")
+    print("-" * W)
+
+    # Collect all paths from any backend key in mm (we pick the first available)
+    method_paths = {}
+    for backend_dict in mm.values():
+        for method, path in backend_dict.items():
+            if method not in method_paths:
+                method_paths[method] = path
+
     for m in methods_order:
-        path = mm.get(m)
+        path = method_paths.get(m)
         if not path or not os.path.exists(path):
-            print(m + " | " + " | ".join(["(missing)"]*(len(headers)-1)))
+            print(f"{m:<9}  (no result)")
             continue
         obj = load(path)
         results = {r.get("task"): r for r in obj.get("results", [])}
-        vals = []
+        row = f"{m:<9}"
         for t in tasks_order:
-            vals.append(best_value_for_task(results.get(t)))
+            res = results.get(t)
+            # Naive: best_value (primary); FlashSVD: best_value_flashsvd
+            vn = _get(res, "best_value")
+            vf = _get(res, "best_value_flashsvd")
+            row += f"  {fmt(vn)} {fmt(vf)}"
         summ = obj.get("summary", {})
-        gavg = float(summ.get("G-Avg", {}).get("final", 0.0))
-        aavg = float(summ.get("A-Avg", {}).get("final", 0.0))
-        line = [m] + [("-" if v is None else f"{v:.4f}") for v in vals] + [f"{gavg:.4f}", f"{aavg:.4f}", os.path.basename(path)]
-        print(" | ".join(line))
+        gn = float(summ.get("G-Avg", {}).get("final", 0.0))
+        an = float(summ.get("A-Avg", {}).get("final", 0.0))
+        # FlashSVD G-Avg / A-Avg: compute from per-task flashsvd values
+        gf_vals, af_vals = [], []
+        for t in tasks_order:
+            res = results.get(t)
+            vf = _get(res, "best_value_flashsvd")
+            if vf is not None:
+                metric = (res.get("best_metric") or
+                          res.get("metrics", {}).get("primary_metric", ""))
+                norm = (vf + 1) / 2 if metric in ("matthews_correlation", "pearson") else vf
+                gf_vals.append(norm)
+                if metric == "accuracy":
+                    af_vals.append(vf)
+        gf = sum(gf_vals) / len(gf_vals) if gf_vals else None
+        af = sum(af_vals) / len(af_vals) if af_vals else None
+        row += f"  {gn:.3f} {fmt(gf)[:5]}  {an:.3f} {fmt(af)[:5]}"
+        print(row)
     print()
 
 nested = stage_backend_maps(mp)
-for stage in sorted(nested.keys()):
-    for backend in sorted(nested[stage].keys()):
-        print_table(stage, backend, nested[stage][backend])
+# Merge all backends into one dict per stage (we show N vs F from the result JSON itself)
+merged = {}
+for stage, bd in nested.items():
+    merged[stage] = bd
+
+for stage in sorted(merged.keys()):
+    print_table(stage, merged[stage])
 PY
 
 echo "Log saved to: ${SUMMARY_LOG}"
