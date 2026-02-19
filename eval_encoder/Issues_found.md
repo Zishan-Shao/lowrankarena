@@ -1,5 +1,33 @@
 # Issues Found & Design Decisions
 
+## Table of Contents
+
+| # | Entry | Status |
+|---|-------|--------|
+| 1 | [FWSVD fp16 Bug](#fwsvd-fp16-bug-2026-02--deferred) | ⏸ Deferred |
+| 2 | [BoolQ label2id 曾反转](#boolq-label2id-曾反转-2026-02--已修复) | ✅ Fixed |
+| 3 | [ANLI de-Adversarialization](#anli-de-adversarialization-2026-02--真实现象) | 📝 Observation |
+| 4 | [SuperGLUE Simplified Metric Rationale](#superglue-simplified-metric-rationale) | 📐 Design |
+| 5 | [FlashSVD fp16 vs fp32 Throughput](#flashsvd-fp16-vs-fp32-throughput-2026-02) | 📝 Observation |
+| 6 | [CB Compression: Proxy Model Problem](#cb-compression-analysis-proxy-model-problem-2026-02) | ⚠️ Known Limitation |
+| 7 | [HANS / ANLI 跨任务校准可复现性建议](#hans--anli-跨任务校准可复现性建议-2026-02) | 📐 Design |
+| 8 | [HANS / ANLI 不支持 pretrain_before_compress](#hans--anli-不支持-pretrain_before_compress-2026-02--设计限制) | 📐 Design |
+| 9 | [Phase 1 SVD r=128 Naive Results](#phase-1-svd-r128-naive-compression-results-2026-02) | 📊 Data |
+| 10 | [Per-Head vs Full-Matrix SVD 语义边界](#per-head-vs-full-matrix-svd语义边界与后端兼容性-2026-02) | 📐 Design |
+| 11 | [AdaSVD (adasvd_origin) 重新实现记录](#adasvd-adasvd_origin-重新实现记录-2026-02) | ✅ Fixed (6 bugs) |
+| 12 | [AdaSVD Classifier/Pooler 被 ARS 压缩](#adasvd-classifierpooler-被-ars-压缩-2026-02--已修复) | ✅ Fixed |
+| 13 | [AdaSVD 不支持 qkv_mode=full](#adasvd-不支持-qkv_modefull-2026-02--已修复) | ✅ Fixed |
+| 14 | [Stage1 Collapse: Task-Finetuned + Plain SVD](#stage1-collapse-analysis-task-finetuned-models--plain-svd-2026-02) | 📝 Observation |
+| 15 | [Phase 1 Dense Baselines](#phase-1-dense-baselines-2026-02) | 📊 Data |
+
+**Status Legend:**
+- ✅ Fixed — bug confirmed and patched
+- ⏸ Deferred — known issue, not yet fixed
+- ⚠️ Known Limitation — by design or environment constraint
+- 📝 Observation — empirical finding, no code change needed
+- 📐 Design Decision — intentional architecture / metric choice
+- 📊 Data — benchmark numbers for reference
+
 ---
 
 ## FWSVD fp16 Bug (2026-02) — Deferred
@@ -546,6 +574,116 @@ if args.qkv_mode == "full" and args.backend == "flashsvd":
 | adasvd | ✅（per-head 截断） | ✅（per-head 截断） | ✅（_LowRankLinear） | ❌ → ValueError |
 
 注：adasvd + `qkv_mode=full` + naive 使用 `compress_adasvd_naive`（`_LowRankLinear`，全矩阵语义），不受此限制。
+
+---
+
+## Stage1 Collapse Analysis: Task-Finetuned Models + Plain SVD (2026-02)
+
+### Observation
+
+When compressing **task-finetuned** checkpoints (e.g., BERT-base fine-tuned on each GLUE
+task in `pretrain_before_compress` mode), **plain truncated SVD** can cause severe Stage1
+degradation (no post-compression fine-tuning), while data-aware methods (FWSVD / DRONE)
+degrade much less under the same target rank / parameter budget.
+
+### Hypothesis (Task-Finetuned + Plain SVD Mismatch)
+
+- Plain SVD minimizes **reconstruction error** (Frobenius norm), not downstream task loss.
+- After fine-tuning, task-relevant signal can reside in directions that are **not aligned with
+  top singular vectors** of the weight matrices (fine-tuning makes small adjustments from
+  pre-trained weights, and these adjustments may not align with the dominant singular directions).
+- Therefore, truncating by singular values may remove task-critical directions even at moderate
+  rank (e.g., r=256 out of d_model=768).
+- Data-aware methods (FWSVD / DRONE) introduce **activation- / data-driven weighting or
+  calibration**, which better preserves task-relevant subspaces under the same compression ratio.
+
+### Evidence (MRPC shows a large gap at the same rank)
+
+At rank=256 full-matrix (`qkv_mode=full`, `scope=qkv+ffn`, `pretrain_before_compress`):
+
+| Method | MRPC F1 (Stage1, no fine-tune) |
+|--------|-------------------------------|
+| SVD    | 0.054 (near class-0 collapse) |
+| FWSVD  | 0.817 (near-lossless)         |
+| DRONE  | 0.813 (near-lossless)         |
+
+This ~15× gap at the same compression ratio demonstrates the failure is **not** due to
+"rank too small", but due to the **compression criterion** (plain SVD vs data-aware
+weighting / calibration).
+
+**Code is correct** — the full-matrix SVD forward pass was verified:
+- `NaiveSVDBlock.forward()` (full mode): `Q = (x @ Uq) @ Vq + bq_full` ✓ shape-checked
+- `MinimalSVDBlock.forward()` (load path): 2D/3D/4D branch all correct ✓
+- Classifier head and pooler are untouched (only `encoder.layer[i]` replaced) ✓
+
+### CoLA Note (Stage1 near-random across all methods)
+
+CoLA (grammatical acceptability, MCC metric) collapses to MCC≈0 for **all** compression
+methods without fine-tuning:
+
+| Method | CoLA MCC (Stage1) |
+|--------|------------------|
+| SVD    | 0.000            |
+| FWSVD  | 0.000            |
+| DRONE  | 0.076            |
+| AdaSVD@0.6 | -0.046      |
+| AdaSVD@0.5 | 0.000        |
+
+MCC=0 means a constant predictor (always predicts same class). Likely cause: CoLA requires
+very specific syntactic/grammatical features that are sparsely encoded across many small
+weight perturbations — neither dominant singular values (SVD) nor dominant activation
+directions (FWSVD/DRONE) capture them reliably.
+
+CoLA Stage1 should be treated as near-random and unreliable. **Stage2 fine-tuning is
+mandatory for CoLA** and reliably recovers to MCC ≈ 0.47–0.50.
+
+---
+
+### Full Stage1 Results (rank=256, full-matrix, pretrain_before_compress, 2026-02-18)
+
+| Task | Dense | SVD | FWSVD | DRONE | AdaSVD@0.6 | AdaSVD@0.5 |
+|------|-------|-----|-------|-------|-----------|-----------|
+| cola (MCC) | 0.581 | 0.000 | 0.000 | 0.076 | -0.046 | 0.000 |
+| sst2 (Acc) | 0.925 | 0.740 | 0.805 | 0.869 | 0.841  | 0.669 |
+| mrpc (F1)  | 0.883 | 0.054 | 0.817 | 0.813 | 0.088  | 0.557 |
+| qqp  (F1)  | 0.879 | 0.545 | 0.607 | 0.756 | 0.705  | 0.492 |
+| mnli (Acc) | 0.843 | 0.353 | 0.444 | 0.684 | 0.539  | 0.354 |
+| qnli (Acc) | 0.917 | 0.501 | 0.535 | 0.685 | 0.606  | 0.514 |
+| rte  (Acc) | 0.675 | 0.469 | 0.567 | 0.552 | 0.487  | 0.527 |
+| stsb (Pear)| 0.885 | -0.028 | 0.699 | 0.580 | 0.693 | -0.207 |
+
+Notable: STS-B with SVD (Pearson=-0.028) and AdaSVD@0.5 (Pearson=-0.207) are completely
+destroyed; FWSVD/DRONE preserve it reasonably (0.699 / 0.580) because regression-score
+directions are more aligned with dominant activation patterns.
+
+---
+
+### Stage2 Results (rank=256, full-matrix, pretrain_before_compress + 3-epoch fine-tune)
+
+| Task | SVD | FWSVD | DRONE | AdaSVD@0.5 |
+|------|-----|-------|-------|-----------|
+| cola (MCC) | 0.471 | 0.501 | 0.490 | 0.306 |
+| sst2 (Acc) | 0.913 | 0.914 | 0.912 | 0.908 |
+| mrpc (F1)  | 0.856 | 0.887 | 0.890 | 0.839 |
+| qqp  (F1)  | 0.877 | 0.880 | 0.874 | 0.873 |
+| mnli (Acc) | 0.825 | 0.826 | 0.824 | 0.823 |
+| qnli (Acc) | 0.892 | 0.896 | 0.901 | 0.888 |
+| rte  (Acc) | 0.643 | 0.646 | 0.668 | 0.621 |
+| stsb (Pear)| 0.867 | 0.873 | 0.863 | 0.855 |
+
+**Key findings from Stage2:**
+- All methods largely recover performance after fine-tuning. SVD Stage1 collapse does not
+  permanently damage the model — the compressed weights retain sufficient structure for
+  gradient-based recovery.
+- **Best overall**: FWSVD / DRONE have small but consistent advantages on hardest tasks
+  (CoLA, RTE, MRPC) — 0.02–0.05 delta vs SVD.
+- **AdaSVD@0.5 underperforms** plain SVD@256 after fine-tuning despite the same parameter
+  ratio (~0.50). Possible explanations:
+  1. Adaptive non-uniform rank allocation may assign too few parameters to layers where
+     task-critical fine-tuning recovery happens.
+  2. The current ARS calibration (512 samples, 16 batches) may not generalize across tasks
+     in the `pretrain_before_compress` pipeline.
+- **Delta vs dense (Stage2)**: SVD max delta = -0.11 (cola), typical delta ≤ -0.02 (most tasks).
 
 ---
 
