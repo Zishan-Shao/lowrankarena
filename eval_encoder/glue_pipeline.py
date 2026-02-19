@@ -803,10 +803,15 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
         args.rank = calculate_rank_from_retention(args.retention, model_id)
 
     # Determine model name based on compression method
-    # NOTE: Must match run_encoder_benchmark.py's naming convention exactly
-    # No task suffix, no retention suffix (retention is just a way to calculate rank)
+    # NOTE: checkpoint name always ends with "_naive" regardless of --backend.
+    # Compression (SVD factorisation) is backend-independent; the backend only
+    # affects the forward-pass implementation.  Pinning the name to "naive"
+    # ensures that flashsvd and naive runs share a single checkpoint so that:
+    #   (a) compression runs only once even when BACKENDS="flashsvd naive", and
+    #   (b) SVD matrices are guaranteed identical across backends.
+    # The backend is applied after loading the checkpoint in evaluate/finetune.
     if args.method == "adasvd":
-        model_name = f"{args.method}_b{args.budget}_{args.qkv_mode}_{args.backend}"
+        model_name = f"{args.method}_b{args.budget}_{args.qkv_mode}_naive"
     elif args.method == "dense":
         model_name = "dense_naive"
     else:
@@ -816,11 +821,11 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
             ra = args.rank_attn if args.rank_attn is not None else args.rank
             rf = args.rank_ffn if args.rank_ffn is not None else args.rank
             rw = args.rank_wo if args.rank_wo is not None else args.rank
-            model_name = f"{args.method}_ra{ra}_rf{rf}_rw{rw}_{args.qkv_mode}_{args.backend}"
+            model_name = f"{args.method}_ra{ra}_rf{rf}_rw{rw}_{args.qkv_mode}_naive"
         elif args.rank is not None:
-            model_name = f"{args.method}_r{args.rank}_{args.qkv_mode}_{args.backend}"
+            model_name = f"{args.method}_r{args.rank}_{args.qkv_mode}_naive"
         else:
-            model_name = f"{args.method}_rNone_{args.qkv_mode}_{args.backend}"
+            model_name = f"{args.method}_rNone_{args.qkv_mode}_naive"
 
     # Use subdirectory structure when using task-specific models to prevent conflicts
     # Structure: eval_encoder/models/{task}/{model_name}
@@ -870,7 +875,7 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
         "python", "eval_encoder/run_encoder_benchmark.py",
         "--model_id", model_id,
         "--method", args.method,
-        "--backend", args.backend,
+        "--backend", "naive",  # always compress with naive; backend applied at eval/benchmark time
         "--task", validation_task,
         "--seq_len", str(args.seq_len),
         "--batch_size", str(args.batch_size),
@@ -1353,6 +1358,11 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         dtype=torch.float32,
     )
 
+    # Apply backend (eval-only; no gradient flow needed here)
+    if getattr(args, 'backend', 'naive') == 'flashsvd':
+        from eval_encoder.flashsvd_backend import enable_flashsvd
+        enable_flashsvd(model)
+
     # Prepare data
     print(f"\n[data] Loading {task} dataset...")
     train_loader, val_loader = prepare_data(task, tokenizer, args.seq_len, args.batch_size)
@@ -1594,6 +1604,14 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
         print(f"[cleanup] Memory: {pre_cleanup_mem:.1f} MB → {post_cleanup_mem:.1f} MB")
 
     print("="*70)
+
+    # Apply backend for inference benchmark.
+    # Training always runs with naive backend (Triton kernels don't support
+    # autograd); we switch to flashsvd here, after the optimizer is gone,
+    # so the throughput measurement reflects the correct execution path.
+    if getattr(args, 'backend', 'naive') == 'flashsvd':
+        from eval_encoder.flashsvd_backend import enable_flashsvd
+        enable_flashsvd(model)
 
     # Benchmark inference speed
     print(f"\n{'='*70}")
