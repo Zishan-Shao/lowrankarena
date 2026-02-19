@@ -96,7 +96,20 @@ def train_adasvd_ranks(
           f"({len(all_batches)} batches, target={max_calib_samples}, batch-level shuffle, seed={seed})")
 
     # ── Step 3: Collect Linear modules and metadata ───────────────────────────
-    linear_list = collect_linear_modules(model)
+    # Exclude task head (classifier) and pooler from ARS — kept full-rank.
+    # Reasons:
+    #   classifier: rank_cap = num_labels (e.g. 2), ARS assigns rank=1 (minimum),
+    #               crippling post-compression fine-tuning for binary tasks.
+    #   pooler:     task-specific [CLS] transform; compression degrades representation
+    #               quality for fine-grained tasks (e.g. CoLA linguistic acceptability).
+    # compress_adasvd_naive already handles "not in ranks_dict → leave as-is".
+    HEAD_EXCLUDE = ("classifier", "pooler")
+    linear_list_all = collect_linear_modules(model)
+    linear_list = [(n, m) for n, m in linear_list_all
+                   if not any(pat in n for pat in HEAD_EXCLUDE)]
+    excluded = [n for n, _ in linear_list_all if any(pat in n for pat in HEAD_EXCLUDE)]
+    if excluded:
+        print(f"[ARS] Excluded from ARS (task head / pooler, kept full-rank): {excluded}")
     op_names    = [n for n, _ in linear_list]
     R_caps      = [min(lin.in_features, lin.out_features) for _, lin in linear_list]
     op_metadata = collect_op_metadata(linear_list)
@@ -129,7 +142,7 @@ def train_adasvd_ranks(
                  budget=budget).to(device)
     optimizer = torch.optim.Adam(HN.parameters(), lr=1e-3)
 
-    # Pre-compute T_original once (only Linear layers, NOT embeddings/LayerNorm)
+    # Pre-compute T_original once (encoder Linear layers only, NOT embeddings/LayerNorm/classifier/pooler)
     T_original = sum(op.in_features * op.out_features for op in op_list)
 
     # ratio_max: ratio_soft at FULL RANK (all singular values kept).
@@ -315,7 +328,7 @@ def compress_adasvd_naive(
             continue
         rank = ranks_dict.get(name)
         if rank is None:
-            continue  # pooler / classifier not in ARS → leave as-is
+            continue  # classifier / pooler excluded from ARS → keep full-rank
 
         W    = module.weight.data.float()           # [out, in]
         rank = max(1, min(rank, min(W.shape)))      # clamp to valid range
