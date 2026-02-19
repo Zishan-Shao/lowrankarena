@@ -68,6 +68,9 @@ NON_INTERACTIVE="${NON_INTERACTIVE:-true}"   # 非交互模式（默认true，�
 MODEL_ID="${MODEL_ID:-bert-base-uncased}"
 USE_TASK_MODELS="${USE_TASK_MODELS:-true}"  # 默认使用任务特定的预训练模型
 TASK_MODEL_PREFIX="${TASK_MODEL_PREFIX:-textattack}"  # 任务模型前缀（textattack 或 howey）
+LOCAL_PRETRAINED_DIR="${LOCAL_PRETRAINED_DIR:-}"      # 本地预训练模型目录（优先于 HuggingFace）
+                                                      # 格式: {dir}/{task}/pretrained_base/
+                                                      # 示例: LOCAL_PRETRAINED_DIR=eval_encoder/models
 
 # 任务配置 (根据可用时间选择)
 # 选项 1: 快速测试 (约 1.5 小时)
@@ -288,7 +291,10 @@ EOF
     fi
 
     # Add task-specific model flag
-    if [ "$USE_TASK_MODELS" = "true" ]; then
+    # LOCAL_PRETRAINED_DIR takes priority over USE_TASK_MODELS (handled in glue_pipeline.py)
+    if [ -n "$LOCAL_PRETRAINED_DIR" ]; then
+        CMD="$CMD --local_pretrained_dir $LOCAL_PRETRAINED_DIR"
+    elif [ "$USE_TASK_MODELS" = "true" ]; then
         CMD="$CMD --use_task_models --task_model_prefix $TASK_MODEL_PREFIX"
     fi
 

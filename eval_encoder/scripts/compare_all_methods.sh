@@ -48,6 +48,7 @@ TASKS="${TASKS:-cola sst2 mrpc qqp mnli qnli rte stsb}"
 # Whether to start from task-specific fine-tuned checkpoints (recommended)
 USE_TASK_MODELS="${USE_TASK_MODELS:-true}"
 TASK_MODEL_PREFIX="${TASK_MODEL_PREFIX:-textattack}"
+LOCAL_PRETRAINED_DIR="${LOCAL_PRETRAINED_DIR:-}"  # 本地预训练模型目录，优先于 HuggingFace
 
 # Output locations
 RESULT_DIR="${RESULT_DIR:-eval_encoder/glue_results}"
@@ -73,7 +74,7 @@ echo "════════════════════════�
 echo "Compare All Methods (GLUE)  |  ${TIMESTAMP}" | tee -a "${SUMMARY_LOG}"
 echo "Repo: ${REPO_ROOT}" | tee -a "${SUMMARY_LOG}"
 echo "Tasks: ${TASKS}" | tee -a "${SUMMARY_LOG}"
-echo "USE_TASK_MODELS=${USE_TASK_MODELS}  TASK_MODEL_PREFIX=${TASK_MODEL_PREFIX}" | tee -a "${SUMMARY_LOG}"
+echo "USE_TASK_MODELS=${USE_TASK_MODELS}  TASK_MODEL_PREFIX=${TASK_MODEL_PREFIX}  LOCAL_PRETRAINED_DIR=${LOCAL_PRETRAINED_DIR}" | tee -a "${SUMMARY_LOG}"
 echo "RANK=${RANK}  RANK_ATTN=${RANK_ATTN}  RANK_FFN=${RANK_FFN}  RANK_WO=${RANK_WO}" | tee -a "${SUMMARY_LOG}"
 echo "QKV_MODE=${QKV_MODE}  CALIB_BATCHES=${CALIB_BATCHES}" | tee -a "${SUMMARY_LOG}"
 echo "BUDGET=${BUDGET}  BACKENDS=${BACKENDS}  MODEL_ID=${MODEL_ID}" | tee -a "${SUMMARY_LOG}"
@@ -146,6 +147,9 @@ run_one() {
   env_prefix+=("BACKEND=${backend}")
   env_prefix+=("USE_TASK_MODELS=${USE_TASK_MODELS}")
   env_prefix+=("TASK_MODEL_PREFIX=${TASK_MODEL_PREFIX}")
+  if [[ -n "${LOCAL_PRETRAINED_DIR}" ]]; then
+    env_prefix+=("LOCAL_PRETRAINED_DIR=${LOCAL_PRETRAINED_DIR}")
+  fi
   env_prefix+=("SKIP_FINETUNING=${skip_finetuning}")
   env_prefix+=("SKIP_COMPRESSION=false")
   env_prefix+=("REUSE_CHECKPOINT=${reuse_checkpoint}")

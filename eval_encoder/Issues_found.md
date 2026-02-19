@@ -440,6 +440,40 @@ for m in base_model.modules():
 
 ---
 
+## AdaSVD Classifier/Pooler 被 ARS 压缩 (2026-02) — 已修复
+
+**现象**: CoLA 微调后 MCC 持续为 0，SST-2/MRPC 可以恢复但 CoLA 不行。
+
+**根因**: `collect_linear_modules(model)` 收集**所有** `nn.Linear`，包括 `classifier` 和 `bert.pooler.dense`，均参与 ARS rank 分配。
+
+对 CoLA（binary，`num_labels=2`）实测 `ranks.json`（budget=0.5，正确收敛到 0.500）：
+- `classifier [2×768]`：**rank=1**（rank_cap=min(2,768)=2，被压到下界！）
+- `bert.pooler.dense [768×768]`：**rank=134**（仅剩 35% 原始参数）
+
+`classifier rank=1` 的影响：
+- 压缩后 `A=[2,1], Bt=[1,768]`，只有 1 个决策方向
+- 模型坍塌到全预测同一类（MCC=0），且由于表示空间被极度压缩，微调难以逃出
+- 注：同任务不同校准数据下，SST-2 得到 `classifier: rank=2`（full rank），所以能恢复；CoLA 得到 rank=1，不能
+
+`pooler rank=134` 的影响：
+- [CLS] token 的任务相关变换只保留 35% 参数
+- 对 sentiment/paraphrase（SST-2/MRPC）影响小，对 syntactic acceptability（CoLA）影响大
+
+**修复** (`src/encoders/adasvd_origin/adasvd_wrapper.py:99-112`)：
+```python
+HEAD_EXCLUDE = ("classifier", "pooler")
+linear_list_all = collect_linear_modules(model)
+linear_list = [(n, m) for n, m in linear_list_all
+               if not any(pat in n for pat in HEAD_EXCLUDE)]
+```
+- `classifier` 和 `pooler` 不进入 ARS，`compress_adasvd_naive` 中 `rank is None → skip`，保持 full-rank `nn.Linear`
+- encoder 72 层获得的 budget 几乎不变（差 <0.7%）
+- `ranks.json` 缩减为 72 条（encoder only）
+
+**需重新压缩**才能生效。
+
+---
+
 ## Phase 1 Dense Baselines (2026-02)
 
 Verified with correct label remaps. All results use `full_validation=True`.

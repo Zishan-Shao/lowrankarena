@@ -338,6 +338,11 @@ def parse_args():
                              "(e.g., textattack/bert-base-uncased-SST-2)")
     parser.add_argument("--task_model_prefix", default="textattack",
                         help="Prefix for task-specific models (default: textattack)")
+    parser.add_argument("--local_pretrained_dir", default=None,
+                        help="Directory containing locally fine-tuned task checkpoints. "
+                             "Expects {dir}/{task}/pretrained_base/ per task "
+                             "(produced by --pretrain_before_compress). "
+                             "Takes priority over --use_task_models.")
     parser.add_argument("--tasks", nargs="+",
                         choices=list(ALL_TASKS.keys()),
                         default=["sst2"],
@@ -723,11 +728,27 @@ def pretrain_base_model(args, task: str) -> Path:
 # ═══════════════════════════════════════════════════════════════════════════
 
 def get_task_model_id(task: str, args) -> str:
-    """Get model ID for a specific task."""
+    """Get model ID for a specific task.
+
+    Priority:
+      1. --local_pretrained_dir  {dir}/{task}/pretrained_base  (local fine-tuned ckpts)
+      2. --use_task_models + --task_model_prefix               (HuggingFace task models)
+      3. --model_id                                            (base model fallback)
+    """
+    # 1. Local pretrained checkpoint directory (highest priority)
+    local_dir = getattr(args, 'local_pretrained_dir', None)
+    if local_dir:
+        local_path = Path(local_dir) / task / "pretrained_base"
+        if local_path.exists():
+            print(f"[model] Using local pretrained checkpoint: {local_path}")
+            return str(local_path)
+        else:
+            print(f"[warn] local_pretrained_dir set but {local_path} not found — falling through")
+
+    # 2. HuggingFace task-specific model
     if not args.use_task_models:
         return args.model_id
 
-    # Get task-specific pretrained models
     task_config = ALL_TASKS.get(task, {})
     pretrained_models = task_config.get("pretrained_models", [])
 
@@ -798,7 +819,13 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
     # Structure: eval_encoder/models/{task}/{model_name}
     # Also required when pretrain_before_compress (model_id_override set): each task
     # has its own pretrained base, so compressed checkpoints must be task-specific too.
-    if task and (args.use_task_models or model_id_override is not None):
+    # Same applies when local_pretrained_dir is set (each task has its own local ckpt).
+    _has_per_task_model = (
+        args.use_task_models or
+        model_id_override is not None or
+        getattr(args, 'local_pretrained_dir', None) is not None
+    )
+    if task and _has_per_task_model:
         checkpoint_path = Path("eval_encoder/models") / task / model_name
         save_dir = str(Path("eval_encoder/models") / task)
     else:
