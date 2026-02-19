@@ -144,7 +144,8 @@ class PaperHN(nn.Module):
     """
     def __init__(self, op_sizes: List[int], op_metadata: List[List[float]],
                  feat_dim: int = 16, hidden: int = 64,
-                 engineering_stable: bool = False):
+                 engineering_stable: bool = False,
+                 budget: float = 0.5):
         super().__init__()
         self.L                  = len(op_sizes)
         meta_dim                = len(op_metadata[0])  # 9
@@ -169,11 +170,14 @@ class PaperHN(nn.Module):
         self.gru = nn.GRU(input_size=gru_in_dim, hidden_size=hidden,
                           num_layers=1, batch_first=True)
         self.heads = nn.ModuleList([nn.Linear(hidden, r) for r in op_sizes])
-        # Bias init: sigmoid(-2.0) ≈ 0.12 → starts in low-rank regime.
-        # Default zero-init → sigmoid(0)≈0.5 (~half rank), which is too high
-        # and makes budget hard to reduce for small targets (e.g. budget=0.3).
+        # Budget-aware bias init: start ratio_soft just ABOVE budget so one-sided
+        # log loss (paper Eq.8) is active from step 0 and can push ratio DOWN.
+        # init_p = budget + 0.15, clamped to [0.55, 0.95].
+        # bias = logit(init_p) = log(p/(1-p))
+        init_p = float(max(0.55, min(0.95, budget + 0.15)))
+        init_bias = math.log(init_p / (1.0 - init_p))
         for head in self.heads:
-            nn.init.constant_(head.bias, -2.0)
+            nn.init.constant_(head.bias, init_bias)
 
     def forward(self) -> List[torch.Tensor]:
         m_out  = self.meta_proj(self.meta)                                    # [L, feat_dim]

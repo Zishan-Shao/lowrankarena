@@ -125,7 +125,8 @@ def train_adasvd_ranks(
 
     # ── Step 6: Build PaperHN and optimizer ───────────────────────────────────
     HN = PaperHN(op_sizes=R_caps, op_metadata=op_metadata,
-                 engineering_stable=engineering_stable).to(device)
+                 engineering_stable=engineering_stable,
+                 budget=budget).to(device)
     optimizer = torch.optim.Adam(HN.parameters(), lr=1e-3)
 
     # Pre-compute T_original once (only Linear layers, NOT embeddings/LayerNorm)
