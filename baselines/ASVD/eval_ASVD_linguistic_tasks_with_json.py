@@ -4,23 +4,24 @@ import os
 import sys
 import datetime as _dt
 import re
+import inspect
 from typing import List, Optional, Tuple
 
 import torch
 
-# Ensure repo root is on PYTHONPATH
+# Ensure repo root is on PYTHONPATH (important if your HF repo's remote code imports `modules/` etc.)
 _REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
+
+# If you vend lm-eval harness as a submodule in this repo, keep it importable.
 _LM_EVAL_ROOT = os.path.join(_REPO_ROOT, "lm-evaluation-harness")
 if os.path.isdir(_LM_EVAL_ROOT) and _LM_EVAL_ROOT not in sys.path:
     sys.path.insert(0, _LM_EVAL_ROOT)
 
-from utils.model_utils import get_model_from_local, get_model_from_huggingface
-
 
 def _parse_tasks(s: str) -> List[str]:
-    return [t.strip() for t in s.split(",") if t.strip()]
+    return [t.strip() for t in (s or "").split(",") if t.strip()]
 
 
 def _parse_task_sets(s: str) -> List[Tuple[str, List[str]]]:
@@ -52,61 +53,116 @@ def _filter_existing_tasks(tasks: List[str], task_manager) -> List[str]:
     return keep
 
 
+def _dtype_from_str(dtype: Optional[str]) -> Optional[torch.dtype]:
+    if dtype is None:
+        return None
+    m = {
+        "float16": torch.float16,
+        "fp16": torch.float16,
+        "bfloat16": torch.bfloat16,
+        "bf16": torch.bfloat16,
+        "float32": torch.float32,
+        "fp32": torch.float32,
+    }
+    return m.get(dtype.lower())
+
+
 def _to_device(model: torch.nn.Module, device: str, dtype: Optional[str]) -> torch.nn.Module:
-    if dtype is not None:
-        dtype_map = {
-            "float16": torch.float16,
-            "fp16": torch.float16,
-            "bfloat16": torch.bfloat16,
-            "bf16": torch.bfloat16,
-            "float32": torch.float32,
-            "fp32": torch.float32,
-        }
-        target_dtype = dtype_map.get(dtype.lower())
-        if target_dtype is not None:
-            model = model.to(dtype=target_dtype)
+    td = _dtype_from_str(dtype)
+    if td is not None:
+        model = model.to(dtype=td)
     return model.to(device)
 
 
-def _resolve_dobi_path(model_id: str, hf_token: Optional[str], revision: Optional[str], cache_dir: Optional[str]) -> str:
-    if os.path.isdir(model_id):
-        return model_id
+def _hf_from_pretrained_with_token_retry(cls, *args, hf_token: Optional[str], **kwargs):
+    """
+    Transformers changed auth kwarg naming across versions (token vs use_auth_token).
+    We try token= first, then fall back to use_auth_token=.
+    """
+    if hf_token is None:
+        return cls.from_pretrained(*args, **kwargs)
+
     try:
-        from huggingface_hub import snapshot_download
-    except Exception as e:
-        raise RuntimeError(f"huggingface_hub is required to download Dobi checkpoints: {e}")
-    return snapshot_download(repo_id=model_id, revision=revision, cache_dir=cache_dir, token=hf_token)
+        return cls.from_pretrained(*args, token=hf_token, **kwargs)
+    except TypeError:
+        return cls.from_pretrained(*args, use_auth_token=hf_token, **kwargs)
 
 
-def _load_dobi_model(
-    model_id: str,
+def _load_hf_model_and_tokenizer(
+    model_id_or_path: str,
+    tokenizer_id_or_path: Optional[str],
     hf_token: Optional[str],
     revision: Optional[str],
     cache_dir: Optional[str],
-    remapping: Optional[bool],
+    trust_remote_code: bool,
+    dtype: Optional[str],
 ):
-    dobi_root = os.path.join(_REPO_ROOT, "baselines", "Dobi-SVD")
-    if dobi_root not in sys.path:
-        sys.path.insert(0, dobi_root)
     try:
-        from modelutils import load_remapping_model, load_unremapping_model
+        from transformers import AutoModelForCausalLM, AutoTokenizer
     except Exception as e:
-        raise RuntimeError(f"Failed to import Dobi-SVD loaders from {dobi_root}: {e}")
-    local_path = _resolve_dobi_path(model_id, hf_token=hf_token, revision=revision, cache_dir=cache_dir)
-    if remapping is None:
-        if os.path.exists(os.path.join(local_path, "remapping_weight.pt")):
-            remapping = True
-        elif os.path.exists(os.path.join(local_path, "DobiSVD_Model.pt")):
-            remapping = False
-        else:
-            raise FileNotFoundError(
-                f"Could not find remapping_weight.pt or DobiSVD_Model.pt under {local_path}"
-            )
-    if remapping:
-        model, tokenizer = load_remapping_model(local_path)
-    else:
-        model, tokenizer = load_unremapping_model(local_path)
-    return model, tokenizer, local_path
+        raise RuntimeError(
+            "transformers is required to load ASVD HuggingFace repos. "
+            "Install it (and sentencepiece for LLaMA tokenizers) and retry.\n"
+            f"Original error: {e}"
+        )
+
+    torch_dtype = _dtype_from_str(dtype)
+
+    model_kwargs = dict(
+        revision=revision,
+        cache_dir=cache_dir,
+        trust_remote_code=trust_remote_code,
+        low_cpu_mem_usage=True,
+    )
+    # If user asked for dtype, load directly in that dtype to save memory.
+    if torch_dtype is not None:
+        model_kwargs["torch_dtype"] = torch_dtype
+
+    model = _hf_from_pretrained_with_token_retry(
+        AutoModelForCausalLM,
+        model_id_or_path,
+        hf_token=hf_token,
+        **model_kwargs,
+    )
+
+    tok_src = tokenizer_id_or_path or model_id_or_path
+    tok_kwargs = dict(
+        revision=revision,
+        cache_dir=cache_dir,
+        trust_remote_code=trust_remote_code,
+    )
+
+    # Prefer fast tokenizer, fallback to slow if needed.
+    try:
+        tokenizer = _hf_from_pretrained_with_token_retry(
+            AutoTokenizer,
+            tok_src,
+            hf_token=hf_token,
+            use_fast=True,
+            **tok_kwargs,
+        )
+    except Exception:
+        tokenizer = _hf_from_pretrained_with_token_retry(
+            AutoTokenizer,
+            tok_src,
+            hf_token=hf_token,
+            use_fast=False,
+            **tok_kwargs,
+        )
+
+    # LLaMA-like tokenizers often have no pad token; lm-eval expects padding.
+    if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
+
+    # Also align generation config if present
+    try:
+        if getattr(model, "generation_config", None) is not None and tokenizer.pad_token_id is not None:
+            model.generation_config.pad_token_id = tokenizer.pad_token_id
+    except Exception:
+        pass
+
+    return model, tokenizer
 
 
 def _write_md(path: str, model_name: str, tasks: List[str], res: dict) -> None:
@@ -154,43 +210,55 @@ def _jsonify(obj):
             pass
     return str(obj)
 
-
 def _safe_tag(s: str) -> str:
-    s = os.path.basename(str(s)).strip()
-    s = re.sub(r"[^A-Za-z0-9_.-]+", "_", s)
-    return s.strip("_") or "run"
+    s = os.path.basename((s or "").rstrip("/")) or "model"
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", s)
 
 
-def _auto_output_json(args, suffix: str):
-    """
-    Priority:
-      1) --output_json
-      2) --output_dir + (<run_name>_<suffix>.json)
-      3) None
-    """
-    out_json = getattr(args, "output_json", None)
-    if out_json:
-        return out_json
-    out_dir = getattr(args, "output_dir", None)
-    if not out_dir:
+def _auto_output_json(args, suffix: str) -> Optional[str]:
+    if args.output_json:
+        return args.output_json
+    if not getattr(args, "output_dir", None):
         return None
-    os.makedirs(out_dir, exist_ok=True)
-    run_name = getattr(args, "run_name", None)
-    if not run_name:
-        base = getattr(args, "model", None) or getattr(args, "checkpoint", None) or getattr(args, "dobi_model", None) or "model"
-        run_name = f"{_safe_tag(base)}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    return os.path.join(out_dir, f"{run_name}_{suffix}.json")
+    os.makedirs(args.output_dir, exist_ok=True)
+    run_name = getattr(args, "run_name", None) or f"{_safe_tag(args.model)}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    return os.path.join(args.output_dir, f"{run_name}_{suffix}.json")
 
 
-def _write_json(path: str, payload):
-    if not path:
-        return
-    d = os.path.dirname(path)
-    if d:
-        os.makedirs(d, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(_jsonify(payload), f, indent=2)
-    print(f"[Output] Wrote JSON -> {path}")
+def _remove_lmeval_samples(obj):
+    """Drop per-sample logs from lm-eval outputs to keep JSON small."""
+    if not isinstance(obj, dict):
+        return obj
+    if "samples" not in obj:
+        return obj
+    out = dict(obj)
+    out.pop("samples", None)
+    return out
+
+
+def _shrink_lmeval_output(obj) -> dict:
+    """Keep only the most useful + compact pieces of lm-eval output."""
+    if not isinstance(obj, dict):
+        return {"value": str(obj)}
+    obj = _remove_lmeval_samples(obj)
+    out = {}
+    out["results"] = obj.get("results", {})
+    for k in (
+        "config",
+        "versions",
+        "n-shot",
+        "n-samples",
+        "higher_is_better",
+        "git_hash",
+        "date",
+        "errors",
+        "groups",
+        "group_subtasks",
+    ):
+        if k in obj:
+            out[k] = obj[k]
+    return out
+
 
 
 def _is_dataset_access_error(err: Exception) -> bool:
@@ -215,7 +283,7 @@ def _safe_simple_evaluate(
     limit: Optional[int],
 ):
     try:
-        res = evaluator.simple_evaluate(
+        kwargs = dict(
             model=model,
             tasks=tasks,
             num_fewshot=num_fewshot,
@@ -224,6 +292,14 @@ def _safe_simple_evaluate(
             device=device,
             limit=limit,
         )
+        # Keep returned object compact (avoid per-sample logs).
+        try:
+            sig = inspect.signature(evaluator.simple_evaluate)
+            if "log_samples" in sig.parameters:
+                kwargs["log_samples"] = False
+        except Exception:
+            pass
+        res = evaluator.simple_evaluate(**kwargs)
         if res is None:
             raise RuntimeError("LM Evaluation Harness returned no results (not rank 0).")
         return res, list(tasks)
@@ -235,7 +311,7 @@ def _safe_simple_evaluate(
         used_tasks: List[str] = []
         for task in tasks:
             try:
-                res = evaluator.simple_evaluate(
+                kwargs = dict(
                     model=model,
                     tasks=[task],
                     num_fewshot=num_fewshot,
@@ -244,6 +320,13 @@ def _safe_simple_evaluate(
                     device=device,
                     limit=limit,
                 )
+                try:
+                    sig = inspect.signature(evaluator.simple_evaluate)
+                    if "log_samples" in sig.parameters:
+                        kwargs["log_samples"] = False
+                except Exception:
+                    pass
+                res = evaluator.simple_evaluate(**kwargs)
                 if res is None:
                     continue
                 combined["results"].update(res.get("results", {}))
@@ -259,31 +342,24 @@ def _safe_simple_evaluate(
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Evaluate linguistic tasks (lm-eval) for local or Dobi checkpoints."
+        description="Evaluate linguistic tasks (lm-eval) for ASVD HuggingFace repos (local folder or HF id)."
     )
     p.add_argument(
         "--model",
         type=str,
-        default=None,
-        help="HF model id or local directory (from save_pretrained). If provided, overrides --checkpoint.",
+        required=True,
+        help="ASVD HF model id or local directory (e.g. ./huggingface_repos/Llama-2-7b-hf-asvd40).",
     )
+    p.add_argument(
+        "--tokenizer",
+        type=str,
+        default=None,
+        help="Optional tokenizer id/path. Use this if your ASVD HF folder does not include tokenizer files.",
+    )
+    p.add_argument("--revision", type=str, default=None)
+    p.add_argument("--cache_dir", type=str, default=None)
+    p.add_argument("--trust_remote_code", action="store_true", help="Enable custom modeling/config code. (Recommended for ASVD.)")
 
-    p.add_argument(
-        "--checkpoint",
-        type=str,
-        default=None,
-        help="Path to a checkpoint saved by this repo (contains {'model','tokenizer'}).",
-    )
-    p.add_argument(
-        "--dobi_model",
-        type=str,
-        default=None,
-        help="Dobi-SVD checkpoint (HF repo id or local dir).",
-    )
-    p.add_argument("--dobi_revision", type=str, default=None)
-    p.add_argument("--dobi_cache_dir", type=str, default=None)
-    p.add_argument("--dobi_remapping", action="store_true")
-    p.add_argument("--dobi_unremapping", action="store_true")
     p.add_argument(
         "--tasks",
         type=str,
@@ -302,48 +378,36 @@ def main() -> None:
         default=None,
         help="Semicolon-separated task sets to evaluate, e.g. 'base:blimp,cola;plus:blimp,cola,mela_en'.",
     )
+
     p.add_argument("--num_fewshot", type=int, default=0)
     p.add_argument("--batch_size", type=int, default=8)
+    p.add_argument("--max_batch_size", type=int, default=64)
     p.add_argument("--device", type=str, default="cuda")
     p.add_argument("--dtype", type=str, default=None)
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--hf_token", type=str, default=None)
+
     p.add_argument("--output_json", type=str, default=None)
     p.add_argument("--output_md", type=str, default=None)
-    p.add_argument("--output_dir", type=str, default=None)
-    p.add_argument("--run_name", type=str, default=None)
+    p.add_argument("--output_dir", type=str, default=None, help="If set (and --output_json not set), auto-write JSON to <output_dir>/<run_name>_ling.json")
+    p.add_argument("--run_name", type=str, default=None, help="Optional run name prefix for auto JSON naming")
+    p.add_argument("--json_full", action="store_true", help="Include full lm-eval output in JSON (can still be large depending on lm-eval version).")
     args = p.parse_args()
-
-    if args.dobi_model:
-        if args.dobi_remapping and args.dobi_unremapping:
-            raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
-    else:
-        if not args.model and not args.checkpoint:
-            raise ValueError("Please provide --model, --checkpoint or --dobi_model.")
-        if args.checkpoint and not os.path.exists(args.checkpoint):
-            raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
 
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but not available.")
 
-    if args.dobi_model:
-        remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
-        model, tokenizer, _ = _load_dobi_model(
-            args.dobi_model,
-            hf_token=args.hf_token,
-            revision=args.dobi_revision,
-            cache_dir=args.dobi_cache_dir,
-            remapping=remap_flag,
-        )
-        model_name = args.dobi_model
-    else:
-        if args.model:
-            model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
-            model_name = args.model
-        else:
-            model, tokenizer = get_model_from_local(args.checkpoint)
-            model_name = args.checkpoint
+    model, tokenizer = _load_hf_model_and_tokenizer(
+        model_id_or_path=args.model,
+        tokenizer_id_or_path=args.tokenizer,
+        hf_token=args.hf_token,
+        revision=args.revision,
+        cache_dir=args.cache_dir,
+        trust_remote_code=args.trust_remote_code,
+        dtype=args.dtype,
+    )
 
+    # If you loaded without torch_dtype above (or you want explicit casting), do it here.
     model = _to_device(model, args.device, args.dtype)
     model.eval()
     try:
@@ -358,14 +422,16 @@ def main() -> None:
         raise RuntimeError(f"lm-eval harness is required: {e}")
 
     tasks = _parse_tasks(args.tasks)
+
     lm = HFLM(
         pretrained=model,
         tokenizer=tokenizer,
         device=args.device,
         batch_size=args.batch_size,
-        max_batch_size=64,
-        trust_remote_code=True,
+        max_batch_size=args.max_batch_size,
+        trust_remote_code=args.trust_remote_code,
     )
+
     try:
         from lm_eval.tasks import TaskManager
         task_manager = TaskManager()
@@ -381,60 +447,63 @@ def main() -> None:
             tasks = tasks + extras
         task_sets = [("default", tasks)]
 
+    out_json = _auto_output_json(args, "ling")
     all_results = {
-        "model": model_name,
+        "schema": "asvd_eval_v1",
+        "script": os.path.basename(__file__),
+        "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
+        "cmd": " ".join(sys.argv),
+        "mode": "linguistic",
+        "model": args.model,
+        "args": vars(args),
         "task_sets": {},
     }
     tasks_used = {}
+
     for set_name, set_tasks in task_sets:
         set_tasks = _filter_existing_tasks(set_tasks, task_manager)
         if not set_tasks:
             print(f"[LM-Eval] No valid tasks for set '{set_name}', skipping.")
             continue
+
         res, used = _safe_simple_evaluate(
             evaluator=evaluator,
             model=lm,
             tasks=set_tasks,
             num_fewshot=args.num_fewshot,
             batch_size=args.batch_size,
-            max_batch_size=64,
+            max_batch_size=args.max_batch_size,
             device=args.device,
             limit=args.limit,
         )
         if not res or not res.get("results"):
             print(f"[LM-Eval] No results for set '{set_name}' after filtering; skipping.")
             continue
+
         tasks_used[set_name] = list(used) if used else list(set_tasks)
         print(res.get("results", res))
-        all_results["task_sets"][set_name] = res
+        # Keep JSON artifact small by default.
+        all_results["task_sets"][set_name] = (_remove_lmeval_samples(res) if args.json_full else _shrink_lmeval_output(res))
 
-    out_json = _auto_output_json(args, "linguistic")
-    payload = {
-        "schema": "svdllm_eval_v1",
-        "script": os.path.basename(__file__),
-        "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
-        "cmd": " ".join(sys.argv),
-        "mode": "linguistic",
-        "args": vars(args),
-        "results": all_results,
-    }
-    _write_json(out_json, payload)
+    if out_json:
+        with open(out_json, "w", encoding="utf-8") as f:
+            json.dump(_jsonify(all_results), f, indent=2)
+        print(f"[Output] Wrote JSON -> {out_json}")
+
     if args.output_md:
         if len(all_results["task_sets"]) == 1:
             only_name = next(iter(all_results["task_sets"]))
             only_tasks = tasks_used.get(only_name, task_sets[0][1])
-            _write_md(args.output_md, model_name=model_name, tasks=only_tasks, res=all_results["task_sets"][only_name])
+            _write_md(
+                args.output_md,
+                model_name=args.model,
+                tasks=only_tasks,
+                res=all_results["task_sets"][only_name],
+            )
         else:
-            lines = []
-            lines.append("# Linguistic Task Evaluation")
-            lines.append("")
-            lines.append(f"Model: {model_name}")
-            lines.append("")
+            lines = ["# Linguistic Task Evaluation", "", f"Model: {args.model}", ""]
             for set_name, res in all_results["task_sets"].items():
-                lines.append(f"## Task set: {set_name}")
-                lines.append("")
-                lines.append("| Task | Metric | Value |")
-                lines.append("|---|---|---:|")
+                lines += [f"## Task set: {set_name}", "", "| Task | Metric | Value |", "|---|---|---:|"]
                 for task, metrics in res.get("results", {}).items():
                     for metric, val in metrics.items():
                         try:

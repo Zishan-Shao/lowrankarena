@@ -1,13 +1,10 @@
 import argparse
 import os
 import sys
-import ast
-import contextlib
-import datetime as _dt
-import io
 import json
+import datetime as _dt
 import re
-import time
+import inspect
 from typing import List, Dict, Any, Tuple, Optional
 
 import torch
@@ -42,11 +39,13 @@ except Exception:
         load_mathqa_local = None
 from tqdm import tqdm
 
+# Ensure repo root is on PYTHONPATH
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
-# ----------------------------------------------------------------------------
-# JSON output helpers (similar to ASVD scripts)
-# ----------------------------------------------------------------------------
-
+from utils.model_utils import get_model_from_huggingface, get_model_from_local
 def _jsonify(obj):
     if isinstance(obj, (str, int, float, bool)) or obj is None:
         return obj
@@ -54,19 +53,17 @@ def _jsonify(obj):
         return {str(k): _jsonify(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [_jsonify(v) for v in obj]
-    try:
-        import numpy as np  # type: ignore
-        if isinstance(obj, np.generic):
-            return obj.item()
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-    except Exception:
-        pass
     if torch.is_tensor(obj):
         if obj.numel() == 1:
             return obj.detach().cpu().item()
         return obj.detach().cpu().tolist()
-    if hasattr(obj, "item") and callable(getattr(obj, "item")):
+    try:
+        import numpy as np
+        if isinstance(obj, np.generic):
+            return obj.item()
+    except Exception:
+        pass
+    if hasattr(obj, "item") and callable(obj.item):
         try:
             return obj.item()
         except Exception:
@@ -75,33 +72,25 @@ def _jsonify(obj):
 
 
 def _safe_tag(s: str) -> str:
-    s = os.path.basename(str(s)).strip()
-    s = re.sub(r"[^A-Za-z0-9_.-]+", "_", s)
-    return s.strip("_") or "run"
+    s = os.path.basename((s or "").rstrip("/")) or "model"
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", s)
 
 
-def _auto_output_json(args, suffix: str):
-    """
-    Priority:
-      1) --output_json
-      2) --output_dir + (<run_name>_<suffix>.json)
-      3) None
-    """
-    out_json = getattr(args, "output_json", None)
-    if out_json:
-        return out_json
+def _auto_output_json(args, suffix: str) -> Optional[str]:
+    # Priority: explicit file path
+    if getattr(args, "output_json", None):
+        return args.output_json
     out_dir = getattr(args, "output_dir", None)
     if not out_dir:
         return None
     os.makedirs(out_dir, exist_ok=True)
     run_name = getattr(args, "run_name", None)
     if not run_name:
-        base = getattr(args, "model", None) or "model"
-        run_name = f"{_safe_tag(base)}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        run_name = f"{_safe_tag(getattr(args, 'model', 'model'))}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
     return os.path.join(out_dir, f"{run_name}_{suffix}.json")
 
 
-def _write_json(path: str, payload):
+def _write_json(path: Optional[str], payload: Dict[str, Any]) -> None:
     if not path:
         return
     d = os.path.dirname(path)
@@ -112,127 +101,42 @@ def _write_json(path: str, payload):
     print(f"[Output] Wrote JSON -> {path}")
 
 
-class _Tee:
-    def __init__(self, *streams):
-        self.streams = streams
-
-    def write(self, data):
-        for s in self.streams:
-            try:
-                s.write(data)
-            except Exception:
-                pass
-
-    def flush(self):
-        for s in self.streams:
-            try:
-                s.flush()
-            except Exception:
-                pass
-
-
-def _extract_balanced_braces(text: str):
-    out = []
-    level = 0
-    start = None
-    for i, ch in enumerate(text):
-        if ch == "{":
-            if level == 0:
-                start = i
-            level += 1
-        elif ch == "}":
-            if level > 0:
-                level -= 1
-                if level == 0 and start is not None:
-                    out.append(text[start : i + 1])
-                    start = None
+def _remove_lmeval_samples(obj: Any) -> Any:
+    """Drop per-sample logs from lm-eval outputs to keep JSON small."""
+    if not isinstance(obj, dict):
+        return obj
+    if "samples" not in obj:
+        return obj
+    out = dict(obj)
+    out.pop("samples", None)
     return out
 
 
-def _parse_best_dict(text: str, want_keys=None):
-    candidates = []
-    for chunk in _extract_balanced_braces(text):
-        try:
-            val = ast.literal_eval(chunk)
-        except Exception:
-            continue
-        if isinstance(val, dict):
-            candidates.append(val)
-    if not candidates:
-        return None
-    if want_keys:
-        want = set(want_keys)
-        best = None
-        best_score = -1
-        for d in candidates:
-            try:
-                keys = set(map(str, d.keys()))
-            except Exception:
-                continue
-            score = len(keys & want)
-            if score > best_score:
-                best = d
-                best_score = score
-        if best is not None and best_score > 0:
-            return best
-    return candidates[-1]
+def _shrink_lmeval_output(obj: Any) -> Dict[str, Any]:
+    """Keep only the most useful + compact pieces of lm-eval output."""
+    if not isinstance(obj, dict):
+        return {"value": str(obj)}
+    # Always drop samples (can be extremely large).
+    obj = _remove_lmeval_samples(obj)
+    out: Dict[str, Any] = {}
+    out["results"] = obj.get("results", {})
+    # Keep small metadata when present.
+    for k in (
+        "config",
+        "versions",
+        "n-shot",
+        "n-samples",
+        "higher_is_better",
+        "git_hash",
+        "date",
+        "errors",
+        "groups",
+        "group_subtasks",
+    ):
+        if k in obj:
+            out[k] = obj[k]
+    return out
 
-
-def _call_and_capture_dict(fn, want_keys=None, **kwargs):
-    buf = io.StringIO()
-    tee = _Tee(sys.stdout, buf)
-    with contextlib.redirect_stdout(tee):
-        ret = fn(**kwargs)
-    if isinstance(ret, dict):
-        return ret
-    return _parse_best_dict(buf.getvalue(), want_keys=want_keys)
-
-
-# Ensure repo root on PYTHONPATH
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-if _THIS_DIR not in sys.path:
-    sys.path.insert(0, _THIS_DIR)
-
-from utils.model_utils import get_model_from_huggingface, get_model_from_local
-
-'''
-A. 纯 lm-eval (最可比)
-python eval_benchmarks.py \
-  --model checkpoints/llama2_act_lora_expressivity_mix_0.4_mcq.pt \
-  --device cuda \
-  --batch_size 1 \
-  --use_lm_eval \
-  --lm_eval_tasks arc_easy,arc_challenge,piqa,winogrande \
-  --lm_eval_num_fewshot 0 \
-  --dtype bfloat16
-
-B. 本地评测但强制一致 padding
-python eval_benchmarks.py \
-  --model checkpoints/llama2_act_lora_expressivity_mix_0.4_mcq.pt \
-  --device cuda \
-  --batch_size 1 \
-  --dtype bfloat16 \
-  --force_right_padding
-
-CUDA_VISIBLE_DEVICES=3 python eval_benchmarks.py   --model ./checkpoints/jeffwan_llama_7b_hf_act_lora_lmwhiten_mixedlora_0.4_linguistic.pt   --device cuda   --batch_size 16   --use_lm_eval   --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa,truthfulqa_mc1   --lm_eval_num_fewshot 0   --dtype bfloat16   --force_right_padding   --fix_pad_query_mask
-
-CUDA_VISIBLE_DEVICES=3 python expressivity/svd_act_lora_joint_QK.py   --model jeffwan/llama-7b-hf   --keep_ratio 0.4   --whitened_cache ./checkpoints/jeffwan_llama_7b_hf_whitening_only_0.4_jointqk.pt   --trust_whitened_cache   --lora_nsamples 4096 --seqlen 2048 --train_batch_size 8   --epochs 1 --lr 5e-4 --lora_rank 16 --lora_alpha 32   --mix_buckets   --bucket_props LM:0.4,INST:0.4,MATH:0.2   --bucket_lm_datasets wikitext2,ptb,c4   --bucket_inst_datasets hellaswag,piqa,winogrande_xl,ai2_arc_easy,ai2_arc_challenge,openbookqa   --bucket_math_datasets aime   --save_path ./checkpoints/jeffwan_ll
-ama_7b_hf_act_lora_lmwhiten_mixedlora_0.4_jointqk.pt
-
-CUDA_VISIBLE_DEVICES=3 python eval_benchmarks.py \
-  --model ./checkpoints/llama-2-7b-hf_act_lora_lmwhiten_mixedlora_0.4_linguistic_enhanced.pt \
-  --device cuda --batch_size 16 \
-  --dtype bfloat16 \
-  --force_right_padding --fix_pad_query_mask \
-  --skip_truthfulqa --skip_gsm8k
-
-
-# evaluate dobi:
-CUDA_VISIBLE_DEVICES=3 python eval_benchmarks.py   --dobi_model Qinsi1/DobiSVD-Llama-2-7b-hf-0.4   --device cuda --batch_size 8 --use_lm_eval   --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa
-
-CUDA_VISIBLE_DEVICES=2 python eval_benchmarks.py   --model Qinsi1/DobiSVD-Llama-2-7b-hf-0.4   --device cuda --batch_size 8   --skip_truthfulqa --skip_gsm8k
-
-'''
 
 
 def _ensure_pad_token(tokenizer):
@@ -419,7 +323,8 @@ def _run_lm_eval_harness(
         add_bos_token=add_bos_token,
         prefix_token_id=prefix_token_id,
     )
-    results = evaluator.simple_evaluate(
+    # Avoid writing per-sample logs into the returned object (keeps JSON outputs small).
+    kwargs = dict(
         model=lm,
         tasks=task_list,
         num_fewshot=num_fewshot,
@@ -429,6 +334,13 @@ def _run_lm_eval_harness(
         limit=limit,
         task_manager=task_manager,
     )
+    try:
+        sig = inspect.signature(evaluator.simple_evaluate)
+        if "log_samples" in sig.parameters:
+            kwargs["log_samples"] = False
+    except Exception:
+        pass
+    results = evaluator.simple_evaluate(**kwargs)
     if results is None:
         raise RuntimeError("LM Evaluation Harness returned no results (not rank 0).")
     # Print compact results dict
@@ -685,7 +597,7 @@ def _parse_mathqa_options(opt_str: str) -> Tuple[List[str], Dict[str, int]]:
     buf = opt_str
     # Split on letter) occurrences
     import re
-    parts = re.split(r"\s*([A-Ea-e])\)\s*", buf)
+    parts = re.split(r"\s*([A-Ea-e])\s*\)\s*", buf)
     # parts like ['', 'A', 'optA', 'B', 'optB', ...]
     for i in range(1, len(parts), 2):
         lab = parts[i].upper()
@@ -747,6 +659,9 @@ def eval_mathqa(model, tokenizer, device: str, batch_size: int, limit: Optional[
         opt = ex.get('options', '')
         correct = ex.get('correct') or ex.get('label') or 'A'
         choices, map_l = _parse_mathqa_options(opt)
+        if not choices:
+            continue
+
         idx = map_l.get(str(correct).upper(), 0)
         items.append({'prompt': q.strip() + '\nAnswer:', 'choices': choices, 'answer_idx': idx})
     return _eval_dataset_mc(model, tokenizer, items, device, batch_size, limit, desc="MathQA")
@@ -852,7 +767,7 @@ def eval_gsm8k(model, tokenizer, device: str, limit: Optional[int], max_new_toke
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--model', type=str, help='HF model id or path to local .pt checkpoint saved by this repo')
+    ap.add_argument('--model', type=str, required=True, help='HF model id or path to local .pt checkpoint saved by this repo')
     ap.add_argument('--device', type=str, default='cuda')
     ap.add_argument('--hf_token', type=str, default=None)
     ap.add_argument('--batch_size', type=int, default=8)
@@ -890,14 +805,10 @@ def main():
     ap.add_argument('--token_ppl_max_batches', type=int, default=None)
     ap.add_argument('--force_right_padding', action='store_true', help='Force right padding (safer for FlashSVD)')
     ap.add_argument('--fix_pad_query_mask', action='store_true', help='Fix pad-query rows in FlashSVD attention')
-    
-    ap.add_argument('--output_json', type=str, default=None,
-                    help='Write evaluation results to this JSON file (optional).')
-    ap.add_argument('--output_dir', type=str, default=None,
-                    help='Directory to write JSON results (auto-named). If unset, no JSON is written unless --output_json is provided.')
-    ap.add_argument('--run_name', type=str, default=None,
-                    help='Optional run name used when auto-naming JSON under --output_dir.')
-
+    ap.add_argument('--output_json', type=str, default=None, help='Write JSON report to this path')
+    ap.add_argument('--output_dir', type=str, default=None, help='If set (and --output_json not set), auto-write JSON to <output_dir>/<run_name>_<suffix>.json')
+    ap.add_argument('--run_name', type=str, default=None, help='Optional run name prefix for auto JSON naming (default: <model>_<timestamp>)')
+    ap.add_argument('--json_full', action='store_true', help='Include full lm-eval output in JSON (can still be large depending on lm-eval version).')
     args = ap.parse_args()
 
     # Load model
@@ -938,8 +849,7 @@ def main():
                 add_bos_token = False
             else:
                 add_bos_token = True
-
-        lm_eval_res = _run_lm_eval_harness(
+        lm_eval_full = _run_lm_eval_harness(
             model,
             tokenizer,
             device=args.device,
@@ -953,33 +863,29 @@ def main():
             add_bos_token=add_bos_token,
             prefix_token_id=prefix_token_id,
         )
-
         out_json = _auto_output_json(args, "lm_eval")
+        lm_eval_small = _shrink_lmeval_output(lm_eval_full)
         payload = {
-            "schema": "svdllm_eval_v1",
+            "schema": "asvd_eval_v1",
             "script": os.path.basename(__file__),
             "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
             "cmd": " ".join(sys.argv),
             "mode": "lm_eval",
-            "args": vars(args),
             "model": args.model,
-            "results": lm_eval_res.get("results", lm_eval_res) if isinstance(lm_eval_res, dict) else lm_eval_res,
+            "args": vars(args),
+            # A compact summary that's easy to parse later.
+            "results": lm_eval_small.get("results", {}),
+            # Keep a compact lm-eval payload by default.
+            # (Historically this key held the full lm-eval dict; now it's shrunk unless --json_full.)
+            "lm_eval_full": (_remove_lmeval_samples(lm_eval_full) if args.json_full else lm_eval_small),
         }
         _write_json(out_json, payload)
         return
-
     if args.token_ppl:
         ds = [d.strip() for d in args.token_ppl_datasets.split(",") if d.strip()]
-        try:
-            from evaluater import ppl_eval  # type: ignore
-        except Exception as e:
-            raise RuntimeError(f"Token PPL requested but failed to import ppl_eval: {e}")
-
-        token_ppl = _call_and_capture_dict(
-            ppl_eval,
-            want_keys=ds,
-            model=model,
-            tokenizer=tokenizer,
+        ppl_eval(
+            model,
+            tokenizer,
             datasets=ds,
             model_seq_len=args.token_ppl_seqlen,
             batch_size=args.token_ppl_batch_size,
@@ -987,22 +893,9 @@ def main():
             label="Token PPL",
             max_batches=args.token_ppl_max_batches,
         )
-
-        out_json = _auto_output_json(args, "token_ppl")
-        payload = {
-            "schema": "svdllm_eval_v1",
-            "script": os.path.basename(__file__),
-            "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
-            "cmd": " ".join(sys.argv),
-            "mode": "token_ppl",
-            "args": vars(args),
-            "model": args.model,
-            "results": token_ppl,
-        }
-        _write_json(out_json, payload)
         return
 
-# Evaluate tasks
+    # Evaluate tasks
     results: Dict[str, float] = {}
     results['Openb.'] = eval_openbookqa(model, tokenizer, args.device, args.batch_size, args.limit)
     results['ARC_e'] = eval_arc_easy(model, tokenizer, args.device, args.batch_size, args.limit)
@@ -1037,25 +930,24 @@ def main():
     print("\nResults (accuracy, %):")
     for k in order:
         v = results.get(k, float('nan'))
-        if isinstance(v, float):
-            print(f"{k}: {v:.2f}")
-        else:
-            print(f"{k}: {v}")
+        
+        print(f"{k}: {v:.2f}")
 
-    # Save JSON (optional)
-    out_json = _auto_output_json(args, "benchmark")
+
+
+
+    out_json = _auto_output_json(args, "bench")
     payload = {
-        "schema": "svdllm_eval_v1",
+        "schema": "asvd_eval_v1",
         "script": os.path.basename(__file__),
         "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
         "cmd": " ".join(sys.argv),
-        "mode": "benchmark",
-        "args": vars(args),
+        "mode": "custom",
         "model": args.model,
+        "args": vars(args),
         "results": results,
     }
     _write_json(out_json, payload)
-
 
 
 if __name__ == '__main__':

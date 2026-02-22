@@ -2,6 +2,13 @@ import argparse
 import math
 import os
 import sys
+import ast
+import contextlib
+import datetime as _dt
+import io
+import json
+import time
+import re
 from typing import List, Optional
 
 import torch
@@ -60,9 +67,161 @@ CUDA_VISIBLE_DEVICES=3 python eval_general_ppl.py \
   --datasets wikitext2,ptb,c4 \
   --ppl_method legacy \
   --device cuda --seqlen 2048 --batch_size 4 --dtype bfloat16
-  
-  
 '''
+# ----------------------------------------------------------------------------
+# JSON output helpers (similar to ASVD scripts)
+# ----------------------------------------------------------------------------
+
+def _jsonify(obj):
+    """Make common python/torch/numpy objects JSON-serializable."""
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    if isinstance(obj, dict):
+        return {str(k): _jsonify(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonify(v) for v in obj]
+    try:
+        import numpy as np  # type: ignore
+        if isinstance(obj, np.generic):
+            return obj.item()
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+    except Exception:
+        pass
+    if torch.is_tensor(obj):
+        if obj.numel() == 1:
+            return obj.detach().cpu().item()
+        return obj.detach().cpu().tolist()
+    if hasattr(obj, "item") and callable(getattr(obj, "item")):
+        try:
+            return obj.item()
+        except Exception:
+            pass
+    return str(obj)
+
+
+def _safe_tag(s: str) -> str:
+    s = os.path.basename(str(s)).strip()
+    s = re.sub(r"[^A-Za-z0-9_.-]+", "_", s)
+    return s.strip("_") or "run"
+
+
+def _auto_output_json(args, suffix: str):
+    """
+    Priority:
+      1) --output_json
+      2) --output_dir + (<run_name>_<suffix>.json)
+      3) None
+    """
+    out_json = getattr(args, "output_json", None)
+    if out_json:
+        return out_json
+    out_dir = getattr(args, "output_dir", None)
+    if not out_dir:
+        return None
+    os.makedirs(out_dir, exist_ok=True)
+    run_name = getattr(args, "run_name", None)
+    if not run_name:
+        base = getattr(args, "checkpoint", None) or getattr(args, "dobi_model", None) or "model"
+        run_name = f"{_safe_tag(base)}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    return os.path.join(out_dir, f"{run_name}_{suffix}.json")
+
+
+def _write_json(path: str, payload):
+    if not path:
+        return
+    d = os.path.dirname(path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(_jsonify(payload), f, indent=2)
+    print(f"[Output] Wrote JSON -> {path}")
+
+
+class _Tee:
+    """File-like that writes to multiple streams (keeps CLI output unchanged while capturing)."""
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for s in self.streams:
+            try:
+                s.write(data)
+            except Exception:
+                pass
+
+    def flush(self):
+        for s in self.streams:
+            try:
+                s.flush()
+            except Exception:
+                pass
+
+
+def _extract_balanced_braces(text: str):
+    """Extract balanced {...} substrings from text."""
+    out = []
+    level = 0
+    start = None
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if level == 0:
+                start = i
+            level += 1
+        elif ch == "}":
+            if level > 0:
+                level -= 1
+                if level == 0 and start is not None:
+                    out.append(text[start : i + 1])
+                    start = None
+    return out
+
+
+def _parse_best_dict(text: str, want_keys=None):
+    """Try to parse a useful dict from captured stdout."""
+    candidates = []
+    for chunk in _extract_balanced_braces(text):
+        try:
+            val = ast.literal_eval(chunk)
+        except Exception:
+            continue
+        if isinstance(val, dict):
+            candidates.append(val)
+    if not candidates:
+        return None
+    if want_keys:
+        want = set(want_keys)
+        best = None
+        best_score = -1
+        for d in candidates:
+            try:
+                keys = set(map(str, d.keys()))
+            except Exception:
+                continue
+            score = len(keys & want)
+            if score > best_score:
+                best = d
+                best_score = score
+        if best is not None and best_score > 0:
+            return best
+    return candidates[-1]
+
+
+def _call_and_capture_dict(fn, want_keys=None, **kwargs):
+    """Call fn(**kwargs) while capturing stdout; return dict if fn returns it or prints it."""
+    buf = io.StringIO()
+    tee = _Tee(sys.stdout, buf)
+    with contextlib.redirect_stdout(tee):
+        ret = fn(**kwargs)
+    if isinstance(ret, dict):
+        return ret
+    text = buf.getvalue()
+    return _parse_best_dict(text, want_keys=want_keys)
+
+
+ 
+  
+
 
 # Ensure repo root is on PYTHONPATH
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -174,6 +333,7 @@ def _legacy_ppl_eval(
         denom = float(num_samples * seq_len)
         ppls[dataset] = float(math.exp(loss_sum / denom))
     print(f"{label} (legacy): {ppls}")
+    return ppls
 
 
 def _load_dobi_model(
@@ -337,7 +497,32 @@ def main() -> None:
         action="store_true",
         help="Allow lm-eval C4 task to download non-streaming shards (default: skip C4 for word/byte/bpb).",
     )
+
+    # Optional: save results to JSON (similar to ASVD scripts)
+    p.add_argument(
+        "--output_json",
+        type=str,
+        default=None,
+        help="Write results to this JSON file (optional).",
+    )
+    p.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="Write JSON into this directory with an auto-generated filename (optional).",
+    )
+    p.add_argument(
+        "--run_name",
+        type=str,
+        default=None,
+        help="Optional name used when auto-generating filename inside --output_dir.",
+    )
+
     args = p.parse_args()
+
+    all_runs = {}
+    models_info = []
+
 
     def _load_ours(ckpt_or_dir: str):
         # If it's a repo checkpoint (.pt), use the repo loader
@@ -358,6 +543,7 @@ def main() -> None:
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but not available.")
 
+
     def _run_one(model, tokenizer, label: str, datasets_override: Optional[List[str]] = None):
         model = _to_device(model, args.device, args.dtype)
         model.eval()
@@ -376,10 +562,21 @@ def main() -> None:
         if "c4" in datasets and not args.c4_stream and not args.c4_dataset:
             os.environ.setdefault("SVDLLM_C4_VAL_STREAM", "1")
             os.environ.setdefault("SVDLLM_C4_VAL_DOCS", "200")
+
         metrics = [m.strip().lower() for m in args.metrics.split(",") if m.strip()]
+        run_out = {
+            "label": label,
+            "datasets": list(datasets),
+            "metrics": list(metrics),
+            "ppl_method": args.ppl_method,
+            "seqlen": int(args.seqlen),
+            "batch_size": int(args.batch_size),
+            "max_batches": args.max_batches,
+        }
+
         if "token" in metrics:
             if args.ppl_method == "legacy":
-                _legacy_ppl_eval(
+                run_out["token_ppl"] = _legacy_ppl_eval(
                     model,
                     tokenizer,
                     datasets=datasets,
@@ -390,9 +587,11 @@ def main() -> None:
                     max_batches=args.max_batches,
                 )
             else:
-                ppl_eval(
-                    model,
-                    tokenizer,
+                run_out["token_ppl"] = _call_and_capture_dict(
+                    ppl_eval,
+                    want_keys=datasets,
+                    model=model,
+                    tokenizer=tokenizer,
                     datasets=datasets,
                     model_seq_len=args.seqlen,
                     batch_size=args.batch_size,
@@ -400,6 +599,7 @@ def main() -> None:
                     label=label,
                     max_batches=args.max_batches,
                 )
+
         if any(m in metrics for m in ("word", "byte", "bpb")):
             # Use lm-eval harness to compute word/byte/bpb for the same datasets.
             try:
@@ -412,11 +612,13 @@ def main() -> None:
                 model.config.use_cache = False
             except Exception:
                 pass
+
             lm_eval_datasets = list(datasets)
             if "c4" in lm_eval_datasets and not args.lm_eval_allow_c4_download:
                 lm_eval_datasets.remove("c4")
                 print("[LM-Eval] Skipping C4 for word/byte/bpb to avoid shard downloads. "
                       "Pass --lm_eval_allow_c4_download to enable.")
+
             # Resolve add_bos_token / prefix_token_id (avoid double BOS in rolling)
             add_bos_token = None
             if args.lm_eval_add_bos_token == "true":
@@ -433,6 +635,7 @@ def main() -> None:
                     add_bos_token = False
                 else:
                     add_bos_token = True
+
             lm = HFLM(
                 pretrained=model,
                 tokenizer=tokenizer,
@@ -444,9 +647,13 @@ def main() -> None:
                 add_bos_token=add_bos_token,
                 prefix_token_id=prefix_token_id,
             )
+
             if not lm_eval_datasets:
                 print("[LM-Eval] No datasets left for word/byte/bpb after filtering; skipping.")
-                return
+                run_out["lm_eval"] = {}
+                run_out["lm_eval_tasks"] = []
+                return run_out
+
             res = evaluator.simple_evaluate(
                 model=lm,
                 tasks=lm_eval_datasets,
@@ -460,47 +667,91 @@ def main() -> None:
                 raise RuntimeError("LM Evaluation Harness returned no results (not rank 0).")
             print("\nLM-Eval metrics (word/byte/bpb):")
             print(res.get("results", res))
+            run_out["lm_eval"] = res.get("results", res)
+            run_out["lm_eval_tasks"] = list(lm_eval_datasets)
 
+        return run_out
     dataset_sets = _parse_dataset_sets(args.dataset_sets) if args.dataset_sets else None
 
     def _run_with_sets(model, tokenizer, label_prefix: str):
         if dataset_sets:
             for set_name, ds in dataset_sets:
-                _run_one(model, tokenizer, label=f"{label_prefix} [{set_name}]", datasets_override=ds)
+                label = f"{label_prefix} [{set_name}]"
+                all_runs[label] = _run_one(model, tokenizer, label=label, datasets_override=ds)
         else:
-            _run_one(model, tokenizer, label=label_prefix)
+            all_runs[label_prefix] = _run_one(model, tokenizer, label=label_prefix)
 
+    # ------------------------------------------------------------------
+    # Run evaluation(s)
+    # ------------------------------------------------------------------
     if args.compare_dobi:
         if not args.checkpoint or not args.dobi_model:
             raise ValueError("--compare_dobi requires both --checkpoint and --dobi_model.")
+
         print("[Compare] Evaluating our checkpoint...")
+        models_info.append({"name": "ours", "source": args.checkpoint})
         model, tokenizer = _load_ours(args.checkpoint)
         _run_with_sets(model, tokenizer, label_prefix=f"{args.label} (ours)")
+
         print("[Compare] Evaluating Dobi checkpoint...")
         remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
-        model, tokenizer, _ = _load_dobi_model(
+        model, tokenizer, local_path = _load_dobi_model(
             args.dobi_model,
             hf_token=args.hf_token,
             revision=args.dobi_revision,
             cache_dir=args.dobi_cache_dir,
             remapping=remap_flag,
         )
+        models_info.append({
+            "name": "dobi",
+            "source": args.dobi_model,
+            "local_path": local_path,
+            "revision": args.dobi_revision,
+            "cache_dir": args.dobi_cache_dir,
+            "remapping": remap_flag,
+        })
         _run_with_sets(model, tokenizer, label_prefix=f"{args.label} (dobi)")
-        return
 
-    if args.dobi_model:
+    elif args.dobi_model:
         remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
-        model, tokenizer, _ = _load_dobi_model(
+        model, tokenizer, local_path = _load_dobi_model(
             args.dobi_model,
             hf_token=args.hf_token,
             revision=args.dobi_revision,
             cache_dir=args.dobi_cache_dir,
             remapping=remap_flag,
         )
+        models_info.append({
+            "name": "dobi",
+            "source": args.dobi_model,
+            "local_path": local_path,
+            "revision": args.dobi_revision,
+            "cache_dir": args.dobi_cache_dir,
+            "remapping": remap_flag,
+        })
         _run_with_sets(model, tokenizer, label_prefix=args.label)
+
     else:
+        models_info.append({"name": "ours", "source": args.checkpoint})
         model, tokenizer = _load_ours(args.checkpoint)
         _run_with_sets(model, tokenizer, label_prefix=args.label)
+
+    # ------------------------------------------------------------------
+    # Save JSON (optional)
+    # ------------------------------------------------------------------
+    out_json = _auto_output_json(args, "ppl")
+    payload = {
+        "schema": "svdllm_eval_v1",
+        "script": os.path.basename(__file__),
+        "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
+        "cmd": " ".join(sys.argv),
+        "mode": "ppl",
+        "args": vars(args),
+        "models": models_info,
+        "results": all_runs,
+    }
+    _write_json(out_json, payload)
+
 
 
 if __name__ == "__main__":
