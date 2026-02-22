@@ -4,6 +4,7 @@ import os
 import sys
 import datetime as _dt
 import re
+import inspect
 from typing import List, Optional, Tuple
 
 import torch
@@ -20,7 +21,7 @@ from utils.model_utils import get_model_from_local, get_model_from_huggingface
 
 
 def _parse_tasks(s: str) -> List[str]:
-    return [t.strip() for t in s.split(",") if t.strip()]
+    return [t.strip() for t in (s or "").split(",") if t.strip()]
 
 
 def _parse_task_sets(s: str) -> List[Tuple[str, List[str]]]:
@@ -143,6 +144,7 @@ def _jsonify(obj):
         return obj.detach().cpu().tolist()
     try:
         import numpy as np
+
         if isinstance(obj, np.generic):
             return obj.item()
     except Exception:
@@ -177,31 +179,106 @@ def _auto_output_json(args, suffix: str):
     os.makedirs(out_dir, exist_ok=True)
     run_name = getattr(args, "run_name", None)
     if not run_name:
-        base = getattr(args, "model", None) or getattr(args, "checkpoint", None) or getattr(args, "dobi_model", None) or "model"
+        base = (
+            getattr(args, "model", None)
+            or getattr(args, "checkpoint", None)
+            or getattr(args, "dobi_model", None)
+            or "model"
+        )
         run_name = f"{_safe_tag(base)}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
     return os.path.join(out_dir, f"{run_name}_{suffix}.json")
 
 
-def _write_json(path: str, payload):
+def _write_json(path: str, payload, *, compact: bool = False) -> None:
     if not path:
         return
     d = os.path.dirname(path)
     if d:
         os.makedirs(d, exist_ok=True)
+
+    dump_kwargs = {
+        "ensure_ascii": False,
+        "indent": None if compact else 2,
+    }
+    if compact:
+        dump_kwargs["separators"] = (",", ":")
+
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(_jsonify(payload), f, indent=2)
+        json.dump(_jsonify(payload), f, **dump_kwargs)
     print(f"[Output] Wrote JSON -> {path}")
+
+
+def _drop_keys_recursive(obj, drop_keys: set):
+    """Recursively remove keys from dicts/lists (to prune huge lm-eval outputs)."""
+    if isinstance(obj, dict):
+        return {k: _drop_keys_recursive(v, drop_keys) for k, v in obj.items() if k not in drop_keys}
+    if isinstance(obj, list):
+        return [_drop_keys_recursive(v, drop_keys) for v in obj]
+    if isinstance(obj, tuple):
+        return [_drop_keys_recursive(v, drop_keys) for v in obj]
+    return obj
+
+
+def _remove_lmeval_samples(obj):
+    # lm-eval usually stores per-example logs under "samples" when log_samples/write_out is enabled.
+    return _drop_keys_recursive(obj, drop_keys={"samples"})
+
+
+def _shrink_lmeval_output(obj) -> dict:
+    """Keep only the most useful + compact pieces of lm-eval output."""
+    if not isinstance(obj, dict):
+        return {"value": str(obj)}
+
+    obj = _remove_lmeval_samples(obj)
+
+    out = {"results": obj.get("results", {})}
+    for k in (
+        "config",
+        "versions",
+        "n-shot",
+        "n-samples",
+        "higher_is_better",
+        "git_hash",
+        "date",
+        "errors",
+        "groups",
+        "group_subtasks",
+    ):
+        if k in obj:
+            out[k] = obj[k]
+    return out
 
 
 def _is_dataset_access_error(err: Exception) -> bool:
     try:
         from datasets.exceptions import DatasetNotFoundError
+
         if isinstance(err, DatasetNotFoundError):
             return True
     except Exception:
         pass
     msg = str(err).lower()
     return "gated dataset" in msg or "datasetnotfounderror" in msg
+
+
+def _simple_evaluate_with_optional_log_samples(evaluator, **kwargs):
+    """Call lm-eval simple_evaluate while trying to control per-sample logging across versions."""
+    try:
+        sig = inspect.signature(evaluator.simple_evaluate)
+        params = sig.parameters
+        want = bool(kwargs.pop("_log_samples", False))
+
+        # Newer lm-eval: log_samples
+        if "log_samples" in params:
+            kwargs["log_samples"] = want
+        # Older forks: write_out
+        elif "write_out" in params:
+            kwargs["write_out"] = want
+    except Exception:
+        # If we can't inspect, just call without extra kwargs.
+        kwargs.pop("_log_samples", None)
+
+    return evaluator.simple_evaluate(**kwargs)
 
 
 def _safe_simple_evaluate(
@@ -213,9 +290,11 @@ def _safe_simple_evaluate(
     max_batch_size: int,
     device: str,
     limit: Optional[int],
+    log_samples: bool,
 ):
     try:
-        res = evaluator.simple_evaluate(
+        res = _simple_evaluate_with_optional_log_samples(
+            evaluator,
             model=model,
             tasks=tasks,
             num_fewshot=num_fewshot,
@@ -223,6 +302,7 @@ def _safe_simple_evaluate(
             max_batch_size=max_batch_size,
             device=device,
             limit=limit,
+            _log_samples=log_samples,
         )
         if res is None:
             raise RuntimeError("LM Evaluation Harness returned no results (not rank 0).")
@@ -235,7 +315,8 @@ def _safe_simple_evaluate(
         used_tasks: List[str] = []
         for task in tasks:
             try:
-                res = evaluator.simple_evaluate(
+                res = _simple_evaluate_with_optional_log_samples(
+                    evaluator,
                     model=model,
                     tasks=[task],
                     num_fewshot=num_fewshot,
@@ -243,6 +324,7 @@ def _safe_simple_evaluate(
                     max_batch_size=max_batch_size,
                     device=device,
                     limit=limit,
+                    _log_samples=log_samples,
                 )
                 if res is None:
                     continue
@@ -259,7 +341,7 @@ def _safe_simple_evaluate(
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Evaluate linguistic tasks (lm-eval) for local or Dobi checkpoints."
+        description="Evaluate linguistic tasks (lm-eval) for SVDLLM/local or Dobi checkpoints."
     )
     p.add_argument(
         "--model",
@@ -308,11 +390,39 @@ def main() -> None:
     p.add_argument("--dtype", type=str, default=None)
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--hf_token", type=str, default=None)
+
+    # Output controls
     p.add_argument("--output_json", type=str, default=None)
     p.add_argument("--output_md", type=str, default=None)
     p.add_argument("--output_dir", type=str, default=None)
     p.add_argument("--run_name", type=str, default=None)
+
+    # Size controls (default: small JSON)
+    p.add_argument(
+        "--log_samples",
+        action="store_true",
+        help="Ask lm-eval to collect per-sample logs (can be very large).",
+    )
+    p.add_argument(
+        "--json_full",
+        action="store_true",
+        help="Include full lm-eval output per task set in JSON (still prunes samples unless --json_keep_samples).",
+    )
+    p.add_argument(
+        "--json_keep_samples",
+        action="store_true",
+        help="Keep per-sample logs in JSON (WARNING: huge). Implies --log_samples.",
+    )
+    p.add_argument(
+        "--json_compact",
+        action="store_true",
+        help="Write compact (minified) JSON (no indentation) to further reduce file size.",
+    )
+
     args = p.parse_args()
+
+    if args.json_keep_samples:
+        args.log_samples = True
 
     if args.dobi_model:
         if args.dobi_remapping and args.dobi_unremapping:
@@ -368,6 +478,7 @@ def main() -> None:
     )
     try:
         from lm_eval.tasks import TaskManager
+
         task_manager = TaskManager()
     except Exception:
         task_manager = None
@@ -386,11 +497,13 @@ def main() -> None:
         "task_sets": {},
     }
     tasks_used = {}
+
     for set_name, set_tasks in task_sets:
         set_tasks = _filter_existing_tasks(set_tasks, task_manager)
         if not set_tasks:
             print(f"[LM-Eval] No valid tasks for set '{set_name}', skipping.")
             continue
+
         res, used = _safe_simple_evaluate(
             evaluator=evaluator,
             model=lm,
@@ -400,30 +513,55 @@ def main() -> None:
             max_batch_size=64,
             device=args.device,
             limit=args.limit,
+            log_samples=args.log_samples,
         )
         if not res or not res.get("results"):
             print(f"[LM-Eval] No results for set '{set_name}' after filtering; skipping.")
             continue
+
         tasks_used[set_name] = list(used) if used else list(set_tasks)
         print(res.get("results", res))
-        all_results["task_sets"][set_name] = res
+
+        # Keep JSON small by default.
+        if args.json_keep_samples:
+            res_out = res
+        elif args.json_full:
+            res_out = _remove_lmeval_samples(res)
+        else:
+            res_out = _shrink_lmeval_output(res)
+
+        all_results["task_sets"][set_name] = res_out
 
     out_json = _auto_output_json(args, "linguistic")
+
+    # Redact secrets from args before serializing.
+    args_dict = dict(vars(args))
+    if args_dict.get("hf_token"):
+        args_dict["hf_token"] = "<REDACTED>"
+
     payload = {
         "schema": "svdllm_eval_v1",
         "script": os.path.basename(__file__),
         "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
         "cmd": " ".join(sys.argv),
         "mode": "linguistic",
-        "args": vars(args),
+        "args": args_dict,
+        "tasks_used": tasks_used,
         "results": all_results,
     }
-    _write_json(out_json, payload)
+
+    _write_json(out_json, payload, compact=args.json_compact)
+
     if args.output_md:
         if len(all_results["task_sets"]) == 1:
             only_name = next(iter(all_results["task_sets"]))
             only_tasks = tasks_used.get(only_name, task_sets[0][1])
-            _write_md(args.output_md, model_name=model_name, tasks=only_tasks, res=all_results["task_sets"][only_name])
+            _write_md(
+                args.output_md,
+                model_name=model_name,
+                tasks=only_tasks,
+                res=all_results["task_sets"][only_name],
+            )
         else:
             lines = []
             lines.append("# Linguistic Task Evaluation")

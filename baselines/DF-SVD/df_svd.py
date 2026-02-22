@@ -47,18 +47,26 @@ CUDA_VISIBLE_DEVICES=2 python df_svd.py \
   --train_lr 5e-4
 
 # example (randomized WS-SVD + cached whitening)
-CUDA_VISIBLE_DEVICES=3 conda run -n flashsvd python -u robust/df_svd.py \
+CUDA_VISIBLE_DEVICES=0 python df_svd.py \
   --model_id meta-llama/Llama-2-7b-hf \
-  --output_dir ./robust/llama2_dfsvd_r0.4_full_fix_cacheS \
-  --compression_ratio 0.4 --base_update_rank 8 \
-  --seq_len 2048 --calib_sequences 256 --cov_max_tokens_total 524288 --batch_size 1 \
+  --output_dir ./llama2_dfsvd_r0.4_fix \
+  --compression_ratio 0.4 \
+  --base_update_rank 8 \
+  --seq_len 2048 \
+  --calib_sequences 256 \
+  --cov_max_tokens_total 524288 \
+  --batch_size 1 \
+  --dtype bfloat16 \
+  --factor_dtype float32 \
   --whitening_cache_dir ./cache/dfsvd_whitening_llama2_seq2048_n256_tok524288 \
-  --whitening_cache_dtype float16 \
+  --whitening_cache_dtype float32 \
   --whitening_cache_overwrite \
-  --ws_svd_method randomized --ws_svd_niter 2 --ws_svd_oversample 8 \
-  --factor_dtype float32 --whitening_damping 1e-4 \
-  --do_train --train_steps 200 --train_lr 1e-4 \
-  --tqdm off
+  --whitening_damping 1e-4 \
+  --do_train \
+  --train_steps 200 \
+  --train_lr 1e-4 \
+  --tqdm on
+
 
 
 """
@@ -94,7 +102,6 @@ TARGET_SUBMODULES = [
     "mlp.down_proj",
 ]
 
-
 def resolve_tqdm_enabled(mode: str) -> bool:
     mode = str(mode).lower().strip()
     if mode == "on":
@@ -116,6 +123,7 @@ def _log(msg: str, *, tqdm_enabled: bool) -> None:
         except Exception:
             pass
     print(msg, flush=True)
+
 
 
 def _whitening_cache_entry_path(cache_dir: str, module_name: str) -> str:
@@ -315,32 +323,23 @@ def svd_topk(
 
     # Exact path or trivial "top-k == full"
     if method == "full" or k >= max_rank:
-        try:
-            U, s, Vh = torch.linalg.svd(mat, full_matrices=False)
-        except RuntimeError:
-            U, s, Vh = torch.linalg.svd(mat.cpu(), full_matrices=False)
-            U, s, Vh = U.to(mat.device), s.to(mat.device), Vh.to(mat.device)
+        
+        U, s, Vh = torch.linalg.svd(mat, full_matrices=False)
+        
         return U[:, :k], s[:k], Vh[:k, :]
 
     # Randomized / low-rank path
     q = min(k + max(0, int(oversample)), max_rank - 1)
     q = max(1, q)
-    try:
-        U, s, V = torch.svd_lowrank(mat, q=q, niter=max(0, int(niter)))
-        # Sort descending by singular value (torch.svd_lowrank is not guaranteed sorted across versions)
-        idx = torch.argsort(s, descending=True)
-        s = s[idx]
-        U = U[:, idx]
-        V = V[:, idx]
-        return U[:, :k], s[:k], V[:, :k].t()
-    except Exception:
-        # Fallback to exact SVD (and truncate)
-        try:
-            U, s, Vh = torch.linalg.svd(mat, full_matrices=False)
-        except RuntimeError:
-            U, s, Vh = torch.linalg.svd(mat.cpu(), full_matrices=False)
-            U, s, Vh = U.to(mat.device), s.to(mat.device), Vh.to(mat.device)
-        return U[:, :k], s[:k], Vh[:k, :]
+    
+    U, s, V = torch.svd_lowrank(mat, q=q, niter=max(0, int(niter)))
+    # Sort descending by singular value (torch.svd_lowrank is not guaranteed sorted across versions)
+    idx = torch.argsort(s, descending=True)
+    s = s[idx]
+    U = U[:, idx]
+    V = V[:, idx]
+    return U[:, :k], s[:k], V[:, :k].t()
+    
 
 
 # -------------------------
@@ -415,8 +414,6 @@ def collect_input_covariance(
     Collect cov = X^T X where X are the flattened inputs to `module` over calibration data.
     We do NOT normalize by token count (to match S = chol(XX^T) in the paper).
     """
-    if not isinstance(module, nn.Linear):
-        raise TypeError("collect_input_covariance expects nn.Linear")
 
     in_features = module.in_features
     cov = torch.zeros((in_features, in_features), device=device, dtype=dtype_acc)
@@ -584,13 +581,9 @@ class DFSVDFactorizedLinear(nn.Module):
         WS = W @ S  # (out,in)
 
         # SVD
-        try:
-            U, s, Vh = torch.linalg.svd(WS, full_matrices=False)
-        except RuntimeError:
-            # fallback to CPU SVD if GPU fails
-            U, s, Vh = torch.linalg.svd(WS.cpu(), full_matrices=False)
-            U, s, Vh = U.to(device), s.to(device), Vh.to(device)
-
+        
+        U, s, Vh = torch.linalg.svd(WS, full_matrices=False)
+        
         k = int(trunc_rank)
         U_k = U[:, :k]
         s_k = s[:k]
@@ -1153,12 +1146,9 @@ def compress_layer_modules(
         Wv = torch.linalg.solve_triangular(S.t(), Vh_k.t(), upper=True).t()  # (k,in) = V^T S^{-1}
 
         # split Wu_init into principal + minor via SVD(Wu_init)
-        try:
-            U2, s2, Vh2 = torch.linalg.svd(Wu_init, full_matrices=False)
-        except RuntimeError:
-            U2, s2, Vh2 = torch.linalg.svd(Wu_init.cpu(), full_matrices=False)
-            U2, s2, Vh2 = U2.to(device), s2.to(device), Vh2.to(device)
-
+        
+        U2, s2, Vh2 = torch.linalg.svd(Wu_init, full_matrices=False)
+        
         r = min(int(r_up), int(k_trunc))
         p = int(k_trunc) - r
 
@@ -1433,7 +1423,7 @@ def main() -> None:
     timing["stages"].append({"name": "load_tokenizer", "sec": time.perf_counter() - t0})
 
     t0 = time.perf_counter()
-    model = AutoModelForCausalLM.from_pretrained(args.model_id, torch_dtype=dtype).to(device)
+    model = AutoModelForCausalLM.from_pretrained(args.model_id, dtype=dtype).to(device)
     model.config.use_cache = False  # avoid kv-cache during calibration/training
     timing["stages"].append({"name": "load_model", "sec": time.perf_counter() - t0})
 
