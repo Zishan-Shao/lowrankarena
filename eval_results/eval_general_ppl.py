@@ -1,11 +1,165 @@
 import argparse
+import ast
+import contextlib
+import datetime as _dt
+import io
+import json
 import math
 import os
+import re
 import sys
 from typing import List, Optional
 
 import torch
 from tqdm import tqdm
+
+
+# ----------------------------------------------------------------------------
+# JSON output helpers (mirrors eval_SVDLLM_benchmark.py)
+# ----------------------------------------------------------------------------
+
+
+def _jsonify(obj):
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    if isinstance(obj, dict):
+        return {str(k): _jsonify(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonify(v) for v in obj]
+    try:
+        import numpy as np  # type: ignore
+        if isinstance(obj, np.generic):
+            return obj.item()
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+    except Exception:
+        pass
+    if torch.is_tensor(obj):
+        if obj.numel() == 1:
+            return obj.detach().cpu().item()
+        return obj.detach().cpu().tolist()
+    if hasattr(obj, 'item') and callable(getattr(obj, 'item')):
+        try:
+            return obj.item()
+        except Exception:
+            pass
+    return str(obj)
+
+
+def _safe_tag(s: str) -> str:
+    s = os.path.basename(str(s)).strip()
+    s = re.sub(r"[^A-Za-z0-9_.-]+", "_", s)
+    return s.strip("_") or 'run'
+
+
+def _auto_output_json(args, suffix: str):
+    # Priority:
+    #   1) --output_json
+    #   2) --output_dir + (<run_name>_<suffix>.json)
+    #   3) None
+    out_json = getattr(args, 'output_json', None)
+    if out_json:
+        return out_json
+    out_dir = getattr(args, 'output_dir', None)
+    if not out_dir:
+        return None
+    os.makedirs(out_dir, exist_ok=True)
+    run_name = getattr(args, 'run_name', None)
+    if not run_name:
+        base = None
+        if getattr(args, 'compare_dobi', False):
+            base = f"compare_{_safe_tag(getattr(args,'checkpoint', 'ours'))}_vs_{_safe_tag(getattr(args,'dobi_model','dobi'))}"
+        base = base or getattr(args, 'checkpoint', None) or getattr(args, 'dobi_model', None) or 'model'
+        run_name = f"{_safe_tag(base)}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    return os.path.join(out_dir, f"{run_name}_{suffix}.json")
+
+
+def _write_json(path: str, payload):
+    if not path:
+        return
+    d = os.path.dirname(path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(_jsonify(payload), f, indent=2)
+    print(f"[Output] Wrote JSON -> {path}")
+
+
+class _Tee:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for s in self.streams:
+            try:
+                s.write(data)
+            except Exception:
+                pass
+
+    def flush(self):
+        for s in self.streams:
+            try:
+                s.flush()
+            except Exception:
+                pass
+
+
+def _extract_balanced_braces(text: str):
+    out = []
+    level = 0
+    start = None
+    for i, ch in enumerate(text):
+        if ch == '{':
+            if level == 0:
+                start = i
+            level += 1
+        elif ch == '}':
+            if level > 0:
+                level -= 1
+                if level == 0 and start is not None:
+                    out.append(text[start : i + 1])
+                    start = None
+    return out
+
+
+def _parse_best_dict(text: str, want_keys=None):
+    candidates = []
+    for chunk in _extract_balanced_braces(text):
+        try:
+            val = ast.literal_eval(chunk)
+        except Exception:
+            continue
+        if isinstance(val, dict):
+            candidates.append(val)
+    if not candidates:
+        return None
+    if want_keys:
+        want = set(want_keys)
+        best = None
+        best_score = -1
+        for d in candidates:
+            try:
+                keys = set(map(str, d.keys()))
+            except Exception:
+                continue
+            score = len(keys & want)
+            if score > best_score:
+                best = d
+                best_score = score
+        if best is not None and best_score > 0:
+            return best
+    return candidates[-1]
+
+
+def _call_and_capture_dict(fn, want_keys=None, **kwargs):
+    buf = io.StringIO()
+    tee = _Tee(sys.stdout, buf)
+    with contextlib.redirect_stdout(tee):
+        ret = fn(**kwargs)
+    if isinstance(ret, dict):
+        return ret
+    return _parse_best_dict(buf.getvalue(), want_keys=want_keys)
+
 
 '''
 1) 默认：token‑level PPL（wikitext2/ptb/c4）
@@ -70,6 +224,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 from utils.model_utils import get_model_from_local, get_model_from_huggingface
+from utils.saes_svd_loader import looks_like_saes_svd_checkpoint, load_saes_svd_model
 from evaluater import ppl_eval
 
 
@@ -174,6 +329,7 @@ def _legacy_ppl_eval(
         denom = float(num_samples * seq_len)
         ppls[dataset] = float(math.exp(loss_sum / denom))
     print(f"{label} (legacy): {ppls}")
+    return ppls
 
 
 def _load_dobi_model(
@@ -216,6 +372,31 @@ def main() -> None:
         type=str,
         default=None,
         help="Path to a checkpoint saved by this repo (contains {'model','tokenizer'}).",
+    )
+
+    p.add_argument(
+        "--saes_model",
+        type=str,
+        default=None,
+        help="SAES-SVD checkpoint (local dir or HF repo id). If set, overrides --checkpoint for the 'ours' model.",
+    )
+    p.add_argument(
+        "--saes_base_model",
+        type=str,
+        default=None,
+        help="Base HF model id/path to apply SAES-SVD onto (required when using SAES-SVD).",
+    )
+    p.add_argument(
+        "--saes_revision",
+        type=str,
+        default=None,
+        help="Optional HF revision for SAES-SVD checkpoint.",
+    )
+    p.add_argument(
+        "--saes_cache_dir",
+        type=str,
+        default=None,
+        help="Optional HF cache dir for SAES-SVD checkpoint.",
     )
     p.add_argument(
         "--dobi_model",
@@ -337,23 +518,54 @@ def main() -> None:
         action="store_true",
         help="Allow lm-eval C4 task to download non-streaming shards (default: skip C4 for word/byte/bpb).",
     )
+    p.add_argument("--output_json", type=str, default=None,
+                   help="Write evaluation results to this JSON file (optional).")
+    p.add_argument("--output_dir", type=str, default=None,
+                   help="Directory to write JSON results (auto-named). If unset, no JSON is written unless --output_json is provided.")
+    p.add_argument("--run_name", type=str, default=None,
+                   help="Optional run name used when auto-naming JSON under --output_dir.")
+
     args = p.parse_args()
 
+    runs = []  # collected results for JSON output
+
+
     def _load_ours(ckpt_or_dir: str):
-        # If it's a repo checkpoint (.pt), use the repo loader
-        if ckpt_or_dir.endswith(".pt"):
+        # 1) Repo checkpoint (.pt) saved by this repo
+        if ckpt_or_dir.endswith(".pt") and os.path.isfile(ckpt_or_dir):
             return get_model_from_local(ckpt_or_dir)
-        # Otherwise treat it as HF model id OR local HF directory
+
+        # 2) Local SAES-SVD dir (contains saes_manifest.json + saes_state.pt)
+        if os.path.isdir(ckpt_or_dir) and looks_like_saes_svd_checkpoint(ckpt_or_dir):
+            if not args.saes_base_model:
+                raise ValueError("SAES-SVD checkpoint detected but --saes_base_model is missing.")
+            model, tokenizer, _ = load_saes_svd_model(
+                ckpt_or_dir,
+                base_model=args.saes_base_model,
+                hf_token=args.hf_token,
+                revision=args.saes_revision,
+                cache_dir=args.saes_cache_dir,
+            )
+            return model, tokenizer
+
+        # 3) Otherwise treat it as HF model id OR local HF directory
         return get_model_from_huggingface(ckpt_or_dir, hf_token=args.hf_token)
 
 
     if args.dobi_model:
         if args.dobi_remapping and args.dobi_unremapping:
             raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
-    if not args.checkpoint and not args.dobi_model:
-        raise ValueError("Please provide --checkpoint or --dobi_model.")
-    if args.checkpoint and not os.path.exists(args.checkpoint):
+    if not args.checkpoint and not args.dobi_model and not args.saes_model:
+        raise ValueError("Please provide --checkpoint, --saes_model, or --dobi_model.")
+    # Only enforce existence for local repo checkpoints; HF ids may not exist on disk.
+    if args.checkpoint and args.checkpoint.endswith(".pt") and not os.path.exists(args.checkpoint):
         raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
+    # If a local SAES checkpoint dir is provided via --checkpoint, require base model.
+    if args.checkpoint and os.path.isdir(args.checkpoint) and looks_like_saes_svd_checkpoint(args.checkpoint):
+        if not args.saes_base_model:
+            raise ValueError("SAES-SVD checkpoint detected but --saes_base_model is missing.")
+    if args.saes_model and not args.saes_base_model:
+        raise ValueError("--saes_model requires --saes_base_model.")
 
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but not available.")
@@ -377,9 +589,22 @@ def main() -> None:
             os.environ.setdefault("SVDLLM_C4_VAL_STREAM", "1")
             os.environ.setdefault("SVDLLM_C4_VAL_DOCS", "200")
         metrics = [m.strip().lower() for m in args.metrics.split(",") if m.strip()]
+
+        run_res = {
+            "model": label,
+            "label": label,
+            "datasets": list(datasets),
+            "metrics_requested": list(metrics),
+            "ppl_method": args.ppl_method,
+            "seqlen": args.seqlen,
+            "batch_size": args.batch_size,
+            "max_batches": args.max_batches,
+            "dtype": args.dtype,
+            "device": args.device,
+        }
         if "token" in metrics:
             if args.ppl_method == "legacy":
-                _legacy_ppl_eval(
+                run_res["token_ppl"] = _legacy_ppl_eval(
                     model,
                     tokenizer,
                     datasets=datasets,
@@ -390,9 +615,11 @@ def main() -> None:
                     max_batches=args.max_batches,
                 )
             else:
-                ppl_eval(
-                    model,
-                    tokenizer,
+                run_res["token_ppl"] = _call_and_capture_dict(
+                    ppl_eval,
+                    want_keys=datasets,
+                    model=model,
+                    tokenizer=tokenizer,
                     datasets=datasets,
                     model_seq_len=args.seqlen,
                     batch_size=args.batch_size,
@@ -400,6 +627,11 @@ def main() -> None:
                     label=label,
                     max_batches=args.max_batches,
                 )
+
+        if not any(m in metrics for m in ("word", "byte", "bpb")):
+            runs.append(run_res)
+            return run_res
+
         if any(m in metrics for m in ("word", "byte", "bpb")):
             # Use lm-eval harness to compute word/byte/bpb for the same datasets.
             try:
@@ -446,7 +678,8 @@ def main() -> None:
             )
             if not lm_eval_datasets:
                 print("[LM-Eval] No datasets left for word/byte/bpb after filtering; skipping.")
-                return
+                runs.append(run_res)
+                return run_res
             res = evaluator.simple_evaluate(
                 model=lm,
                 tasks=lm_eval_datasets,
@@ -460,6 +693,10 @@ def main() -> None:
                 raise RuntimeError("LM Evaluation Harness returned no results (not rank 0).")
             print("\nLM-Eval metrics (word/byte/bpb):")
             print(res.get("results", res))
+            run_res["lm_eval_tasks"] = list(lm_eval_datasets)
+            run_res["lm_eval_results"] = res.get("results", res)
+            runs.append(run_res)
+            return run_res
 
     dataset_sets = _parse_dataset_sets(args.dataset_sets) if args.dataset_sets else None
 
@@ -470,11 +707,21 @@ def main() -> None:
         else:
             _run_one(model, tokenizer, label=label_prefix)
 
+
     if args.compare_dobi:
-        if not args.checkpoint or not args.dobi_model:
-            raise ValueError("--compare_dobi requires both --checkpoint and --dobi_model.")
+        if not (args.checkpoint or args.saes_model) or not args.dobi_model:
+            raise ValueError("--compare_dobi requires (--checkpoint or --saes_model) and --dobi_model.")
         print("[Compare] Evaluating our checkpoint...")
-        model, tokenizer = _load_ours(args.checkpoint)
+        if args.saes_model:
+            model, tokenizer, _ = load_saes_svd_model(
+                args.saes_model,
+                base_model=args.saes_base_model,
+                hf_token=args.hf_token,
+                revision=args.saes_revision,
+                cache_dir=args.saes_cache_dir,
+            )
+        else:
+            model, tokenizer = _load_ours(args.checkpoint)
         _run_with_sets(model, tokenizer, label_prefix=f"{args.label} (ours)")
         print("[Compare] Evaluating Dobi checkpoint...")
         remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
@@ -486,6 +733,18 @@ def main() -> None:
             remapping=remap_flag,
         )
         _run_with_sets(model, tokenizer, label_prefix=f"{args.label} (dobi)")
+
+        out_json = _auto_output_json(args, "general_ppl")
+        payload = {
+            "schema": "svdllm_eval_v1",
+            "script": os.path.basename(__file__),
+            "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
+            "cmd": " ".join(sys.argv),
+            "mode": "general_ppl_compare",
+            "args": vars(args),
+            "runs": runs,
+        }
+        _write_json(out_json, payload)
         return
 
     if args.dobi_model:
@@ -498,9 +757,30 @@ def main() -> None:
             remapping=remap_flag,
         )
         _run_with_sets(model, tokenizer, label_prefix=args.label)
+    elif args.saes_model:
+        model, tokenizer, _ = load_saes_svd_model(
+            args.saes_model,
+            base_model=args.saes_base_model,
+            hf_token=args.hf_token,
+            revision=args.saes_revision,
+            cache_dir=args.saes_cache_dir,
+        )
+        _run_with_sets(model, tokenizer, label_prefix=args.label)
     else:
         model, tokenizer = _load_ours(args.checkpoint)
         _run_with_sets(model, tokenizer, label_prefix=args.label)
+
+    out_json = _auto_output_json(args, "general_ppl")
+    payload = {
+        "schema": "svdllm_eval_v1",
+        "script": os.path.basename(__file__),
+        "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
+        "cmd": " ".join(sys.argv),
+        "mode": "general_ppl",
+        "args": vars(args),
+        "runs": runs,
+    }
+    _write_json(out_json, payload)
 
 
 if __name__ == "__main__":

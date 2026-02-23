@@ -1,5 +1,11 @@
 import argparse
+import ast
+import contextlib
+import datetime as _dt
+import io
+import json
 import os
+import re
 import sys
 from typing import List, Dict, Any, Tuple, Optional
 
@@ -35,12 +41,159 @@ except Exception:
         load_mathqa_local = None
 from tqdm import tqdm
 
-# Ensure repo root on PYTHONPATH
+
+# ----------------------------------------------------------------------------
+# JSON output helpers (mirrors eval_SVDLLM_benchmark.py)
+# ----------------------------------------------------------------------------
+
+
+def _jsonify(obj):
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    if isinstance(obj, dict):
+        return {str(k): _jsonify(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonify(v) for v in obj]
+    try:
+        import numpy as np  # type: ignore
+        if isinstance(obj, np.generic):
+            return obj.item()
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+    except Exception:
+        pass
+    if torch.is_tensor(obj):
+        if obj.numel() == 1:
+            return obj.detach().cpu().item()
+        return obj.detach().cpu().tolist()
+    if hasattr(obj, "item") and callable(getattr(obj, "item")):
+        try:
+            return obj.item()
+        except Exception:
+            pass
+    return str(obj)
+
+
+def _safe_tag(s: str) -> str:
+    s = os.path.basename(str(s)).strip()
+    s = re.sub(r"[^A-Za-z0-9_.-]+", "_", s)
+    return s.strip("_") or "run"
+
+
+def _auto_output_json(args, suffix: str):
+    # Priority:
+    #   1) --output_json
+    #   2) --output_dir + (<run_name>_<suffix>.json)
+    #   3) None
+    out_json = getattr(args, "output_json", None)
+    if out_json:
+        return out_json
+    out_dir = getattr(args, "output_dir", None)
+    if not out_dir:
+        return None
+    os.makedirs(out_dir, exist_ok=True)
+    run_name = getattr(args, "run_name", None)
+    if not run_name:
+        base = getattr(args, "model", None) or "model"
+        run_name = f"{_safe_tag(base)}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    return os.path.join(out_dir, f"{run_name}_{suffix}.json")
+
+
+def _write_json(path: str, payload):
+    if not path:
+        return
+    d = os.path.dirname(path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(_jsonify(payload), f, indent=2)
+    print(f"[Output] Wrote JSON -> {path}")
+
+
+class _Tee:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for s in self.streams:
+            try:
+                s.write(data)
+            except Exception:
+                pass
+
+    def flush(self):
+        for s in self.streams:
+            try:
+                s.flush()
+            except Exception:
+                pass
+
+
+def _extract_balanced_braces(text: str):
+    out = []
+    level = 0
+    start = None
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if level == 0:
+                start = i
+            level += 1
+        elif ch == "}":
+            if level > 0:
+                level -= 1
+                if level == 0 and start is not None:
+                    out.append(text[start : i + 1])
+                    start = None
+    return out
+
+
+def _parse_best_dict(text: str, want_keys=None):
+    candidates = []
+    for chunk in _extract_balanced_braces(text):
+        try:
+            val = ast.literal_eval(chunk)
+        except Exception:
+            continue
+        if isinstance(val, dict):
+            candidates.append(val)
+    if not candidates:
+        return None
+    if want_keys:
+        want = set(want_keys)
+        best = None
+        best_score = -1
+        for d in candidates:
+            try:
+                keys = set(map(str, d.keys()))
+            except Exception:
+                continue
+            score = len(keys & want)
+            if score > best_score:
+                best = d
+                best_score = score
+        if best is not None and best_score > 0:
+            return best
+    return candidates[-1]
+
+
+def _call_and_capture_dict(fn, want_keys=None, **kwargs):
+    buf = io.StringIO()
+    tee = _Tee(sys.stdout, buf)
+    with contextlib.redirect_stdout(tee):
+        ret = fn(**kwargs)
+    if isinstance(ret, dict):
+        return ret
+    return _parse_best_dict(buf.getvalue(), want_keys=want_keys)
+
+
+# Ensure repo root on PYTHONPATH so imports work regardless of launch cwd.
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-if _THIS_DIR not in sys.path:
-    sys.path.insert(0, _THIS_DIR)
+_REPO_ROOT = os.path.dirname(_THIS_DIR)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 from utils.model_utils import get_model_from_huggingface, get_model_from_local
+from utils.saes_svd_loader import looks_like_saes_svd_checkpoint, load_saes_svd_model
 from evaluater import ppl_eval
 
 '''
@@ -76,9 +229,8 @@ CUDA_VISIBLE_DEVICES=3 python eval_benchmarks.py \
 
 
 # evaluate dobi:
-CUDA_VISIBLE_DEVICES=3 python eval_benchmarks.py   --dobi_model Qinsi1/DobiSVD-Llama-2-7b-hf-0.4   --device cuda --batch_size 8 --use_lm_eval   --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa
+CUDA_VISIBLE_DEVICES=3 python eval_benchmarks.py   --model Qinsi1/DobiSVD-Llama-2-7b-hf-0.4   --device cuda --batch_size 8 --use_lm_eval   --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa
 
-CUDA_VISIBLE_DEVICES=2 python eval_benchmarks.py   --model Qinsi1/DobiSVD-Llama-2-7b-hf-0.4   --device cuda --batch_size 8   --skip_truthfulqa --skip_gsm8k
 
 '''
 
@@ -282,6 +434,7 @@ def _run_lm_eval_harness(
     # Print compact results dict
     print("\nLM-Eval results:")
     print(results.get("results", results))
+    return results
 
 
 @torch.no_grad()
@@ -702,6 +855,12 @@ def main():
     ap.add_argument('--model', type=str, required=True, help='HF model id or path to local .pt checkpoint saved by this repo')
     ap.add_argument('--device', type=str, default='cuda')
     ap.add_argument('--hf_token', type=str, default=None)
+    ap.add_argument('--saes_svd', action='store_true',
+                    help='Treat --model as SAES-SVD checkpoint (local dir or HF repo id)')
+    ap.add_argument('--saes_base_model', type=str, default=None,
+                    help='Base HF model id/path to apply SAES-SVD onto (required when using SAES-SVD).')
+    ap.add_argument('--saes_revision', type=str, default=None)
+    ap.add_argument('--saes_cache_dir', type=str, default=None)
     ap.add_argument('--batch_size', type=int, default=8)
     ap.add_argument('--limit', type=int, default=None, help='Limit examples per task for quick runs')
     ap.add_argument('--dtype', type=str, default=None, help='float16/bfloat16/float32')
@@ -737,11 +896,29 @@ def main():
     ap.add_argument('--token_ppl_max_batches', type=int, default=None)
     ap.add_argument('--force_right_padding', action='store_true', help='Force right padding (safer for FlashSVD)')
     ap.add_argument('--fix_pad_query_mask', action='store_true', help='Fix pad-query rows in FlashSVD attention')
+
+    ap.add_argument('--output_json', type=str, default=None,
+                    help='Write evaluation results to this JSON file (optional).')
+    ap.add_argument('--output_dir', type=str, default=None,
+                    help='Directory to write JSON results (auto-named). If unset, no JSON is written unless --output_json is provided.')
+    ap.add_argument('--run_name', type=str, default=None,
+                    help='Optional run name used when auto-naming JSON under --output_dir.')
+
     args = ap.parse_args()
 
     # Load model
     if os.path.exists(args.model) and args.model.endswith('.pt'):
         model, tokenizer = get_model_from_local(args.model)
+    elif (os.path.isdir(args.model) and looks_like_saes_svd_checkpoint(args.model)) or args.saes_svd:
+        if not args.saes_base_model:
+            raise ValueError("SAES-SVD requires --saes_base_model.")
+        model, tokenizer, _ = load_saes_svd_model(
+            args.model,
+            base_model=args.saes_base_model,
+            hf_token=args.hf_token,
+            revision=args.saes_revision,
+            cache_dir=args.saes_cache_dir,
+        )
     else:
         model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
     tokenizer = _ensure_tokenizer_compat(model, tokenizer, hf_token=args.hf_token)
@@ -777,7 +954,7 @@ def main():
                 add_bos_token = False
             else:
                 add_bos_token = True
-        _run_lm_eval_harness(
+        lm_eval_res = _run_lm_eval_harness(
             model,
             tokenizer,
             device=args.device,
@@ -791,19 +968,47 @@ def main():
             add_bos_token=add_bos_token,
             prefix_token_id=prefix_token_id,
         )
+
+        out_json = _auto_output_json(args, 'lm_eval')
+        payload = {
+            'schema': 'svdllm_eval_v1',
+            'script': os.path.basename(__file__),
+            'timestamp': _dt.datetime.now().isoformat(timespec='seconds'),
+            'cmd': ' '.join(sys.argv),
+            'mode': 'lm_eval',
+            'args': vars(args),
+            'model': args.model,
+            'results': lm_eval_res.get('results', lm_eval_res) if isinstance(lm_eval_res, dict) else lm_eval_res,
+        }
+        _write_json(out_json, payload)
         return
     if args.token_ppl:
-        ds = [d.strip() for d in args.token_ppl_datasets.split(",") if d.strip()]
-        ppl_eval(
-            model,
-            tokenizer,
+        ds = [d.strip() for d in args.token_ppl_datasets.split(',') if d.strip()]
+        token_ppl = _call_and_capture_dict(
+            ppl_eval,
+            want_keys=ds,
+            model=model,
+            tokenizer=tokenizer,
             datasets=ds,
             model_seq_len=args.token_ppl_seqlen,
             batch_size=args.token_ppl_batch_size,
             device=args.device,
-            label="Token PPL",
+            label='Token PPL',
             max_batches=args.token_ppl_max_batches,
         )
+
+        out_json = _auto_output_json(args, 'token_ppl')
+        payload = {
+            'schema': 'svdllm_eval_v1',
+            'script': os.path.basename(__file__),
+            'timestamp': _dt.datetime.now().isoformat(timespec='seconds'),
+            'cmd': ' '.join(sys.argv),
+            'mode': 'token_ppl',
+            'args': vars(args),
+            'model': args.model,
+            'results': token_ppl,
+        }
+        _write_json(out_json, payload)
         return
 
     # Evaluate tasks
@@ -845,6 +1050,21 @@ def main():
             print(f"{k}: {v:.2f}")
         else:
             print(f"{k}: {v}")
+
+
+    # Save JSON (optional)
+    out_json = _auto_output_json(args, 'benchmark')
+    payload = {
+        'schema': 'svdllm_eval_v1',
+        'script': os.path.basename(__file__),
+        'timestamp': _dt.datetime.now().isoformat(timespec='seconds'),
+        'cmd': ' '.join(sys.argv),
+        'mode': 'benchmark',
+        'args': vars(args),
+        'model': args.model,
+        'results': results,
+    }
+    _write_json(out_json, payload)
 
 
 if __name__ == '__main__':

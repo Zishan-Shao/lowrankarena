@@ -81,6 +81,16 @@ def get_model_from_local(model_id):
                     return torch.nn.functional.silu(x)
             # Attach to the same module path the pickle expects
             setattr(_hf_acts, "SiLUActivation", SiLUActivation)
+        # LLaMA attention shim: some checkpoints were saved with Transformers that defined LlamaSdpaAttention
+        try:
+            import transformers.models.llama.modeling_llama as _llama_mod
+            if not hasattr(_llama_mod, "LlamaSdpaAttention") and hasattr(_llama_mod, "LlamaAttention"):
+                class LlamaSdpaAttention(_llama_mod.LlamaAttention):
+                    pass
+                setattr(_llama_mod, "LlamaSdpaAttention", LlamaSdpaAttention)
+        except Exception:
+            pass
+
         # Some checkpoints were saved while wrapper classes lived under __main__
         # (e.g., when using the medium training scripts directly). Expose shims
         # on the current __main__ to make unpickling robust.
