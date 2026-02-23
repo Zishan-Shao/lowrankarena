@@ -850,16 +850,29 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
 
         from adasvd_wrapper import compress_adasvd_naive, compress_adasvd_flashsvd
 
-        if backend == "naive":
-            print(f"[adasvd] Compressing with naive backend (FWSVDBlock) using ranks from {ranks_path}")
+        # Block format is determined by qkv_mode, NOT by --backend.
+        # --backend only selects the eval-time forward kernel (naive einsum vs
+        # Triton), exactly like svd/fwsvd/drone.
+        #
+        # per_head: compress_adasvd_flashsvd → BertLayerShim(NaiveSVDBlock)
+        #   · NaiveSVDBlock.forward() is the naive eval path (einsum per-head)
+        #   · enable_flashsvd() can swap it to FlashSVDBlock (Triton per-head)
+        #   · Same structure as svd/fwsvd/drone → both backends work in one run
+        #
+        # full: compress_adasvd_naive → _LowRankLinear (full-matrix matmul)
+        #   · Preserves original HF structure; faithful to ARS full-matrix ranks
+        #   · FlashSVD is incompatible with full mode anyway (blocked at pipeline
+        #     level), so no NaiveSVDBlock is needed here.
+        if qkv_mode == "per_head":
+            print(f"[adasvd] Compressing with NaiveSVDBlock/per-head (naive+flashsvd eval compatible)"
+                  f" using ranks from {ranks_path}")
+            compress_adasvd_flashsvd(model, ranks_path, device=device)
+        else:  # full
+            print(f"[adasvd] Compressing with _LowRankLinear/full-matrix (naive eval only)"
+                  f" using ranks from {ranks_path}")
             compress_adasvd_naive(model, ranks_path, device=device)
-        elif backend == "flashsvd":
-            print(f"[adasvd] Compressing with FlashSVD backend (Triton kernels) using ranks from {ranks_path}")
-            compress_adasvd_flashsvd(model, ranks_path, ffn_kernel="v1", device=device)
-        else:
-            raise ValueError(f"Unsupported backend for AdaSVD: {backend}")
 
-        print(f"[adasvd] Model compressed with AdaSVD {backend} backend")
+        print(f"[adasvd] Model compressed (qkv_mode={qkv_mode}, eval backend={backend})")
 
         # Return the reloaded and compressed model
         return model

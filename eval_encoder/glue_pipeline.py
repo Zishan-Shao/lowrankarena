@@ -2027,9 +2027,13 @@ def run_pipeline(args):
                 else:
                     print(f"\n[shared] Reusing shared compressed model: {checkpoint_path}")
 
-            # Fine-tune on task OR just evaluate (if skip_finetuning)
-            if args.skip_finetuning:
-                print(f"\n[info] Skipping fine-tuning, evaluating compressed model directly...")
+            # Fine-tune on task OR just evaluate (if skip_finetuning or dense method)
+            # Dense model is already task-fine-tuned; re-training is redundant compute.
+            if args.skip_finetuning or args.method == 'dense':
+                if args.method == 'dense' and not args.skip_finetuning:
+                    print(f"\n[info] Dense method: skipping fine-tuning (model already task-fine-tuned).")
+                else:
+                    print(f"\n[info] Skipping fine-tuning, evaluating compressed model directly...")
                 results = evaluate_compressed_model(checkpoint_path, task, args)
             else:
                 results = finetune_on_task(checkpoint_path, task, args)
@@ -2040,7 +2044,7 @@ def run_pipeline(args):
                 results["pretrain_value"] = pretrain_metric_value  # legacy field
 
             # Write post-compression fine-tune result to CSV (if fine-tuning was done)
-            if not args.skip_finetuning:
+            if not args.skip_finetuning and args.method != 'dense':
                 _write_finetune_csv_row(checkpoint_path, task, results, args)
 
             all_results.append(results)
