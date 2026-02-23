@@ -1331,7 +1331,13 @@ def write_csv_row(args, metric_name, metric_value,
         "batch_size": args.batch_size,
         "dtype": args.dtype,
         "method": args.method,
-        "rank": args.rank if args.rank is not None else "",
+        "rank": (
+            f"ra{args.rank_attn if args.rank_attn is not None else args.rank}"
+            f"_rf{args.rank_ffn if args.rank_ffn is not None else args.rank}"
+            f"_rw{args.rank_wo if args.rank_wo is not None else args.rank}"
+            if (args.rank_attn is not None or args.rank_ffn is not None or args.rank_wo is not None)
+            else (args.rank if args.rank is not None else "")
+        ),
         "budget": args.budget if args.budget is not None else "",
         "scope": args.scope,
         "backend": args.backend,
