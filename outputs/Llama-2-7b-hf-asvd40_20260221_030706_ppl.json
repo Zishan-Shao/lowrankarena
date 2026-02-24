@@ -1,0 +1,48 @@
+{
+  "schema": "asvd_eval_v1",
+  "script": "eval_ASVD_ppl_with_json.py",
+  "timestamp": "2026-02-21T03:58:15",
+  "cmd": "/home/lz299/lowrankarena/baselines/ASVD/eval_ASVD_ppl_with_json.py --checkpoint /home/lz299/lowrankarena/baselines/ASVD/huggingface_repos/Llama-2-7b-hf-asvd40 --datasets wikitext2,ptb,c4 --device cuda --seqlen 2048 --batch_size 1 --dtype bfloat16 --output_dir outputs --run_name Llama-2-7b-hf-asvd40_20260221_030706",
+  "mode": "ppl",
+  "args": {
+    "model": "/home/lz299/lowrankarena/baselines/ASVD/huggingface_repos/Llama-2-7b-hf-asvd40",
+    "checkpoint": "/home/lz299/lowrankarena/baselines/ASVD/huggingface_repos/Llama-2-7b-hf-asvd40",
+    "models": null,
+    "datasets": "wikitext2,ptb,c4",
+    "seqlen": 2048,
+    "batch_size": 1,
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "max_batches": null,
+    "ppl_method": "token",
+    "revision": null,
+    "cache_dir": null,
+    "trust_remote_code": false,
+    "no_trust_remote_code": false,
+    "c4_docs": null,
+    "c4_stream": false,
+    "c4_dataset": null,
+    "metrics": "token",
+    "lm_eval_add_bos_token": "auto",
+    "lm_eval_prefix_token_id": null,
+    "lm_eval_allow_c4_download": false,
+    "add_bos": false,
+    "hf_token": null,
+    "output_json": null,
+    "output_dir": "outputs",
+    "run_name": "Llama-2-7b-hf-asvd40_20260221_030706"
+  },
+  "models": {
+    "model": {
+      "model": "/home/lz299/lowrankarena/baselines/ASVD/huggingface_repos/Llama-2-7b-hf-asvd40",
+      "resolved_path": "/home/lz299/lowrankarena/baselines/ASVD/huggingface_repos/Llama-2-7b-hf-asvd40"
+    }
+  },
+  "results": {
+    "model": {
+      "wikitext2_ppl": 15015.179326600437,
+      "ptb_ppl": 16753.125193938737,
+      "c4_ppl": 17356.301266829723
+    }
+  }
+}

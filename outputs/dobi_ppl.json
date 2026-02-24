@@ -1,0 +1,62 @@
+{
+  "schema": "svdllm_eval_v1",
+  "script": "eval_general_ppl.py",
+  "timestamp": "2026-02-21T03:50:53",
+  "cmd": "/home/lz299/lowrankarena/eval_results/eval_general_ppl.py --dobi_model Qinsi1/DobiSVD-Llama-2-7b-hf-0.4 --datasets wikitext2,ptb,c4 --metrics token --device cuda --dtype bfloat16 --output_json outputs/dobi_ppl.json",
+  "mode": "general_ppl",
+  "args": {
+    "checkpoint": null,
+    "dobi_model": "Qinsi1/DobiSVD-Llama-2-7b-hf-0.4",
+    "dobi_revision": null,
+    "dobi_cache_dir": null,
+    "dobi_remapping": false,
+    "dobi_unremapping": false,
+    "compare_dobi": false,
+    "datasets": "wikitext2,ptb,c4",
+    "dataset_sets": null,
+    "seqlen": 2048,
+    "batch_size": 4,
+    "device": "cuda",
+    "hf_token": null,
+    "dtype": "bfloat16",
+    "max_batches": null,
+    "label": "General PPL",
+    "metrics": "token",
+    "ppl_method": "token",
+    "lm_eval_add_bos_token": "auto",
+    "lm_eval_prefix_token_id": null,
+    "c4_docs": null,
+    "c4_stream": false,
+    "auto_c4_stream": false,
+    "c4_dataset": null,
+    "lm_eval_allow_c4_download": false,
+    "output_json": "outputs/dobi_ppl.json",
+    "output_dir": null,
+    "run_name": null
+  },
+  "runs": [
+    {
+      "model": "General PPL",
+      "label": "General PPL",
+      "datasets": [
+        "wikitext2",
+        "ptb",
+        "c4"
+      ],
+      "metrics_requested": [
+        "token"
+      ],
+      "ppl_method": "token",
+      "seqlen": 2048,
+      "batch_size": 4,
+      "max_batches": null,
+      "dtype": "bfloat16",
+      "device": "cuda",
+      "token_ppl": {
+        "wikitext2": 9.690913315628817,
+        "ptb": 84.79411145539088,
+        "c4": 20.38100992040882
+      }
+    }
+  ]
+}

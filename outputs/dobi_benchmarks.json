@@ -1,0 +1,86 @@
+{
+  "schema": "svdllm_eval_v1",
+  "script": "eval_benchmarks.py",
+  "timestamp": "2026-02-21T03:45:48",
+  "cmd": "/home/lz299/lowrankarena/eval_results/eval_benchmarks.py --model Qinsi1/DobiSVD-Llama-2-7b-hf-0.4 --device cuda --batch_size 1 --use_lm_eval --dtype bfloat16 --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa --output_json outputs/dobi_benchmarks.json",
+  "mode": "lm_eval",
+  "args": {
+    "model": "Qinsi1/DobiSVD-Llama-2-7b-hf-0.4",
+    "device": "cuda",
+    "hf_token": null,
+    "batch_size": 1,
+    "limit": null,
+    "dtype": "bfloat16",
+    "gsm8k_max_new_tokens": 64,
+    "skip_gsm8k": false,
+    "skip_truthfulqa": false,
+    "use_lm_eval": true,
+    "lm_eval_tasks": "openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa",
+    "lm_eval_num_fewshot": 0,
+    "lm_eval_max_length": 2048,
+    "lm_eval_max_batch_size": 64,
+    "lm_eval_add_bos_token": "auto",
+    "lm_eval_prefix_token_id": null,
+    "lm_eval_include_path": null,
+    "token_ppl": false,
+    "token_ppl_datasets": "wikitext2,ptb,c4",
+    "token_ppl_seqlen": 2048,
+    "token_ppl_batch_size": 4,
+    "token_ppl_max_batches": null,
+    "force_right_padding": false,
+    "fix_pad_query_mask": false,
+    "output_json": "outputs/dobi_benchmarks.json",
+    "output_dir": null,
+    "run_name": null
+  },
+  "model": "Qinsi1/DobiSVD-Llama-2-7b-hf-0.4",
+  "results": {
+    "arc_challenge": {
+      "alias": "arc_challenge",
+      "acc,none": 0.23037542662116042,
+      "acc_stderr,none": 0.012304928418747613,
+      "acc_norm,none": 0.28242320819112626,
+      "acc_norm_stderr,none": 0.013155456884097222
+    },
+    "arc_easy": {
+      "alias": "arc_easy",
+      "acc,none": 0.25841750841750843,
+      "acc_stderr,none": 0.008982741341291305,
+      "acc_norm,none": 0.2588383838383838,
+      "acc_norm_stderr,none": 0.008987501845758052
+    },
+    "hellaswag": {
+      "alias": "hellaswag",
+      "acc,none": 0.25562636924915355,
+      "acc_stderr,none": 0.004353212146198471,
+      "acc_norm,none": 0.2591117307309301,
+      "acc_norm_stderr,none": 0.004372516060164738
+    },
+    "mathqa": {
+      "alias": "mathqa",
+      "acc,none": 0.17654941373534339,
+      "acc_stderr,none": 0.006979953060027765,
+      "acc_norm,none": 0.1899497487437186,
+      "acc_norm_stderr,none": 0.007180851288894218
+    },
+    "openbookqa": {
+      "alias": "openbookqa",
+      "acc,none": 0.16,
+      "acc_stderr,none": 0.016411540980502327,
+      "acc_norm,none": 0.286,
+      "acc_norm_stderr,none": 0.02022934632917752
+    },
+    "piqa": {
+      "alias": "piqa",
+      "acc,none": 0.5277475516866159,
+      "acc_stderr,none": 0.01164784665606225,
+      "acc_norm,none": 0.48911860718171923,
+      "acc_norm_stderr,none": 0.011663061261117741
+    },
+    "winogrande": {
+      "alias": "winogrande",
+      "acc,none": 0.489344909234412,
+      "acc_stderr,none": 0.014049294536290396
+    }
+  }
+}

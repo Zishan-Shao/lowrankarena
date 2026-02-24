@@ -1,0 +1,65 @@
+{
+  "schema": "svdllm_eval_v1",
+  "script": "eval_SVDLLM_ppl.py",
+  "timestamp": "2026-02-21T05:25:53",
+  "cmd": "/home/lz299/lowrankarena/baselines/SVD-LLM/eval_SVDLLM_ppl.py --checkpoint checkpoints/meta_llama_Llama_2_7b_hf_whitening_only_0.4.pt --datasets wikitext2,ptb,c4 --max_batches 50 --device cuda --seqlen 2048 --batch_size 1 --dtype bfloat16 --output_json outputs/ppl.json",
+  "mode": "ppl",
+  "args": {
+    "checkpoint": "checkpoints/meta_llama_Llama_2_7b_hf_whitening_only_0.4.pt",
+    "dobi_model": null,
+    "dobi_revision": null,
+    "dobi_cache_dir": null,
+    "dobi_remapping": false,
+    "dobi_unremapping": false,
+    "compare_dobi": false,
+    "datasets": "wikitext2,ptb,c4",
+    "dataset_sets": null,
+    "seqlen": 2048,
+    "batch_size": 1,
+    "device": "cuda",
+    "hf_token": null,
+    "dtype": "bfloat16",
+    "max_batches": 50,
+    "label": "General PPL",
+    "metrics": "token",
+    "ppl_method": "token",
+    "lm_eval_add_bos_token": "auto",
+    "lm_eval_prefix_token_id": null,
+    "c4_docs": null,
+    "c4_stream": false,
+    "auto_c4_stream": false,
+    "c4_dataset": null,
+    "lm_eval_allow_c4_download": false,
+    "output_json": "outputs/ppl.json",
+    "output_dir": null,
+    "run_name": null
+  },
+  "models": [
+    {
+      "name": "ours",
+      "source": "checkpoints/meta_llama_Llama_2_7b_hf_whitening_only_0.4.pt"
+    }
+  ],
+  "results": {
+    "General PPL": {
+      "label": "General PPL",
+      "datasets": [
+        "wikitext2",
+        "ptb",
+        "c4"
+      ],
+      "metrics": [
+        "token"
+      ],
+      "ppl_method": "token",
+      "seqlen": 2048,
+      "batch_size": 1,
+      "max_batches": 50,
+      "token_ppl": {
+        "wikitext2": 50.213667451596024,
+        "ptb": 1351.736161008503,
+        "c4": 359.2875730577906
+      }
+    }
+  }
+}
