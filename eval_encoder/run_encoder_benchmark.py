@@ -1548,6 +1548,9 @@ def main():
             args.load_model_dir, device=args.device, dtype=pt_dtype
         )
         arch, encoder_layers = _detect_arch(model)
+        # 用 comp_info 中的 model_id 覆盖默认的 bert-base-uncased，保证 CSV 和显示正确
+        if _comp_info.get('model_id'):
+            args.model_id = _comp_info['model_id']
         print(f"[load_model_dir] Loaded: arch={arch}, {len(encoder_layers)} layers")
         # 若 attn_mode=sdpa，patch 所有 NaiveSVDBlock
         if getattr(args, 'attn_mode', 'einsum') != 'einsum':
