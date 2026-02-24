@@ -1484,7 +1484,10 @@ def main():
     calib_task = args.calib_task or args.task
     calib_cfg = TASK_CFG[calib_task]
 
-    if args.method in ["fwsvd", "drone", "adasvd", "adawhiten", "adafwsvd"]:
+    if getattr(args, 'load_model_dir', None):
+        # 加载本地已压缩模型时，压缩步骤被跳过，校准数据完全不需要
+        pass
+    elif args.method in ["fwsvd", "drone", "adasvd", "adawhiten", "adafwsvd"]:
         if calib_cfg.get("train_split") is None:
             raise ValueError(
                 f"Calibration task '{calib_task}' has no train split and cannot be used for "
