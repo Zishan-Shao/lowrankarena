@@ -980,19 +980,30 @@ SDPA 消融实验**无需重新压缩或微调**（SDPA 与 einsum 数学等价�
 
 ### 运行 SDPA 消融实验的命令
 
+使用专用脚本 `eval_encoder/scripts/run_sdpa_ablation.sh`，
+对应 **per-head 配置**（`attn=48, ffn=256, wo=208`，与主 benchmark 一致）。
+
 ```bash
 cd /path/to/lowrankarena
 
-# 使用已保存的 svd_r256_naive 模型（full-matrix 配置）
-for TASK in cola sst2 mrpc qqp mnli qnli rte stsb; do
-    python eval_encoder/run_encoder_benchmark.py \
-        --load_model_dir eval_encoder/models/${TASK}/svd_r256_naive \
-        --task ${TASK} \
-        --attn_mode sdpa \
-        --seq_len 512 --batch_size 32 --dtype fp32 \
-        --full_validation \
-        --skip_eval
-done
+# ── 模式 A：服务器上有已保存的 per-head 压缩模型（推荐，约 3 min/task）──
+MODEL_BASE_DIR=/path/to/server/models \
+QKV_MODE=per_head RANK_ATTN=48 RANK_FFN=256 RANK_WO=208 \
+BUDGET=0.527 \
+bash eval_encoder/scripts/run_sdpa_ablation.sh
+
+# ── 模式 B：本地无存档，自动重新压缩（约 3.5-18 min/task）──
+FORCE_RECOMPRESS=true \
+QKV_MODE=per_head RANK_ATTN=48 RANK_FFN=256 RANK_WO=208 \
+BUDGET=0.527 \
+bash eval_encoder/scripts/run_sdpa_ablation.sh
 ```
 
-精度列直接复用对应 Naive(einsum) 行的数值。
+脚本会自动：
+- 检测 `MODEL_BASE_DIR/{task}/{method}_ra48_rf256_rw208_per_head_naive` 是否存在
+- 存在 → 模式 A（直接 `--load_model_dir`，跳过压缩）
+- 不存在或 `FORCE_RECOMPRESS=true` → 模式 B（重新压缩 + 测量）
+- 对 AdaSVD 使用 `--budget` 而非 `--rank_attn/ffn/wo`
+- 结果写入 `eval_encoder/eval_results/encoder_runs.csv`
+
+精度列直接复用对应 Naive(einsum) 行的数值，无需重新评估。

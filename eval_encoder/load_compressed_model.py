@@ -383,6 +383,7 @@ class MinimalSVDBlock(nn.Module):
         super().__init__()
         # Parameters will be loaded from state_dict
         # We just need to define the structure here
+        self.attn_mode = "einsum"  # "einsum" | "sdpa" — patchable after load
 
     def forward(self, x, mask=None):
         import math
@@ -463,13 +464,18 @@ class MinimalSVDBlock(nn.Module):
         else:
             raise ValueError(f"Unexpected Pq shape: {self.Pq.shape}. Expected 2D [dm, R], 3D [H, dh, R], or 4D [1, H, dm, R]")
 
-        # Standard scaled-dot-product attention
-        logits = torch.einsum("bhmd,bhnd->bhmn", Q, K) * scale
-        if mask is not None:
-            m = mask.view(B, 1, 1, M).to(torch.bool)
-            logits = logits.masked_fill(~m, torch.finfo(logits.dtype).min)
-        A = torch.softmax(logits, dim=-1)
-        attn = torch.einsum("bhmn,bhnd->bhmd", A, V)
+        # Attention kernel: einsum (paper-faithful O(n²)) or sdpa (PyTorch flash-attn)
+        import torch.nn.functional as _F
+        if getattr(self, 'attn_mode', 'einsum') == 'sdpa':
+            sdpa_mask = mask.view(B, 1, 1, M).to(torch.bool) if mask is not None else None
+            attn = _F.scaled_dot_product_attention(Q, K, V, attn_mask=sdpa_mask, scale=scale, dropout_p=0.0)
+        else:
+            logits = torch.einsum("bhmd,bhnd->bhmn", Q, K) * scale
+            if mask is not None:
+                m = mask.view(B, 1, 1, M).to(torch.bool)
+                logits = logits.masked_fill(~m, torch.finfo(logits.dtype).min)
+            A = torch.softmax(logits, dim=-1)
+            attn = torch.einsum("bhmn,bhnd->bhmd", A, V)
 
         # Output projection + LN
         attn = attn.transpose(1, 2).reshape(B, M, dm)
