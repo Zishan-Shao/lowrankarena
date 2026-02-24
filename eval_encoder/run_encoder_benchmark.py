@@ -88,10 +88,16 @@ def parse_args():
                    help="Measure performance over full validation set (like src/profile_*.py). "
                         "When enabled, ignores --measure_steps and --num_runs, traverses entire dataset once. "
                         "Provides more realistic end-to-end performance but slower to measure.")
-    p.add_argument("--reload_before_perf", action="store_true",
-                   help="Save compressed model and reload before performance measurement. "
-                        "Recommended for methods with calibration (fwsvd/drone/adasvd) to avoid "
-                        "GPU memory fragmentation and cache pollution from backward passes.")
+    p.add_argument("--reload_before_perf", action="store_true", default=True,
+                   help="Move compressed model to CPU and back to GPU before performance "
+                        "measurement to ensure accurate inference-only peak memory. "
+                        "Enabled by default to avoid measuring compression-phase memory "
+                        "as inference memory (old BertLayer params may still be alive via "
+                        "reference cycles when reset_peak_memory_stats() is called). "
+                        "Use --no_reload_before_perf to disable.")
+    p.add_argument("--no_reload_before_perf", dest="reload_before_perf", action="store_false",
+                   help="Disable GPU reload before performance measurement (faster but "
+                        "peak_mem_infer_mb may include compression-phase memory).")
     # calibration (for fwsvd / drone)
     p.add_argument("--calib_batches", type=int, default=4,
                    help="Number of batches used for Fisher / covariance calibration")
