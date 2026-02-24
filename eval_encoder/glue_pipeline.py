@@ -1525,10 +1525,10 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         warmup_steps=10, measure_steps=50
     )
 
-    # Evaluate + benchmark with flashsvd backend (SVD methods only)
+    # Evaluate + benchmark with flashsvd backend (SVD methods only, per_head only)
     results_flashsvd = None
     speed_metrics_flash = None
-    if _comp_method != 'dense':
+    if _comp_method != 'dense' and getattr(args, 'qkv_mode', 'per_head') == 'per_head':
         try:
             from eval_encoder.flashsvd_backend import enable_flashsvd
             enable_flashsvd(model)
@@ -1693,7 +1693,7 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
 
     # Initial evaluation — flashsvd backend (save/restore keeps naive blocks for training)
     initial_results_flashsvd = None
-    if _comp_method != 'dense':
+    if _comp_method != 'dense' and getattr(args, 'qkv_mode', 'per_head') == 'per_head':
         try:
             _saved_blocks = _enable_flashsvd_save(model)
             print(f"\n[eval] Initial evaluation (flashsvd)...")
@@ -1819,7 +1819,7 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
     # throughput measurements reflect the real FlashSVD execution path.
     final_results_naive = final_results
     final_results_flashsvd = None
-    if _comp_method != 'dense':
+    if _comp_method != 'dense' and getattr(args, 'qkv_mode', 'per_head') == 'per_head':
         try:
             from eval_encoder.flashsvd_backend import enable_flashsvd
             enable_flashsvd(model)
