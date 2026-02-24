@@ -2,6 +2,7 @@
 .claude/
 
 # Compressed and fine-tuned model checkpoints
+eval_encoder/models.bak/
 models/
 eval_encoder/models/
 eval_encoder/finetuned_models/
@@ -28,6 +29,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.bak
 
 # Virtual environments
 venv/

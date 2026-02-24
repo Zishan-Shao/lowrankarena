@@ -89,7 +89,7 @@ PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS:-false}"  # 先微调base m
 NUM_EPOCHS="${NUM_EPOCHS:-3}"
 BATCH_SIZE="${BATCH_SIZE:-32}"                # Batch size (建议 32 以提高吞吐量)
 LEARNING_RATE="${LEARNING_RATE:-2e-5}"
-SEQ_LEN="${SEQ_LEN:-128}"
+SEQ_LEN="${SEQ_LEN:-512}"
 SEED="${SEED:-42}"
 
 # 输出配置

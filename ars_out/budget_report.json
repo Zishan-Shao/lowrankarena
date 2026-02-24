@@ -1,12 +1,14 @@
 {
-  "target_budget": 0.5,
-  "achieved_ratio": 0.7525816939725101,
-  "total_svd_params": 64365314,
-  "original_linear_params": 85526016,
-  "num_operations": 74,
-  "steps": 100,
-  "max_calib_samples": 512,
-  "actual_calib_samples": 512,
+  "target_budget": 0.527,
+  "achieved_ratio": 0.5268735532407407,
+  "total_params": 44749824,
+  "original_model_params": 84934656,
+  "original_linear_params": 84934656,
+  "total_svd_params": 44749824,
+  "num_operations": 72,
+  "steps": 800,
+  "max_calib_samples": 4000,
+  "actual_calib_samples": 4021,
   "engineering_stable": false,
   "hn_type": "PaperHN"
 }
