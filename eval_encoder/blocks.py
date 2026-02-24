@@ -170,6 +170,11 @@ class NaiveSVDBlock(nn.Module):
             V = V.view(B, M, H, dh).transpose(1, 2)
 
         # --- Standard scaled-dot-product attention (same for both modes) ---
+        # Intentionally uses explicit einsum (no flash attention) to faithfully
+        # replicate the original paper's execution — FWSVD/DRONE/AdaSVD all run
+        # standard O(n²) attention.  The FlashSVD backend (Triton kernels) is
+        # where memory optimisation is applied; measuring the contrast between
+        # naive (~2000 MB) and flash (~708 MB) is part of the benchmark.
         logits = torch.einsum("bhmd,bhnd->bhmn", Q, K) * scale
         if mask is not None:
             m = mask.view(B, 1, 1, M).to(torch.bool)
