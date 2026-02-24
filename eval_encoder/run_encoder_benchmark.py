@@ -77,6 +77,16 @@ def parse_args():
                    help="QKV factorization mode: 'per_head' (rank limited to dh=64) or 'full' (paper-style, rank can be 256+)")
     # backend
     p.add_argument("--backend", choices=["naive", "flashsvd"], default="naive")
+    p.add_argument("--attn_mode", choices=["einsum", "sdpa"], default="einsum",
+                   help="Attention implementation for the naive backend. "
+                        "'einsum': standard O(n²) attention (paper-faithful, default). "
+                        "'sdpa': PyTorch 2.0 SDPA (avoids [B,H,M,M] materialization; "
+                        "ablation to isolate flash-attention benefit from FlashSVD kernel).")
+    # shortcut: load pre-compressed model from disk, skip compression
+    p.add_argument("--load_model_dir", default=None,
+                   help="Load a previously saved compressed model from this directory "
+                        "(produced by --save_model). Skips compression entirely. "
+                        "Use with --skip_eval --attn_mode sdpa to only measure SDPA performance.")
     # logging / perf
     p.add_argument("--out_csv", default="eval_encoder/eval_results/encoder_runs.csv")
     p.add_argument("--notes", default="")
@@ -121,6 +131,10 @@ def parse_args():
                    help="Save compressed model to disk for later fine-tuning")
     p.add_argument("--save_dir", default="eval_encoder/models",
                    help="Directory to save compressed models")
+    # skip flags
+    p.add_argument("--skip_eval", action="store_true",
+                   help="Skip task metric evaluation (only measure performance). "
+                        "Useful with --load_model_dir --attn_mode sdpa to purely benchmark speed/memory.")
     return p.parse_args()
 
 
@@ -677,7 +691,8 @@ def _build_adasvd(model, calib_loader, device, budget, arch, backend="naive",
 def compress_model(model, method, rank, budget, scope, loader, device, calib_batches, calib_loader=None, backend="naive",
                    rank_attn=None, rank_ffn=None, rank_wo=None, qkv_mode="per_head",
                    adasvd_full_loader=None, adasvd_max_calib_samples=4000,
-                   adasvd_steps=800, adasvd_engineering_stable=False, adasvd_seed=0):
+                   adasvd_steps=800, adasvd_engineering_stable=False, adasvd_seed=0,
+                   attn_mode="einsum"):
     """Replace encoder layers with SVD blocks in-place (BERT/RoBERTa/ModernBERT).
 
     Args:
@@ -734,7 +749,8 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
             )
             return ModernBertLayerShim(blk).to(device).eval()
         else:
-            blk = NaiveSVDBlock(layer, r_attn, r_ff, per_head_fn, low_rank_fn, r_wo, qkv_mode=qkv_mode)
+            blk = NaiveSVDBlock(layer, r_attn, r_ff, per_head_fn, low_rank_fn, r_wo,
+                                qkv_mode=qkv_mode, attn_mode=attn_mode)
             return BertLayerShim(blk).to(device).eval()
 
     if method == "svd":
@@ -1520,7 +1536,26 @@ def main():
         )
 
     compression_peak_mb = 0.0
-    if args.method != "dense":
+    if getattr(args, 'load_model_dir', None):
+        # --- 从磁盘加载已压缩模型，跳过压缩步骤 ---
+        from eval_encoder.load_compressed_model import load_compressed_model as _load_compressed
+        print(f"\n[load_model_dir] Loading pre-compressed model from: {args.load_model_dir}")
+        pt_dtype = DTYPE_MAP[args.dtype]
+        model, tokenizer, _comp_info = _load_compressed(
+            args.load_model_dir, device=args.device, dtype=pt_dtype
+        )
+        arch, encoder_layers = _detect_arch(model)
+        print(f"[load_model_dir] Loaded: arch={arch}, {len(encoder_layers)} layers")
+        # 若 attn_mode=sdpa，patch 所有 NaiveSVDBlock
+        if getattr(args, 'attn_mode', 'einsum') != 'einsum':
+            patched = 0
+            for layer in encoder_layers:
+                blk = getattr(layer, 'block', None)
+                if blk is not None and hasattr(blk, 'attn_mode'):
+                    blk.attn_mode = args.attn_mode
+                    patched += 1
+            print(f"[load_model_dir] Patched attn_mode={args.attn_mode} on {patched} blocks")
+    elif args.method != "dense":
         model = compress_model(model, args.method, args.rank, args.budget,
                                args.scope, loader, args.device, args.calib_batches,
                                calib_loader=calib_loader, backend=args.backend,
@@ -1530,7 +1565,8 @@ def main():
                                adasvd_max_calib_samples=getattr(args, 'adasvd_calib_samples', 4000),
                                adasvd_steps=getattr(args, 'adasvd_steps', 800),
                                adasvd_engineering_stable=getattr(args, 'adasvd_engineering_stable', False),
-                               adasvd_seed=calib_seed)
+                               adasvd_seed=calib_seed,
+                               attn_mode=getattr(args, 'attn_mode', 'einsum'))
 
         # Capture peak memory during compression (includes calibration, SVD, etc.)
         if torch.cuda.is_available():
@@ -1561,9 +1597,13 @@ def main():
             enable_flashsvd(model)
 
     # 5) evaluate task metric
-    print("\n[eval] Computing task metric ...")
-    metric_name, metric_value = evaluate_task(model, loader, args.task, args.device)
-    print(f"[eval] {metric_name} = {metric_value:.4f}")
+    if getattr(args, 'skip_eval', False):
+        print("\n[eval] Skipped (--skip_eval)")
+        metric_name, metric_value = "skipped", 0.0
+    else:
+        print("\n[eval] Computing task metric ...")
+        metric_name, metric_value = evaluate_task(model, loader, args.task, args.device)
+        print(f"[eval] {metric_name} = {metric_value:.4f}")
 
     # 5.3) Save model if requested (including dense)
     if args.save_model:

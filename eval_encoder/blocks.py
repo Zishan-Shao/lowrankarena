@@ -48,6 +48,7 @@ class NaiveSVDBlock(nn.Module):
         svd_low_rank_fn: Callable,
         rank_wo: int = 768,
         qkv_mode: str = "per_head",
+        attn_mode: str = "einsum",
     ):
         super().__init__()
         cfg = hf_layer.attention.self
@@ -58,6 +59,7 @@ class NaiveSVDBlock(nn.Module):
         # Store for forward
         self.num_heads = H
         self.qkv_mode = qkv_mode
+        self.attn_mode = attn_mode  # "einsum" | "sdpa"
 
         if qkv_mode == "per_head":
             # --- Q / K / V per-head factorisation (original) ---
@@ -169,18 +171,28 @@ class NaiveSVDBlock(nn.Module):
             K = K.view(B, M, H, dh).transpose(1, 2)
             V = V.view(B, M, H, dh).transpose(1, 2)
 
-        # --- Standard scaled-dot-product attention (same for both modes) ---
-        # Intentionally uses explicit einsum (no flash attention) to faithfully
-        # replicate the original paper's execution — FWSVD/DRONE/AdaSVD all run
-        # standard O(n²) attention.  The FlashSVD backend (Triton kernels) is
-        # where memory optimisation is applied; measuring the contrast between
-        # naive (~2000 MB) and flash (~708 MB) is part of the benchmark.
-        logits = torch.einsum("bhmd,bhnd->bhmn", Q, K) * scale
-        if mask is not None:
-            m = mask.view(B, 1, 1, M).to(torch.bool)
-            logits = logits.masked_fill(~m, torch.finfo(logits.dtype).min)
-        A = torch.softmax(logits, dim=-1)
-        attn = torch.einsum("bhmn,bhnd->bhmd", A, V)
+        # --- Attention (same for both qkv_mode branches) ---
+        if self.attn_mode == "sdpa":
+            # PyTorch 2.0+ SDPA — 不物化完整 [B,H,M,M] attention 矩阵。
+            # 用于消融实验：隔离"flash attention 本身的收益"与
+            # "FlashSVD Triton kernel 低秩投影融合的额外收益"。
+            # 精度与 einsum 路径等价（fp32 下数值误差 < 1e-5）。
+            if mask is not None:
+                sdpa_mask = mask.view(B, 1, 1, M).to(torch.bool)
+            else:
+                sdpa_mask = None
+            attn = F.scaled_dot_product_attention(
+                Q, K, V, attn_mask=sdpa_mask, scale=scale, dropout_p=0.0
+            )
+        else:
+            # einsum 路径 — 忠实复现原论文（FWSVD/DRONE/AdaSVD 均为此路径）。
+            # 显式物化 [B,H,M,M]（O(n²) 显存），是 Naive backend 的基准。
+            logits = torch.einsum("bhmd,bhnd->bhmn", Q, K) * scale
+            if mask is not None:
+                m = mask.view(B, 1, 1, M).to(torch.bool)
+                logits = logits.masked_fill(~m, torch.finfo(logits.dtype).min)
+            A = torch.softmax(logits, dim=-1)
+            attn = torch.einsum("bhmn,bhnd->bhmd", A, V)
 
         # --- Output projection + LN (same for both modes) ---
         attn = attn.transpose(1, 2).reshape(B, M, dm)

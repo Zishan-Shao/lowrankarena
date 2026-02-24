@@ -21,6 +21,7 @@
 | 15 | [Phase 1 Dense Baselines](#phase-1-dense-baselines-2026-02) | 📊 Data |
 | 16 | [SVD 格式参数膨胀与 Backend 对比配置选型](#svd-格式参数膨胀与-backend-对比配置选型-2026-02) | 📐 Design |
 | 17 | [MRPC=0 vs 论文 61.4：设置差异分析](#mrpc0-vs-论文-614设置差异分析-2026-02) | 📝 Observation |
+| 18 | [Naive vs FlashSVD 对比混淆 Attention Kernel 与投影融合两个变量](#naive-vs-flashsvd-对比混淆-attention-kernel-与投影融合两个变量-2026-02) | 📐 Design |
 
 **Status Legend:**
 - ✅ Fixed — bug confirmed and patched
@@ -930,3 +931,68 @@ MRPC 的三个特点叠加导致它是最脆弱的任务：
    - 结果是 0 还是 61.4，对 backend 正确性的判断没有任何影响
 
 4. **更换任务可得到非零 SVD baseline**：SST-2、QQP、MNLI 在同样设置下 SVD 有非零结果（0.37 / 0.17 等），可用于数值一致性的正向验证。
+
+---
+
+## Naive vs FlashSVD 对比混淆 Attention Kernel 与投影融合两个变量 (2026-02)
+
+**状态**: 📐 Design Decision
+
+### 问题描述
+
+当前 `encoder_runs.csv` 中 Naive 与 FlashSVD backend 的对比**混淆了两个独立变量**：
+
+| 差异维度 | Naive backend | FlashSVD backend |
+|---------|--------------|-----------------|
+| Attention 计算 | 标准 O(n²) einsum，物化 [B,H,M,M] | Flash attention（分块 tiled，不物化）|
+| 低秩投影处理 | 先算完整 Q/K/V，再做 attention | P/V 因子直接进 Triton kernel，融合计算 |
+
+因此观测到的差距（Naive ~2003 MB vs FlashSVD ~708 MB，吞吐 ~190 vs ~330 sps）**同时包含了两个贡献**，无法从当前数据单独归因。
+
+### 三档对比图解
+
+```
+Naive(einsum)    →    Naive(SDPA)    →    FlashSVD(Triton)
+  ~2003 MB            ~720 MB?              ~708 MB
+  ~190 sps            ~220 sps?             ~330 sps
+
+←── flash attn 收益 ──→←── 投影融合额外收益 ──→
+```
+
+- **Naive → SDPA**：仅替换 attention kernel（PyTorch 2.0 SDPA），隔离 flash attention 的显存收益
+- **SDPA → FlashSVD**：Triton kernel 额外融合低秩投影，进一步提升吞吐
+
+### 当前 benchmark 的合理性
+
+对于"实际部署成本对比"的叙述，当前两档是合理的：
+- Naive = 原论文方法原样部署
+- FlashSVD = 本系统优化部署
+
+报告中的表述应为："采用 FlashSVD 优化部署后，相比原始实现减少 65% 显存、提升 75% 吞吐"，而非"低秩 backend 本身节省了 65% 显存"。
+
+### 解决方案：加入 SDPA 消融组
+
+已实现：
+- `NaiveSVDBlock` 新增 `attn_mode` 参数（`"einsum"` / `"sdpa"`），默认保持 `"einsum"`（不破坏已有行为）
+- `run_encoder_benchmark.py` 新增 `--attn_mode`、`--load_model_dir`、`--skip_eval` 参数
+
+SDPA 消融实验**无需重新压缩或微调**（SDPA 与 einsum 数学等价，精度数值相同）。只需对已保存的压缩模型重跑性能测量。
+
+### 运行 SDPA 消融实验的命令
+
+```bash
+cd /path/to/lowrankarena
+
+# 使用已保存的 svd_r256_naive 模型（full-matrix 配置）
+for TASK in cola sst2 mrpc qqp mnli qnli rte stsb; do
+    python eval_encoder/run_encoder_benchmark.py \
+        --load_model_dir eval_encoder/models/${TASK}/svd_r256_naive \
+        --task ${TASK} \
+        --attn_mode sdpa \
+        --seq_len 512 --batch_size 32 --dtype fp32 \
+        --full_validation \
+        --skip_eval
+done
+```
+
+精度列直接复用对应 Naive(einsum) 行的数值。
