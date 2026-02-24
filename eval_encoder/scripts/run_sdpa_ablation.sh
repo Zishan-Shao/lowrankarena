@@ -133,6 +133,7 @@ for METHOD in ${METHODS}; do
             CMD=(
                 python eval_encoder/run_encoder_benchmark.py
                 --load_model_dir "${MODEL_DIR}"
+                --method "${METHOD}"
                 --task "${TASK}"
                 --attn_mode sdpa
                 --seq_len "${SEQ_LEN}"
