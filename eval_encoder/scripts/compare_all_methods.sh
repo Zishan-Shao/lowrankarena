@@ -67,6 +67,24 @@ BACKENDS="${BACKENDS:-naive}"
 MODEL_ID="${MODEL_ID:-bert-base-uncased}"
 PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS:-false}"
 
+# ── PERF_ONLY mode ────────────────────────────────────────────────────────────
+# When PERF_ONLY=true: skip compression entirely, load existing checkpoints and
+# only measure throughput/memory.  Useful for re-benchmarking at different
+# seq_len / dtype / attn_mode without touching saved checkpoints.
+#
+# Example:
+#   SEQ_LEN=512 DTYPE=fp32 ATTN_MODE=sdpa PERF_ONLY=true \
+#     bash eval_encoder/scripts/compare_all_methods.sh
+# ─────────────────────────────────────────────────────────────────────────────
+PERF_ONLY="${PERF_ONLY:-false}"
+BATCH_SIZE="${BATCH_SIZE:-32}"
+DTYPE="${DTYPE:-fp32}"
+ATTN_MODE="${ATTN_MODE:-einsum}"      # einsum | sdpa  (naive backend only)
+WARMUP_STEPS="${WARMUP_STEPS:-10}"
+MEASURE_STEPS="${MEASURE_STEPS:-50}"
+NUM_RUNS="${NUM_RUNS:-1}"
+PERF_CSV="${PERF_CSV:-eval_encoder/eval_results/encoder_runs.csv}"
+
 # ------------------------- derived settings -----------------------------------
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 SUMMARY_LOG="${LOG_DIR}/compare_all_${TIMESTAMP}.log"
@@ -79,7 +97,10 @@ echo "USE_TASK_MODELS=${USE_TASK_MODELS}  TASK_MODEL_PREFIX=${TASK_MODEL_PREFIX}
 echo "RANK=${RANK}  RANK_ATTN=${RANK_ATTN}  RANK_FFN=${RANK_FFN}  RANK_WO=${RANK_WO}" | tee -a "${SUMMARY_LOG}"
 echo "QKV_MODE=${QKV_MODE}  CALIB_BATCHES=${CALIB_BATCHES}" | tee -a "${SUMMARY_LOG}"
 echo "SEQ_LEN=${SEQ_LEN}  BUDGET=${BUDGET}  BACKENDS=${BACKENDS}  MODEL_ID=${MODEL_ID}" | tee -a "${SUMMARY_LOG}"
-echo "TWO_STAGE=${TWO_STAGE}" | tee -a "${SUMMARY_LOG}"
+echo "TWO_STAGE=${TWO_STAGE}  PERF_ONLY=${PERF_ONLY}" | tee -a "${SUMMARY_LOG}"
+if [[ "${PERF_ONLY}" == "true" ]]; then
+  echo "PERF_ONLY config: bs=${BATCH_SIZE} dtype=${DTYPE} attn_mode=${ATTN_MODE} warmup=${WARMUP_STEPS} measure=${MEASURE_STEPS} csv=${PERF_CSV}" | tee -a "${SUMMARY_LOG}"
+fi
 echo "════════════════════════════════════════════════════════════════════" | tee -a "${SUMMARY_LOG}"
 echo "" | tee -a "${SUMMARY_LOG}"
 
@@ -113,6 +134,68 @@ fi
 # We'll collect JSON paths per (stage, backend, method)
 declare -A JSON_BY_STAGE_BACKEND_METHOD
 
+# Helper: derive checkpoint subdir name (mirrors glue_pipeline.py naming)
+_checkpoint_subdir() {
+  local method="$1"
+  if [[ "${method}" == "adasvd" ]]; then
+    echo "adasvd_b${BUDGET}_${QKV_MODE}_naive"
+  elif [[ "${method}" == "dense" ]]; then
+    echo "dense_naive"
+  elif [[ -n "${RANK_ATTN}" ]] || [[ -n "${RANK_FFN}" ]] || [[ -n "${RANK_WO}" ]]; then
+    local ra="${RANK_ATTN:-${RANK}}"
+    local rf="${RANK_FFN:-${RANK}}"
+    local rw="${RANK_WO:-${RANK}}"
+    echo "${method}_ra${ra}_rf${rf}_rw${rw}_${QKV_MODE}_naive"
+  else
+    echo "${method}_r${RANK}_${QKV_MODE}_naive"
+  fi
+}
+
+# Helper: run performance-only measurement on an existing checkpoint (PERF_ONLY=true)
+_run_perf_only() {
+  local method="$1"
+  local task="$2"
+  local backend="$3"
+
+  local subdir
+  subdir="$(_checkpoint_subdir "${method}")"
+
+  local model_dir
+  if [[ "${USE_TASK_MODELS}" == "true" || -n "${LOCAL_PRETRAINED_DIR}" ]]; then
+    model_dir="${REPO_ROOT}/eval_encoder/models/${task}/${subdir}"
+  else
+    model_dir="${REPO_ROOT}/eval_encoder/models/${subdir}"
+  fi
+
+  if [[ ! -d "${model_dir}" ]]; then
+    echo "[perf_only][warn] Checkpoint not found: ${model_dir} — skipping" | tee -a "${SUMMARY_LOG}"
+    return 0
+  fi
+
+  echo "[perf_only] method=${method} task=${task} backend=${backend} attn_mode=${ATTN_MODE}" | tee -a "${SUMMARY_LOG}"
+  echo "[perf_only] checkpoint: ${model_dir}" | tee -a "${SUMMARY_LOG}"
+
+  local cmd=(
+    python eval_encoder/run_encoder_benchmark.py
+    --load_model_dir "${model_dir}"
+    --method "${method}"
+    --task "${task}"
+    --backend "${backend}"
+    --attn_mode "${ATTN_MODE}"
+    --seq_len "${SEQ_LEN}"
+    --batch_size "${BATCH_SIZE}"
+    --dtype "${DTYPE}"
+    --skip_eval
+    --warmup_steps "${WARMUP_STEPS}"
+    --measure_steps "${MEASURE_STEPS}"
+    --num_runs "${NUM_RUNS}"
+    --out_csv "${PERF_CSV}"
+  )
+
+  echo "CMD: ${cmd[*]}" | tee -a "${SUMMARY_LOG}"
+  "${cmd[@]}" 2>&1 | tee -a "${SUMMARY_LOG}"
+}
+
 # Helper: find latest JSON for method+backend from RESULT_DIR
 latest_json_for_method() {
   local method="$1"
@@ -128,6 +211,23 @@ run_one() {
   echo "────────────────────────────────────────────────────────────────────" | tee -a "${SUMMARY_LOG}"
   echo "Stage=${stage}  Backend=${backend}  Method=${method}" | tee -a "${SUMMARY_LOG}"
   echo "────────────────────────────────────────────────────────────────────" | tee -a "${SUMMARY_LOG}"
+
+  # ── PERF_ONLY mode: load existing checkpoint, skip compression/finetune ──
+  if [[ "${PERF_ONLY}" == "true" ]]; then
+    local task perf_ok=0 perf_fail=0
+    for task in ${TASKS}; do
+      if _run_perf_only "${method}" "${task}" "${backend}"; then
+        echo "✅ perf_only done: method=${method} task=${task}" | tee -a "${SUMMARY_LOG}"
+        perf_ok=$((perf_ok + 1))
+      else
+        echo "❌ perf_only failed: method=${method} task=${task}" | tee -a "${SUMMARY_LOG}"
+        perf_fail=$((perf_fail + 1))
+      fi
+    done
+    echo "" | tee -a "${SUMMARY_LOG}"
+    [[ "${perf_fail}" -eq 0 ]]  # propagate failure to caller
+    return
+  fi
 
   local skip_finetuning="false"
   local reuse_checkpoint="false"
