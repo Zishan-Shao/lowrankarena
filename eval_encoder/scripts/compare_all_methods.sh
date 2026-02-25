@@ -192,6 +192,17 @@ _run_perf_only() {
     --out_csv "${PERF_CSV}"
   )
 
+  # Pass rank/budget info so CSV rows have correct rank field
+  if [[ "${method}" == "adasvd" ]]; then
+    cmd+=(--budget "${BUDGET}")
+  elif [[ -n "${RANK_ATTN}" ]] || [[ -n "${RANK_FFN}" ]] || [[ -n "${RANK_WO}" ]]; then
+    [[ -n "${RANK_ATTN}" ]] && cmd+=(--rank_attn "${RANK_ATTN}")
+    [[ -n "${RANK_FFN}" ]]  && cmd+=(--rank_ffn  "${RANK_FFN}")
+    [[ -n "${RANK_WO}" ]]   && cmd+=(--rank_wo   "${RANK_WO}")
+  elif [[ -n "${RANK}" ]]; then
+    cmd+=(--rank "${RANK}")
+  fi
+
   echo "CMD: ${cmd[*]}" | tee -a "${SUMMARY_LOG}"
   "${cmd[@]}" 2>&1 | tee -a "${SUMMARY_LOG}"
 }
