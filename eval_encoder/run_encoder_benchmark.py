@@ -1331,6 +1331,7 @@ def write_csv_row(args, metric_name, metric_value,
                         writer.writeheader()
                         # Write old rows (missing fields will be empty)
                         for old_row in old_rows:
+                            old_row.pop(None, None)  # trailing-comma rows get None key
                             # Fill missing fields with empty values
                             for field in CSV_FIELDS:
                                 if field not in old_row:
