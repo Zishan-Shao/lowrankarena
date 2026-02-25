@@ -21,6 +21,7 @@ if os.path.isdir(_LM_EVAL_ROOT) and _LM_EVAL_ROOT not in sys.path:
 
 from utils.model_utils import get_model_from_local, get_model_from_huggingface
 from utils.saes_svd_loader import looks_like_saes_svd_checkpoint, load_saes_svd_model
+from utils.df_svd_loader import looks_like_dfsvd_checkpoint, load_dfsvd_model
 
 
 def _parse_tasks(s: str) -> List[str]:
@@ -371,6 +372,21 @@ def main() -> None:
     p.add_argument("--saes_cache_dir", type=str, default=None)
 
     p.add_argument(
+        "--dfsvd_model",
+        type=str,
+        default=None,
+        help="DF-SVD checkpoint (local dir or HF repo id).",
+    )
+    p.add_argument(
+        "--dfsvd_base_model",
+        type=str,
+        default=None,
+        help="Base HF model id/path to apply DF-SVD onto (required when using DF-SVD).",
+    )
+    p.add_argument("--dfsvd_revision", type=str, default=None)
+    p.add_argument("--dfsvd_cache_dir", type=str, default=None)
+
+    p.add_argument(
         "--dobi_model",
         type=str,
         default=None,
@@ -456,8 +472,8 @@ def main() -> None:
         if args.dobi_remapping and args.dobi_unremapping:
             raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
     else:
-        if not args.model and not args.checkpoint and not args.saes_model:
-            raise ValueError("Please provide --model, --checkpoint, --saes_model or --dobi_model.")
+        if not args.model and not args.checkpoint and not args.saes_model and not args.dfsvd_model:
+            raise ValueError("Please provide --model, --checkpoint, --saes_model, --dfsvd_model or --dobi_model.")
         if args.checkpoint and not os.path.exists(args.checkpoint):
             raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
 
@@ -475,7 +491,18 @@ def main() -> None:
         )
         model_name = args.dobi_model
     else:
-        if args.saes_model:
+        if args.dfsvd_model:
+            if not args.dfsvd_base_model:
+                raise ValueError("--dfsvd_model requires --dfsvd_base_model.")
+            model, tokenizer, _ = load_dfsvd_model(
+                args.dfsvd_model,
+                base_model=args.dfsvd_base_model,
+                hf_token=args.hf_token,
+                revision=args.dfsvd_revision,
+                cache_dir=args.dfsvd_cache_dir,
+            )
+            model_name = args.dfsvd_model
+        elif args.saes_model:
             if not args.saes_base_model:
                 raise ValueError("--saes_model requires --saes_base_model.")
             model, tokenizer, _ = load_saes_svd_model(
@@ -497,6 +524,17 @@ def main() -> None:
                     hf_token=args.hf_token,
                     revision=args.saes_revision,
                     cache_dir=args.saes_cache_dir,
+                )
+            # Allow --model to be a local DF-SVD directory too (auto-detect)
+            elif os.path.isdir(args.model) and looks_like_dfsvd_checkpoint(args.model):
+                if not args.dfsvd_base_model:
+                    raise ValueError("DF-SVD checkpoint detected but --dfsvd_base_model is missing.")
+                model, tokenizer, _ = load_dfsvd_model(
+                    args.model,
+                    base_model=args.dfsvd_base_model,
+                    hf_token=args.hf_token,
+                    revision=args.dfsvd_revision,
+                    cache_dir=args.dfsvd_cache_dir,
                 )
             else:
                 model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)

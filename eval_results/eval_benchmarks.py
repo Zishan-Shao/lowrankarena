@@ -194,7 +194,88 @@ if _REPO_ROOT not in sys.path:
 
 from utils.model_utils import get_model_from_huggingface, get_model_from_local
 from utils.saes_svd_loader import looks_like_saes_svd_checkpoint, load_saes_svd_model
+from utils.df_svd_loader import looks_like_dfsvd_checkpoint, load_dfsvd_model
 from evaluater import ppl_eval
+
+# ----------------------------------------------------------------------------
+# Dobi-SVD loader (mirrors eval_general_ppl.py)
+# ----------------------------------------------------------------------------
+
+def _looks_like_dobi_svd_model(model_id: str) -> bool:
+    """Heuristic: detect a Dobi-SVD checkpoint to route loading to baselines/Dobi-SVD."""
+    if not model_id:
+        return False
+    s = str(model_id).lower()
+    if "dobisvd" in s or "dobi-svd" in s:
+        return True
+    if os.path.isdir(model_id):
+        for fn in ("remapping_weight.pt", "DobiSVD_Model.pt"):
+            if os.path.exists(os.path.join(model_id, fn)):
+                return True
+    return False
+
+
+def _resolve_dobi_path(
+    model_id: str,
+    hf_token: Optional[str] = None,
+    revision: Optional[str] = None,
+    cache_dir: Optional[str] = None,
+) -> str:
+    """Return local directory for a Dobi-SVD model id (HF repo or local dir)."""
+    if os.path.isdir(model_id):
+        return model_id
+    try:
+        from huggingface_hub import snapshot_download  # type: ignore
+    except Exception as e:
+        raise ImportError(
+            "huggingface_hub is required to load Dobi-SVD HF repos. Please `pip install huggingface_hub`."
+        ) from e
+    return snapshot_download(repo_id=model_id, token=hf_token, revision=revision, cache_dir=cache_dir)
+
+
+def _load_dobi_model(
+    model_id: str,
+    hf_token: Optional[str] = None,
+    revision: Optional[str] = None,
+    cache_dir: Optional[str] = None,
+    remapping: Optional[bool] = None,
+):
+    """Load Dobi-SVD model via the official loader functions.
+
+    remapping:
+      - True  -> load_remapping_model (keeps remapped/packed weights; avoids dequantization)
+      - False -> load_unremapping_model (unremap/dequantize to regular weights)
+      - None  -> auto-detect based on files in the checkpoint dir.
+    """
+    dobi_root = os.path.join(_REPO_ROOT, "baselines", "Dobi-SVD")
+    if dobi_root not in sys.path:
+        sys.path.insert(0, dobi_root)
+    try:
+        from modelutils import load_remapping_model, load_unremapping_model  # type: ignore
+    except Exception as e:
+        raise ImportError(
+            f"Failed to import Dobi-SVD loader from {dobi_root}. "
+            "Make sure baselines/Dobi-SVD is present and its dependencies are installed."
+        ) from e
+
+    local_path = _resolve_dobi_path(model_id, hf_token=hf_token, revision=revision, cache_dir=cache_dir)
+
+    if remapping is None:
+        if os.path.exists(os.path.join(local_path, "remapping_weight.pt")):
+            remapping = True
+        elif os.path.exists(os.path.join(local_path, "DobiSVD_Model.pt")):
+            remapping = False
+        else:
+            raise FileNotFoundError(
+                f"Could not infer Dobi-SVD mode from checkpoint dir: {local_path}. "
+                "Expected remapping_weight.pt (remapping) or DobiSVD_Model.pt (unremapping). "
+                "If this is a standard HF model, do NOT use the Dobi loader."
+            )
+
+    loader = load_remapping_model if remapping else load_unremapping_model
+    model, tokenizer = loader(local_path)
+    return model, tokenizer, local_path, bool(remapping)
+
 
 '''
 A. 纯 lm-eval (最可比)
@@ -861,6 +942,22 @@ def main():
                     help='Base HF model id/path to apply SAES-SVD onto (required when using SAES-SVD).')
     ap.add_argument('--saes_revision', type=str, default=None)
     ap.add_argument('--saes_cache_dir', type=str, default=None)
+    ap.add_argument('--dfsvd_svd', action='store_true',
+                    help='Treat --model as DF-SVD checkpoint (local dir or HF repo id)')
+    ap.add_argument('--dfsvd_base_model', type=str, default=None,
+                    help='Base HF model id/path to apply DF-SVD onto (required when using DF-SVD).')
+    ap.add_argument('--dfsvd_revision', type=str, default=None)
+    ap.add_argument('--dfsvd_cache_dir', type=str, default=None)
+
+    ap.add_argument('--dobi_svd', action='store_true',
+                    help='Treat --model as a Dobi-SVD checkpoint (HF repo id or local dir) and load via baselines/Dobi-SVD.')
+    ap.add_argument('--dobi_remapping', action='store_true',
+                    help='Force Dobi *remapping* loader (keeps remapped/packed weights; avoids dequantization).')
+    ap.add_argument('--dobi_unremapping', action='store_true',
+                    help='Force Dobi *unremapping* loader (unremap/dequantize to regular weights).')
+    ap.add_argument('--dobi_revision', type=str, default=None)
+    ap.add_argument('--dobi_cache_dir', type=str, default=None)
+
     ap.add_argument('--batch_size', type=int, default=8)
     ap.add_argument('--limit', type=int, default=None, help='Limit examples per task for quick runs')
     ap.add_argument('--dtype', type=str, default=None, help='float16/bfloat16/float32')
@@ -907,8 +1004,33 @@ def main():
     args = ap.parse_args()
 
     # Load model
-    if os.path.exists(args.model) and args.model.endswith('.pt'):
+    if args.dobi_remapping and args.dobi_unremapping:
+        raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
+    use_dobi = bool(args.dobi_svd or args.dobi_remapping or args.dobi_unremapping or _looks_like_dobi_svd_model(args.model))
+
+    if use_dobi:
+        remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
+        model, tokenizer, _, is_dobi_remapping = _load_dobi_model(
+            args.model,
+            hf_token=args.hf_token,
+            revision=args.dobi_revision,
+            cache_dir=args.dobi_cache_dir,
+            remapping=remap_flag,
+        )
+    elif os.path.exists(args.model) and args.model.endswith('.pt'):
         model, tokenizer = get_model_from_local(args.model)
+        is_dobi_remapping = False
+    elif (os.path.isdir(args.model) and looks_like_dfsvd_checkpoint(args.model)) or args.dfsvd_svd:
+        if not args.dfsvd_base_model:
+            raise ValueError("DF-SVD requires --dfsvd_base_model.")
+        model, tokenizer, _ = load_dfsvd_model(
+            args.model,
+            base_model=args.dfsvd_base_model,
+            hf_token=args.hf_token,
+            revision=args.dfsvd_revision,
+            cache_dir=args.dfsvd_cache_dir,
+        )
+        is_dobi_remapping = False
     elif (os.path.isdir(args.model) and looks_like_saes_svd_checkpoint(args.model)) or args.saes_svd:
         if not args.saes_base_model:
             raise ValueError("SAES-SVD requires --saes_base_model.")
@@ -919,14 +1041,20 @@ def main():
             revision=args.saes_revision,
             cache_dir=args.saes_cache_dir,
         )
+        is_dobi_remapping = False
     else:
         model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
+        is_dobi_remapping = False
     tokenizer = _ensure_tokenizer_compat(model, tokenizer, hf_token=args.hf_token)
     if args.force_right_padding:
         _force_right_padding(tokenizer)
     else:
         _ensure_pad_token(tokenizer)
-    model = _to_device(model, args.device, args.dtype)
+    # NOTE: Dobi remapping checkpoints may store packed/int weights; avoid dtype casting in that case.
+    if 'is_dobi_remapping' in locals() and is_dobi_remapping:
+        model = model.to(args.device).eval()
+    else:
+        model = _to_device(model, args.device, args.dtype)
     _set_pad_query_fix_flags(model, fix=args.fix_pad_query_mask)
 
     # Disable cache for deterministic eval and lower memory

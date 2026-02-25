@@ -11,8 +11,8 @@ The DF-SVD checkpoint directory is expected to contain:
 Example:
 CUDA_VISIBLE_DEVICES=0 python robust/eval_lm_eval_dfsvd.py \
   --base_model meta-llama/Llama-2-7b-hf \
-  --ckpt_dir robust/llama2_dfsvd_r0.4_full \
-  --tasks arc_easy,arc_challenge,hellaswag,piqa,winogrande \
+  --ckpt_dir baselines/DF-SVD/llama2_dfsvd_r0.4 \
+  --tasks wikitext,c4 \
   --num_fewshot 0 \
   --batch_size 4 \
   --device cuda

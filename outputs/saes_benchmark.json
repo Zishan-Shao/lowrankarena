@@ -1,8 +1,8 @@
 {
   "schema": "svdllm_eval_v1",
   "script": "eval_benchmarks.py",
-  "timestamp": "2026-02-23T05:18:43",
-  "cmd": "/home/lz299/lowrankarena/eval_results/eval_benchmarks.py --model baselines/SEAS-SVD/robust/llama2_saes_r0.4 --saes_svd --saes_base_model meta-llama/Llama-2-7b-hf --use_lm_eval --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa --device cuda --batch_size 1 --dtype bfloat16 --lm_eval_num_fewshot 25 --output_json outputs/saes_benchmark.json",
+  "timestamp": "2026-02-24T02:57:58",
+  "cmd": "/home/lz299/lowrankarena/eval_results/eval_benchmarks.py --model baselines/SEAS-SVD/robust/llama2_saes_r0.4 --saes_svd --saes_base_model meta-llama/Llama-2-7b-hf --use_lm_eval --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa --device cuda --batch_size 1 --dtype bfloat16 --lm_eval_num_fewshot 0 --output_json outputs/saes_benchmark.json",
   "mode": "lm_eval",
   "args": {
     "model": "baselines/SEAS-SVD/robust/llama2_saes_r0.4",
@@ -20,7 +20,7 @@
     "skip_truthfulqa": false,
     "use_lm_eval": true,
     "lm_eval_tasks": "openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa",
-    "lm_eval_num_fewshot": 25,
+    "lm_eval_num_fewshot": 0,
     "lm_eval_max_length": 2048,
     "lm_eval_max_batch_size": 64,
     "lm_eval_add_bos_token": "auto",
@@ -41,43 +41,43 @@
   "results": {
     "arc_challenge": {
       "alias": "arc_challenge",
-      "acc,none": 0.2098976109215017,
-      "acc_stderr,none": 0.011900548748047477,
-      "acc_norm,none": 0.27474402730375425,
-      "acc_norm_stderr,none": 0.013044617212771227
+      "acc,none": 0.21928327645051193,
+      "acc_stderr,none": 0.012091245787615749,
+      "acc_norm,none": 0.2721843003412969,
+      "acc_norm_stderr,none": 0.01300660040642371
     },
     "arc_easy": {
       "alias": "arc_easy",
       "acc,none": 0.2542087542087542,
-      "acc_stderr,none": 0.008934537681141556,
-      "acc_norm,none": 0.2727272727272727,
-      "acc_norm_stderr,none": 0.00913863072636423
+      "acc_stderr,none": 0.008934537681141557,
+      "acc_norm,none": 0.26515151515151514,
+      "acc_norm_stderr,none": 0.00905762113917262
     },
     "hellaswag": {
       "alias": "hellaswag",
-      "acc,none": 0.25473013343955386,
-      "acc_stderr,none": 0.004348189459336527,
-      "acc_norm,none": 0.26289583748257317,
-      "acc_norm_stderr,none": 0.0043930667609168245
+      "acc,none": 0.2539334793865764,
+      "acc_stderr,none": 0.004343704512380106,
+      "acc_norm,none": 0.2583150766779526,
+      "acc_norm_stderr,none": 0.004368135676213557
     },
     "openbookqa": {
       "alias": "openbookqa",
-      "acc,none": 0.13,
-      "acc_stderr,none": 0.015055009352810986,
-      "acc_norm,none": 0.268,
-      "acc_norm_stderr,none": 0.019827714859587574
+      "acc,none": 0.158,
+      "acc_stderr,none": 0.016328049804579844,
+      "acc_norm,none": 0.262,
+      "acc_norm_stderr,none": 0.01968468882019472
     },
     "piqa": {
       "alias": "piqa",
-      "acc,none": 0.529923830250272,
-      "acc_stderr,none": 0.011644913435420153,
-      "acc_norm,none": 0.4961915125136017,
-      "acc_norm_stderr,none": 0.0116654857447468
+      "acc,none": 0.528835690968444,
+      "acc_stderr,none": 0.01164640780994472,
+      "acc_norm,none": 0.49891186071817195,
+      "acc_norm_stderr,none": 0.011665796539540873
     },
     "winogrande": {
       "alias": "winogrande",
-      "acc,none": 0.47671665351223363,
-      "acc_stderr,none": 0.014037241309573642
+      "acc,none": 0.4996053670086819,
+      "acc_stderr,none": 0.014052481306049516
     }
   }
 }

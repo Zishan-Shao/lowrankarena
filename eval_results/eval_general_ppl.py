@@ -225,6 +225,7 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 from utils.model_utils import get_model_from_local, get_model_from_huggingface
 from utils.saes_svd_loader import looks_like_saes_svd_checkpoint, load_saes_svd_model
+from utils.df_svd_loader import looks_like_dfsvd_checkpoint, load_dfsvd_model
 from evaluater import ppl_eval
 
 
@@ -398,6 +399,31 @@ def main() -> None:
         default=None,
         help="Optional HF cache dir for SAES-SVD checkpoint.",
     )
+
+    p.add_argument(
+        "--dfsvd_model",
+        type=str,
+        default=None,
+        help="DF-SVD checkpoint (local dir or HF repo id). If set, overrides --checkpoint for the 'ours' model.",
+    )
+    p.add_argument(
+        "--dfsvd_base_model",
+        type=str,
+        default=None,
+        help="Base HF model id/path to apply DF-SVD onto (required when using DF-SVD).",
+    )
+    p.add_argument(
+        "--dfsvd_revision",
+        type=str,
+        default=None,
+        help="Optional HF revision for DF-SVD checkpoint.",
+    )
+    p.add_argument(
+        "--dfsvd_cache_dir",
+        type=str,
+        default=None,
+        help="Optional HF cache dir for DF-SVD checkpoint.",
+    )
     p.add_argument(
         "--dobi_model",
         type=str,
@@ -548,6 +574,19 @@ def main() -> None:
             )
             return model, tokenizer
 
+        # 2b) Local DF-SVD dir (contains dfsvd_manifest.json + dfsvd_state.pt)
+        if os.path.isdir(ckpt_or_dir) and looks_like_dfsvd_checkpoint(ckpt_or_dir):
+            if not args.dfsvd_base_model:
+                raise ValueError("DF-SVD checkpoint detected but --dfsvd_base_model is missing.")
+            model, tokenizer, _ = load_dfsvd_model(
+                ckpt_or_dir,
+                base_model=args.dfsvd_base_model,
+                hf_token=args.hf_token,
+                revision=args.dfsvd_revision,
+                cache_dir=args.dfsvd_cache_dir,
+            )
+            return model, tokenizer
+
         # 3) Otherwise treat it as HF model id OR local HF directory
         return get_model_from_huggingface(ckpt_or_dir, hf_token=args.hf_token)
 
@@ -555,8 +594,8 @@ def main() -> None:
     if args.dobi_model:
         if args.dobi_remapping and args.dobi_unremapping:
             raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
-    if not args.checkpoint and not args.dobi_model and not args.saes_model:
-        raise ValueError("Please provide --checkpoint, --saes_model, or --dobi_model.")
+    if not args.checkpoint and not args.dobi_model and not args.saes_model and not args.dfsvd_model:
+        raise ValueError("Please provide --checkpoint, --saes_model, --dfsvd_model, or --dobi_model.")
     # Only enforce existence for local repo checkpoints; HF ids may not exist on disk.
     if args.checkpoint and args.checkpoint.endswith(".pt") and not os.path.exists(args.checkpoint):
         raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
@@ -564,8 +603,14 @@ def main() -> None:
     if args.checkpoint and os.path.isdir(args.checkpoint) and looks_like_saes_svd_checkpoint(args.checkpoint):
         if not args.saes_base_model:
             raise ValueError("SAES-SVD checkpoint detected but --saes_base_model is missing.")
+    # If a local DF-SVD checkpoint dir is provided via --checkpoint, require base model.
+    if args.checkpoint and os.path.isdir(args.checkpoint) and looks_like_dfsvd_checkpoint(args.checkpoint):
+        if not args.dfsvd_base_model:
+            raise ValueError("DF-SVD checkpoint detected but --dfsvd_base_model is missing.")
     if args.saes_model and not args.saes_base_model:
         raise ValueError("--saes_model requires --saes_base_model.")
+    if args.dfsvd_model and not args.dfsvd_base_model:
+        raise ValueError("--dfsvd_model requires --dfsvd_base_model.")
 
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but not available.")
@@ -709,10 +754,18 @@ def main() -> None:
 
 
     if args.compare_dobi:
-        if not (args.checkpoint or args.saes_model) or not args.dobi_model:
-            raise ValueError("--compare_dobi requires (--checkpoint or --saes_model) and --dobi_model.")
+        if not (args.checkpoint or args.saes_model or args.dfsvd_model) or not args.dobi_model:
+            raise ValueError("--compare_dobi requires (--checkpoint or --saes_model or --dfsvd_model) and --dobi_model.")
         print("[Compare] Evaluating our checkpoint...")
-        if args.saes_model:
+        if args.dfsvd_model:
+            model, tokenizer, _ = load_dfsvd_model(
+                args.dfsvd_model,
+                base_model=args.dfsvd_base_model,
+                hf_token=args.hf_token,
+                revision=args.dfsvd_revision,
+                cache_dir=args.dfsvd_cache_dir,
+            )
+        elif args.saes_model:
             model, tokenizer, _ = load_saes_svd_model(
                 args.saes_model,
                 base_model=args.saes_base_model,
@@ -755,6 +808,15 @@ def main() -> None:
             revision=args.dobi_revision,
             cache_dir=args.dobi_cache_dir,
             remapping=remap_flag,
+        )
+        _run_with_sets(model, tokenizer, label_prefix=args.label)
+    elif args.dfsvd_model:
+        model, tokenizer, _ = load_dfsvd_model(
+            args.dfsvd_model,
+            base_model=args.dfsvd_base_model,
+            hf_token=args.hf_token,
+            revision=args.dfsvd_revision,
+            cache_dir=args.dfsvd_cache_dir,
         )
         _run_with_sets(model, tokenizer, label_prefix=args.label)
     elif args.saes_model:

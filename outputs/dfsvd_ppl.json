@@ -1,17 +1,17 @@
 {
   "schema": "svdllm_eval_v1",
   "script": "eval_general_ppl.py",
-  "timestamp": "2026-02-24T03:00:42",
-  "cmd": "/home/lz299/lowrankarena/eval_results/eval_general_ppl.py --saes_model baselines/SEAS-SVD/robust/llama2_saes_r0.4 --saes_base_model meta-llama/Llama-2-7b-hf --datasets wikitext2,ptb,c4 --c4_stream --c4_docs 2000 --seqlen 2048 --batch_size 1 --device cuda --dtype bfloat16 --metrics token --output_json outputs/saes_ppl.json",
+  "timestamp": "2026-02-24T03:28:07",
+  "cmd": "/home/lz299/lowrankarena/eval_results/eval_general_ppl.py --dfsvd_model ./baselines/DF-SVD/llama2_dfsvd_debug --dfsvd_base_model meta-llama/Llama-2-7b-hf --datasets wikitext2,ptb,c4 --device cuda --seqlen 2048 --batch_size 4 --dtype bfloat16 --metrics token --output_json outputs/dfsvd_ppl.json",
   "mode": "general_ppl",
   "args": {
     "checkpoint": null,
-    "saes_model": "baselines/SEAS-SVD/robust/llama2_saes_r0.4",
-    "saes_base_model": "meta-llama/Llama-2-7b-hf",
+    "saes_model": null,
+    "saes_base_model": null,
     "saes_revision": null,
     "saes_cache_dir": null,
-    "dfsvd_model": null,
-    "dfsvd_base_model": null,
+    "dfsvd_model": "./baselines/DF-SVD/llama2_dfsvd_debug",
+    "dfsvd_base_model": "meta-llama/Llama-2-7b-hf",
     "dfsvd_revision": null,
     "dfsvd_cache_dir": null,
     "dobi_model": null,
@@ -23,7 +23,7 @@
     "datasets": "wikitext2,ptb,c4",
     "dataset_sets": null,
     "seqlen": 2048,
-    "batch_size": 1,
+    "batch_size": 4,
     "device": "cuda",
     "hf_token": null,
     "dtype": "bfloat16",
@@ -33,12 +33,12 @@
     "ppl_method": "token",
     "lm_eval_add_bos_token": "auto",
     "lm_eval_prefix_token_id": null,
-    "c4_docs": 2000,
-    "c4_stream": true,
+    "c4_docs": null,
+    "c4_stream": false,
     "auto_c4_stream": false,
     "c4_dataset": null,
     "lm_eval_allow_c4_download": false,
-    "output_json": "outputs/saes_ppl.json",
+    "output_json": "outputs/dfsvd_ppl.json",
     "output_dir": null,
     "run_name": null
   },
@@ -56,14 +56,14 @@
       ],
       "ppl_method": "token",
       "seqlen": 2048,
-      "batch_size": 1,
+      "batch_size": 4,
       "max_batches": null,
       "dtype": "bfloat16",
       "device": "cuda",
       "token_ppl": {
-        "wikitext2": 81581.88437600754,
-        "ptb": 89616.54966635109,
-        "c4": 111133.09268735272
+        "wikitext2": 12.412914000851092,
+        "ptb": 1753.8284010359037,
+        "c4": 12.99375944399754
       }
     }
   ]
