@@ -36,6 +36,7 @@ RANK_ATTN="${RANK_ATTN:-}"        # Component-specific ranks (optional)
 RANK_FFN="${RANK_FFN:-}"
 RANK_WO="${RANK_WO:-}"
 QKV_MODE="${QKV_MODE:-per_head}"  # per_head or full
+SEQ_LEN="${SEQ_LEN:-128}"             # Input sequence length (128 for standard GLUE, 512 for full)
 CALIB_BATCHES="${CALIB_BATCHES:-16}"  # Calibration batches for fwsvd/drone (NOT used by adasvd_origin)
 BUDGET="${BUDGET:-0.6}"
 ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"  # ARS calibration samples (paper: ~4000)
@@ -77,7 +78,7 @@ echo "Tasks: ${TASKS}" | tee -a "${SUMMARY_LOG}"
 echo "USE_TASK_MODELS=${USE_TASK_MODELS}  TASK_MODEL_PREFIX=${TASK_MODEL_PREFIX}  LOCAL_PRETRAINED_DIR=${LOCAL_PRETRAINED_DIR}" | tee -a "${SUMMARY_LOG}"
 echo "RANK=${RANK}  RANK_ATTN=${RANK_ATTN}  RANK_FFN=${RANK_FFN}  RANK_WO=${RANK_WO}" | tee -a "${SUMMARY_LOG}"
 echo "QKV_MODE=${QKV_MODE}  CALIB_BATCHES=${CALIB_BATCHES}" | tee -a "${SUMMARY_LOG}"
-echo "BUDGET=${BUDGET}  BACKENDS=${BACKENDS}  MODEL_ID=${MODEL_ID}" | tee -a "${SUMMARY_LOG}"
+echo "SEQ_LEN=${SEQ_LEN}  BUDGET=${BUDGET}  BACKENDS=${BACKENDS}  MODEL_ID=${MODEL_ID}" | tee -a "${SUMMARY_LOG}"
 echo "TWO_STAGE=${TWO_STAGE}" | tee -a "${SUMMARY_LOG}"
 echo "════════════════════════════════════════════════════════════════════" | tee -a "${SUMMARY_LOG}"
 echo "" | tee -a "${SUMMARY_LOG}"
@@ -167,8 +168,9 @@ run_one() {
     env_prefix+=("RANK_WO=${RANK_WO}")
   fi
 
-  # Add QKV mode and calibration batches
+  # Add QKV mode, seq_len and calibration batches
   env_prefix+=("QKV_MODE=${QKV_MODE}")
+  env_prefix+=("SEQ_LEN=${SEQ_LEN}")
   env_prefix+=("CALIB_BATCHES=${CALIB_BATCHES}")
 
   if [[ "${method}" == "adasvd" ]]; then

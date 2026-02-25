@@ -22,6 +22,7 @@
 | 16 | [SVD 格式参数膨胀与 Backend 对比配置选型](#svd-格式参数膨胀与-backend-对比配置选型-2026-02) | 📐 Design |
 | 17 | [MRPC=0 vs 论文 61.4：设置差异分析](#mrpc0-vs-论文-614设置差异分析-2026-02) | 📝 Observation |
 | 18 | [Naive vs FlashSVD 对比混淆 Attention Kernel 与投影融合两个变量](#naive-vs-flashsvd-对比混淆-attention-kernel-与投影融合两个变量-2026-02) | 📐 Design |
+| 19 | [Dense 987MB < 压缩 Naive 2004MB：Kernel 实现差异](#dense-987mb--压缩-naive-2004mbkernel-实现差异-2026-02) | 📝 Observation |
 
 **Status Legend:**
 - ✅ Fixed — bug confirmed and patched
@@ -1007,3 +1008,60 @@ bash eval_encoder/scripts/run_sdpa_ablation.sh
 - 结果写入 `eval_encoder/eval_results/encoder_runs.csv`
 
 精度列直接复用对应 Naive(einsum) 行的数值，无需重新评估。
+
+---
+
+## Dense 987MB < 压缩 Naive 2004MB：Kernel 实现差异 (2026-02)
+
+**状态**: 📝 Observation
+
+### 现象
+
+| Backend | Peak mem (MB) |
+|---------|--------------|
+| Dense (HF BERT) | 987 |
+| 压缩 Naive(einsum) | ~2004 |
+| 压缩 Naive(SDPA) | ~1566 |
+| 压缩 FlashSVD | ~708 |
+
+压缩后 naive 版本比 dense 原始模型**多出约 1017 MB**，乍看不合理。
+
+### 根因：Attention 中间张量物化
+
+**Dense HF BERT**（PyTorch ≥ 2.0 默认路径）：
+- `BertSelfAttention.forward()` 内部被 `torch.nn.functional.scaled_dot_product_attention` 融合执行
+- Flash attention 分块计算，**不物化** `[B, H, M, M]` logits 和 attention weights 矩阵
+- seq=512, bs=32, H=12：`[32, 12, 512, 512]` × fp32 = 32×12×512×512×4 ≈ **384 MB × 2 = 768 MB 不被分配**
+
+**压缩 Naive(einsum) backend**：
+- 使用显式 einsum 计算 attention：
+  ```python
+  logits = einsum('bhid,bhjd->bhij', Q, K) / sqrt(d)   # [B,H,M,M] ≈ 384 MB
+  A      = softmax(logits)                               # [B,H,M,M] ≈ 384 MB
+  out    = einsum('bhij,bhjd->bhid', A, V)
+  ```
+- `logits` 和 `A` 均被**完整物化**到显存，各约 384 MB，合计约 **768 MB 额外开销**
+
+### 数值验证
+
+```
+Dense      987 MB
++ logits  +384 MB
++ A       +384 MB
+─────────────────
+= 压缩估算  1755 MB  （实测 2004 MB，差异来自 SVD 参数本身 + 激活缓存）
+```
+
+Naive(SDPA) 中间结果（1566 MB）也验证了这一点：替换为 SDPA 后，[B,H,M,M] 不再物化，
+显存从 2004 MB 降至 1566 MB（-438 MB ≈ 一个 384 MB 矩阵 + 额外缓冲）。
+
+### 结论
+
+这**不是对比不公平**，而是 kernel 实现层面的客观差异：
+
+- Dense BERT 受益于 HF 框架的 SDPA 融合优化，无需手动物化中间矩阵
+- 压缩 Naive 实现复现了原论文的标准推理路径（显式 einsum），是一个合理的"未优化部署"基准
+- FlashSVD（708 MB）才是真正与 Dense（987 MB）在同一 kernel 优化水位上的公平对比
+
+报告中出现 Dense < Naive 内存时，应注明这是 **HF SDPA 融合 vs 显式 einsum 的实现差异**，
+而非压缩后内存反增。
