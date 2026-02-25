@@ -1163,7 +1163,7 @@ def measure_performance(model, loader, device, warmup_steps, measure_steps, num_
 CSV_FIELDS = [
     "timestamp", "model_id", "task", "dataset_split", "dataset_size",
     "seq_len", "batch_size", "dtype",
-    "method", "rank", "budget", "scope", "backend", "seed",
+    "method", "rank", "budget", "scope", "backend", "attn_mode", "seed",
     # Calibration info (for FWSVD/Whiten/Ada methods)
     "calib_dataset", "calib_split", "calib_samples", "calib_batches", "calib_seed", "calib_seq_len",
     # Cross-task display: "mnli:train → hans:validation" — convenience for debugging
@@ -1309,7 +1309,7 @@ def write_csv_row(args, metric_name, metric_value,
                 reader = csv.DictReader(f)
                 existing_fields = reader.fieldnames
                 # Check if new fields are present
-                missing_fields = [f for f in ["total_param_ratio", "total_original_params", "total_compressed_params"]
+                missing_fields = [f for f in ["total_param_ratio", "total_original_params", "total_compressed_params", "attn_mode"]
                                  if f not in existing_fields]
                 if missing_fields:
                     # Backup old CSV and rewrite with new header
@@ -1363,6 +1363,7 @@ def write_csv_row(args, metric_name, metric_value,
         "budget": args.budget if args.budget is not None else "",
         "scope": args.scope,
         "backend": args.backend,
+        "attn_mode": getattr(args, 'attn_mode', 'einsum'),
         "seed": args.seed,
         # Calibration info (only for methods that need it)
         "calib_dataset": calib_info.get("dataset", "") if needs_calib else "",
@@ -1537,6 +1538,11 @@ def main():
             calib_task, tokenizer, args.seq_len, args.batch_size,
             split=args.calib_split,
         )
+
+    # Reset peak stats before compression so compression_peak_mb only reflects
+    # the compression phase, not the entire program history up to this point.
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
 
     compression_peak_mb = 0.0
     if getattr(args, 'load_model_dir', None):

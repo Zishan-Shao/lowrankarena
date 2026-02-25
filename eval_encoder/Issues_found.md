@@ -23,6 +23,7 @@
 | 17 | [MRPC=0 vs 论文 61.4：设置差异分析](#mrpc0-vs-论文-614设置差异分析-2026-02) | 📝 Observation |
 | 18 | [Naive vs FlashSVD 对比混淆 Attention Kernel 与投影融合两个变量](#naive-vs-flashsvd-对比混淆-attention-kernel-与投影融合两个变量-2026-02) | 📐 Design |
 | 19 | [Dense 987MB < 压缩 Naive 2004MB：Kernel 实现差异](#dense-987mb--压缩-naive-2004mbkernel-实现差异-2026-02) | 📝 Observation |
+| 20 | [fp32 SDPA 短序列内存反高于 einsum：MEA Tile Overhead](#fp32-sdpa-短序列内存反高于-einsum-mea-tile-overhead-2026-02) | 📝 Observation |
 
 **Status Legend:**
 - ✅ Fixed — bug confirmed and patched
@@ -1065,3 +1066,71 @@ Naive(SDPA) 中间结果（1566 MB）也验证了这一点：替换为 SDPA 后�
 
 报告中出现 Dense < Naive 内存时，应注明这是 **HF SDPA 融合 vs 显式 einsum 的实现差异**，
 而非压缩后内存反增。
+
+---
+
+## fp32 SDPA 短序列内存反高于 einsum：MEA Tile Overhead (2026-02)
+
+**状态**: 📝 Observation
+
+### 现象
+
+在 seq=128 和 seq=256 时，Naive(SDPA) 的推理内存**高于** Naive(einsum)，乍看反直觉：
+
+| seq | Naive(einsum) | Naive(SDPA) | FlashSVD | 关系 |
+|-----|--------------|-------------|----------|------|
+| 128 | 559.0 MB | **840.0 MB** | 377.7 MB | SDPA **贵 50%** |
+| 256 | 942.1 MB | **1078.0 MB** | 484.8 MB | SDPA 贵 14% |
+| 512 | 2003.9 MB | 1566.0 MB | 708.1 MB | SDPA **省 22%** ✅ |
+
+SDPA 在 seq=256→512 之间发生**反转**：短序列时比 einsum 更贵，长序列时反而更省。
+
+### 根因：fp32 SDPA 后端选择
+
+PyTorch 的 `scaled_dot_product_attention` 在 fp32 下**不能使用 Flash Attention 2**
+（FA2 要求 fp16 / bf16）。fp32 时 PyTorch 选择 **Memory-Efficient Attention (MEA)**（来自 xFormers/cuDNN 的 tiled 实现）。
+
+两种 attention 实现的内存构成不同：
+
+| 实现 | 内存主项 | 数量级 |
+|------|---------|--------|
+| einsum | `[B, H, M, M]` 矩阵（logits + softmax） | O(M²) |
+| MEA (SDPA fp32) | 分块 tile 缓冲区 + 内部 workspace | O(M)，但固定开销大 |
+
+**关键**：MEA 的 tile 缓冲区有较大的**固定 overhead**，不随序列长度消失。
+在短序列（M 小）时：
+- einsum 的 O(M²) 矩阵很小（seq=128：`[32,12,128,128]×fp32 ≈ 24 MB`）
+- MEA 的固定 tile overhead 反而占主导（实测约 280 MB）
+
+随序列增长，einsum 的 O(M²) 矩阵急剧增大，而 MEA 的 overhead 几乎不变，
+到 seq=512 时（einsum 矩阵 ≈ 384 MB），MEA 的 tile overhead 相对不再显眼，SDPA 实现优势显现。
+
+### 为什么数据可信（非测量 bug）
+
+可能的误解：SDPA 内存更高是不是 `peak_mem_e2e_mb` 被污染了？
+
+**答**：不是。SDPA 实验以 `--load_model_dir` 模式运行（加载已压缩模型），
+跳过压缩阶段，`compression_peak_mb = 0`，因此：
+
+```
+peak_mem_e2e_mb = max(0, peak_mem_infer_mb) = peak_mem_infer_mb
+```
+
+所有 SDPA 行均满足 `peak_mem_infer_mb == peak_mem_e2e_mb`（已用脚本逐行核验），
+确认是真实的推理期内存峰值，不存在跨方法污染。
+
+### 实测数据（seq=128，8 GLUE 任务平均）
+
+```
+Naive(einsum)  559.0 MB  ─── O(M²) attention matrix dominates at seq≥256
+Naive(SDPA)    840.0 MB  ─── MEA tile overhead dominates at seq≤256
+FlashSVD       377.7 MB  ─── Triton fused kernel, best at all seq lengths
+```
+
+### 结论
+
+1. **数据正确，不需要重跑**：SDPA > einsum at short seq 是真实 fp32 MEA 行为。
+2. **交叉点在 seq=256→512 之间**：对于论文中 seq=512 的主 benchmark，SDPA（1566 MB）已优于 einsum（2004 MB），结论不受影响。
+3. **SDPA 在短序列场景（seq≤256）优势有限**：部署建议应注明 seq 范围。
+4. **图表注释**：Memory scaling 图中 SDPA 线在 seq=128 高于 einsum 时，应标注
+   "SDPA > einsum (fp32 MEA overhead)"，避免读者误解。

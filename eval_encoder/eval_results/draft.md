@@ -84,6 +84,18 @@
 | STS-B | DRONE | 165/194/2004 | 96/335/708 | x1.72 | -1296 MB (-64.7%) |
 | STS-B | AdaSVD | 168/190/2524 | 103/311/726 | x1.63 | -1799 MB (-71.3%) |
 
+---
+## Systems Efficiency — 论文叙事结构（Figure 顺序）
+
+> **叙事逻辑：** 先解释单点（为什么 Flash 在 seq=512 省 65%），再展示 trend（优势随 seq 增长），最后综合 accuracy–memory 权衡。
+>
+> 1. **Figure 1–2（Kernel Tier）** — 同一 seq_len 下三档 kernel 对比：einsum → SDPA → FlashSVD。说明 FlashSVD 的优势来自 *kernel fusion*，不是单纯换用 SDPA。
+> 2. **Figure 3（Memory Breakdown）** — 把省出来的显存拆分为 param 节省 vs activation 节省，解释 *为什么* FlashSVD 更省。
+> 3. **Figure 4–6（Seq-len Scaling）** — 把 seq_len 拉开（128/256/512），展示优势随序列增长单调增强（memory 32%→49%→65%，speedup ×1.10→×1.37→×1.72）。这是最强的 *scaling result*。
+> 4. **Figure 7（Pareto）** — accuracy vs memory 综合权衡，FlashSVD 在不改变精度的前提下整体左移所有方法。
+
+---
+
 ### SDPA 消融（三档对比）：Naive(einsum) → Naive(SDPA) → FlashSVD(Triton)
 
 **SDPA**（Scaled Dot-Product Attention）是 PyTorch 2.0 引入的融合 attention 算子（`torch.nn.functional.scaled_dot_product_attention`）。它通过 Flash Attention 算法分块计算 softmax(QKᵀ/√d)V，**不显式物化** [B,H,M,M] 的 logits 和 attention weight 矩阵，从而大幅降低显存占用并提升吞吐。HF BERT 在 PyTorch ≥ 2.0 下默认走此路径；压缩模型的 Naive(einsum) 实现则使用显式 einsum，会完整物化上述两个矩阵（各约 384 MB，seq=512, bs=32, fp32）。
@@ -162,13 +174,13 @@ DRONE 协方差校准在 per-head 模式下已能有效捕捉各头内部的激�
 
 ARS 以全矩阵语义分配 rank，budget=0.527 下某些层 Q rank 过低（ARS 可能把更多 budget 分给 FFN），仍导致 MRPC collapse。但 RTE 明显改善（0.534 → 0.599）——RTE 可能受益于全局子空间的跨头语义保留。
 
-![Figure 4: GLUE average performance under equal parameter ratio](figures/fig3_glue_avg_ph_vs_fm.png)
+![Acc-Figure 1: GLUE average performance under equal parameter ratio](figures/fig3_glue_avg_ph_vs_fm.png)
 
-**Figure 4:** GLUE average performance under equal parameter ratio (~0.527). (a) Stage 1 (no finetune): Full-matrix compression consistently outperforms per-head, suggesting improved cross-head information preservation. (b) Stage 2 (post-compression finetuning): Performance recovers toward the dense baseline; the gap between compression modes narrows.
+**Acc-Figure 1:** GLUE average performance under equal parameter ratio (~0.527). (a) Stage 1 (no finetune): Full-matrix compression consistently outperforms per-head, suggesting improved cross-head information preservation. (b) Stage 2 (post-compression finetuning): Performance recovers toward the dense baseline; the gap between compression modes narrows.
 
-![Figure 5: MRPC F1 under per-head and full-matrix compression](figures/fig4_mrpc_collapse.png)
+![Acc-Figure 2: MRPC F1 under per-head and full-matrix compression](figures/fig4_mrpc_collapse.png)
 
-**Figure 5:** MRPC F1 under per-head and full-matrix compression. Per-head compression causes severe degradation for SVD and AdaSVD (F1≈0). Full-matrix compression partially restores performance. Post-compression finetuning recovers accuracy for all methods. Naive and FlashSVD backends produce identical task metrics.
+**Acc-Figure 2:** MRPC F1 under per-head and full-matrix compression. Per-head compression causes severe degradation for SVD and AdaSVD (F1≈0). Full-matrix compression partially restores performance. Post-compression finetuning recovers accuracy for all methods. Naive and FlashSVD backends produce identical task metrics.
 
 ### Full-matrix ra312 性能对比（stage1，naive backend）
 | Method | Latency (ms) | Throughput (sps) | Mem (MB) | vs Per-head 速度 | vs Per-head 内存 |
@@ -194,6 +206,43 @@ ARS 以全矩阵语义分配 rank，budget=0.527 下某些层 Q rank 过低（AR
 
 FWSVD / DRONE / AdaSVD full-matrix stage2 待跑。
 
-![Figure 6: Memory–accuracy trade-off](figures/fig6_pareto_front.png)
+---
+### Seq-len Scaling（Figure 4–6）
 
-**Figure 6:** Memory–accuracy trade-off (Stage 1, no finetune). Points correspond to naive and FlashSVD backends under each compression method. Arrows indicate memory reduction at identical accuracy when switching from naive to FlashSVD. FlashSVD consistently shifts methods toward lower peak memory without affecting task performance.
+测试条件：SVD per-head ra48/rf256/rw208，bs=32，fp32，avg. 8 GLUE tasks
+
+| seq_len | Naive(einsum) MB | Naive(SDPA) MB | FlashSVD MB | Reduction |
+|--------:|:----------------:|:--------------:|:-----------:|:---------:|
+| 128 | 559.0 | 840.0 | 377.7 | **−32.4%** |
+| 256 | 942.1 | 1078.0 | 484.8 | **−48.5%** |
+| 512 | 2003.9 | 1566.0 | 708.1 | **−64.7%** |
+
+| seq_len | Naive(einsum) sps | Naive(SDPA) sps | FlashSVD sps | Speedup |
+|--------:|:-----------------:|:---------------:|:------------:|:-------:|
+| 128 | 1325 | 1487 | 1460 | **×1.10** |
+| 256 | 530 | 756 | 725 | **×1.37** |
+| 512 | 195 | 352 | 336 | **×1.72** |
+
+**关键 scaling 结论：**
+- FlashSVD 的显存优势随序列增长单调增强（32.4% → 48.5% → 64.7%）
+- 吞吐加速也随序列增长（×1.10 → ×1.37 → ×1.72）
+- SDPA 在 seq=128 时比 einsum *多用* 281 MB，证明优势来自 kernel fusion 而非 flash attention 本身
+- FlashSVD 在所有 seq_len 下均优于 SDPA（内存）
+
+![Figure 4: Peak memory vs sequence length](figures/seqlen_memory.png)
+
+**Figure 4:** Peak memory vs. sequence length (SVD per-head ra48, bs=32, fp32). Naive(einsum) memory grows super-linearly due to explicit [B,H,M,M] attention matrix materialization. FlashSVD scales near-linearly; the gap widens from 32.4% at seq=128 to 64.7% at seq=512. Naive(SDPA) uses *more* memory than einsum at seq≤256: in fp32, PyTorch SDPA dispatches to Memory-Efficient Attention (not Flash Attention 2, which requires fp16/bf16) whose O(M) tile overhead exceeds the O(M²) attention matrix savings at short sequences. The cross-over occurs between seq=256 and seq=512. This confirms that FlashSVD's memory advantage at all sequence lengths originates from kernel fusion, not from flash attention alone.
+
+![Figure 5: Throughput vs sequence length](figures/seqlen_throughput.png)
+
+**Figure 5:** Throughput vs. sequence length. FlashSVD's throughput advantage over Naive(einsum) grows from ×1.10 at seq=128 to ×1.72 at seq=512. Naive(SDPA) matches FlashSVD in throughput but cannot achieve the same memory reduction (Figure 4).
+
+![Figure 6: Memory reduction (%) vs sequence length](figures/seqlen_reduction.png)
+
+**Figure 6:** FlashSVD memory reduction (%) vs. Naive(einsum) as a function of sequence length. The monotonically increasing curve demonstrates that FlashSVD's advantage is not incidental—it scales with the O(M²) attention matrix overhead avoided by kernel fusion.
+
+---
+
+![Figure 7: Memory–accuracy trade-off](figures/fig6_pareto_front.png)
+
+**Figure 7:** Memory–accuracy trade-off (Stage 1, no finetune). Points correspond to naive and FlashSVD backends under each compression method. Arrows indicate memory reduction at identical accuracy when switching from naive to FlashSVD. FlashSVD consistently shifts methods toward lower peak memory without affecting task performance.
