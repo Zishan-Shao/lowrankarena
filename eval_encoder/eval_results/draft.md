@@ -114,7 +114,7 @@
 **关键结论：**
 - Flash attention（einsum→SDPA）贡献约 **+77% 吞吐**，内存 -22%（2004→1566 MB）
 - Triton 投影融合（SDPA→FlashSVD）贡献额外 **-55% 内存**（1566→708 MB），但吞吐略降 ~5%
-- FlashSVD 相对 Naive(einsum) 综合效果：**+73% 吞吐，-64.7% 内存**
+- FlashSVD 相对 Naive(einsum) 综合效果：**+73% 吞吐，−1296 MB (−64.7%) 内存**
 - SDPA 吞吐（~346 sps）略高于 FlashSVD（~332 sps）：Triton kernel 融合节省内存但引入少量计算开销
 
 ![Figure 1: Peak inference memory under different attention implementations](figures/fig1_memory_kernels.png)
@@ -150,11 +150,11 @@ $$\frac{\text{Naive activations}}{\text{params}} = \frac{1748 \text{ MB}}{256 \t
 
 **与 seq_len 的关系：** 随 N 增大，O(BHN²) 项占比单调上升，而参数和非 attention 激活仅线性增长。FlashSVD 专门攻击二次项，因此收益随 seq 单调增强：
 
-| seq_len | Naive 激活 (est.) | Flash 激活 (est.) | 激活节省率 | 总显存节省率 |
-|--------:|:-----------------:|:-----------------:|:---------:|:-----------:|
-| 128 | ~303 MB | ~98 MB | ~68% | **−32.4%** |
-| 256 | ~686 MB | ~229 MB | ~67% | **−48.5%** |
-| 512 | ~1748 MB | ~452 MB | ~74% | **−64.7%** |
+| seq_len | Naive 激活 (est.) | Flash 激活 (est.) | 激活节省率 | 总显存节省 (MB) | 总显存节省率 |
+|--------:|:-----------------:|:-----------------:|:---------:|---------------:|:-----------:|
+| 128 | ~303 MB | ~98 MB | ~68% | **−181 MB** | **−32.4%** |
+| 256 | ~686 MB | ~229 MB | ~67% | **−457 MB** | **−48.5%** |
+| 512 | ~1748 MB | ~452 MB | ~74% | **−1296 MB** | **−64.7%** |
 
 **理论上界：** r/N = 48/512 ≈ 0.094，attention 激活理论减少 (1−r/N) = 91%；实测 74%，差距来自非 attention 层的激活下底与 cuBLAS/Triton 显存分配器的舍入开销。
 
@@ -242,11 +242,11 @@ FWSVD / DRONE / AdaSVD full-matrix stage2 待跑。
 
 测试条件：SVD per-head ra48/rf256/rw208，bs=32，fp32，avg. 8 GLUE tasks
 
-| seq_len | Naive(einsum) MB | Naive(SDPA) MB | FlashSVD MB | Reduction |
-|--------:|:----------------:|:--------------:|:-----------:|:---------:|
-| 128 | 559.0 | 840.0 | 377.7 | **−32.4%** |
-| 256 | 942.1 | 1078.0 | 484.8 | **−48.5%** |
-| 512 | 2003.9 | 1566.0 | 708.1 | **−64.7%** |
+| seq_len | Naive(einsum) MB | Naive(SDPA) MB | FlashSVD MB | Saved (MB) | Reduction |
+|--------:|:----------------:|:--------------:|:-----------:|-----------:|:---------:|
+| 128 | 559.0 | 840.0 | 377.7 | **−181 MB** | **−32.4%** |
+| 256 | 942.1 | 1078.0 | 484.8 | **−457 MB** | **−48.5%** |
+| 512 | 2003.9 | 1566.0 | 708.1 | **−1296 MB** | **−64.7%** |
 
 | seq_len | Naive(einsum) sps | Naive(SDPA) sps | FlashSVD sps | Speedup |
 |--------:|:-----------------:|:---------------:|:------------:|:-------:|
@@ -255,14 +255,14 @@ FWSVD / DRONE / AdaSVD full-matrix stage2 待跑。
 | 512 | 195 | 352 | 336 | **×1.72** |
 
 **关键 scaling 结论：**
-- FlashSVD 的显存优势随序列增长单调增强（32.4% → 48.5% → 64.7%）
+- FlashSVD 的显存优势随序列增长单调增强（−181 MB/−32.4% → −457 MB/−48.5% → −1296 MB/−64.7%）
 - 吞吐加速也随序列增长（×1.10 → ×1.37 → ×1.72）
 - SDPA 在 seq=128 时比 einsum *多用* 281 MB，证明优势来自 kernel fusion 而非 flash attention 本身
 - FlashSVD 在所有 seq_len 下均优于 SDPA（内存）
 
 ![Figure 4: Peak memory vs sequence length](figures/seqlen_memory.png)
 
-**Figure 4:** Peak memory vs. sequence length (SVD per-head ra48, bs=32, fp32). Naive(einsum) memory grows super-linearly due to explicit [B,H,M,M] attention matrix materialization. FlashSVD scales near-linearly; the gap widens from 32.4% at seq=128 to 64.7% at seq=512. Naive(SDPA) uses *more* memory than einsum at seq≤256: in fp32, PyTorch SDPA dispatches to Memory-Efficient Attention (not Flash Attention 2, which requires fp16/bf16) whose O(M) tile overhead exceeds the O(M²) attention matrix savings at short sequences. The cross-over occurs between seq=256 and seq=512. This confirms that FlashSVD's memory advantage at all sequence lengths originates from kernel fusion, not from flash attention alone.
+**Figure 4:** Peak memory vs. sequence length (SVD per-head ra48, bs=32, fp32). Naive(einsum) memory grows super-linearly due to explicit [B,H,M,M] attention matrix materialization. FlashSVD scales near-linearly; the absolute gap widens from **181 MB (−32.4%)** at seq=128 to **1296 MB (−64.7%)** at seq=512. Naive(SDPA) uses *more* memory than einsum at seq≤256: in fp32, PyTorch SDPA dispatches to Memory-Efficient Attention (not Flash Attention 2, which requires fp16/bf16) whose O(M) tile overhead exceeds the O(M²) attention matrix savings at short sequences. The cross-over occurs between seq=256 and seq=512. This confirms that FlashSVD's memory advantage at all sequence lengths originates from kernel fusion, not from flash attention alone.
 
 ![Figure 5: Throughput vs sequence length](figures/seqlen_throughput.png)
 
@@ -270,7 +270,7 @@ FWSVD / DRONE / AdaSVD full-matrix stage2 待跑。
 
 ![Figure 6: Memory reduction (%) vs sequence length](figures/seqlen_reduction.png)
 
-**Figure 6:** FlashSVD memory reduction (%) vs. Naive(einsum) as a function of sequence length. The monotonically increasing curve demonstrates that FlashSVD's advantage is not incidental—it scales with the O(M²) attention matrix overhead avoided by kernel fusion.
+**Figure 6:** FlashSVD memory reduction vs. Naive(einsum) as a function of sequence length (181 MB / 457 MB / 1296 MB at seq=128/256/512, or −32% / −49% / −65%). The monotonically increasing curve demonstrates that FlashSVD's advantage is not incidental—it scales with the O(M²) attention matrix overhead avoided by kernel fusion.
 
 ---
 
@@ -367,7 +367,7 @@ At N=128/256/512, this formula predicts ≈63%/72%/91% attention reduction; tota
 
 **dtype multiplier.** In bf16, every memory term halves. FlashSVD bf16 achieves 193/245/357 MB at seq=128/256/512 — 50% of the fp32 values, confirming the linear dtype scaling. The activation/parameter ratio remains ≫1 even in bf16, so FlashSVD's structural advantage is dtype-invariant.
 
-**Accuracy invariance.** FlashSVD is mathematically equivalent to Naive SVD inference up to floating-point rounding: it evaluates the same low-rank attention computation via a different tiling strategy. All eight GLUE tasks confirm identical metric values across the two backends (naive/flash delta = 0.00 in all cases). The Pareto front (Figure 6) therefore reflects kernel choice as a *free* dimension: any Naive SVD operating point can be shifted to FlashSVD with identical accuracy and −65% memory.
+**Accuracy invariance.** FlashSVD is mathematically equivalent to Naive SVD inference up to floating-point rounding: it evaluates the same low-rank attention computation via a different tiling strategy. All eight GLUE tasks confirm identical metric values across the two backends (naive/flash delta = 0.00 in all cases). The Pareto front (Figure 6) therefore reflects kernel choice as a *free* dimension: any Naive SVD operating point can be shifted to FlashSVD with identical accuracy and **−1296 MB (−65%)** memory at seq=512.
 
 **Practical takeaway.** The complete design space for deployment is (compression method) × (rank) × (backend) × (dtype). Across these dimensions, FlashSVD + bf16 is Pareto-dominant: it achieves the lowest memory at any fixed accuracy, with throughput matching or exceeding fp32 Naive by ×1.7–2.0× at seq=512.
 
