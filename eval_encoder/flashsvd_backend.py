@@ -146,7 +146,11 @@ class FlashSVDBlock(nn.Module):
         # block_m must match kernels/encoder_kernels/flashsvdattn.py BLOCK_M=64.
         # Passing block_m=32 would compute grid with 32-row tiles but the Triton
         # kernel processes 64-row tiles → out-of-bounds reads → CUDA illegal access.
-        mask4 = mask.view(B, 1, 1, M) if mask is not None else None
+        if mask is not None:
+            mask4 = mask.view(B, 1, 1, M)
+        else:
+            # No padding mask → all tokens valid (full attention)
+            mask4 = torch.ones(B, 1, 1, M, dtype=torch.bool, device=x.device)
         attn_out = _flash_svd_attention(
             tmp_q, Vq_f, bq_f,
             tmp_k, Vk_f, bk_f,
