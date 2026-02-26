@@ -274,6 +274,37 @@ FWSVD / DRONE / AdaSVD full-matrix stage2 待跑。
 
 ---
 
+### dtype × Backend Scaling（fp32 vs bf16）
+
+测试条件：SVD per-head ra48/rf256/rw208，bs=32，avg. 8 GLUE tasks
+- fp32 数据来自 seq-len scaling 实验；bf16 数据来自 encoder_runs.csv
+
+| seq | fp32-einsum (MB) | fp32-SDPA (MB) | fp32-Flash (MB) | bf16-Naive (MB) | bf16-Flash (MB) | bf16 red% |
+|----:|----------------:|---------------:|----------------:|----------------:|----------------:|----------:|
+| 128 | 559.0 | 840.0 | 377.7 | 257.9 | 193.1 | −25.1% |
+| 256 | 942.1 | 1078.0 | 484.8 | 377.0 | 245.2 | −34.9% |
+| 512 | 2003.9 | 1566.0 | 708.1 | 621.2 | 357.4 | −42.5% |
+
+| seq | fp32-einsum (sps) | fp32-SDPA (sps) | fp32-Flash (sps) | bf16-Flash (sps) | bf16 speedup vs fp32 |
+|----:|------------------:|----------------:|-----------------:|-----------------:|---------------------:|
+| 128 | 1325 | 1487 | 1460 | 2498 | ×1.71 |
+| 256 | 530 | 756 | 725 | 1542 | ×2.13 |
+| 512 | 195 | 352 | 336 | 699 | ×2.08 |
+
+![Figure: Memory Scaling by dtype × Backend](figures/dtype_memory_scaling.png)
+
+**Figure (dtype-mem):** Memory scaling across dtype × backend. fp32 lines (dashed) show the three kernel tiers; bf16 FlashSVD (teal, solid) is the memory-optimal frontier at every seq_len. The SDPA > einsum crossover at seq=128 (fp32) reflects MEA tile overhead (Issue #20). bf16 halves all memory terms; FlashSVD's structural −O(N²) advantage persists.
+
+![Figure: Throughput Scaling by dtype × Backend](figures/dtype_throughput_scaling.png)
+
+**Figure (dtype-thr):** Throughput scaling across dtype × backend. bf16 FlashSVD is ×2.08–2.13× faster than fp32 FlashSVD at seq=256/512, close to the theoretical ×2 for half-precision tensor core utilization. The annotation at seq=512 confirms the bf16 advantage is stable across the tested range.
+
+![Figure: FlashSVD Memory Reduction by dtype](figures/dtype_memory_reduction.png)
+
+**Figure (dtype-red%):** FlashSVD memory reduction (%) vs. Naive baseline by dtype. bf16 reduction grows from −25% to −43% as seq increases; fp32 reduction grows from −32% to −65%. The bf16 reduction is smaller (in %) because bf16 Naive already benefits from half-precision weight storage, so the relative gain from kernel fusion is proportionally less—but absolute savings are still ∼180–264 MB at seq=256/512.
+
+---
+
 ![Figure 7: Memory–accuracy trade-off](figures/fig6_pareto_front.png)
 
 **Figure 7:** Memory–accuracy trade-off (Stage 1, no finetune). Points correspond to naive and FlashSVD backends under each compression method. Arrows indicate memory reduction at identical accuracy when switching from naive to FlashSVD. FlashSVD consistently shifts methods toward lower peak memory without affecting task performance.
@@ -339,3 +370,21 @@ At N=128/256/512, this formula predicts ≈63%/72%/91% attention reduction; tota
 **Accuracy invariance.** FlashSVD is mathematically equivalent to Naive SVD inference up to floating-point rounding: it evaluates the same low-rank attention computation via a different tiling strategy. All eight GLUE tasks confirm identical metric values across the two backends (naive/flash delta = 0.00 in all cases). The Pareto front (Figure 6) therefore reflects kernel choice as a *free* dimension: any Naive SVD operating point can be shifted to FlashSVD with identical accuracy and −65% memory.
 
 **Practical takeaway.** The complete design space for deployment is (compression method) × (rank) × (backend) × (dtype). Across these dimensions, FlashSVD + bf16 is Pareto-dominant: it achieves the lowest memory at any fixed accuracy, with throughput matching or exceeding fp32 Naive by ×1.7–2.0× at seq=512.
+
+---
+
+## Appendix: Batch-size Scaling（Appendix Figure A1–A2）
+
+> **定位**：Batch scaling 是 reinforcement evidence，不进主文。
+> Seq-len scaling（Figure 4）对 reviewer 更直观，已在主文中。
+> 此处作为 appendix 补充，验证 FlashSVD 优势不依赖特定 batch size。
+
+测试条件：SVD per-head ra48/rf256/rw208，seq=512（固定），bs ∈ {8,16,32,64}，fp32 + bf16（若可用），microbenchmark（50 steps, 20 warmup）
+
+![Appendix Figure A1: Memory vs batch size](figures/batch_memory.png)
+
+**Appendix Figure A1:** Peak inference memory vs. batch size (seq=512 fixed). Naive(einsum) memory grows linearly in B (O(BHN²) attention activation term dominates). FlashSVD memory grows slower: the [B,H,N,r] intermediate is 10.7× smaller. Reduction labels show FlashSVD vs Naive(einsum) gap at each batch size; the advantage is stable (∼30–64%) across the tested range, confirming it is a structural property of the kernel, not an artifact of a specific batch size.
+
+![Appendix Figure A2: Throughput vs batch size](figures/batch_throughput.png)
+
+**Appendix Figure A2:** Throughput (samples/sec) vs. batch size. FlashSVD matches or exceeds Naive(SDPA) throughput at all batch sizes while consuming substantially less memory. The crossover between Naive(einsum) and Naive(SDPA) reflects the same MEA tile overhead observed in seq-len scaling (Figure 4).

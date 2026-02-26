@@ -339,11 +339,14 @@ def plot_results(rows: List[dict]):
             color, marker, dashes, label = STYLE[key]
             kw = dict(color=color, marker=marker, lw=LW, ms=MS,
                       label=label, zorder=4)
+            if key[2] == "einsum":          # fade einsum: reference, not hero
+                kw["alpha"] = 0.50
+                kw["lw"]    = LW - 0.4
             if dashes:
                 kw["dashes"] = dashes
             ax.plot(vals["bs"], vals[metric], **kw)
 
-        # annotate FlashSVD reduction vs einsum at each bs
+        # annotate FlashSVD memory reduction vs einsum at each bs
         if metric == "mem":
             einsum_by_bs = {}
             for key, vals in groups.items():
@@ -353,13 +356,16 @@ def plot_results(rows: List[dict]):
             for key, vals in groups.items():
                 if key == ("fp32", "flashsvd", "triton"):
                     flash_by_bs = dict(zip(vals["bs"], vals["mem"]))
+            flash_color = STYLE[("fp32", "flashsvd", "triton")][0]
             for bs in bs_vals:
                 if bs in einsum_by_bs and bs in flash_by_bs:
                     red = (einsum_by_bs[bs] - flash_by_bs[bs]) / einsum_by_bs[bs] * 100
                     mid = (einsum_by_bs[bs] + flash_by_bs[bs]) / 2
-                    ax.text(bs + 1.2, mid, f"−{red:.0f}%",
-                            color=STYLE[("fp32","flashsvd","triton")][0],
-                            fontsize=8, va="center", ha="left", fontstyle="italic")
+                    ax.text(bs, mid, f"−{red:.0f}%",
+                            color=flash_color, fontsize=9.5, fontweight="bold",
+                            va="center", ha="center",
+                            bbox=dict(boxstyle="round,pad=0.15",
+                                      fc="white", ec="none", alpha=0.8))
 
         ax.set_xticks(bs_vals)
         ax.set_xticklabels([str(b) for b in bs_vals])
