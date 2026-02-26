@@ -144,17 +144,17 @@ FlashSVD 的 −65% 显存不是调参的偶然结果——它有严格的复杂
 
 **激活/参数比验证（seq=512, bs=32, fp32, H=12, r=48）：**
 
-$$\frac{\text{Naive activations}}{\text{params}} = \frac{1748 \text{ MB}}{256 \text{ MB}} \approx 6.8 \gg 1$$
+$$\frac{\text{Naive activations}}{\text{params}} = \frac{1739 \text{ MB}}{265 \text{ MB}} \approx 6.6 \gg 1$$
 
-推理显存由激活**完全主导**，参数压缩对峰值显存的贡献（−162 MB）远小于激活压缩（−1296 MB）。这是为何"换用 FlashSVD backend"的收益（−65%）大于"换用更小的 rank"的根本原因。
+推理显存由激活**完全主导**，参数压缩对峰值显存的贡献（−153 MB）远小于激活压缩（−1296 MB）。这是为何"换用 FlashSVD backend"的收益（−65%）大于"换用更小的 rank"的根本原因。
 
 **与 seq_len 的关系：** 随 N 增大，O(BHN²) 项占比单调上升，而参数和非 attention 激活仅线性增长。FlashSVD 专门攻击二次项，因此收益随 seq 单调增强：
 
 | seq_len | Naive 激活 (est.) | Flash 激活 (est.) | 激活节省率 | 总显存节省 (MB) | 总显存节省率 |
 |--------:|:-----------------:|:-----------------:|:---------:|---------------:|:-----------:|
-| 128 | ~303 MB | ~98 MB | ~68% | **−181 MB** | **−32.4%** |
-| 256 | ~686 MB | ~229 MB | ~67% | **−457 MB** | **−48.5%** |
-| 512 | ~1748 MB | ~452 MB | ~74% | **−1296 MB** | **−64.7%** |
+| 128 | ~294 MB | ~113 MB | ~62% | **−181 MB** | **−32.4%** |
+| 256 | ~677 MB | ~220 MB | ~68% | **−457 MB** | **−48.5%** |
+| 512 | ~1739 MB | ~443 MB | ~75% | **−1296 MB** | **−64.7%** |
 
 **理论上界：** r/N = 48/512 ≈ 0.094，attention 激活理论减少 (1−r/N) = 91%；实测 74%，差距来自非 attention 层的激活下底与 cuBLAS/Triton 显存分配器的舍入开销。
 
@@ -319,7 +319,7 @@ FWSVD / DRONE / AdaSVD full-matrix stage2 待跑。
 |---|--------|------|---------|
 | 1 | Kernel-tier memory (seq=512) | `fig1_memory_kernels.png` | einsum 2004 MB → SDPA 1566 MB → Flash 708 MB；三档 kernel 消除不同来源的激活开销 |
 | 2 | Kernel-tier throughput (seq=512) | `fig2_throughput_kernels.png` | SDPA ≈ Flash 吞吐；Flash 省内存不以吞吐为代价 |
-| 3 | Memory breakdown (param vs activation) | `fig5_memory_breakdown.png` | 激活/参数 = 6.8×；参数压缩贡献 −162 MB，激活压缩贡献 −1296 MB |
+| 3 | Memory breakdown (param vs activation) | `fig5_memory_breakdown.png` | 激活/参数 = 6.6×；参数压缩贡献 −153 MB，激活压缩贡献 −1296 MB |
 | 4 | Seq-len memory scaling | `seqlen_memory.png` | 三档 kernel × 三个 seq_len；Flash 优势单调增强（32% → 49% → 65%） |
 | 5 | dtype × backend memory scaling | `dtype_memory_scaling.png` | fp32 vs bf16 × 3 backends；bf16 Flash 为最优前沿（−25%~−42% vs bf16 Naive） |
 | 6 | Accuracy–memory Pareto | `fig6_pareto_front.png` | Flash 在不改变精度前提下整体左移所有压缩方法 |
@@ -333,14 +333,14 @@ FWSVD / DRONE / AdaSVD full-matrix stage2 待跑。
 Low-rank factorization of attention weights is widely studied for *parameter* efficiency, but its impact on *inference memory* is less well understood. We identify three additive components that determine peak memory during inference:
 
 **(1) Parameter memory** — proportional to compressed parameter count; *independent of sequence length* N.
-With SVD rank r=48 per head: 418 MB → 256 MB (−39%), a constant offset regardless of batch size or sequence length.
+With SVD rank r=48 per head: 418 MB → 265 MB (−37%), a constant offset regardless of batch size or sequence length.
 
 **(2) Attention activation memory** — the dominant, sequence-dependent term.
 A naive implementation materializes the full [B, H, N, N] logit and attention weight tensors:
 
 $$\text{Naive Memory}_{\text{attn}} \approx O(BHN^2)$$
 
-At B=32, H=12, N=512: this contributes ≈1748 MB, over **6.8× the parameter footprint**. Standard PyTorch SDPA eliminates explicit materialization via tiling (Flash Attention), achieving O(B·N·M·block) but still scaling as O(N) in practice for the attention tile buffer. FlashSVD goes further: by fusing the low-rank projection into the attention kernel, the retained intermediate tensor is [B, H, N, r], giving:
+At B=32, H=12, N=512: this contributes ≈1739 MB, over **6.6× the parameter footprint**. Standard PyTorch SDPA eliminates explicit materialization via tiling (Flash Attention), achieving O(B·N·M·block) but still scaling as O(N) in practice for the attention tile buffer. FlashSVD goes further: by fusing the low-rank projection into the attention kernel, the retained intermediate tensor is [B, H, N, r], giving:
 
 $$\text{Flash Memory}_{\text{attn}} \approx O(BHNr)$$
 
@@ -352,8 +352,8 @@ Since r=48 ≪ N=512, this is a **10.7× reduction** in attention activation mem
 
 | Component | Naive | FlashSVD | Savings |
 |-----------|------:|--------:|--------:|
-| Parameters (SVD compressed) | 256 MB | 256 MB | 0 |
-| Attention activations (est.) | 1748 MB | 452 MB | −1296 MB |
+| Parameters (SVD compressed) | 265 MB | 265 MB | 0 |
+| Attention activations (est.) | 1739 MB | 443 MB | −1296 MB |
 | Non-attn activations (est.) | ~0 MB | ~0 MB | — |
 | **Peak total** | **2004 MB** | **708 MB** | **−1296 MB (−64.7%)** |
 
@@ -361,7 +361,7 @@ The key takeaway: *swapping the inference backend saves 8× more memory than com
 
 **Scaling behavior.** The O(BHN²) term grows quadratically; parameters and non-attention activations grow at most linearly in N. As sequence length increases, FlashSVD's advantage amplifies monotonically:
 
-$$\text{Memory Reduction}(N) \approx 1 - \frac{256 + c \cdot Nr}{256 + c \cdot N^2} \xrightarrow{N \to \infty} 1 - \frac{r}{N}$$
+$$\text{Memory Reduction}(N) \approx 1 - \frac{265 + c \cdot Nr}{265 + c \cdot N^2} \xrightarrow{N \to \infty} 1 - \frac{r}{N}$$
 
 At N=128/256/512, this formula predicts ≈63%/72%/91% attention reduction; total peak savings track at 32%/49%/65% once the parameter floor and non-attention residuals are accounted for.
 

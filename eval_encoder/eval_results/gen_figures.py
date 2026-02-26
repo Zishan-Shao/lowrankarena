@@ -339,19 +339,19 @@ print('✓ fig6_pareto_front.png')
 #
 # Parameter memory  = total_compressed_params × 4 bytes (fp32)
 #   Dense:   109,483,778 × 4 = 418 MB
-#   SVD any: 67,099,394  × 4 = 256 MB
+#   SVD any:  69,375,746 × 4 = 265 MB  (from encoder_runs.csv total_compressed_params)
 #
 # Activation memory = peak_mem − param_mem
 #   Dense           :  987 − 418 = 569 MB  (SDPA, no [B,H,M,M])
-#   SVD Naive einsum: 2004 − 256 = 1748 MB (logits+A each ~384 MB)
-#   SVD Naive SDPA  : 1566 − 256 = 1310 MB
-#   SVD FlashSVD    :  708 − 256 =  452 MB
+#   SVD Naive einsum: 2004 − 265 = 1739 MB (logits+A each ~384 MB)
+#   SVD Naive SDPA  : 1566 − 265 = 1301 MB
+#   SVD FlashSVD    :  708 − 265 =  443 MB
 # ──────────────────────────────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(8, 5.2))
 
 xlabels = ['Dense\n(HF BERT)', 'SVD\nNaive (einsum)', 'SVD\nNaive (SDPA)', 'SVD\nFlashSVD']
-param_mem  = [418, 256, 256, 256]
-activ_mem  = [569, 1748, 1310, 452]
+param_mem  = [418, 265, 265, 265]
+activ_mem  = [569, 1739, 1301, 443]
 colors_p   = [C['dense'], C['einsum'], C['sdpa'], C['flash']]
 color_act  = '#AAAAAA'
 
@@ -381,13 +381,13 @@ for xi, p, a in zip(x, param_mem, activ_mem):
                 fontsize=9, color='#333333', fontweight='bold')
 
 # Highlight: param reduction Dense→SVD
-ax.annotate('', xy=(1, 256), xytext=(0, 418),
+ax.annotate('', xy=(1, 265), xytext=(0, 418),
             arrowprops=dict(arrowstyle='->', color='navy', lw=1.5))
-ax.text(0.5, 380, '−39%\nparams', ha='center', fontsize=9,
+ax.text(0.5, 380, '−37%\nparams', ha='center', fontsize=9,
         color='navy', fontweight='bold')
 
 # Highlight: FlashSVD activation vs Dense
-ax.annotate('', xy=(3, 256 + 452), xytext=(0, 418 + 569),
+ax.annotate('', xy=(3, 265 + 443), xytext=(0, 418 + 569),
             arrowprops=dict(arrowstyle='->', color='#555', lw=1.5,
                             connectionstyle='arc3,rad=0.18'))
 ax.text(1.9, 1100, 'FlashSVD total < Dense\n(708 vs 987 MB)', ha='center',
