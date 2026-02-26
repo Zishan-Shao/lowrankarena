@@ -131,44 +131,83 @@ plt.close()
 print('✓ fig2_throughput_kernels.png')
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Figure 3 — G-AVG: Per-head vs Full-matrix  (2-panel: Stage1 + Stage2)
+# Figure 3a — G-AVG Stage 1 (No Finetune): Per-head vs Full-matrix
 # ──────────────────────────────────────────────────────────────────────────────
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
-
 methods = ['SVD', 'FWSVD', 'DRONE', 'AdaSVD']
 x = np.arange(len(methods))
 w = 0.35
 
-# Panel (a): Stage1
 ph_s1 = [0.333, 0.543, 0.594, 0.389]
 fm_s1 = [0.421, 0.574, 0.604, 0.400]
 
+fig, ax = plt.subplots(figsize=(6, 5))
+b1 = ax.bar(x - w/2, ph_s1, w, label='Per-head (ra48)',     color='#4878CF', alpha=0.88)
+b2 = ax.bar(x + w/2, fm_s1, w, label='Full-matrix (ra312)', color='#E87B3E', alpha=0.88)
+for bar in list(b1) + list(b2):
+    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.009,
+            f'{bar.get_height():.3f}', ha='center', va='bottom', fontsize=8.5)
+ax.axhline(0.827, color='gray', linestyle='--', linewidth=1.4, label='Dense (0.827)')
+ax.set_xticks(x); ax.set_xticklabels(methods)
+ax.set_ylabel('GLUE Average (G-AVG)')
+ax.set_title('GLUE Average: Stage 1 — No Finetune\n'
+             '(Per-head ra48 vs Full-matrix ra312, param_ratio ≈ 0.527)')
+ax.set_ylim(0, 1.0)
+ax.legend()
+ax.grid(axis='y', linestyle='--', alpha=0.35)
+plt.tight_layout()
+plt.savefig(os.path.join(OUT_DIR, 'fig3a_glue_avg_stage1.png'), bbox_inches='tight')
+plt.close()
+print('✓ fig3a_glue_avg_stage1.png')
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Figure 3b — G-AVG Stage 2 (Post-compress Finetune): Per-head vs Full-matrix
+# ──────────────────────────────────────────────────────────────────────────────
+ph_s2 = [0.7737, 0.7963, 0.8020, 0.7837]
+fm_s2 = [0.774, None, None, None]   # FM stage2 incomplete — only SVD available
+
+fig, ax = plt.subplots(figsize=(6, 5))
+b3 = ax.bar(x - w/2, ph_s2, w, label='Per-head (ra48)', color='#4878CF', alpha=0.88)
+for bar in b3:
+    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.009,
+            f'{bar.get_height():.4f}', ha='center', va='bottom', fontsize=8.5)
+for i, val in enumerate(fm_s2):
+    if val is not None:
+        b = ax.bar(x[i] + w/2, val, w, color='#E87B3E', alpha=0.88,
+                   label='Full-matrix (ra312)')
+        ax.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
+                f'{val:.4f}', ha='center', va='bottom', fontsize=8.5)
+    else:
+        ax.text(x[i] + w/2, 0.05, 'pending', ha='center', va='bottom',
+                fontsize=8, color='#E87B3E', rotation=90, alpha=0.6)
+ax.axhline(0.833, color='gray', linestyle='--', linewidth=1.4, label='Dense-ft (0.833)')
+ax.set_xticks(x); ax.set_xticklabels(methods)
+ax.set_ylabel('GLUE Average (G-AVG)')
+ax.set_title('GLUE Average: Stage 2 — Post-compress Finetune\n'
+             '(Per-head ra48 vs Full-matrix ra312, param_ratio ≈ 0.527)')
+ax.set_ylim(0, 1.0)
+ax.legend()
+ax.grid(axis='y', linestyle='--', alpha=0.35)
+plt.tight_layout()
+plt.savefig(os.path.join(OUT_DIR, 'fig3b_glue_avg_stage2.png'), bbox_inches='tight')
+plt.close()
+print('✓ fig3b_glue_avg_stage2.png')
+
+# Keep combined version for backward compat
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
 b1 = ax1.bar(x - w/2, ph_s1, w, label='Per-head (ra48)',    color='#4878CF', alpha=0.88)
 b2 = ax1.bar(x + w/2, fm_s1, w, label='Full-matrix (ra312)', color='#E87B3E', alpha=0.88)
-
 for bar in list(b1) + list(b2):
     ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.009,
              f'{bar.get_height():.3f}', ha='center', va='bottom', fontsize=8.5)
-
 ax1.axhline(0.827, color='gray', linestyle='--', linewidth=1.4, label='Dense (0.827)')
 ax1.set_xticks(x); ax1.set_xticklabels(methods)
 ax1.set_ylabel('GLUE Average (G-AVG)')
 ax1.set_title('(a) Stage 1 — No Finetune')
-ax1.set_ylim(0, 1.0)
-ax1.legend()
-ax1.grid(axis='y', linestyle='--', alpha=0.35)
-
-# Panel (b): Stage2
-ph_s2 = [0.7737, 0.7963, 0.8020, 0.7837]
-# FM stage2 incomplete — only SVD available
-fm_s2 = [0.774, None, None, None]   # SVD-FM partial (4 tasks only, exact G-AVG TBD)
-
+ax1.set_ylim(0, 1.0); ax1.legend(); ax1.grid(axis='y', linestyle='--', alpha=0.35)
 b3 = ax2.bar(x - w/2, ph_s2, w, label='Per-head (ra48)',     color='#4878CF', alpha=0.88)
 for bar in b3:
     ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.009,
              f'{bar.get_height():.4f}', ha='center', va='bottom', fontsize=8.5)
-
-# FM bars only where available
 for i, val in enumerate(fm_s2):
     if val is not None:
         b = ax2.bar(x[i] + w/2, val, w, color='#E87B3E', alpha=0.88,
@@ -178,15 +217,11 @@ for i, val in enumerate(fm_s2):
     else:
         ax2.text(x[i] + w/2, 0.05, 'pending', ha='center', va='bottom',
                  fontsize=8, color='#E87B3E', rotation=90, alpha=0.6)
-
 ax2.axhline(0.833, color='gray', linestyle='--', linewidth=1.4, label='Dense-ft (0.833)')
 ax2.set_xticks(x); ax2.set_xticklabels(methods)
 ax2.set_ylabel('GLUE Average (G-AVG)')
 ax2.set_title('(b) Stage 2 — Post-compress Finetune')
-ax2.set_ylim(0, 1.0)
-ax2.legend()
-ax2.grid(axis='y', linestyle='--', alpha=0.35)
-
+ax2.set_ylim(0, 1.0); ax2.legend(); ax2.grid(axis='y', linestyle='--', alpha=0.35)
 fig.suptitle('GLUE Average: Per-head vs Full-matrix Compression\n'
              '(param_ratio ≈ 0.527, seq=512, bs=32, fp32)', fontsize=12)
 plt.tight_layout()

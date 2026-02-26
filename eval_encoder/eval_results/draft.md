@@ -207,7 +207,7 @@ ARS 以全矩阵语义分配 rank，budget=0.527 下某些层 Q rank 过低（AR
 
 ![Acc-Figure 1: GLUE average performance under equal parameter ratio](figures/fig3_glue_avg_ph_vs_fm.png)
 
-**Acc-Figure 1:** GLUE average performance under equal parameter ratio (~0.527). (a) Stage 1 (no finetune): Full-matrix compression consistently outperforms per-head, suggesting improved cross-head information preservation. (b) Stage 2 (post-compression finetuning): Performance recovers toward the dense baseline; the gap between compression modes narrows.
+**Acc-Figure 1:** GLUE average performance under equal parameter ratio (~0.527). (a) Stage 1 (no finetune): Full-matrix compression consistently outperforms per-head, suggesting improved cross-head information preservation. (b) Stage 2 (post-compression finetuning): Performance recovers toward the dense baseline; the gap between compression modes narrows. FM Stage 2 data partially pending (FWSVD/DRONE/AdaSVD).
 
 ![Acc-Figure 2: MRPC F1 under per-head and full-matrix compression](figures/fig4_mrpc_collapse.png)
 
