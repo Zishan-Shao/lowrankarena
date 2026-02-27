@@ -509,34 +509,30 @@ def calculate_rank_from_retention(retention: float, model_id: str = "bert-base-u
 # Step 0 (optional): Pre-train base model before compression
 # ═══════════════════════════════════════════════════════════════════════════
 
+ACCURACY_CSV_PATH   = "eval_encoder/eval_results/glue_accuracy_runs.csv"
+ACCURACY_CSV_FIELDS = [
+    "timestamp", "model_id", "task", "dataset_split",
+    "seq_len", "batch_size", "dtype",
+    "method", "qkv_mode", "rank", "budget", "backend", "stage", "seed",
+    "metric_name", "metric_value",
+    "notes",
+]
+
 def _write_csv_row(row_data: dict):
-    """Append a row to encoder_runs.csv, creating it with header if needed."""
+    """Append a row to glue_accuracy_runs.csv (accuracy-only; no mem/sps)."""
     import csv as csv_mod
-    csv_path = "eval_encoder/eval_results/encoder_runs.csv"
-    fields = [
-        "timestamp", "model_id", "task", "dataset_split", "dataset_size",
-        "seq_len", "batch_size", "dtype",
-        "method", "rank", "budget", "scope", "backend", "seed",
-        "calib_dataset", "calib_split", "calib_samples", "calib_batches", "calib_seed", "calib_seq_len",
-        "metric_name", "metric_value",
-        "latency_ms", "throughput_sps",
-        "peak_mem_infer_mb", "peak_mem_e2e_mb", "peak_mem_mb",
-        "param_ratio", "original_params", "compressed_params",
-        "total_param_ratio", "total_original_params", "total_compressed_params",
-        "notes", "git_commit",
-    ]
-    row = {f: "" for f in fields}
-    row.update(row_data)
-    write_header = not Path(csv_path).exists()
-    with open(csv_path, "a", newline="") as f:
-        writer = csv_mod.DictWriter(f, fieldnames=fields)
+    row = {f: "" for f in ACCURACY_CSV_FIELDS}
+    row.update({k: v for k, v in row_data.items() if k in ACCURACY_CSV_FIELDS})
+    write_header = not Path(ACCURACY_CSV_PATH).exists()
+    with open(ACCURACY_CSV_PATH, "a", newline="") as f:
+        writer = csv_mod.DictWriter(f, fieldnames=ACCURACY_CSV_FIELDS)
         if write_header:
             writer.writeheader()
         writer.writerow(row)
 
 
 def _write_pretrain_csv_row(pretrain_dir, task, metric_name, metric_value, args):
-    """Write pretrain baseline score directly to encoder_runs.csv."""
+    """Write pretrain baseline score to glue_accuracy_runs.csv."""
     _write_csv_row({
         "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "model_id": str(pretrain_dir),
@@ -545,8 +541,10 @@ def _write_pretrain_csv_row(pretrain_dir, task, metric_name, metric_value, args)
         "seq_len": str(args.seq_len),
         "batch_size": str(args.batch_size),
         "dtype": "fp32",
-        "method": "pretrained_base",
+        "method": "dense",
+        "qkv_mode": getattr(args, "qkv_mode", "per_head"),
         "backend": "naive",
+        "stage": "pretrain_base",
         "seed": str(args.seed),
         "metric_name": metric_name,
         "metric_value": f"{metric_value:.6f}",
@@ -588,9 +586,11 @@ def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
         "seq_len": str(args.seq_len),
         "batch_size": str(args.batch_size),
         "dtype": "fp32",
-        "method": f"{args.method}_finetuned",
+        "method": args.method,
+        "qkv_mode": getattr(args, "qkv_mode", "per_head"),
         "rank": rank_str,
         "budget": budget_str,
+        "stage": "compress_finetune",
         "seed": str(args.seed),
         "notes": f"post_compress_finetune epochs={args.num_epochs} lr={args.learning_rate}",
     }
@@ -609,6 +609,37 @@ def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
                         "metric_name": metric_name,
                         "metric_value": f"{best_value_flash:.6f}"})
         print(f"[finetune] CSV row written (flashsvd): {metric_name}={best_value_flash:.4f}")
+
+
+def _write_compress_eval_csv_rows(task, comp_info, metric_name,
+                                   value_naive, value_flash, args):
+    """Write stage1 (compress → eval, no finetune) accuracy rows to glue_accuracy_runs.csv."""
+    ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    base = {
+        "timestamp": ts,
+        "model_id": comp_info.get("model_id", ""),
+        "task": task,
+        "dataset_split": "validation",
+        "seq_len": str(args.seq_len),
+        "batch_size": str(args.batch_size),
+        "dtype": "fp32",
+        "method": comp_info.get("method", args.method),
+        "qkv_mode": getattr(args, "qkv_mode", "per_head"),
+        "rank": str(comp_info.get("rank") or ""),
+        "budget": str(getattr(args, "budget", "") or ""),
+        "stage": "compress_eval",
+        "seed": str(args.seed),
+        "metric_name": metric_name,
+        "notes": "no_finetune",
+    }
+    _write_csv_row({**base, "backend": "naive",
+                    "metric_value": f"{value_naive:.6f}"})
+    if value_flash is not None:
+        _write_csv_row({**base, "backend": "flashsvd",
+                        "metric_value": f"{value_flash:.6f}"})
+    print(f"[compress_eval] CSV rows written: naive={value_naive:.4f}"
+          + (f" flash={value_flash:.4f}" if value_flash is not None else ""))
+
 
 def pretrain_base_model(args, task: str) -> Path:
     """Fine-tune the base model (bert-base-uncased) on a task before compression.
@@ -1566,7 +1597,13 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     metric_value_flash = (results_flashsvd.get(cfg["metric"], 0)
                           if results_flashsvd is not None else None)
 
-    # Write flashsvd row to CSV
+    # Write stage1 accuracy rows to glue_accuracy_runs.csv
+    _write_compress_eval_csv_rows(
+        task, comp_info, cfg["metric"],
+        metric_value, metric_value_flash, args,
+    )
+
+    # Write flashsvd efficiency row to encoder_runs.csv (has mem/sps data)
     if results_flashsvd is not None and speed_metrics_flash is not None:
         _append_flashsvd_csv_row(
             task, comp_info, speed_metrics_flash,

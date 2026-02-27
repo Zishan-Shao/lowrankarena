@@ -77,6 +77,7 @@ PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS:-false}"
 #     bash eval_encoder/scripts/compare_all_methods.sh
 # ─────────────────────────────────────────────────────────────────────────────
 PERF_ONLY="${PERF_ONLY:-false}"
+AUTO_FIGURES="${AUTO_FIGURES:-false}"  # 所有方法跑完后自动收集结果并重新生成图表
 BATCH_SIZE="${BATCH_SIZE:-32}"
 DTYPE="${DTYPE:-fp32}"
 ATTN_MODE="${ATTN_MODE:-einsum}"      # einsum | sdpa  (naive backend only)
@@ -267,6 +268,7 @@ run_one() {
   env_prefix+=("REUSE_CHECKPOINT=${reuse_checkpoint}")
   env_prefix+=("PRETRAIN_BEFORE_COMPRESS=${PRETRAIN_BEFORE_COMPRESS}")
   env_prefix+=("NON_INTERACTIVE=true")
+  env_prefix+=("AUTO_FIGURES=false")  # 由 compare_all_methods.sh 统一在最后出图
 
   # Add component-specific ranks if set
   if [[ -n "${RANK_ATTN}" ]]; then
@@ -488,6 +490,20 @@ PY
 
 echo "Log saved to: ${SUMMARY_LOG}"
 echo "Success: ${SUCCESS}  Fail: ${FAIL}"
+
+# 自动出图
+if [ "${AUTO_FIGURES}" = "true" ]; then
+  echo ""
+  echo "════════════════════════════════════════════════════════════════════"
+  echo "Auto-generating figures"
+  echo "════════════════════════════════════════════════════════════════════"
+  FIGURES_DIR="eval_encoder/eval_results"
+  python "${FIGURES_DIR}/collect_glue_results.py" 2>&1 | tee -a "${SUMMARY_LOG}" && \
+  python "${FIGURES_DIR}/gen_figures.py"          2>&1 | tee -a "${SUMMARY_LOG}" && \
+  echo "✅ Figures updated: ${FIGURES_DIR}/figures/" | tee -a "${SUMMARY_LOG}" || \
+  echo "⚠️  Figure generation failed (results still saved)" | tee -a "${SUMMARY_LOG}"
+fi
+
 if [[ "${FAIL}" -gt 0 ]]; then
   exit 1
 fi

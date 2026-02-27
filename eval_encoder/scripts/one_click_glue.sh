@@ -63,6 +63,7 @@ ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"  # ARS 校准样本数 (pap
 ADASVD_STEPS="${ADASVD_STEPS:-800}"                   # ARS 超网络训练步数 (paper: 800)
 BACKEND="${BACKEND:-naive}"            # 后端: naive, flashsvd
 NON_INTERACTIVE="${NON_INTERACTIVE:-true}"   # 非交互模式（默认true，跳过所有提示）
+AUTO_FIGURES="${AUTO_FIGURES:-false}"  # 实验完成后自动收集结果并重新生成图表
 
 # 模型配置
 MODEL_ID="${MODEL_ID:-bert-base-uncased}"
@@ -337,6 +338,16 @@ EOF
     echo "To view results:"
     echo "  cat ${OUTPUT_DIR}/glue_results_${METHOD}_${BACKEND}_*.json | python -m json.tool"
     echo ""
+
+    # 自动出图
+    if [ "$AUTO_FIGURES" = "true" ]; then
+        print_section "Auto-generating figures"
+        FIGURES_DIR="${EVAL_ENCODER_PATH}/eval_results"
+        python "${FIGURES_DIR}/collect_glue_results.py" && \
+        python "${FIGURES_DIR}/gen_figures.py" && \
+        echo "✅ Figures updated: ${FIGURES_DIR}/figures/" || \
+        echo "⚠️  Figure generation failed (results still saved)"
+    fi
 }
 
 # ═════════════════════════════════════════════════════════════════════════════

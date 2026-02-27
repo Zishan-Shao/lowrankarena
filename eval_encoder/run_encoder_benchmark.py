@@ -1163,7 +1163,7 @@ def measure_performance(model, loader, device, warmup_steps, measure_steps, num_
 CSV_FIELDS = [
     "timestamp", "model_id", "task", "dataset_split", "dataset_size",
     "seq_len", "batch_size", "dtype",
-    "method", "rank", "budget", "scope", "backend", "attn_mode", "seed",
+    "method", "qkv_mode", "rank", "budget", "scope", "backend", "attn_mode", "seed",
     # Calibration info (for FWSVD/Whiten/Ada methods)
     "calib_dataset", "calib_split", "calib_samples", "calib_batches", "calib_seed", "calib_seq_len",
     # Cross-task display: "mnli:train → hans:validation" — convenience for debugging
@@ -1354,6 +1354,7 @@ def write_csv_row(args, metric_name, metric_value,
         "batch_size": args.batch_size,
         "dtype": args.dtype,
         "method": args.method,
+        "qkv_mode": getattr(args, 'qkv_mode', 'per_head'),
         "rank": (
             f"ra{args.rank_attn if args.rank_attn is not None else args.rank}"
             f"_rf{args.rank_ffn if args.rank_ffn is not None else args.rank}"

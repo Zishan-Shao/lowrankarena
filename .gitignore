@@ -71,6 +71,7 @@ eval_encoder/docs/docker/
 
 # GLUE evaluation results (runtime generated)
 eval_encoder/glue_results/
+glue_results/
 eval_encoder/logs/
 
 # Backup and archived files

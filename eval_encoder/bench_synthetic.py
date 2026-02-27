@@ -60,6 +60,7 @@ CSV_PATH = os.path.join(OUT_DIR, "batch_scaling.csv")
 os.makedirs(FIG_DIR, exist_ok=True)
 
 CSV_FIELDS = [
+    "model_id", "method", "qkv_mode", "rank",
     "bs", "seq_len", "dtype", "backend", "attn_mode",
     "latency_ms", "throughput_sps", "peak_mem_infer_mb",
 ]
@@ -219,6 +220,10 @@ def run_benchmark(args) -> List[dict]:
                 print(f"lat={lat:6.1f} ms  thr={thr:6.0f} sps  mem={mem:6.0f} MB")
 
                 rows.append({
+                    "model_id":          args.model_id,
+                    "method":            "svd",
+                    "qkv_mode":          "per_head",
+                    "rank":              f"ra{RANK_ATTN}_rf{RANK_FFN}_rw{RANK_WO}",
                     "bs":                bs,
                     "seq_len":           args.seq_len,
                     "dtype":             dtype_str,
@@ -232,6 +237,9 @@ def run_benchmark(args) -> List[dict]:
             except torch.cuda.OutOfMemoryError:
                 print("OOM")
                 rows.append({
+                    "model_id": args.model_id, "method": "svd",
+                    "qkv_mode": "per_head",
+                    "rank": f"ra{RANK_ATTN}_rf{RANK_FFN}_rw{RANK_WO}",
                     "bs": bs, "seq_len": args.seq_len,
                     "dtype": dtype_str, "backend": backend, "attn_mode": attn_mode,
                     "latency_ms": "OOM", "throughput_sps": "OOM",
