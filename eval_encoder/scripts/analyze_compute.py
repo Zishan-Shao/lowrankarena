@@ -554,6 +554,9 @@ def main():
         model, tokenizer, comp_info = load_compressed_model(
             args.model_dir, device=args.device, dtype=dtype)
         model_id = comp_info.get("model_id") or args.model_id or "unknown"
+        # infer method from comp_info if not overridden on CLI
+        if args.method == "svd":   # default value = not explicitly set
+            args.method = comp_info.get("method", args.method)
     else:
         # on-the-fly compression (slow path)
         print(f"[compress] Compressing {args.method} rank={args.rank} ...")
@@ -616,7 +619,8 @@ def main():
         lat_s = lat_ms / 1000.0
         achieved_tflops = totals["total_flops"] / lat_s / 1e12
         row = {
-            "task": args.task, "backend": args.backend, "dtype": args.dtype,
+            "task": args.task, "method": args.method,
+            "backend": args.backend, "dtype": args.dtype,
             "seq_len": args.seq_len, "batch_size": args.batch_size,
             "useful_tflops": f"{totals['useful_flops']/lat_s/1e12:.3f}",
             "padding_tflops": f"{totals['padding_flops']/lat_s/1e12:.3f}",
