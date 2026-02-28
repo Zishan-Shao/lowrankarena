@@ -370,9 +370,12 @@ def parse_args():
     parser.add_argument("--qkv_mode", choices=["per_head", "full"], default="per_head",
                         help="QKV factorization mode: 'per_head' (rank limited to head_dim=64) "
                              "or 'full' (paper-style, rank can be 256+). FlashSVD only supports per_head.")
-    parser.add_argument("--backend", choices=["naive", "flashsvd"],
+    parser.add_argument("--backend", choices=["naive", "flashsvd", "flashsvd15"],
                         default="naive",
                         help="Execution backend")
+    parser.add_argument("--dtype", choices=["fp32", "fp16", "bf16"], default="fp32",
+                        help="Model dtype for compression and evaluation "
+                             "(flashsvd15 + bf16 gives real speedup with zero cast overhead)")
     parser.add_argument("--calib_batches", type=int, default=4,
                         help="Number of calibration batches for FWSVD/DRONE/AdaSVD (default: 4)")
     parser.add_argument("--calib_task", default=None,
@@ -509,6 +512,8 @@ def calculate_rank_from_retention(retention: float, model_id: str = "bert-base-u
 # Step 0 (optional): Pre-train base model before compression
 # ═══════════════════════════════════════════════════════════════════════════
 
+DTYPE_MAP = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
+
 ACCURACY_CSV_PATH   = "eval_encoder/eval_results/glue_accuracy_runs.csv"
 ACCURACY_CSV_FIELDS = [
     "timestamp", "model_id", "task", "dataset_split",
@@ -540,7 +545,7 @@ def _write_pretrain_csv_row(pretrain_dir, task, metric_name, metric_value, args)
         "dataset_split": "validation",
         "seq_len": str(args.seq_len),
         "batch_size": str(args.batch_size),
-        "dtype": "fp32",
+        "dtype": getattr(args, "dtype", "fp32"),
         "method": "dense",
         "qkv_mode": getattr(args, "qkv_mode", "per_head"),
         "backend": "naive",
@@ -585,7 +590,7 @@ def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
         "dataset_split": "validation",
         "seq_len": str(args.seq_len),
         "batch_size": str(args.batch_size),
-        "dtype": "fp32",
+        "dtype": getattr(args, "dtype", "fp32"),
         "method": args.method,
         "qkv_mode": getattr(args, "qkv_mode", "per_head"),
         "rank": rank_str,
@@ -612,7 +617,8 @@ def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
 
 
 def _write_compress_eval_csv_rows(task, comp_info, metric_name,
-                                   value_naive, value_flash, args):
+                                   value_naive, value_flash, args,
+                                   value_flash15=None):
     """Write stage1 (compress → eval, no finetune) accuracy rows to glue_accuracy_runs.csv."""
     ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     base = {
@@ -622,7 +628,7 @@ def _write_compress_eval_csv_rows(task, comp_info, metric_name,
         "dataset_split": "validation",
         "seq_len": str(args.seq_len),
         "batch_size": str(args.batch_size),
-        "dtype": "fp32",
+        "dtype": getattr(args, "dtype", "fp32"),
         "method": comp_info.get("method", args.method),
         "qkv_mode": getattr(args, "qkv_mode", "per_head"),
         "rank": str(comp_info.get("rank") or ""),
@@ -637,8 +643,12 @@ def _write_compress_eval_csv_rows(task, comp_info, metric_name,
     if value_flash is not None:
         _write_csv_row({**base, "backend": "flashsvd",
                         "metric_value": f"{value_flash:.6f}"})
+    if value_flash15 is not None:
+        _write_csv_row({**base, "backend": "flashsvd15",
+                        "metric_value": f"{value_flash15:.6f}"})
     print(f"[compress_eval] CSV rows written: naive={value_naive:.4f}"
-          + (f" flash={value_flash:.4f}" if value_flash is not None else ""))
+          + (f" flash={value_flash:.4f}" if value_flash is not None else "")
+          + (f" flash15={value_flash15:.4f}" if value_flash15 is not None else ""))
 
 
 def pretrain_base_model(args, task: str) -> Path:
@@ -852,9 +862,9 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
         print(f"[model] Using model: {model_id}")
 
     # Validate incompatible option combinations
-    if getattr(args, "qkv_mode", "per_head") == "full" and getattr(args, "backend", "naive") == "flashsvd":
+    if getattr(args, "qkv_mode", "per_head") == "full" and getattr(args, "backend", "naive") in ("flashsvd", "flashsvd15"):
         raise ValueError(
-            "--qkv_mode full is not compatible with --backend flashsvd. "
+            f"--qkv_mode full is not compatible with --backend {args.backend}. "
             "FlashSVD kernels require per-head format (use --qkv_mode per_head)."
         )
 
@@ -939,7 +949,7 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
         "--task", validation_task,
         "--seq_len", str(args.seq_len),
         "--batch_size", str(args.batch_size),
-        "--dtype", "fp32",
+        "--dtype", getattr(args, "dtype", "fp32"),
         "--save_model",
         "--save_dir", save_dir,
         "--full_validation",
@@ -1398,16 +1408,22 @@ def benchmark_inference_speed(model, val_loader, device, warmup_steps=10, measur
     }
 
 def _append_flashsvd_csv_row(task, comp_info, speed_metrics, metric_name, metric_value,
-                              csv_path="eval_encoder/eval_results/encoder_runs.csv"):
-    """Append a flashsvd benchmark row to encoder_runs.csv.
+                              csv_path="eval_encoder/eval_results/encoder_runs.csv",
+                              backend="flashsvd"):
+    """Append a flashsvd/flashsvd15 benchmark row to encoder_runs.csv.
 
     Finds the most recent naive row matching (model_id, task, method) and copies
     all parameter/dataset fields — only backend, speed metrics, and accuracy differ.
     FlashSVD shares parameters with naive, so param counts are identical.
+
+    Parameters
+    ----------
+    backend : str
+        The backend label to write: ``"flashsvd"`` or ``"flashsvd15"``.
     """
     import csv as csv_mod
     if not os.path.exists(csv_path):
-        print(f"[csv] Skipping flashsvd row: {csv_path} not found")
+        print(f"[csv] Skipping {backend} row: {csv_path} not found")
         return
 
     model_id = comp_info.get('model_id', '')
@@ -1429,14 +1445,14 @@ def _append_flashsvd_csv_row(task, comp_info, speed_metrics, metric_name, metric
             break
 
     if matching_row is None:
-        print(f"[csv] Skipping flashsvd row: no matching naive row for "
+        print(f"[csv] Skipping {backend} row: no matching naive row for "
               f"model={model_id} task={task} method={method}")
         return
 
-    # Build flashsvd row: copy naive row, update only what differs
+    # Build flashsvd/flashsvd15 row: copy naive row, update only what differs
     flash_row = dict(matching_row)
     flash_row['timestamp']        = datetime.now().isoformat(timespec='seconds')
-    flash_row['backend']          = 'flashsvd'
+    flash_row['backend']          = backend
     flash_row['metric_value']     = f"{metric_value:.6f}"
     flash_row['latency_ms']       = f"{speed_metrics['latency_ms_per_batch']:.2f}"
     flash_row['throughput_sps']   = f"{speed_metrics['throughput_samples_per_sec']:.1f}"
@@ -1452,7 +1468,7 @@ def _append_flashsvd_csv_row(task, comp_info, speed_metrics, metric_name, metric
     with open(csv_path, 'a', newline='', encoding='utf-8') as f:
         writer = csv_mod.DictWriter(f, fieldnames=fieldnames)
         writer.writerow(flash_row)
-    print(f"[csv] ✅ FlashSVD row appended to {csv_path}")
+    print(f"[csv] ✅ {backend} row appended to {csv_path}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1468,13 +1484,18 @@ def _get_encoder_layers(model):
     return None
 
 
-def _enable_flashsvd_save(model):
-    """Enable FlashSVD in-place; return saved (layer, naive_block) pairs for restore.
+def _enable_flashsvd_save(model, backend="flashsvd"):
+    """Enable FlashSVD (v1 or v1.5) in-place; return saved (layer, naive_block) pairs for restore.
 
     The FlashSVDBlock shares all nn.Parameter objects with the original NaiveSVDBlock
     (no copies), so the saved naive_block references remain valid after training.
     """
-    from eval_encoder.flashsvd_backend import enable_flashsvd
+    if backend == "flashsvd15":
+        from eval_encoder.flashsvd_backend import enable_flashsvd15
+        _enable_fn = enable_flashsvd15
+    else:
+        from eval_encoder.flashsvd_backend import enable_flashsvd
+        _enable_fn = enable_flashsvd
     layers = _get_encoder_layers(model)
     saved = []
     if layers is not None:
@@ -1482,7 +1503,7 @@ def _enable_flashsvd_save(model):
             block = getattr(layer, 'block', None)
             if block is not None and type(block).__name__ in ('NaiveSVDBlock', 'MinimalSVDBlock'):
                 saved.append((layer, block))
-    enable_flashsvd(model)
+    _enable_fn(model)
 
     # Verify parameter identity: FlashSVDBlock must hold the SAME Parameter objects
     # as NaiveSVDBlock (not copies). If this assert fires, FlashSVDBlock.__init__
@@ -1524,10 +1545,11 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     start_time = time.time()
 
     # Load compressed model
+    _dtype = DTYPE_MAP.get(getattr(args, "dtype", "fp32"), torch.float32)
     model, tokenizer, comp_info = load_compressed_model(
         str(checkpoint_path),
         device=device,
-        dtype=torch.float32,
+        dtype=_dtype,
     )
 
     # Prepare data
@@ -1577,6 +1599,27 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         except RuntimeError as e:
             print(f"[eval] FlashSVD unavailable: {e}")
 
+    # Evaluate + benchmark with flashsvd15 backend (SVD methods only, per_head only)
+    results_flashsvd15 = None
+    speed_metrics_flash15 = None
+    if _comp_method != 'dense' and getattr(args, 'qkv_mode', 'per_head') == 'per_head':
+        try:
+            from eval_encoder.flashsvd_backend import enable_flashsvd15
+            enable_flashsvd15(model)
+            print(f"\n[eval] Evaluating with flashsvd15 backend...")
+            results_flashsvd15, _ = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
+            print(f"[eval] flashsvd15: {results_flashsvd15}")
+
+            print(f"\n{'='*70}")
+            print("STEP 3c: Inference Speed Benchmark (flashsvd15)")
+            print("="*70)
+            speed_metrics_flash15 = benchmark_inference_speed(
+                model, val_loader, device,
+                warmup_steps=10, measure_steps=50
+            )
+        except RuntimeError as e:
+            print(f"[eval] FlashSVD15 unavailable: {e}")
+
     results = results_naive
 
     # Record end time
@@ -1586,9 +1629,11 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     print(f"\n{'='*70}")
     print(f"Evaluation Complete: {task.upper()}")
     print("="*70)
-    print(f"Naive:    {results_naive}")
+    print(f"Naive:      {results_naive}")
     if results_flashsvd is not None:
-        print(f"FlashSVD: {results_flashsvd}")
+        print(f"FlashSVD:   {results_flashsvd}")
+    if results_flashsvd15 is not None:
+        print(f"FlashSVD15: {results_flashsvd15}")
     print(f"Time:    {eval_time:.1f} seconds")
     print("="*70)
 
@@ -1596,11 +1641,14 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     metric_value = results_naive.get(cfg["metric"], 0)
     metric_value_flash = (results_flashsvd.get(cfg["metric"], 0)
                           if results_flashsvd is not None else None)
+    metric_value_flash15 = (results_flashsvd15.get(cfg["metric"], 0)
+                            if results_flashsvd15 is not None else None)
 
     # Write stage1 accuracy rows to glue_accuracy_runs.csv
     _write_compress_eval_csv_rows(
         task, comp_info, cfg["metric"],
         metric_value, metric_value_flash, args,
+        value_flash15=metric_value_flash15,
     )
 
     # Write flashsvd efficiency row to encoder_runs.csv (has mem/sps data)
@@ -1608,6 +1656,15 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         _append_flashsvd_csv_row(
             task, comp_info, speed_metrics_flash,
             cfg["metric"], metric_value_flash,
+            backend="flashsvd",
+        )
+
+    # Write flashsvd15 efficiency row to encoder_runs.csv
+    if results_flashsvd15 is not None and speed_metrics_flash15 is not None:
+        _append_flashsvd_csv_row(
+            task, comp_info, speed_metrics_flash15,
+            cfg["metric"], metric_value_flash15,
+            backend="flashsvd15",
         )
 
     return {
@@ -1623,11 +1680,14 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
             "initial": results_naive,
             "initial_naive": results_naive,
             "initial_flashsvd": results_flashsvd,
+            "initial_flashsvd15": results_flashsvd15,
             "final": results_naive,
             "final_naive": results_naive,
             "final_flashsvd": results_flashsvd,
+            "final_flashsvd15": results_flashsvd15,
             "best_value": metric_value,
             "best_value_flashsvd": metric_value_flash,
+            "best_value_flashsvd15": metric_value_flash15,
             "improvement": 0.0,  # No improvement without fine-tuning
         },
         "training": {
@@ -1641,6 +1701,7 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         "inference_speed": speed_metrics_naive,
         "inference_speed_naive": speed_metrics_naive,
         "inference_speed_flashsvd": speed_metrics_flash,
+        "inference_speed_flashsvd15": speed_metrics_flash15,
         # Legacy fields for backward compatibility
         "initial_results": results_naive,
         "initial_results_naive": results_naive,
@@ -1651,6 +1712,7 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         "best_metric": cfg["metric"],
         "best_value": metric_value,
         "best_value_flashsvd": metric_value_flash,
+        "best_value_flashsvd15": metric_value_flash15,
     }
 
 
@@ -1678,10 +1740,11 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
     start_time = time.time()
 
     # Load compressed model
+    _dtype = DTYPE_MAP.get(getattr(args, "dtype", "fp32"), torch.float32)
     model, tokenizer, comp_info = load_compressed_model(
         str(checkpoint_path),
         device=device,
-        dtype=torch.float32,
+        dtype=_dtype,
     )
 
     # Prepare data
@@ -1740,12 +1803,13 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
         except RuntimeError as e:
             print(f"[eval] FlashSVD unavailable for initial eval: {e}")
 
-    # Safety check: ensure no FlashSVDBlock is present before training.
+    # Safety check: ensure no FlashSVDBlock/FlashSVD15Block is present before training.
     # Triton kernels don't support autograd; training through them would silently
     # produce zero gradients or crash.
-    from eval_encoder.flashsvd_backend import FlashSVDBlock as _FSB
+    from eval_encoder.flashsvd_backend import FlashSVDBlock as _FSB, FlashSVD15Block as _FSB15
     _flash_found = [type(m).__name__ for m in model.modules()
-                    if isinstance(m, _FSB) or type(m).__name__ == 'FlashSVDBlock']
+                    if isinstance(m, (_FSB, _FSB15))
+                    or type(m).__name__ in ('FlashSVDBlock', 'FlashSVD15Block')]
     assert not _flash_found, (
         f"FlashSVDBlock found in model before training: {_flash_found}. "
         "_restore_naive() must be called before the training loop."

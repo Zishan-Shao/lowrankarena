@@ -61,7 +61,10 @@ BUDGET="${BUDGET:-0.6}"                # AdaSVD 预算 (仅当 METHOD=adasvd 时
                                        # 注意: 0.3太激进，准确率会显著下降
 ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"  # ARS 校准样本数 (paper: ~4000)
 ADASVD_STEPS="${ADASVD_STEPS:-800}"                   # ARS 超网络训练步数 (paper: 800)
-BACKEND="${BACKEND:-naive}"            # 后端: naive, flashsvd
+BACKEND="${BACKEND:-naive}"            # 后端: naive, flashsvd, flashsvd15
+                                       # flashsvd15 后端建议使用 bf16 获得真实加速效果
+DTYPE="${DTYPE:-fp32}"                 # 模型精度: fp32, fp16, bf16
+                                       # --dtype bf16 + --backend flashsvd15 = 零 cast overhead
 NON_INTERACTIVE="${NON_INTERACTIVE:-true}"   # 非交互模式（默认true，跳过所有提示）
 AUTO_FIGURES="${AUTO_FIGURES:-false}"  # 实验完成后自动收集结果并重新生成图表
 
@@ -200,6 +203,7 @@ Configuration:
   QKV Mode:      $QKV_MODE
   Calib Batches: $CALIB_BATCHES
   Backend:       $BACKEND
+  Dtype:         $DTYPE
   Model:         $MODEL_ID
   Use Task Models: $USE_TASK_MODELS
   Tasks:         $TASKS
@@ -262,6 +266,7 @@ EOF
     CMD="python ${EVAL_ENCODER_PATH}/glue_pipeline.py \
         --method \"$METHOD\" \
         --backend \"$BACKEND\" \
+        --dtype \"$DTYPE\" \
         --model_id \"$MODEL_ID\" \
         --tasks $TASKS \
         --num_epochs \"$NUM_EPOCHS\" \

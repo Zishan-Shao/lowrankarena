@@ -62,7 +62,8 @@ TWO_STAGE="${TWO_STAGE:-false}"
 
 # Backends to test
 # For quick test: only naive (faster, works for all methods)
-# For full test: "flashsvd naive" (test both backends)
+# For full test: "naive flashsvd flashsvd15" (test all backends)
+# Note: flashsvd15 + DTYPE=bf16 gives real speedup with no cast overhead
 BACKENDS="${BACKENDS:-naive}"
 MODEL_ID="${MODEL_ID:-bert-base-uncased}"
 PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS:-false}"
@@ -419,21 +420,38 @@ def stage_backend_maps(mp):
 def fmt(v):
     return "-    " if v is None else f"{v:.4f}"
 
+def _backend_avgs(results, tasks_order, val_key):
+    """Compute G-Avg and A-Avg for a given backend value key."""
+    gvals, avals = [], []
+    for t in tasks_order:
+        res = results.get(t)
+        vf = _get(res, val_key)
+        if vf is not None:
+            metric = (res.get("best_metric") or
+                      res.get("metrics", {}).get("primary_metric", ""))
+            norm = (vf + 1) / 2 if metric in ("matthews_correlation", "pearson") else vf
+            gvals.append(norm)
+            if metric == "accuracy":
+                avals.append(vf)
+    g = sum(gvals) / len(gvals) if gvals else None
+    a = sum(avals) / len(avals) if avals else None
+    return g, a
+
 def print_table(stage, mm):
-    """Print one table per stage showing both naive (N) and flashsvd (F) accuracy."""
+    """Print one table per stage: naive (N), flashsvd (F), flashsvd15 (F15)."""
     methods_order = ["dense","svd","fwsvd","drone","adasvd"]
-    W = 10 + len(tasks_order) * 14 + 20
+    W = 10 + len(tasks_order) * 21 + 32
     print("=" * W)
-    print(f"Stage: {stage}   (N = naive backend, F = flashsvd backend)")
+    print(f"Stage: {stage}   (N=naive  F=flashsvd  F15=flashsvd15)")
     print("=" * W)
     # Header
     hdr = f"{'Method':<9}"
     for t in tasks_order:
-        hdr += f"  {task_hdr[t]:>11}"
-    hdr += f"  {'G-Avg':>6}  {'A-Avg':>6}"
+        hdr += f"  {task_hdr[t]:>17}"
+    hdr += f"  {'G-Avg':>11}  {'A-Avg':>11}"
     print(hdr)
-    print(f"{'':9}" + "".join(f"  {'N':>5} {'F':>5}" for _ in tasks_order) +
-          f"  {'N':>3} {'F':>3}  {'N':>3} {'F':>3}")
+    print(f"{'':9}" + "".join(f"  {'N':>5} {'F':>5} {'F15':>5}" for _ in tasks_order) +
+          f"  {'N':>4} {'F':>3} {'F15':>3}  {'N':>4} {'F':>3} {'F15':>3}")
     print("-" * W)
 
     # Collect all paths from any backend key in mm (we pick the first available)
@@ -453,28 +471,17 @@ def print_table(stage, mm):
         row = f"{m:<9}"
         for t in tasks_order:
             res = results.get(t)
-            # Naive: best_value (primary); FlashSVD: best_value_flashsvd
-            vn = _get(res, "best_value")
-            vf = _get(res, "best_value_flashsvd")
-            row += f"  {fmt(vn)} {fmt(vf)}"
+            vn  = _get(res, "best_value")
+            vf  = _get(res, "best_value_flashsvd")
+            vf15 = _get(res, "best_value_flashsvd15")
+            row += f"  {fmt(vn)} {fmt(vf)} {fmt(vf15)}"
         summ = obj.get("summary", {})
         gn = float(summ.get("G-Avg", {}).get("final", 0.0))
         an = float(summ.get("A-Avg", {}).get("final", 0.0))
-        # FlashSVD G-Avg / A-Avg: compute from per-task flashsvd values
-        gf_vals, af_vals = [], []
-        for t in tasks_order:
-            res = results.get(t)
-            vf = _get(res, "best_value_flashsvd")
-            if vf is not None:
-                metric = (res.get("best_metric") or
-                          res.get("metrics", {}).get("primary_metric", ""))
-                norm = (vf + 1) / 2 if metric in ("matthews_correlation", "pearson") else vf
-                gf_vals.append(norm)
-                if metric == "accuracy":
-                    af_vals.append(vf)
-        gf = sum(gf_vals) / len(gf_vals) if gf_vals else None
-        af = sum(af_vals) / len(af_vals) if af_vals else None
-        row += f"  {gn:.3f} {fmt(gf)[:5]}  {an:.3f} {fmt(af)[:5]}"
+        gf,  af  = _backend_avgs(results, tasks_order, "best_value_flashsvd")
+        gf15, af15 = _backend_avgs(results, tasks_order, "best_value_flashsvd15")
+        row += f"  {gn:.3f} {fmt(gf)[:5]} {fmt(gf15)[:5]}"
+        row += f"  {an:.3f} {fmt(af)[:5]} {fmt(af15)[:5]}"
         print(row)
     print()
 

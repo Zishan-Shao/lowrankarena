@@ -27,24 +27,19 @@ except ImportError:
 # ---------------------------------------------------------------------------
 _flash_svd_attention = None
 _flashsvd_ffn_v1 = None
+_flash_svd_attention_v15 = None
+_flashsvd_ffn_v15_fn = None
 
 
-def _import_kernels():
-    global _flash_svd_attention, _flashsvd_ffn_v1
-    if _flash_svd_attention is not None:
-        return  # already imported
-
-    # Ensure the encoder-kernel directory is importable
-    # Try local kernels first (for standalone/Docker deployment)
+def _resolve_kernel_dir():
+    """Return the encoder-kernel directory path."""
     local_kernel_dir = os.path.join(os.path.dirname(__file__), "kernels")
-    # Fall back to repository structure
     _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     repo_kernel_dir = os.path.join(_REPO_ROOT, "kernels", "encoder_kernels")
-
     if os.path.isdir(local_kernel_dir):
-        kernel_dir = local_kernel_dir
+        return local_kernel_dir
     elif os.path.isdir(repo_kernel_dir):
-        kernel_dir = repo_kernel_dir
+        return repo_kernel_dir
     else:
         raise RuntimeError(
             f"FlashSVD kernel directory not found.\n"
@@ -52,6 +47,13 @@ def _import_kernels():
             "Make sure kernels are available."
         )
 
+
+def _import_kernels():
+    global _flash_svd_attention, _flashsvd_ffn_v1
+    if _flash_svd_attention is not None:
+        return  # already imported
+
+    kernel_dir = _resolve_kernel_dir()
     if kernel_dir not in sys.path:
         sys.path.insert(0, kernel_dir)
 
@@ -67,6 +69,29 @@ def _import_kernels():
 
     _flash_svd_attention = flash_svd_attention
     _flashsvd_ffn_v1 = flashsvd_ffn_v1
+
+
+def _import_kernels_v15():
+    global _flash_svd_attention_v15, _flashsvd_ffn_v15_fn
+    if _flash_svd_attention_v15 is not None:
+        return  # already imported
+
+    kernel_dir = _resolve_kernel_dir()
+    if kernel_dir not in sys.path:
+        sys.path.insert(0, kernel_dir)
+
+    try:
+        from flashsvdattn15 import flash_svd_attention_v15
+        from flashsvdffnv15 import flashsvd_ffn_v15
+    except ImportError as e:
+        raise RuntimeError(
+            "Cannot import FlashSVD v1.5 Triton kernels. "
+            "Ensure Triton is installed (`pip install triton`) and a CUDA GPU "
+            f"is available.\nOriginal error: {e}"
+        ) from e
+
+    _flash_svd_attention_v15 = flash_svd_attention_v15
+    _flashsvd_ffn_v15_fn = flashsvd_ffn_v15
 
 
 # ---------------------------------------------------------------------------
@@ -248,4 +273,170 @@ def enable_flashsvd(model: nn.Module) -> nn.Module:
         print(f"[flashsvd] Already enabled ({already_flash} layers) — no-op.")
     else:
         print(f"[flashsvd] Patched {patched} encoder layers with FlashSVD kernels.")
+    return model
+
+
+# ---------------------------------------------------------------------------
+# FlashSVD15Block – v1.5 kernels (rank-space kernel, native fp16/bf16, no expand)
+# ---------------------------------------------------------------------------
+class FlashSVD15Block(nn.Module):
+    """Drop-in replacement for NaiveSVDBlock using FlashSVD v1.5 Triton kernels.
+
+    Key differences from FlashSVDBlock (v1):
+    - Attention: passes V/bias as [H,R,D]/[H,D] directly (no batch-dim expand)
+    - FFN: uses flashsvd_ffn_v15 with native fp16/bf16 support and fp32 auto-cast
+
+    Parameters are *shared* (not copied) from the source NaiveSVDBlock.
+    """
+
+    def __init__(self, naive_block: NaiveSVDBlock):
+        super().__init__()
+        _import_kernels_v15()
+
+        # Share every parameter tensor (no copy)
+        self.Pq = naive_block.Pq
+        self.Vq = naive_block.Vq
+        self.bq = naive_block.bq
+        self.Pk = naive_block.Pk
+        self.Vk = naive_block.Vk
+        self.bk = naive_block.bk
+        self.Pv = naive_block.Pv
+        self.Vv = naive_block.Vv
+        self.bv = naive_block.bv
+
+        self.Uo = naive_block.Uo
+        self.Vo = naive_block.Vo
+        self.bo_attn = naive_block.bo_attn
+
+        self.U1 = naive_block.U1
+        self.V1 = naive_block.V1
+        self.b1 = naive_block.b1
+        self.U2 = naive_block.U2
+        self.V2 = naive_block.V2
+        self.b2 = naive_block.b2
+
+        self.ln1 = naive_block.ln1
+        self.ln2 = naive_block.ln2
+
+        # Pre-squeeze bias from [1, H, 1, dh] → [1, H, dh] for kernel compat
+        # v1.5 kernel auto-strips the leading 1 for bq/bv; bk is softmax-invariant.
+        self._bq_sq = nn.Parameter(naive_block.bq.data.squeeze(2))
+        self._bk_sq = nn.Parameter(naive_block.bk.data.squeeze(2))
+        self._bv_sq = nn.Parameter(naive_block.bv.data.squeeze(2))
+
+    # -----------------------------------------------------------------
+    def forward(self, x, mask=None):
+        B, M, dm = x.shape
+        # Pq stored as [1, H, dm, R] (NaiveSVDBlock) or [H, dm, R] (checkpoint)
+        Pq = self.Pq[0] if self.Pq.ndim == 4 else self.Pq  # [H, dm, R]
+        Pk = self.Pk[0] if self.Pk.ndim == 4 else self.Pk
+        Pv = self.Pv[0] if self.Pv.ndim == 4 else self.Pv
+        H = Pq.shape[0]
+        R = Pq.shape[2]
+
+        # --- project x into low-rank space per head ---
+        tmp_q = torch.einsum("bmd,hdr->bhmr", x, Pq).contiguous()
+        tmp_k = torch.einsum("bmd,hdr->bhmr", x, Pk).contiguous()
+        tmp_v = torch.einsum("bmd,hdr->bhmr", x, Pv).contiguous()
+
+        # Vq stored as [1, H, R, dh] or [H, R, dh] — v1.5 handles both
+        Vq_b = self.Vq[0] if self.Vq.ndim == 4 else self.Vq  # [H, R, dh]
+        Vk_b = self.Vk[0] if self.Vk.ndim == 4 else self.Vk
+        Vv_b = self.Vv[0] if self.Vv.ndim == 4 else self.Vv
+
+        # v1.5: pass V/bias without batch expansion; kernel accepts [H,R,D] and [1,H,D]
+        if mask is not None:
+            mask4 = mask.view(B, 1, 1, M)
+        else:
+            mask4 = torch.ones(B, 1, 1, M, dtype=torch.bool, device=x.device)
+
+        attn_out = _flash_svd_attention_v15(
+            tmp_q, Vq_b, self._bq_sq,
+            tmp_k, Vk_b, self._bk_sq,
+            tmp_v, Vv_b, self._bv_sq,
+            mask=mask4,
+            block_r=R,
+        )
+        del tmp_q, tmp_k, tmp_v
+
+        dh = dm // H
+        attn = attn_out.view(B, H, M, dh).transpose(1, 2).reshape(B, M, dm)
+        x1 = self.ln1(x + (attn @ self.Uo) @ self.Vo + self.bo_attn)
+
+        # --- FlashSVD v1.5 FFN (native fp16/bf16; fp32 auto-cast fallback) ---
+        mid = x1 @ self.U1
+        y = _flashsvd_ffn_v15_fn(mid, self.V1, self.U2, self.V2, self.b1, self.b2)
+        return self.ln2(x1 + y)
+
+
+# ---------------------------------------------------------------------------
+# Public API – v1.5
+# ---------------------------------------------------------------------------
+def enable_flashsvd15(model: nn.Module) -> nn.Module:
+    """Patch a model in-place: swap every NaiveSVDBlock for a FlashSVD15Block.
+
+    Parameters
+    ----------
+    model : nn.Module
+        A ``BertForSequenceClassification`` (or similar) whose encoder layers
+        have been wrapped with ``BertLayerShim(NaiveSVDBlock(...))``.
+
+    Returns
+    -------
+    model : nn.Module   (same object, mutated in-place)
+    """
+    _import_kernels_v15()  # fail-fast if kernels are missing
+
+    # Locate encoder layers
+    model_type = getattr(model.config, "model_type", "").lower()
+    encoder_layers = None
+    if model_type == "modernbert":
+        raise RuntimeError(
+            "enable_flashsvd15: ModernBERT requires different Triton kernels "
+            "that are not yet integrated. Use --backend naive for ModernBERT."
+        )
+    elif hasattr(model, "bert"):
+        encoder_layers = model.bert.encoder.layer
+    elif hasattr(model, "roberta"):
+        encoder_layers = model.roberta.encoder.layer
+    else:
+        raise RuntimeError(
+            "enable_flashsvd15: cannot find .bert.encoder.layer or "
+            ".roberta.encoder.layer on the supplied model."
+        )
+
+    patched = 0
+    already_flash = 0
+    for i, layer in enumerate(encoder_layers):
+        block = getattr(layer, "block", None)
+        _cls_name = type(block).__name__ if block is not None else ""
+
+        # Idempotency: skip layers that are already FlashSVD15Block
+        if _cls_name == "FlashSVD15Block" or isinstance(block, FlashSVD15Block):
+            already_flash += 1
+            continue
+
+        is_svd_block = (
+            isinstance(block, NaiveSVDBlock)
+            or (MinimalSVDBlock and isinstance(block, MinimalSVDBlock))
+            or _cls_name in ("NaiveSVDBlock", "MinimalSVDBlock", "FlashSVDBlock")
+        )
+        if is_svd_block:
+            # If already a FlashSVDBlock, unwrap to the underlying naive params
+            # by building FlashSVD15Block from it (it stores all the same tensors)
+            flash15_block = FlashSVD15Block(block)
+            layer.block = flash15_block
+            patched += 1
+
+    if patched == 0 and already_flash == 0:
+        raise RuntimeError(
+            "enable_flashsvd15: no SVD block instances found. "
+            "Did you run compression (--method != dense) before calling "
+            "enable_flashsvd15?"
+        )
+
+    if already_flash > 0 and patched == 0:
+        print(f"[flashsvd15] Already enabled ({already_flash} layers) — no-op.")
+    else:
+        print(f"[flashsvd15] Patched {patched} encoder layers with FlashSVD v1.5 kernels.")
     return model

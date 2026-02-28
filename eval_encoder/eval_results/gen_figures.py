@@ -53,36 +53,40 @@ plt.rcParams.update({
 
 # Palette
 C = {
-    'dense':  '#4878CF',   # blue
-    'einsum': '#E87B3E',   # orange
-    'sdpa':   '#6ACC65',   # green
-    'flash':  '#D65F5F',   # red
-    'svd':    '#4878CF',
-    'fwsvd':  '#E87B3E',
-    'drone':  '#6ACC65',
-    'adasvd': '#956CB4',
+    'dense':   '#4878CF',   # blue
+    'einsum':  '#E87B3E',   # orange
+    'sdpa':    '#6ACC65',   # green
+    'flash':   '#D65F5F',   # red
+    'flash15': '#A0522D',   # brown — FlashSVD v1.5 (bf16/fp16 native)
+    'svd':     '#4878CF',
+    'fwsvd':   '#E87B3E',
+    'drone':   '#6ACC65',
+    'adasvd':  '#956CB4',
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Figure 1 — Peak Memory across kernel tiers
 # ──────────────────────────────────────────────────────────────────────────────
-fig, ax = plt.subplots(figsize=(8, 5.4))
+fig, ax = plt.subplots(figsize=(9.5, 5.4))
 
-labels = ['Dense\n(HF BERT)', 'Naive\n(einsum)', 'Naive\n(SDPA)', 'FlashSVD']
-values = [987, 2004, 1566, 708]
-colors = [C['dense'], C['einsum'], C['sdpa'], C['flash']]
+# FlashSVD15 memory: TBD — update with real benchmark value once available
+# Expected: similar to FlashSVD (708 MB) for fp32; lower for bf16 due to half-precision weights
+_FLASH15_MEM = None   # TODO: fill in after running --backend flashsvd15 benchmark
+labels = ['Dense\n(HF BERT)', 'Naive\n(einsum)', 'Naive\n(SDPA)', 'FlashSVD\n(v1)', 'FlashSVD\n(v1.5)']
+values = [987, 2004, 1566, 708, _FLASH15_MEM or 0]
+colors = [C['dense'], C['einsum'], C['sdpa'], C['flash'], C['flash15']]
 
 bars = ax.bar(labels, values, color=colors, width=0.52,
               edgecolor='white', linewidth=1.5, zorder=3)
 ax.grid(axis='y', linestyle='--', alpha=0.4, zorder=0)
 
-# Bar top labels: just the value
-for bar, val in zip(bars, values):
-    ax.text(bar.get_x() + bar.get_width() / 2, val + 28,
-            f'{val} MB', ha='center', va='bottom', fontsize=12, fontweight='bold')
+# Bar top labels
+for bar, val, lbl in zip(bars, values, labels):
+    label_text = f'{val} MB' if val > 0 else 'TBD'
+    ax.text(bar.get_x() + bar.get_width() / 2, (val or 50) + 28,
+            label_text, ha='center', va='bottom', fontsize=12, fontweight='bold')
 
-# Vertical transition arrows at midpoints between bars (x = 0.5, 1.5, 2.5)
-# % label placed at y_mid, to the right of the arrow
+# Vertical transition arrows
 transitions = [
     (0.5, 987,  2004, '+117%', 'logits+A materialize', C['einsum']),
     (1.5, 2004, 1566, '−22%',  'SDPA: no materialize', C['sdpa']),
@@ -115,22 +119,26 @@ print('✓ fig1_memory_kernels.png')
 # ──────────────────────────────────────────────────────────────────────────────
 # Figure 2 — Throughput across kernel tiers
 # ──────────────────────────────────────────────────────────────────────────────
-fig, ax = plt.subplots(figsize=(7, 4.8))
+fig, ax = plt.subplots(figsize=(8.5, 4.8))
 
+# FlashSVD15 throughput: TBD — update with real benchmark value once available
+# Expected: higher than FlashSVD v1 for bf16 (native dtype, no cast overhead)
+_FLASH15_SPS = None   # TODO: fill in after running --backend flashsvd15 benchmark
 # avg across SVD/FWSVD/DRONE/AdaSVD for compressed tiers
-labels = ['Dense\n(HF BERT)', 'Naive\n(einsum)', 'Naive\n(SDPA)', 'FlashSVD']
-values = [265.7, 193.8, 342.8, 329.3]
-colors = [C['dense'], C['einsum'], C['sdpa'], C['flash']]
+labels = ['Dense\n(HF BERT)', 'Naive\n(einsum)', 'Naive\n(SDPA)', 'FlashSVD\n(v1)', 'FlashSVD\n(v1.5)']
+values = [265.7, 193.8, 342.8, 329.3, _FLASH15_SPS or 0]
+colors = [C['dense'], C['einsum'], C['sdpa'], C['flash'], C['flash15']]
 
 bars = ax.bar(labels, values, color=colors, width=0.52,
               edgecolor='white', linewidth=1.5, zorder=3)
 ax.grid(axis='y', linestyle='--', alpha=0.4, zorder=0)
 
 for bar, val in zip(bars, values):
-    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 4,
-            f'{val:.0f}', ha='center', va='bottom', fontsize=11, fontweight='bold')
+    label_text = f'{val:.0f}' if val > 0 else 'TBD'
+    ax.text(bar.get_x() + bar.get_width() / 2, (val or 10) + 4,
+            label_text, ha='center', va='bottom', fontsize=11, fontweight='bold')
 
-# Annotations
+# Annotations (v1 tiers only)
 ax.annotate('+77%\nvs einsum', xy=(2, 310), xytext=(1.5, 215),
             ha='center', fontsize=10, fontweight='bold', color='#1a1a1a',
             arrowprops=dict(arrowstyle='->', color='#555', lw=1.2),
@@ -140,7 +148,8 @@ ax.annotate('−4% vs SDPA', xy=(2.5, 336), ha='center', fontsize=10,
             fontweight='bold', color=C['flash'])
 
 ax.text(0.98, 0.97,
-        'FlashSVD: −5% throughput vs SDPA\n−55% memory vs SDPA (see Figure 1)',
+        'FlashSVD v1: −5% throughput vs SDPA, −55% memory\n'
+        'FlashSVD v1.5: native bf16/fp16, lower cast overhead',
         transform=ax.transAxes, ha='right', va='top', fontsize=9,
         bbox=dict(boxstyle='round,pad=0.5', facecolor='#F5F5F5',
                   edgecolor='#AAAAAA', alpha=0.9))
@@ -148,7 +157,7 @@ ax.text(0.98, 0.97,
 ax.set_ylabel('Throughput (samples / sec)')
 ax.set_title('Throughput — Attention Kernel Tiers\n'
              '(per-head ra48, seq=512, bs=32, fp32, avg across SVD/FWSVD/DRONE/AdaSVD)')
-ax.set_ylim(0, 430)
+ax.set_ylim(0, 480)
 
 plt.tight_layout()
 plt.savefig(os.path.join(OUT_DIR, 'fig2_throughput_kernels.png'), bbox_inches='tight')

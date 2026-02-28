@@ -76,7 +76,7 @@ def parse_args():
     p.add_argument("--qkv_mode", choices=["per_head", "full"], default="per_head",
                    help="QKV factorization mode: 'per_head' (rank limited to dh=64) or 'full' (paper-style, rank can be 256+)")
     # backend
-    p.add_argument("--backend", choices=["naive", "flashsvd"], default="naive")
+    p.add_argument("--backend", choices=["naive", "flashsvd", "flashsvd15"], default="naive")
     p.add_argument("--attn_mode", choices=["einsum", "sdpa"], default="einsum",
                    help="Attention implementation for the naive backend. "
                         "'einsum': standard O(n²) attention (paper-faithful, default). "
@@ -1449,9 +1449,9 @@ def main():
     print(f"  backend  : {args.backend}")
     if args.qkv_mode == "full":
         print(f"  qkv_mode : {args.qkv_mode} (paper-style full-matrix SVD)")
-        if args.backend == "flashsvd":
+        if args.backend in ("flashsvd", "flashsvd15"):
             raise ValueError(
-                "--qkv_mode full is not compatible with --backend flashsvd. "
+                f"--qkv_mode full is not compatible with --backend {args.backend}. "
                 "FlashSVD kernels require per-head format (use --qkv_mode per_head)."
             )
     print(f"  dtype    : {args.dtype}  device={args.device}")
@@ -1601,14 +1601,16 @@ def main():
             print(f"[cleanup] Memory allocated after cleanup: {after_cleanup_mb:.1f} MB")
 
     # 4) backend
-    if args.backend == "flashsvd":
+    if args.backend in ("flashsvd", "flashsvd15"):
         if args.method == "dense":
-            print("[backend] Warning: backend=flashsvd ignored for method=dense (no compression)")
+            print(f"[backend] Warning: backend={args.backend} ignored for method=dense (no compression)")
         else:
-            # AdaSVD now creates NaiveSVDBlock instances (no longer uses
-            # adasvd_refactored/profile_flashsvd); enable_flashsvd works uniformly.
-            from eval_encoder.flashsvd_backend import enable_flashsvd
-            enable_flashsvd(model)
+            if args.backend == "flashsvd":
+                from eval_encoder.flashsvd_backend import enable_flashsvd
+                enable_flashsvd(model)
+            else:
+                from eval_encoder.flashsvd_backend import enable_flashsvd15
+                enable_flashsvd15(model)
 
     # 5) evaluate task metric
     if getattr(args, 'skip_eval', False):
