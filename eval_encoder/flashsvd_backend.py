@@ -31,6 +31,13 @@ _flash_svd_attention_v15 = None
 _flashsvd_ffn_v15_fn = None
 
 
+def _next_pow2(n: int) -> int:
+    """Smallest power of 2 >= n (required by tl.arange in Triton kernels)."""
+    if n <= 1:
+        return 1
+    return 1 << (n - 1).bit_length()
+
+
 def _resolve_kernel_dir():
     """Return the encoder-kernel directory path."""
     local_kernel_dir = os.path.join(os.path.dirname(__file__), "kernels")
@@ -350,12 +357,24 @@ class FlashSVD15Block(nn.Module):
         else:
             mask4 = torch.ones(B, 1, 1, M, dtype=torch.bool, device=x.device)
 
+        # Triton tl.arange(0, BLOCK_R) requires BLOCK_R = R to be a power of 2.
+        # Pad the rank dimension to next_pow2(R) with zeros (no-op when R is already pow2).
+        R_pad = _next_pow2(R)
+        if R_pad != R:
+            pad = R_pad - R
+            tmp_q = F.pad(tmp_q, (0, pad))   # [B,H,M,R] → [B,H,M,R_pad]
+            tmp_k = F.pad(tmp_k, (0, pad))
+            tmp_v = F.pad(tmp_v, (0, pad))
+            Vq_b = F.pad(Vq_b, (0, 0, 0, pad))  # [H,R,dh] → [H,R_pad,dh]
+            Vk_b = F.pad(Vk_b, (0, 0, 0, pad))
+            Vv_b = F.pad(Vv_b, (0, 0, 0, pad))
+
         attn_out = _flash_svd_attention_v15(
             tmp_q, Vq_b, self._bq_sq,
             tmp_k, Vk_b, self._bk_sq,
             tmp_v, Vv_b, self._bv_sq,
             mask=mask4,
-            block_r=R,
+            block_r=R_pad,
         )
         del tmp_q, tmp_k, tmp_v
 
