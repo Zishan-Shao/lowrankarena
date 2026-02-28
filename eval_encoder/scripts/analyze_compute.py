@@ -567,9 +567,9 @@ def main():
         model, tokenizer = load_model(model_id, args.task, args.dtype, args.device)
 
         # build a minimal calibration loader
-        from eval_encoder.run_encoder_benchmark import build_loader
-        loader_tmp = build_loader(
-            tokenizer, args.task, "train", args.seq_len, 4, shuffle=True)
+        from eval_encoder.run_encoder_benchmark import prepare_loader
+        loader_tmp = prepare_loader(
+            args.task, tokenizer, args.seq_len, 4, split="train")
         model = compress_model(model, args.method, args.rank, args.budget,
                                "qkv+ffn", loader_tmp, args.device, 4)
 
@@ -585,10 +585,10 @@ def main():
     print(f"[backend] {args.backend} enabled")
 
     # ── build validation loader ───────────────────────────────────────────
-    from eval_encoder.run_encoder_benchmark import build_loader
-    loader = build_loader(
-        tokenizer, args.task, "validation", args.seq_len,
-        args.batch_size, shuffle=False)
+    from eval_encoder.run_encoder_benchmark import prepare_loader
+    loader = prepare_loader(
+        args.task, tokenizer, args.seq_len, args.batch_size,
+        split="validation")
 
     # ── static FLOP / traffic analysis ───────────────────────────────────
     print(f"[analyze] Computing FLOP and traffic breakdown ...")
