@@ -23,7 +23,8 @@
 # 可覆盖变量示例：
 #   TASKS="boolq hans"
 #   METHODS="svd fwsvd"
-#   BACKENDS="naive flashsvd15"
+#   BACKENDS="naive sdpa flashsvd"    # fp32 下不含 flashsvd15（会 cast 到 fp16）
+#   DTYPE=fp32 BACKENDS="naive sdpa flashsvd"   # fp32 精度测试（不含 flashsvd15）
 #   RECOMPRESS=true     # 强制重新压缩（忽略已有 checkpoint）
 #   OUT_CSV=eval_encoder/eval_results/superglue_results.csv
 # ─────────────────────────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ cd "${REPO_ROOT}"
 # ── 配置 ─────────────────────────────────────────────────────────────────────
 TASKS="${TASKS:-boolq rte_sg wic hans anli_r1 anli_r2 anli_r3}"
 METHODS="${METHODS:-dense svd fwsvd drone adasvd}"
-BACKENDS="${BACKENDS:-naive flashsvd flashsvd15}"
+BACKENDS="${BACKENDS:-naive sdpa flashsvd flashsvd15}"
 
 # SVD / FWSVD / DRONE 的 rank（与 GLUE expA 完全一致）
 RANK_ATTN="${RANK_ATTN:-48}"
@@ -51,7 +52,7 @@ ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"
 ADASVD_STEPS="${ADASVD_STEPS:-800}"
 
 CALIB_BATCHES="${CALIB_BATCHES:-16}"
-DTYPE="${DTYPE:-fp32}"
+DTYPE="${DTYPE:-bf16}"
 SEQ_LEN="${SEQ_LEN:-512}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
 
