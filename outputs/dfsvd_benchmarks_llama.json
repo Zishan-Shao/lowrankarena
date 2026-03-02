@@ -1,0 +1,92 @@
+{
+  "schema": "svdllm_eval_v1",
+  "script": "eval_benchmarks.py",
+  "timestamp": "2026-02-26T04:58:22",
+  "cmd": "/home/lz299/lowrankarena/eval_results/eval_benchmarks.py --model ./baselines/DF-SVD/llama7b_dfsvd_0.4 --dfsvd_base_model huggyllama/llama-7b --device cuda --batch_size 8 --dtype bfloat16 --use_lm_eval --lm_eval_tasks arc_easy,arc_challenge,hellaswag,piqa,winogrande,openbookqa --output_json outputs/dfsvd_benchmarks_llama.json",
+  "mode": "lm_eval",
+  "args": {
+    "model": "./baselines/DF-SVD/llama7b_dfsvd_0.4",
+    "device": "cuda",
+    "hf_token": null,
+    "saes_svd": false,
+    "saes_base_model": null,
+    "saes_revision": null,
+    "saes_cache_dir": null,
+    "dfsvd_svd": false,
+    "dfsvd_base_model": "huggyllama/llama-7b",
+    "dfsvd_revision": null,
+    "dfsvd_cache_dir": null,
+    "dobi_svd": false,
+    "dobi_remapping": false,
+    "dobi_unremapping": false,
+    "dobi_revision": null,
+    "dobi_cache_dir": null,
+    "batch_size": 8,
+    "limit": null,
+    "dtype": "bfloat16",
+    "gsm8k_max_new_tokens": 64,
+    "skip_gsm8k": false,
+    "skip_truthfulqa": false,
+    "use_lm_eval": true,
+    "lm_eval_tasks": "arc_easy,arc_challenge,hellaswag,piqa,winogrande,openbookqa",
+    "lm_eval_num_fewshot": 0,
+    "lm_eval_max_length": 2048,
+    "lm_eval_max_batch_size": 64,
+    "lm_eval_add_bos_token": "auto",
+    "lm_eval_prefix_token_id": null,
+    "lm_eval_include_path": null,
+    "token_ppl": false,
+    "token_ppl_datasets": "wikitext2,ptb,c4",
+    "token_ppl_seqlen": 2048,
+    "token_ppl_batch_size": 4,
+    "token_ppl_max_batches": null,
+    "force_right_padding": false,
+    "fix_pad_query_mask": false,
+    "output_json": "outputs/dfsvd_benchmarks_llama.json",
+    "output_dir": null,
+    "run_name": null
+  },
+  "model": "./baselines/DF-SVD/llama7b_dfsvd_0.4",
+  "results": {
+    "arc_challenge": {
+      "alias": "arc_challenge",
+      "acc,none": 0.2354948805460751,
+      "acc_stderr,none": 0.012399451855004746,
+      "acc_norm,none": 0.2832764505119454,
+      "acc_norm_stderr,none": 0.013167478735134576
+    },
+    "arc_easy": {
+      "alias": "arc_easy",
+      "acc,none": 0.2537878787878788,
+      "acc_stderr,none": 0.008929657065808286,
+      "acc_norm,none": 0.26641414141414144,
+      "acc_norm_stderr,none": 0.009071357971078681
+    },
+    "hellaswag": {
+      "alias": "hellaswag",
+      "acc,none": 0.2562238597888867,
+      "acc_stderr,none": 0.004356547185847049,
+      "acc_norm,none": 0.26030671181039633,
+      "acc_norm_stderr,none": 0.004379051357024133
+    },
+    "openbookqa": {
+      "alias": "openbookqa",
+      "acc,none": 0.142,
+      "acc_stderr,none": 0.015625630247810298,
+      "acc_norm,none": 0.258,
+      "acc_norm_stderr,none": 0.01958671178521584
+    },
+    "piqa": {
+      "alias": "piqa",
+      "acc,none": 0.5272034820457019,
+      "acc_stderr,none": 0.01164854526242902,
+      "acc_norm,none": 0.49510337323177367,
+      "acc_norm_stderr,none": 0.011665264730078137
+    },
+    "winogrande": {
+      "alias": "winogrande",
+      "acc,none": 0.4925019731649566,
+      "acc_stderr,none": 0.01405090552122858
+    }
+  }
+}

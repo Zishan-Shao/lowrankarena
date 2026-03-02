@@ -278,10 +278,16 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
     use_cpu_buffers = True if str(dev).startswith('cuda') else False
     buf_device = torch.device('cpu') if use_cpu_buffers else dev
     pin = True if use_cpu_buffers else False
-    calib_seqlen = int(calib_loader[0]["input_ids"].shape[-1])
+    # keep the seqlen set by the caller (args.model_seq_len)
+    calib_seqlen = int(getattr(model, "seqlen", calib_loader[0]["input_ids"].shape[-1]))
+
+    # never exceed the model's max position embeddings (important for LLaMA-1)
+    max_pos = getattr(model.config, "max_position_embeddings", None)
+    calib_seqlen = min(calib_seqlen, int(max_pos))
+
     model.seqlen = calib_seqlen
     inps = torch.zeros(
-        (len(calib_loader), calib.seqlen, model.config.hidden_size),
+        (len(calib_loader), model.seqlen, model.config.hidden_size),
         dtype=dtype,
         device=buf_device,
         pin_memory=pin,
@@ -314,6 +320,15 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
     layers[0] = Catcher(layers[0])
     for batch in calib_loader:
         try:
+            # enforce seqlen cap
+            if "input_ids" in batch and batch["input_ids"].shape[-1] > calib_seqlen:
+                batch = dict(batch)
+                batch["input_ids"] = batch["input_ids"][:, :calib_seqlen]
+                if "attention_mask" in batch and batch["attention_mask"] is not None:
+                    batch["attention_mask"] = batch["attention_mask"][:, :calib_seqlen]
+                if "position_ids" in batch and batch.get("position_ids", None) is not None:
+                    batch["position_ids"] = batch["position_ids"][:, :calib_seqlen]
+
             batch = {k: v.to(dev) for k, v in batch.items()}
             model(**batch)
         except ValueError:

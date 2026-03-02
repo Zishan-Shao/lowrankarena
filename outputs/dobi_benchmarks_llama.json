@@ -1,0 +1,99 @@
+{
+  "schema": "svdllm_eval_v1",
+  "script": "eval_benchmarks.py",
+  "timestamp": "2026-02-26T05:05:22",
+  "cmd": "/home/lz299/lowrankarena/eval_results/eval_benchmarks.py --model Qinsi1/DobiSVD-Llama-7b-hf-0.4 --device cuda --batch_size 1 --use_lm_eval --dtype bfloat16 --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa --output_json outputs/dobi_benchmarks_llama.json",
+  "mode": "lm_eval",
+  "args": {
+    "model": "Qinsi1/DobiSVD-Llama-7b-hf-0.4",
+    "device": "cuda",
+    "hf_token": null,
+    "saes_svd": false,
+    "saes_base_model": null,
+    "saes_revision": null,
+    "saes_cache_dir": null,
+    "dfsvd_svd": false,
+    "dfsvd_base_model": null,
+    "dfsvd_revision": null,
+    "dfsvd_cache_dir": null,
+    "dobi_svd": false,
+    "dobi_remapping": false,
+    "dobi_unremapping": false,
+    "dobi_revision": null,
+    "dobi_cache_dir": null,
+    "batch_size": 1,
+    "limit": null,
+    "dtype": "bfloat16",
+    "gsm8k_max_new_tokens": 64,
+    "skip_gsm8k": false,
+    "skip_truthfulqa": false,
+    "use_lm_eval": true,
+    "lm_eval_tasks": "openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa",
+    "lm_eval_num_fewshot": 0,
+    "lm_eval_max_length": 2048,
+    "lm_eval_max_batch_size": 64,
+    "lm_eval_add_bos_token": "auto",
+    "lm_eval_prefix_token_id": null,
+    "lm_eval_include_path": null,
+    "token_ppl": false,
+    "token_ppl_datasets": "wikitext2,ptb,c4",
+    "token_ppl_seqlen": 2048,
+    "token_ppl_batch_size": 4,
+    "token_ppl_max_batches": null,
+    "force_right_padding": false,
+    "fix_pad_query_mask": false,
+    "output_json": "outputs/dobi_benchmarks_llama.json",
+    "output_dir": null,
+    "run_name": null
+  },
+  "model": "Qinsi1/DobiSVD-Llama-7b-hf-0.4",
+  "results": {
+    "arc_challenge": {
+      "alias": "arc_challenge",
+      "acc,none": 0.24232081911262798,
+      "acc_stderr,none": 0.012521593295800116,
+      "acc_norm,none": 0.2781569965870307,
+      "acc_norm_stderr,none": 0.0130944699195388
+    },
+    "arc_easy": {
+      "alias": "arc_easy",
+      "acc,none": 0.4452861952861953,
+      "acc_stderr,none": 0.010198171137873876,
+      "acc_norm,none": 0.4086700336700337,
+      "acc_norm_stderr,none": 0.010087174498762883
+    },
+    "hellaswag": {
+      "alias": "hellaswag",
+      "acc,none": 0.3434574785899223,
+      "acc_stderr,none": 0.004738920624724478,
+      "acc_norm,none": 0.4419438358892651,
+      "acc_norm_stderr,none": 0.004956030970911508
+    },
+    "mathqa": {
+      "alias": "mathqa",
+      "acc,none": 0.22512562814070353,
+      "acc_stderr,none": 0.007645901662342719,
+      "acc_norm,none": 0.22512562814070353,
+      "acc_norm_stderr,none": 0.007645901662342707
+    },
+    "openbookqa": {
+      "alias": "openbookqa",
+      "acc,none": 0.214,
+      "acc_stderr,none": 0.018359797502387004,
+      "acc_norm,none": 0.338,
+      "acc_norm_stderr,none": 0.02117566569520941
+    },
+    "piqa": {
+      "alias": "piqa",
+      "acc,none": 0.6011969532100109,
+      "acc_stderr,none": 0.011424390545037282,
+      "acc_norm,none": 0.602829162132753,
+      "acc_norm_stderr,none": 0.011416453840790274
+    },
+    "winogrande": {
+      "alias": "winogrande",
+      "acc,none": 0.6029992107340174,
+      "acc_stderr,none": 0.013751092519806699
+    }
+  }
+}

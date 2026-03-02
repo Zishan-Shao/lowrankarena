@@ -49,7 +49,7 @@
 
 
 
-ASVD_MODEL="/home/lz299/lowrankarena/baselines/ASVD/huggingface_repos/Llama-2-7b-hf-asvd40"
+ASVD_MODEL="/home/lz299/lowrankarena/baselines/ASVD/huggingface_repos/llama-7b-asvd40"
 RUN_ID="$(basename "$ASVD_MODEL")_$(date +%Y%m%d_%H%M%S)"
 # benchmark (lm-eval)
 CUDA_VISIBLE_DEVICES=0 python -m baselines.ASVD.eval_ASVD_benchmark_with_json \
