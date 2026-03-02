@@ -174,10 +174,18 @@ for TASK in ${TASKS}; do
         fi
 
         # ── Step 2：遍历其余 backend（从 naive checkpoint load）──────────────
+        # sdpa 实际上是 --backend naive --attn_mode sdpa，不是独立 backend
         for BACKEND in ${BACKENDS}; do
             # naive 在 Step 1 压缩时已经评估并写 CSV，跳过重复跑
             [[ "${BACKEND}" == "naive" && "${METHOD}" != "dense" && -d "${CKPT_DIR}" && "${RECOMPRESS}" != "true" ]] && \
                 echo "   [skip naive — already in CSV from compress step]" && continue
+
+            # 翻译 sdpa → --backend naive --attn_mode sdpa
+            if [[ "${BACKEND}" == "sdpa" ]]; then
+                BACKEND_ARGS=(--backend naive --attn_mode sdpa)
+            else
+                BACKEND_ARGS=(--backend "${BACKEND}")
+            fi
 
             echo "   ── ${TASK} / ${METHOD} / ${BACKEND}"
 
@@ -186,11 +194,11 @@ for TASK in ${TASKS}; do
                     --task       "${TASK}" \
                     --model_id   "${MODEL_ID}" \
                     --method     dense \
-                    --backend    "${BACKEND}" \
                     --dtype      "${DTYPE}" \
                     --seq_len    "${SEQ_LEN}" \
                     --batch_size "${BATCH_SIZE}" \
                     --out_csv    "${OUT_CSV}" \
+                    "${BACKEND_ARGS[@]}" \
                     "${EXTRA_ARGS[@]}" \
                     && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
             else
@@ -199,11 +207,11 @@ for TASK in ${TASKS}; do
                     --model_id       "${MODEL_ID}" \
                     --method         "${METHOD}" \
                     --load_model_dir "${CKPT_DIR}" \
-                    --backend        "${BACKEND}" \
                     --dtype          "${DTYPE}" \
                     --seq_len        "${SEQ_LEN}" \
                     --batch_size     "${BATCH_SIZE}" \
                     --out_csv        "${OUT_CSV}" \
+                    "${BACKEND_ARGS[@]}" \
                     "${EXTRA_ARGS[@]}" \
                     && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
             fi
