@@ -8,7 +8,7 @@ Two panels side-by-side:
 
 Usage:
     python eval_encoder/scripts/plot_flops_breakdown.py \
-        --csv     eval_encoder/eval_results/expA_backend.csv \
+        --csv     eval_encoder/eval_results/expB_backend.csv \
         --task    mnli \
         --dtype   bf16 \
         --seq_len 512 \
@@ -166,7 +166,7 @@ def plot(df, task, dtype, seq_len, outdir):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--csv",     default="eval_encoder/eval_results/expA_backend.csv")
+    p.add_argument("--csv",     default="eval_encoder/eval_results/expB_backend.csv")
     p.add_argument("--task",    default="mnli")
     p.add_argument("--dtype",   default="bf16")
     p.add_argument("--seq_len", type=int, default=512)
