@@ -1559,6 +1559,16 @@ def main():
         # 用 comp_info 中的 model_id 覆盖默认的 bert-base-uncased，保证 CSV 和显示正确
         if _comp_info.get('model_id'):
             args.model_id = _comp_info['model_id']
+        # 回填 calib_info，使 load 路径的 CSV 行与压缩时一致
+        if _comp_info.get('calib_dataset'):
+            calib_info = {
+                "dataset":  _comp_info.get('calib_dataset', ''),
+                "split":    _comp_info.get('calib_split', ''),
+                "samples":  _comp_info.get('calib_samples', ''),
+                "batches":  _comp_info.get('calib_batches', ''),
+                "seed":     _comp_info.get('calib_seed', ''),
+                "seq_len":  _comp_info.get('calib_seq_len', ''),
+            }
         print(f"[load_model_dir] Loaded: arch={arch}, {len(encoder_layers)} layers")
         # 若 attn_mode=sdpa，patch 所有 NaiveSVDBlock
         if getattr(args, 'attn_mode', 'einsum') != 'einsum':
@@ -1666,6 +1676,13 @@ def main():
             "accuracy_before_finetune": float(metric_value),
             "dtype": args.dtype,
             "seq_len": args.seq_len,
+            # calib fields — needed to back-fill CSV when loading from checkpoint
+            "calib_dataset": calib_info.get("dataset", ""),
+            "calib_split":   calib_info.get("split", ""),
+            "calib_samples": calib_info.get("samples", ""),
+            "calib_batches": calib_info.get("batches", ""),
+            "calib_seed":    calib_info.get("seed", ""),
+            "calib_seq_len": calib_info.get("seq_len", ""),
         }
 
         with open(save_path / "compression_info.json", "w") as f:

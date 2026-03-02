@@ -32,6 +32,7 @@ cd "${REPO_ROOT}"
 # ── 配置 ─────────────────────────────────────────────────────────────────────
 TASKS="${TASKS:-mnli stsb}"
 METHODS="${METHODS:-svd adasvd}"
+BACKENDS="${BACKENDS:-naive sdpa flashsvd flashsvd15}"
 DTYPE="${DTYPE:-bf16}"
 SEQ_LEN="${SEQ_LEN:-512}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
@@ -59,8 +60,8 @@ _model_subdir() {
 }
 
 echo "══════════════════════════════════════════════════════════════"
-echo "  expA SDPA 消融实验（load from checkpoint）"
-echo "  tasks=${TASKS}  methods=${METHODS}"
+echo "  expA backend 实验（load from checkpoint）"
+echo "  tasks=${TASKS}  methods=${METHODS}  backends=${BACKENDS}"
 echo "  dtype=${DTYPE}  seq_len=${SEQ_LEN}  bs=${BATCH_SIZE}"
 echo "  out_csv=${OUT_CSV}"
 echo "══════════════════════════════════════════════════════════════"
@@ -75,23 +76,25 @@ for TASK in ${TASKS}; do
             continue
         fi
 
-        echo ""
-        echo "── ${METHOD} / ${TASK} / sdpa  (load: ${MODEL_DIR})"
+        for BACKEND in ${BACKENDS}; do
+            echo ""
+            echo "── ${METHOD} / ${TASK} / ${BACKEND}  (load: ${MODEL_DIR})"
 
-        python eval_encoder/scripts/analyze_compute.py \
-            --model_dir  "${MODEL_DIR}" \
-            --task       "${TASK}" \
-            --backend    sdpa \
-            --dtype      "${DTYPE}" \
-            --seq_len    "${SEQ_LEN}" \
-            --batch_size "${BATCH_SIZE}" \
-            --warmup     "${WARMUP}" \
-            --measure    "${MEASURE}" \
-            --out_csv    "${OUT_CSV}"
+            python eval_encoder/scripts/analyze_compute.py \
+                --model_dir  "${MODEL_DIR}" \
+                --task       "${TASK}" \
+                --backend    "${BACKEND}" \
+                --dtype      "${DTYPE}" \
+                --seq_len    "${SEQ_LEN}" \
+                --batch_size "${BATCH_SIZE}" \
+                --warmup     "${WARMUP}" \
+                --measure    "${MEASURE}" \
+                --out_csv    "${OUT_CSV}"
+        done
     done
 done
 
 echo ""
 echo "══════════════════════════════════════════════════════════════"
-echo "  SDPA 消融完成 → ${OUT_CSV}"
+echo "  完成 → ${OUT_CSV}"
 echo "══════════════════════════════════════════════════════════════"

@@ -106,14 +106,7 @@ def plot(df, task, dtype, seq_len, outdir):
     ax_left.set_axisbelow(True)
     ax_left.set_yticks(range(0, 101, 20))
 
-    # legend
-    ax_left.legend(
-        handles=[
-            plt.Rectangle((0, 0), 1, 1, color=C_USEFUL,  label="Useful compute"),
-            plt.Rectangle((0, 0), 1, 1, color=C_RANKPAD, label="Rank-alignment overhead\n(Triton next_pow2(R))"),
-        ],
-        loc="lower right", fontsize=8.5, framealpha=0.9,
-    )
+    # no per-panel legend on the left; a single shared legend sits right of the right panel
 
     # ── Panel 2: full inference budget (including seq-padding) ────────────────
     ax_right.set_title(
@@ -150,13 +143,15 @@ def plot(df, task, dtype, seq_len, outdir):
     ax_right.set_axisbelow(True)
     ax_right.set_yticks(range(0, 101, 20))
 
+    # Single shared legend to the right of the right panel — covers all 3 colors used in both panels
     ax_right.legend(
         handles=[
-            plt.Rectangle((0, 0), 1, 1, color=C_USEFUL,  label="Effective compute\n(real tokens, real ranks)"),
-            plt.Rectangle((0, 0), 1, 1, color=C_RANKPAD, label="Rank-alignment overhead"),
+            plt.Rectangle((0, 0), 1, 1, color=C_USEFUL,  label="Effective / useful compute"),
+            plt.Rectangle((0, 0), 1, 1, color=C_RANKPAD, label="Rank-alignment overhead\n(Triton next_pow2(R))"),
             plt.Rectangle((0, 0), 1, 1, color=C_SEQPAD,  label="Sequence-padding tokens\n(input-level waste)"),
         ],
-        loc="upper right", fontsize=8.5, framealpha=0.9,
+        loc="upper left", bbox_to_anchor=(1.03, 1),
+        fontsize=8.5, framealpha=0.9, borderaxespad=0,
     )
 
     # ── save ──────────────────────────────────────────────────────────────────
