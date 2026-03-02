@@ -391,6 +391,52 @@ class FlashSVD15Block(nn.Module):
 # ---------------------------------------------------------------------------
 # Public API – v1.5
 # ---------------------------------------------------------------------------
+def enable_sdpa(model: nn.Module) -> nn.Module:
+    """Switch every NaiveSVDBlock to use F.scaled_dot_product_attention.
+
+    The rank-space projections (P/V matrices) remain as PyTorch einsum ops;
+    only the attention score+softmax+weighted-sum step is replaced with
+    PyTorch's fused SDPA (Flash Attention 2 / memory-efficient, if available).
+
+    This provides an ablation point between:
+      naive     — explicit einsum, full [B,H,M,M] matrix in HBM
+      sdpa      — fused Flash Attention, no M² materialization, still PyTorch
+      flashsvd  — Triton-fused rank-projection + attention + lift
+      flashsvd15— Triton-fused rank-space kernel, native bf16/fp16
+    """
+    model_type = getattr(model.config, "model_type", "").lower()
+    if model_type == "modernbert":
+        # ModernBERT NaiveModernBertSVDBlock already uses SDPA unconditionally.
+        print("[sdpa] ModernBERT already uses SDPA — no-op.")
+        return model
+
+    if hasattr(model, "bert"):
+        encoder_layers = model.bert.encoder.layer
+    elif hasattr(model, "roberta"):
+        encoder_layers = model.roberta.encoder.layer
+    else:
+        raise RuntimeError(
+            "enable_sdpa: cannot find .bert.encoder.layer or "
+            ".roberta.encoder.layer on the supplied model."
+        )
+
+    patched = 0
+    for layer in encoder_layers:
+        block = getattr(layer, "block", None)
+        if block is not None and hasattr(block, "attn_mode"):
+            block.attn_mode = "sdpa"
+            patched += 1
+
+    if patched == 0:
+        raise RuntimeError(
+            "enable_sdpa: no NaiveSVDBlock instances found "
+            "(FlashSVD blocks don't have attn_mode). "
+            "Use --backend sdpa only before enable_flashsvd/flashsvd15."
+        )
+    print(f"[sdpa] Switched {patched} encoder layers to SDPA attention.")
+    return model
+
+
 def enable_flashsvd15(model: nn.Module) -> nn.Module:
     """Patch a model in-place: swap every NaiveSVDBlock for a FlashSVD15Block.
 

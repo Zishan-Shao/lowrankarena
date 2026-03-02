@@ -601,7 +601,7 @@ def parse_args():
     p.add_argument("--model_id",  default=None,
                    help="HuggingFace model ID (auto-detected from compression_info.json "
                         "when --model_dir is given)")
-    p.add_argument("--backend",   choices=["naive", "flashsvd", "flashsvd15"],
+    p.add_argument("--backend",   choices=["naive", "sdpa", "flashsvd", "flashsvd15"],
                    default="flashsvd15")
     p.add_argument("--dtype",     choices=["fp32", "fp16", "bf16"], default="bf16")
     p.add_argument("--seq_len",   type=int, default=512)
@@ -686,9 +686,12 @@ def main():
 
     # ── apply backend ─────────────────────────────────────────────────────
     # Dense models have no SVD blocks; skip backend swap silently.
-    if not layer_results and args.backend != "naive":
+    if not layer_results and args.backend not in ("naive", "sdpa"):
         print(f"[backend] No SVD blocks found — skipping {args.backend} swap (dense model)")
-    if layer_results and args.backend == "flashsvd":
+    if layer_results and args.backend == "sdpa":
+        from eval_encoder.flashsvd_backend import enable_sdpa
+        enable_sdpa(model)
+    elif layer_results and args.backend == "flashsvd":
         from eval_encoder.flashsvd_backend import enable_flashsvd
         enable_flashsvd(model)
     elif layer_results and args.backend == "flashsvd15":
