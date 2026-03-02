@@ -484,8 +484,10 @@ def print_report(layer_results, totals, lat_ms, sps, peak_mb, avg_eff_tokens,
     # ── totals ────────────────────────────────────────────────────────────
     print("─" * 80)
     print(f"\n  Aggregate (all {len(layer_results)} layers, B={B}, M={M}):")
+    _useful_pct = (100*(1-totals['padding_flops']/totals['total_flops'])
+                   if totals['total_flops'] > 0 else 0.0)
     print(f"    Useful  FLOPs (abs)    : {_fmt_t(totals['useful_flops']):>10}  "
-          f"({100*(1-totals['padding_flops']/totals['total_flops']):.1f}% of total)  "
+          f"({_useful_pct:.1f}% of total)  "
           f"[latency-independent]")
     print(f"    Rank-pad FLOPs (abs)   : {_fmt_t(totals['padding_flops']):>10}  "
           f"({totals['padding_pct']:.1f}% Triton next_pow2(R) overhead)  "
@@ -713,9 +715,14 @@ def main():
         nvtx_label=f"inference_{args.backend}_{args.dtype}")
 
     # ── print report ──────────────────────────────────────────────────────
-    print_report(layer_results, totals, lat_ms, sps, peak_mb, avg_eff_tokens,
-                 args.batch_size, args.seq_len, dtype,
-                 args.backend, gpu_name, gpu_tflops, gpu_bw)
+    if not layer_results:
+        print("[warn] No SVD blocks found — FLOPs breakdown unavailable for this model.")
+        print(f"  Latency : {lat_ms:.2f} ms/batch  |  Throughput : {sps:.1f} sps  "
+              f"|  Peak Mem : {peak_mb:.1f} MB")
+    else:
+        print_report(layer_results, totals, lat_ms, sps, peak_mb, avg_eff_tokens,
+                     args.batch_size, args.seq_len, dtype,
+                     args.backend, gpu_name, gpu_tflops, gpu_bw)
 
     # ── optional CSV output ───────────────────────────────────────────────
     if args.out_csv:
