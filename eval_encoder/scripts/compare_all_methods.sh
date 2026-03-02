@@ -271,7 +271,8 @@ run_one() {
   env_prefix+=("NON_INTERACTIVE=true")
   env_prefix+=("AUTO_FIGURES=false")  # 由 compare_all_methods.sh 统一在最后出图
   env_prefix+=("OUT_CSV=${PERF_CSV}")
-  env_prefix+=("SKIP_ENV_CHECK=true")
+  env_prefix+=("SKIP_ENV_CHECK=${_ENV_CHECKED}")
+  _ENV_CHECKED=true   # 第一次 check 完成后，后续全部跳过
 
   # Add component-specific ranks if set
   if [[ -n "${RANK_ATTN}" ]]; then
@@ -329,6 +330,7 @@ run_one() {
 # ------------------------- main loops -----------------------------------------
 SUCCESS=0
 FAIL=0
+_ENV_CHECKED=false   # 第一次调用 one_click_glue.sh 时跑 check，之后跳过
 
 for stage in "${STAGES[@]}"; do
   for backend in ${BACKENDS}; do
