@@ -25,9 +25,11 @@ import pandas as pd
 
 
 # ── visual config ──────────────────────────────────────────────────────────────
-BACKEND_ORDER  = ["naive", "flashsvd", "flashsvd15"]
-BACKEND_COLORS = {"naive": "#9e9e9e", "flashsvd": "#42a5f5", "flashsvd15": "#ef5350"}
-BACKEND_LABELS = {"naive": "Naive", "flashsvd": "FlashSVD", "flashsvd15": "FlashSVD 1.5"}
+BACKEND_ORDER  = ["naive", "sdpa", "flashsvd", "flashsvd15"]
+BACKEND_COLORS = {"naive": "#9e9e9e", "sdpa": "#66bb6a",
+                  "flashsvd": "#42a5f5", "flashsvd15": "#ef5350"}
+BACKEND_LABELS = {"naive": "Naive", "sdpa": "SDPA",
+                  "flashsvd": "FlashSVD", "flashsvd15": "FlashSVD 1.5"}
 METHOD_LABELS  = {"svd": "SVD", "fwsvd": "FWSVD", "drone": "DRONE", "adasvd": "AdaSVD"}
 TASK_LABELS    = {"mnli": "MNLI", "cola": "CoLA", "stsb": "STS-B",
                   "sst2": "SST-2", "mrpc": "MRPC", "qqp": "QQP",
@@ -325,6 +327,24 @@ def plot_memory(df, tasks, methods, outdir, dtype, seq_len):
     _save(fig, outdir, _fname("memory", tasks, dtype, seq_len))
 
 
+def plot_throughput(df, tasks, methods, outdir, dtype, seq_len):
+    fig, axes = _make_fig(tasks)
+    fig.suptitle(f"Throughput (samples / s)  |  dtype={dtype}  seq_len={seq_len}",
+                 fontsize=12, fontweight="bold")
+    for i, task in enumerate(tasks):
+        sub = df[df["task"] == task]
+        _draw_bars(axes[i, 0], sub, methods, "throughput_sps",
+                   ylabel=f"{TASK_LABELS.get(task, task)}\nsamples / s",
+                   higher_better=True, fmt="{:.0f}",
+                   show_xlabel=(i == len(tasks) - 1))
+        axes[i, 0].set_title(TASK_LABELS.get(task, task), fontsize=10,
+                              loc="left", pad=4)
+    _draw_fairness_panel(axes[-1, 0], df, tasks, methods)
+    _make_legend(fig)
+    plt.tight_layout(rect=[0, 0.06, 1, 1])
+    _save(fig, outdir, _fname("throughput", tasks, dtype, seq_len))
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--csv",     default="eval_encoder/eval_results/expA_backend.csv")
@@ -357,9 +377,10 @@ def main():
 
     print(f"[plot] tasks={tasks}  methods={methods}  outdir={args.outdir}")
 
-    plot_latency(df, tasks, methods, args.outdir, args.dtype, args.seq_len)
-    plot_speedup(df, tasks, methods, args.outdir, args.dtype, args.seq_len)
-    plot_memory( df, tasks, methods, args.outdir, args.dtype, args.seq_len)
+    plot_latency(    df, tasks, methods, args.outdir, args.dtype, args.seq_len)
+    plot_throughput( df, tasks, methods, args.outdir, args.dtype, args.seq_len)
+    plot_speedup(    df, tasks, methods, args.outdir, args.dtype, args.seq_len)
+    plot_memory(     df, tasks, methods, args.outdir, args.dtype, args.seq_len)
 
 
 if __name__ == "__main__":
