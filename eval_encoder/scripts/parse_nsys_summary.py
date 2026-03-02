@@ -76,14 +76,17 @@ def parse_section(body: str) -> dict:
             top1_name = name[:60]
             top1_pct  = pct
 
+    n_unique = len(data_lines)
+    frag = round(total_calls / n_unique, 2) if n_unique > 0 else 0.0
     return {
-        "total_kernel_calls": total_calls,
-        "n_unique_kernels":   len(data_lines),
-        "gemm_time_pct":      round(gemm_pct,   1),
-        "memcpy_time_pct":    round(memcpy_pct, 1),
-        "sync_time_pct":      round(sync_pct,   1),
-        "top1_kernel":        top1_name,
-        "top1_time_pct":      round(top1_pct,   1),
+        "total_kernel_calls":  total_calls,
+        "n_unique_kernels":    n_unique,
+        "fragmentation_ratio": frag,   # total_calls / n_unique: higher = more repeated small launches
+        "gemm_time_pct":       round(gemm_pct,   1),
+        "memcpy_time_pct":     round(memcpy_pct, 1),
+        "sync_time_pct":       round(sync_pct,   1),
+        "top1_kernel":         top1_name,
+        "top1_time_pct":       round(top1_pct,   1),
     }
 
 
@@ -107,7 +110,7 @@ def parse_summary_file(path: str) -> list[dict]:
 
 
 def print_table(rows: list[dict]):
-    hdr = (f"{'Point':<32} {'Calls':>7} {'Uniq':>5} "
+    hdr = (f"{'Point':<32} {'Calls':>7} {'Uniq':>5} {'Frag':>6} "
            f"{'GEMM%':>7} {'Memcpy%':>8} {'Sync%':>6}  "
            f"{'Top-1 kernel (truncated)':<50} {'Top1%':>6}")
     print(hdr)
@@ -117,6 +120,7 @@ def print_table(rows: list[dict]):
             f"{r['point']:<32} "
             f"{r['total_kernel_calls']:>7} "
             f"{r['n_unique_kernels']:>5} "
+            f"{r['fragmentation_ratio']:>6.2f} "
             f"{r['gemm_time_pct']:>6.1f}% "
             f"{r['memcpy_time_pct']:>7.1f}% "
             f"{r['sync_time_pct']:>5.1f}%  "
