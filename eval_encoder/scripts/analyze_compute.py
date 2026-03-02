@@ -328,8 +328,23 @@ def run_timing(model, loader, device, warmup=10, measure=50,
         If True, wrap each measured step with NVTX range annotations
         so that nsys captures per-step kernel timelines.
         Also calls torch.cuda.profiler.start/stop around the measure loop.
+        NOTE: performance numbers measured under nsys have profiling overhead.
+        Use perf_only=True (no --profile_nsys) for official latency/throughput
+        numbers; use --profile_nsys only for kernel-level attribution.
     nvtx_label : str
         Base label for NVTX ranges (e.g. "inference_flashsvd15").
+
+    Returns
+    -------
+    lat_ms : float
+        Median batch latency in ms.
+    sps : float
+        Median throughput in samples/s.
+    peak_mb : float
+        Peak GPU memory in MB (reset before measure loop).
+    avg_eff_tokens : float
+        Average number of non-padding tokens per sample (from attention_mask).
+        Used to compute sequence-level padding fraction.
     """
     model.eval()
     data_iter = iter(loader)
@@ -362,10 +377,18 @@ def run_timing(model, loader, device, warmup=10, measure=50,
         print(f"[nsys] CUDA profiler started  ({measure} steps, label={nvtx_label!r})")
 
     times = []
+    eff_token_sums = []   # sum of attention_mask per sample, for seq-padding stats
     with torch.no_grad():
         for step in range(measure):
             batch = _next_batch()
             batch = {k: v.to(device) for k, v in batch.items()}
+
+            # Track effective (non-padding) tokens from the attention mask.
+            # This is independent of backend and only depends on the data.
+            if "attention_mask" in batch:
+                eff_token_sums.append(
+                    batch["attention_mask"].float().sum(dim=1).mean().item()
+                )
 
             if has_nvtx and profile_nsys:
                 torch.cuda.nvtx.range_push(f"{nvtx_label}/step{step}")
@@ -389,7 +412,8 @@ def run_timing(model, loader, device, warmup=10, measure=50,
 
     lat_ms = statistics.median(times) * 1000
     sps    = bs / statistics.median(times)
-    return lat_ms, sps, peak_mb
+    avg_eff_tokens = statistics.mean(eff_token_sums) if eff_token_sums else 0.0
+    return lat_ms, sps, peak_mb, avg_eff_tokens
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -400,8 +424,34 @@ def _fmt_t(n): return f"{n/1e12:.3f}T"
 def _fmt_mb(n): return f"{n/1e6:.1f}MB"
 
 
-def print_report(layer_results, totals, lat_ms, sps, peak_mb,
+def print_report(layer_results, totals, lat_ms, sps, peak_mb, avg_eff_tokens,
                  B, M, dtype, backend, gpu_name, gpu_tflops, gpu_bw):
+    """
+    Print the full compute breakdown report.
+
+    Padding terminology
+    -------------------
+    Two distinct sources of "wasted" FLOPs are tracked and must NOT be confused:
+
+    (A) Rank-alignment padding (rank_pad_*):
+        Triton kernels require block sizes to be powers of 2.  When the actual
+        SVD rank R is not a power of 2, the kernel pads to next_pow2(R).
+        This overhead is 0% when R is already a power of 2 (e.g. R=256).
+        This is a STATIC property of the model — it does not vary with input.
+
+    (B) Sequence-level padding (seq_pad_*):
+        Input sentences are padded to max_length=M with [PAD] tokens.  The
+        model forward pass runs over all M positions including the padding
+        positions (they are masked in attention but still cost FLOPs in the
+        projection layers).  This overhead depends on the average actual
+        sentence length in the dataset.
+        This is a DYNAMIC property of the data — it varies by task/split.
+
+    The TFLOP rates (useful_tflop_rate, rank_pad_tflop_rate, achieved_tflop_rate)
+    are all *rates* in TFLOPs/s = FLOPs / latency.  They change across backends
+    because latency changes.  Use *_flops_abs for the backend-independent
+    absolute FLOPs counts.
+    """
     ebytes = _dtype_bytes(dtype)
     dtype_name = {torch.float32: "fp32", torch.float16: "fp16",
                   torch.bfloat16: "bf16"}.get(dtype, str(dtype))
@@ -415,7 +465,7 @@ def print_report(layer_results, totals, lat_ms, sps, peak_mb,
     # ── per-layer rank summary ────────────────────────────────────────────
     print(f"\n{'Layer':>5}  {'R_attn':>7}{'→pad':>5}  "
           f"{'R_ffn_r2':>9}{'→pad':>5}  "
-          f"{'Useful':>10}  {'Padding':>10}  {'Pad%':>5}  "
+          f"{'Useful':>10}  {'RankPad':>10}  {'RP%':>5}  "
           f"{'Traffic':>10}  {'AI':>6}")
     print("─" * 80)
     for r in layer_results:
@@ -434,39 +484,63 @@ def print_report(layer_results, totals, lat_ms, sps, peak_mb,
     # ── totals ────────────────────────────────────────────────────────────
     print("─" * 80)
     print(f"\n  Aggregate (all {len(layer_results)} layers, B={B}, M={M}):")
-    print(f"    Useful  FLOPs : {_fmt_t(totals['useful_flops']):>10}  "
-          f"({100*(1-totals['padding_flops']/totals['total_flops']):.1f}% of total)")
-    print(f"    Padding FLOPs : {_fmt_t(totals['padding_flops']):>10}  "
-          f"({totals['padding_pct']:.1f}% overhead)")
-    print(f"    Total   FLOPs : {_fmt_t(totals['total_flops']):>10}")
-    print(f"    Weight traffic: {_fmt_mb(totals['weight_traffic']):>10}")
-    print(f"    Activ  traffic: {_fmt_mb(totals['act_traffic']):>10}")
-    print(f"    Total  traffic: {_fmt_mb(totals['total_traffic']):>10}")
-    print(f"    Arith intensity: {totals['arith_intensity']:.1f} FLOP/byte")
+    print(f"    Useful  FLOPs (abs)    : {_fmt_t(totals['useful_flops']):>10}  "
+          f"({100*(1-totals['padding_flops']/totals['total_flops']):.1f}% of total)  "
+          f"[latency-independent]")
+    print(f"    Rank-pad FLOPs (abs)   : {_fmt_t(totals['padding_flops']):>10}  "
+          f"({totals['padding_pct']:.1f}% Triton next_pow2(R) overhead)  "
+          f"[latency-independent]")
+    print(f"    Total   FLOPs (abs)    : {_fmt_t(totals['total_flops']):>10}  "
+          f"[latency-independent]")
+    print(f"    Weight traffic         : {_fmt_mb(totals['weight_traffic']):>10}")
+    print(f"    Activ  traffic         : {_fmt_mb(totals['act_traffic']):>10}")
+    print(f"    Total  traffic         : {_fmt_mb(totals['total_traffic']):>10}")
+    print(f"    Arith intensity        : {totals['arith_intensity']:.1f} FLOP/byte")
+
+    # ── sequence-level padding (from actual data) ──────────────────────
+    if avg_eff_tokens > 0:
+        seq_pad_pct = 100.0 * (1.0 - avg_eff_tokens / M)
+        print(f"\n  Sequence-level padding (data-dependent, all backends identical):")
+        print(f"    Avg effective tokens/sample : {avg_eff_tokens:.1f} / {M}  "
+              f"({seq_pad_pct:.1f}% padding tokens)")
+        print(f"    NOTE: All backends see the same batches (shuffle=False, "
+              f"padding='max_length').")
+        print(f"          This overhead is NOT included in the FLOPs above "
+              f"(which use fixed M={M}).")
+        print(f"          seq_pad_pct quantifies how much compute is 'wasted' "
+              f"on [PAD] tokens.")
 
     # ── timing ────────────────────────────────────────────────────────────
     lat_s = lat_ms / 1000.0
-    achieved_tflops = totals["total_flops"] / lat_s / 1e12
-    achieved_bw_gbs = totals["total_traffic"] / lat_s / 1e9
+    # TFLOP rates: same FLOPs / different latency → rate changes across backends
+    useful_tflop_rate    = totals["useful_flops"]   / lat_s / 1e12
+    rank_pad_tflop_rate  = totals["padding_flops"]  / lat_s / 1e12
+    achieved_tflop_rate  = totals["total_flops"]    / lat_s / 1e12
+    achieved_bw_gbs      = totals["total_traffic"]  / lat_s / 1e9
 
-    print(f"\n  Timing (median over 50 steps):")
-    print(f"    Latency   : {lat_ms:.2f} ms/batch")
-    print(f"    Throughput: {sps:.1f} samples/s")
-    print(f"    Peak Mem  : {peak_mb:.1f} MB")
+    print(f"\n  Timing (median over measure steps):")
+    print(f"    Latency                : {lat_ms:.2f} ms/batch")
+    print(f"    Throughput             : {sps:.1f} samples/s")
+    print(f"    Peak Mem               : {peak_mb:.1f} MB")
 
-    print(f"\n  Achieved hardware utilization:")
-    print(f"    Achieved TFLOPS : {achieved_tflops:.1f}")
+    print(f"\n  Achieved TFLOP rates (FLOPs/latency — change with backend speed):")
+    print(f"    Useful TFLOP rate      : {useful_tflop_rate:.1f} TFLOPs/s  "
+          f"  [= useful_flops / latency]")
+    print(f"    Rank-pad TFLOP rate    : {rank_pad_tflop_rate:.1f} TFLOPs/s  "
+          f"  [= rank_pad_flops / latency]")
+    print(f"    Achieved TFLOP rate    : {achieved_tflop_rate:.1f} TFLOPs/s  "
+          f"  [= total_flops / latency]")
     if gpu_tflops:
-        mfu = achieved_tflops / gpu_tflops
-        print(f"    GPU peak TFLOPS : {gpu_tflops:.0f}  ({gpu_name})")
-        print(f"    MFU             : {mfu:.1%}")
+        mfu = achieved_tflop_rate / gpu_tflops
+        print(f"    GPU peak               : {gpu_tflops:.0f} TFLOPs/s  ({gpu_name})")
+        print(f"    MFU                    : {mfu:.1%}")
     else:
-        print(f"    GPU peak TFLOPS : unknown")
-    print(f"    Achieved BW     : {achieved_bw_gbs:.0f} GB/s")
+        print(f"    GPU peak               : unknown")
+    print(f"    Achieved BW            : {achieved_bw_gbs:.0f} GB/s")
     if gpu_bw:
         bwu = achieved_bw_gbs / gpu_bw
-        print(f"    GPU peak BW     : {gpu_bw:.0f} GB/s")
-        print(f"    BW utilization  : {bwu:.1%}")
+        print(f"    GPU peak BW            : {gpu_bw:.0f} GB/s")
+        print(f"    BW utilization         : {bwu:.1%}")
 
     # ── roofline ─────────────────────────────────────────────────────────
     if gpu_tflops and gpu_bw:
@@ -474,14 +548,14 @@ def print_report(layer_results, totals, lat_ms, sps, peak_mb,
         ai    = totals["arith_intensity"]
         bound = "compute-bound ✓" if ai >= ridge else "memory-bound ⚠"
         print(f"\n  Roofline:")
-        print(f"    Ridge point     : {ridge:.0f} FLOP/byte")
-        print(f"    Arith intensity : {ai:.1f} FLOP/byte  → {bound}")
+        print(f"    Ridge point            : {ridge:.0f} FLOP/byte")
+        print(f"    Arith intensity        : {ai:.1f} FLOP/byte  → {bound}")
 
     # ── per-op breakdown for first layer ─────────────────────────────────
     if layer_results:
-        print(f"\n  Per-op breakdown (layer 0):")
+        print(f"\n  Per-op breakdown (layer 0)  [rank-alignment padding only]:")
         ops = layer_results[0]["per_op"]
-        print(f"    {'Op':20s}  {'Useful':>10}  {'Padding':>10}  {'Pad%':>5}  {'Traffic':>10}")
+        print(f"    {'Op':20s}  {'Useful':>10}  {'RankPad':>10}  {'RP%':>5}  {'Traffic':>10}")
         print("    " + "─" * 60)
         for o in ops:
             total_op = o["useful_flops"] + o["padding_flops"]
@@ -563,8 +637,17 @@ def main():
         from eval_encoder.run_encoder_benchmark import (
             load_model, TASK_CFG, compress_model)
         if args.model_id is None:
-            from eval_encoder.run_encoder_benchmark import TASK_MODELS
-            model_id = TASK_MODELS.get(args.task, "bert-base-uncased")
+            _TASK_MODELS = {
+                "cola":  "textattack/bert-base-uncased-CoLA",
+                "sst2":  "textattack/bert-base-uncased-SST-2",
+                "mrpc":  "textattack/bert-base-uncased-MRPC",
+                "qqp":   "textattack/bert-base-uncased-QQP",
+                "mnli":  "textattack/bert-base-uncased-MNLI",
+                "qnli":  "textattack/bert-base-uncased-QNLI",
+                "rte":   "textattack/bert-base-uncased-RTE",
+                "stsb":  "textattack/bert-base-uncased-STS-B",
+            }
+            model_id = _TASK_MODELS.get(args.task, "bert-base-uncased")
         else:
             model_id = args.model_id
         model, tokenizer = load_model(model_id, args.task, args.dtype, args.device)
@@ -577,6 +660,14 @@ def main():
                                "qkv+ffn", loader_tmp, args.device, 4)
 
     model.eval()
+
+    # ── static FLOP / traffic analysis (BEFORE backend swap) ─────────────
+    # Must run on NaiveSVDBlock so Pq.shape[-1] == rank (not head_dim).
+    # After enable_flashsvd15, Pq becomes [H,R,dh] and shape[-1]=dh=64,
+    # which would give _next_pow2(64)=64 → 0% attention padding (wrong).
+    print(f"[analyze] Computing FLOP and traffic breakdown ...")
+    layer_results, totals = analyze_model(
+        model, args.batch_size, args.seq_len, dtype)
 
     # ── apply backend ─────────────────────────────────────────────────────
     if args.backend == "flashsvd":
@@ -593,23 +684,20 @@ def main():
         args.task, tokenizer, args.seq_len, args.batch_size,
         split="validation")
 
-    # ── static FLOP / traffic analysis ───────────────────────────────────
-    print(f"[analyze] Computing FLOP and traffic breakdown ...")
-    layer_results, totals = analyze_model(
-        model, args.batch_size, args.seq_len, dtype)
-
     # ── timing (+ optional nsys NVTX) ────────────────────────────────────
     if args.profile_nsys:
         print(f"[nsys] NVTX profiling enabled — wrapping each step with range annotations")
+        print(f"[nsys] NOTE: latency/throughput measured under nsys have profiling overhead.")
+        print(f"[nsys]       Use these numbers only for kernel attribution, not perf claims.")
         print_nsys_command(sys.argv[1:])
     print(f"[timing] Warmup={args.warmup} Measure={args.measure} steps ...")
-    lat_ms, sps, peak_mb = run_timing(
+    lat_ms, sps, peak_mb, avg_eff_tokens = run_timing(
         model, loader, args.device, args.warmup, args.measure,
         profile_nsys=args.profile_nsys,
         nvtx_label=f"inference_{args.backend}_{args.dtype}")
 
     # ── print report ──────────────────────────────────────────────────────
-    print_report(layer_results, totals, lat_ms, sps, peak_mb,
+    print_report(layer_results, totals, lat_ms, sps, peak_mb, avg_eff_tokens,
                  args.batch_size, args.seq_len, dtype,
                  args.backend, gpu_name, gpu_tflops, gpu_bw)
 
@@ -617,20 +705,39 @@ def main():
     if args.out_csv:
         import csv
         lat_s = lat_ms / 1000.0
-        achieved_tflops = totals["total_flops"] / lat_s / 1e12
+        seq_pad_pct = 100.0 * (1.0 - avg_eff_tokens / args.seq_len) if avg_eff_tokens > 0 else 0.0
+        # TFLOP rates: FLOPs / latency — these change across backends because
+        # latency changes, NOT because FLOPs change.  Use *_flops_abs for the
+        # latency-independent absolute FLOPs.
+        useful_tflop_rate   = totals["useful_flops"]  / lat_s / 1e12
+        rank_pad_tflop_rate = totals["padding_flops"] / lat_s / 1e12
+        achieved_tflop_rate = totals["total_flops"]   / lat_s / 1e12
         row = {
-            "task": args.task, "method": args.method,
-            "backend": args.backend, "dtype": args.dtype,
-            "seq_len": args.seq_len, "batch_size": args.batch_size,
-            "useful_tflops": f"{totals['useful_flops']/lat_s/1e12:.3f}",
-            "padding_tflops": f"{totals['padding_flops']/lat_s/1e12:.3f}",
-            "total_tflops": f"{achieved_tflops:.3f}",
-            "padding_pct": f"{totals['padding_pct']:.2f}",
-            "arith_intensity": f"{totals['arith_intensity']:.1f}",
-            "latency_ms": f"{lat_ms:.2f}",
-            "throughput_sps": f"{sps:.1f}",
-            "peak_mem_mb": f"{peak_mb:.1f}",
-            "mfu": f"{achieved_tflops/gpu_tflops:.4f}" if gpu_tflops else "",
+            "task":                 args.task,
+            "method":               args.method,
+            "backend":              args.backend,
+            "dtype":                args.dtype,
+            "seq_len":              args.seq_len,
+            "batch_size":           args.batch_size,
+            # ── absolute FLOPs (latency-independent; same across backends) ──
+            "useful_flops_abs":     f"{totals['useful_flops']/1e12:.4f}",   # TFLOPs
+            "rank_pad_flops_abs":   f"{totals['padding_flops']/1e12:.4f}",  # TFLOPs
+            "total_flops_abs":      f"{totals['total_flops']/1e12:.4f}",    # TFLOPs
+            # ── TFLOP rates (FLOPs/s; change with backend speed) ──────────
+            "useful_tflop_rate":    f"{useful_tflop_rate:.3f}",
+            "rank_pad_tflop_rate":  f"{rank_pad_tflop_rate:.3f}",
+            "achieved_tflop_rate":  f"{achieved_tflop_rate:.3f}",
+            # ── padding fractions ─────────────────────────────────────────
+            "rank_pad_pct":         f"{totals['padding_pct']:.2f}",   # Triton next_pow2(R)
+            "seq_pad_pct":          f"{seq_pad_pct:.2f}",              # sentence padding
+            "avg_eff_tokens":       f"{avg_eff_tokens:.1f}",
+            # ── roofline ──────────────────────────────────────────────────
+            "arith_intensity":      f"{totals['arith_intensity']:.1f}",
+            # ── timing / memory ───────────────────────────────────────────
+            "latency_ms":           f"{lat_ms:.2f}",
+            "throughput_sps":       f"{sps:.1f}",
+            "peak_mem_mb":          f"{peak_mb:.1f}",
+            "mfu":                  f"{achieved_tflop_rate/gpu_tflops:.4f}" if gpu_tflops else "",
         }
         write_header = not os.path.exists(args.out_csv)
         with open(args.out_csv, "a", newline="") as f:
