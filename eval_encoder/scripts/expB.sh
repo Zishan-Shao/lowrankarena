@@ -46,6 +46,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
+# ── 日志 ──────────────────────────────────────────────────────────────────────
+LOG_DIR="${LOG_DIR:-eval_encoder/logs}"
+mkdir -p "${LOG_DIR}"
+LOG_FILE="${LOG_DIR}/expB_$(date +%Y%m%d_%H%M%S).log"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+echo "[log] → ${LOG_FILE}"
+
 # ── 配置 ──────────────────────────────────────────────────────────────────────
 TASKS="${TASKS:-cola sst2 mrpc qqp mnli qnli rte stsb}"
 METHODS="${METHODS:-svd fwsvd drone adasvd}"

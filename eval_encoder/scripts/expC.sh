@@ -47,6 +47,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
+# ── 日志 ──────────────────────────────────────────────────────────────────────
+LOG_DIR="${LOG_DIR:-eval_encoder/logs}"
+mkdir -p "${LOG_DIR}"
+LOG_FILE="${LOG_DIR}/expC_$(date +%Y%m%d_%H%M%S).log"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+echo "[log] → ${LOG_FILE}"
+
 # ── 配置 ──────────────────────────────────────────────────────────────────────
 PHASES="${PHASES:-seqlen batch}"
 TASKS="${TASKS:-mnli stsb}"

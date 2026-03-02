@@ -53,7 +53,7 @@ LOCAL_PRETRAINED_DIR="${LOCAL_PRETRAINED_DIR:-}"  # 本地预训练模型目录�
 
 # Output locations
 RESULT_DIR="${RESULT_DIR:-eval_encoder/glue_results}"
-LOG_DIR="${LOG_DIR:-eval_encoder/eval_results}"
+LOG_DIR="${LOG_DIR:-eval_encoder/logs}"
 mkdir -p "${RESULT_DIR}" "${LOG_DIR}"
 
 # Two-stage by default: compare "no finetune" vs "with finetune"

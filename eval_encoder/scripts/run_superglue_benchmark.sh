@@ -35,6 +35,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
+# ── 日志 ─────────────────────────────────────────────────────────────────────
+LOG_DIR="${LOG_DIR:-eval_encoder/logs}"
+mkdir -p "${LOG_DIR}"
+LOG_FILE="${LOG_DIR}/superglue_$(date +%Y%m%d_%H%M%S).log"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+echo "[log] → ${LOG_FILE}"
+
 # ── 配置 ─────────────────────────────────────────────────────────────────────
 TASKS="${TASKS:-boolq rte_sg wic hans anli_r1 anli_r2 anli_r3}"
 METHODS="${METHODS:-dense svd fwsvd drone adasvd}"

@@ -42,6 +42,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
+# ── 日志 ──────────────────────────────────────────────────────────────────────
+LOG_DIR="${LOG_DIR:-eval_encoder/logs}"
+mkdir -p "${LOG_DIR}"
+LOG_FILE="${LOG_DIR}/expA_$(date +%Y%m%d_%H%M%S).log"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+echo "[log] → ${LOG_FILE}"
+
 # ── Canonical config（不要随意修改，改了就不是论文结果了）─────────────────────
 export QKV_MODE="per_head"
 export RANK_ATTN=48
