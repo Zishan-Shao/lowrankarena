@@ -271,6 +271,7 @@ run_one() {
   env_prefix+=("NON_INTERACTIVE=true")
   env_prefix+=("AUTO_FIGURES=false")  # 由 compare_all_methods.sh 统一在最后出图
   env_prefix+=("OUT_CSV=${PERF_CSV}")
+  env_prefix+=("SKIP_ENV_CHECK=true")
 
   # Add component-specific ranks if set
   if [[ -n "${RANK_ATTN}" ]]; then

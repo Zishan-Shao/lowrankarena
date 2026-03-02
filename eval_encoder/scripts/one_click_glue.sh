@@ -237,8 +237,10 @@ EOF
     echo "Starting pipeline at $(date)"
     echo "All output will be logged to: $LOG_FILE"
 
-    # 环境检查
-    check_environment
+    # 环境检查（被 compare_all_methods.sh 调用时跳过，避免重复 check）
+    if [[ "${SKIP_ENV_CHECK:-false}" != "true" ]]; then
+        check_environment
+    fi
 
     # 估算时间
     print_section "Time Estimation"
