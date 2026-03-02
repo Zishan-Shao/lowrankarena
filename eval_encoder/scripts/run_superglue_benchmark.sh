@@ -2,16 +2,16 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # run_superglue_benchmark.sh
 #
-# 在 SuperGLUE / HANS / ANLI 上跑所有压缩方法并汇总结果。
-# 不进行微调，直接评估压缩后的精度（zero-shot compression eval）。
+# 在 SuperGLUE / HANS / ANLI 上跑所有压缩方法 × 多个 backend 并汇总结果。
+# 不进行微调，直接评估压缩后精度（zero-shot compression eval）。
 #
 # Checkpoint 逻辑：
-#   若 MODEL_BASE_DIR/{task}/{method_subdir}/ 存在 → --load_model_dir（跳过压缩）
-#   否则 → 重新压缩，并 --save_model --save_dir MODEL_BASE_DIR/{task}
+#   压缩只做一次（naive backend），checkpoint 命名带 _naive 后缀。
+#   backend 循环时从 naive checkpoint --load_model_dir，只换 --backend。
 #
 # 覆盖任务（7 个，cb 排除）：
 #   boolq, rte_sg, wic, hans, anli_r1, anli_r2, anli_r3
-# cb 排除原因：验证集仅 56 例 + 无 bert-base 专用 fine-tuned 模型 → 结果不可信
+#   cb 排除：验证集仅 56 例 + 无 bert-base 专用 fine-tuned 模型 → 结果不可信
 #
 # 覆盖方法（5 个）：
 #   dense, svd, fwsvd, drone, adasvd
@@ -21,10 +21,10 @@
 #   bash eval_encoder/scripts/run_superglue_benchmark.sh
 #
 # 可覆盖变量示例：
-#   TASKS="boolq hans"        METHODS="svd fwsvd"
-#   RANK_ATTN=64 RANK_FFN=256 RANK_WO=256
-#   DTYPE=bf16  SEQ_LEN=256   BACKEND=naive
-#   RECOMPRESS=true           # 强制重新压缩（忽略已有 checkpoint）
+#   TASKS="boolq hans"
+#   METHODS="svd fwsvd"
+#   BACKENDS="naive flashsvd15"
+#   RECOMPRESS=true     # 强制重新压缩（忽略已有 checkpoint）
 #   OUT_CSV=eval_encoder/eval_results/superglue_results.csv
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -36,8 +36,8 @@ cd "${REPO_ROOT}"
 
 # ── 配置 ─────────────────────────────────────────────────────────────────────
 TASKS="${TASKS:-boolq rte_sg wic hans anli_r1 anli_r2 anli_r3}"
-# cb 排除：验证集仅 56 例且无 bert-base 专用 fine-tuned 模型，结果不可信
 METHODS="${METHODS:-dense svd fwsvd drone adasvd}"
+BACKENDS="${BACKENDS:-naive flashsvd flashsvd15}"
 
 # SVD / FWSVD / DRONE 的 rank（与 GLUE expA 完全一致）
 RANK_ATTN="${RANK_ATTN:-48}"
@@ -53,13 +53,12 @@ ADASVD_STEPS="${ADASVD_STEPS:-800}"
 CALIB_BATCHES="${CALIB_BATCHES:-16}"
 DTYPE="${DTYPE:-fp32}"
 SEQ_LEN="${SEQ_LEN:-512}"
-BACKEND="${BACKEND:-naive}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
 
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-eval_encoder/models}"
 OUT_CSV="${OUT_CSV:-eval_encoder/eval_results/superglue_results.csv}"
 
-# RECOMPRESS=true 可强制跳过 checkpoint 直接重新压缩
+# RECOMPRESS=true 强制忽略已有 checkpoint，重新压缩
 RECOMPRESS="${RECOMPRESS:-false}"
 
 # ── task → model_id 映射 ──────────────────────────────────────────────────────
@@ -85,25 +84,26 @@ _calib_task_for() {
     esac
 }
 
-# checkpoint 子目录名（与 glue_pipeline.py / run_encoder_benchmark.py 保存命名一致）
-_model_subdir() {
+# checkpoint 子目录名 — 始终带 _naive 后缀（压缩统一用 naive 保存）
+_ckpt_subdir() {
     local method="$1"
     case "${method}" in
-        dense)   echo "dense_naive" ;;
-        adasvd)  echo "adasvd_b${BUDGET}_${QKV_MODE}_${BACKEND}" ;;
-        *)       echo "${method}_ra${RANK_ATTN}_rf${RANK_FFN}_rw${RANK_WO}_${QKV_MODE}_${BACKEND}" ;;
+        dense)  echo "dense_naive" ;;
+        adasvd) echo "adasvd_b${BUDGET}_${QKV_MODE}_naive" ;;
+        *)      echo "${method}_ra${RANK_ATTN}_rf${RANK_FFN}_rw${RANK_WO}_${QKV_MODE}_naive" ;;
     esac
 }
 
 echo "══════════════════════════════════════════════════════════════════════"
 echo "  SuperGLUE / HANS / ANLI Compression Benchmark"
-echo "  tasks:   ${TASKS}"
-echo "  methods: ${METHODS}"
-echo "  ranks:   ra${RANK_ATTN}_rf${RANK_FFN}_rw${RANK_WO}  qkv=${QKV_MODE}"
-echo "  adasvd:  budget=${BUDGET}  calib_samples=${ADASVD_CALIB_SAMPLES}  steps=${ADASVD_STEPS}"
-echo "  dtype:   ${DTYPE}   seq_len: ${SEQ_LEN}   backend: ${BACKEND}"
-echo "  models:  ${MODEL_BASE_DIR}  recompress: ${RECOMPRESS}"
-echo "  out_csv: ${OUT_CSV}"
+echo "  tasks:    ${TASKS}"
+echo "  methods:  ${METHODS}"
+echo "  backends: ${BACKENDS}"
+echo "  ranks:    ra${RANK_ATTN}_rf${RANK_FFN}_rw${RANK_WO}  qkv=${QKV_MODE}"
+echo "  adasvd:   budget=${BUDGET}  calib_samples=${ADASVD_CALIB_SAMPLES}  steps=${ADASVD_STEPS}"
+echo "  dtype:    ${DTYPE}   seq_len: ${SEQ_LEN}   bs: ${BATCH_SIZE}"
+echo "  models:   ${MODEL_BASE_DIR}  recompress: ${RECOMPRESS}"
+echo "  out_csv:  ${OUT_CSV}"
 echo "══════════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -119,91 +119,96 @@ for TASK in ${TASKS}; do
     fi
 
     CALIB_TASK="$(_calib_task_for "${TASK}")"
+    EXTRA_ARGS=()
+    [[ -n "${CALIB_TASK}" ]] && EXTRA_ARGS+=(--calib_task "${CALIB_TASK}")
 
     for METHOD in ${METHODS}; do
-        SUBDIR="$(_model_subdir "${METHOD}")"
+        SUBDIR="$(_ckpt_subdir "${METHOD}")"
         CKPT_DIR="${MODEL_BASE_DIR}/${TASK}/${SUBDIR}"
 
-        echo "── ${TASK} / ${METHOD}"
+        # ── Step 1：确保 naive checkpoint 存在（dense 不需要）────────────────
+        if [[ "${METHOD}" != "dense" ]]; then
+            if [[ "${RECOMPRESS}" == "true" || ! -d "${CKPT_DIR}" ]]; then
+                echo "── ${TASK} / ${METHOD}  [compress → ${CKPT_DIR}]"
 
-        # ── dense ─────────────────────────────────────────────────────────
-        if [[ "${METHOD}" == "dense" ]]; then
-            python eval_encoder/run_encoder_benchmark.py \
-                --task       "${TASK}" \
-                --model_id   "${MODEL_ID}" \
-                --method     dense \
-                --backend    "${BACKEND}" \
-                --dtype      "${DTYPE}" \
-                --seq_len    "${SEQ_LEN}" \
-                --batch_size "${BATCH_SIZE}" \
-                --out_csv    "${OUT_CSV}" \
-                && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
-            continue
+                if [[ "${METHOD}" == "adasvd" ]]; then
+                    python eval_encoder/run_encoder_benchmark.py \
+                        --task                 "${TASK}" \
+                        --model_id             "${MODEL_ID}" \
+                        --method               adasvd \
+                        --budget               "${BUDGET}" \
+                        --qkv_mode             "${QKV_MODE}" \
+                        --adasvd_calib_samples "${ADASVD_CALIB_SAMPLES}" \
+                        --adasvd_steps         "${ADASVD_STEPS}" \
+                        --backend              naive \
+                        --dtype                "${DTYPE}" \
+                        --seq_len              "${SEQ_LEN}" \
+                        --batch_size           "${BATCH_SIZE}" \
+                        --save_model \
+                        --save_dir             "${MODEL_BASE_DIR}/${TASK}" \
+                        --out_csv              "${OUT_CSV}" \
+                        "${EXTRA_ARGS[@]}"
+                else
+                    python eval_encoder/run_encoder_benchmark.py \
+                        --task          "${TASK}" \
+                        --model_id      "${MODEL_ID}" \
+                        --method        "${METHOD}" \
+                        --rank_attn     "${RANK_ATTN}" \
+                        --rank_ffn      "${RANK_FFN}" \
+                        --rank_wo       "${RANK_WO}" \
+                        --qkv_mode      "${QKV_MODE}" \
+                        --calib_batches "${CALIB_BATCHES}" \
+                        --backend       naive \
+                        --dtype         "${DTYPE}" \
+                        --seq_len       "${SEQ_LEN}" \
+                        --batch_size    "${BATCH_SIZE}" \
+                        --save_model \
+                        --save_dir      "${MODEL_BASE_DIR}/${TASK}" \
+                        --out_csv       "${OUT_CSV}" \
+                        "${EXTRA_ARGS[@]}"
+                fi && OK=$((OK + 1)) || { FAIL=$((FAIL + 1)); continue; }
+            else
+                echo "── ${TASK} / ${METHOD}  [checkpoint exists: ${CKPT_DIR}]"
+            fi
         fi
 
-        # ── SVD-based + AdaSVD ────────────────────────────────────────────
-        EXTRA_ARGS=()
-        [[ -n "${CALIB_TASK}" ]] && EXTRA_ARGS+=(--calib_task "${CALIB_TASK}")
+        # ── Step 2：遍历其余 backend（从 naive checkpoint load）──────────────
+        for BACKEND in ${BACKENDS}; do
+            # naive 在 Step 1 压缩时已经评估并写 CSV，跳过重复跑
+            [[ "${BACKEND}" == "naive" && "${METHOD}" != "dense" && -d "${CKPT_DIR}" && "${RECOMPRESS}" != "true" ]] && \
+                echo "   [skip naive — already in CSV from compress step]" && continue
 
-        if [[ "${RECOMPRESS}" != "true" && -d "${CKPT_DIR}" ]]; then
-            # checkpoint 已存在，直接 load
-            echo "   [load] ${CKPT_DIR}"
-            python eval_encoder/run_encoder_benchmark.py \
-                --task           "${TASK}" \
-                --model_id       "${MODEL_ID}" \
-                --method         "${METHOD}" \
-                --load_model_dir "${CKPT_DIR}" \
-                --backend        "${BACKEND}" \
-                --dtype          "${DTYPE}" \
-                --seq_len        "${SEQ_LEN}" \
-                --batch_size     "${BATCH_SIZE}" \
-                --out_csv        "${OUT_CSV}" \
-                "${EXTRA_ARGS[@]}" \
-                && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
-        elif [[ "${METHOD}" == "adasvd" ]]; then
-            # AdaSVD：用 budget，不用 rank 参数
-            echo "   [compress] adasvd budget=${BUDGET}  saving to ${CKPT_DIR}"
-            python eval_encoder/run_encoder_benchmark.py \
-                --task                 "${TASK}" \
-                --model_id             "${MODEL_ID}" \
-                --method               adasvd \
-                --budget               "${BUDGET}" \
-                --qkv_mode             "${QKV_MODE}" \
-                --adasvd_calib_samples "${ADASVD_CALIB_SAMPLES}" \
-                --adasvd_steps         "${ADASVD_STEPS}" \
-                --backend              "${BACKEND}" \
-                --dtype                "${DTYPE}" \
-                --seq_len              "${SEQ_LEN}" \
-                --batch_size           "${BATCH_SIZE}" \
-                --save_model \
-                --save_dir             "${MODEL_BASE_DIR}/${TASK}" \
-                --out_csv              "${OUT_CSV}" \
-                "${EXTRA_ARGS[@]}" \
-                && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
-        else
-            # SVD / FWSVD / DRONE：用 rank 参数
-            echo "   [compress] saving to ${CKPT_DIR}"
-            python eval_encoder/run_encoder_benchmark.py \
-                --task          "${TASK}" \
-                --model_id      "${MODEL_ID}" \
-                --method        "${METHOD}" \
-                --rank_attn     "${RANK_ATTN}" \
-                --rank_ffn      "${RANK_FFN}" \
-                --rank_wo       "${RANK_WO}" \
-                --qkv_mode      "${QKV_MODE}" \
-                --calib_batches "${CALIB_BATCHES}" \
-                --backend       "${BACKEND}" \
-                --dtype         "${DTYPE}" \
-                --seq_len       "${SEQ_LEN}" \
-                --batch_size    "${BATCH_SIZE}" \
-                --save_model \
-                --save_dir      "${MODEL_BASE_DIR}/${TASK}" \
-                --out_csv       "${OUT_CSV}" \
-                "${EXTRA_ARGS[@]}" \
-                && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
-        fi
+            echo "   ── ${TASK} / ${METHOD} / ${BACKEND}"
+
+            if [[ "${METHOD}" == "dense" ]]; then
+                python eval_encoder/run_encoder_benchmark.py \
+                    --task       "${TASK}" \
+                    --model_id   "${MODEL_ID}" \
+                    --method     dense \
+                    --backend    "${BACKEND}" \
+                    --dtype      "${DTYPE}" \
+                    --seq_len    "${SEQ_LEN}" \
+                    --batch_size "${BATCH_SIZE}" \
+                    --out_csv    "${OUT_CSV}" \
+                    "${EXTRA_ARGS[@]}" \
+                    && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
+            else
+                python eval_encoder/run_encoder_benchmark.py \
+                    --task           "${TASK}" \
+                    --model_id       "${MODEL_ID}" \
+                    --method         "${METHOD}" \
+                    --load_model_dir "${CKPT_DIR}" \
+                    --backend        "${BACKEND}" \
+                    --dtype          "${DTYPE}" \
+                    --seq_len        "${SEQ_LEN}" \
+                    --batch_size     "${BATCH_SIZE}" \
+                    --out_csv        "${OUT_CSV}" \
+                    "${EXTRA_ARGS[@]}" \
+                    && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
+            fi
+        done
+        echo ""
     done
-    echo ""
 done
 
 echo "══════════════════════════════════════════════════════════════════════"
