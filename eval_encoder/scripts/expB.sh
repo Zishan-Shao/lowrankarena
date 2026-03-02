@@ -15,7 +15,7 @@
 #     （同时含 latency/memory 列 和 FLOPs/MFU 列，所有图从同一文件读取）
 #
 # 取代
-#   run_expA_sdpa.sh   （旧：只跑 analyze_compute.py，输出 expA_backend.csv）
+#   run_expA_sdpa.sh   （旧：只跑 analyze_compute.py，输出已归档至 _retired/）
 #   run_sdpa_ablation.sh （旧：只跑 run_encoder_benchmark.py, 输出 encoder_runs.csv）
 #
 # 用法
