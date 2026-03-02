@@ -420,6 +420,8 @@ def parse_args():
 
     # Output configuration
     parser.add_argument("--output_dir", default="eval_encoder/glue_results")
+    parser.add_argument("--out_csv", default="eval_encoder/eval_results/encoder_runs.csv",
+                        help="CSV file for benchmark rows (accuracy + performance)")
     parser.add_argument("--save_models", action="store_true",
                         help="Save fine-tuned models")
 
@@ -984,6 +986,8 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
             cmd.extend(["--calib_batches", str(args.calib_batches)])
             if effective_calib_task != validation_task:
                 cmd.extend(["--calib_task", effective_calib_task])
+
+    cmd.extend(["--out_csv", args.out_csv])
 
     print(f"\n[cmd] {' '.join(cmd)}\n")
 
@@ -1651,19 +1655,21 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         value_flash15=metric_value_flash15,
     )
 
-    # Write flashsvd efficiency row to encoder_runs.csv (has mem/sps data)
+    # Write flashsvd efficiency row (has mem/sps data)
     if results_flashsvd is not None and speed_metrics_flash is not None:
         _append_flashsvd_csv_row(
             task, comp_info, speed_metrics_flash,
             cfg["metric"], metric_value_flash,
+            csv_path=args.out_csv,
             backend="flashsvd",
         )
 
-    # Write flashsvd15 efficiency row to encoder_runs.csv
+    # Write flashsvd15 efficiency row
     if results_flashsvd15 is not None and speed_metrics_flash15 is not None:
         _append_flashsvd_csv_row(
             task, comp_info, speed_metrics_flash15,
             cfg["metric"], metric_value_flash15,
+            csv_path=args.out_csv,
             backend="flashsvd15",
         )
 

@@ -270,6 +270,7 @@ run_one() {
   env_prefix+=("PRETRAIN_BEFORE_COMPRESS=${PRETRAIN_BEFORE_COMPRESS}")
   env_prefix+=("NON_INTERACTIVE=true")
   env_prefix+=("AUTO_FIGURES=false")  # 由 compare_all_methods.sh 统一在最后出图
+  env_prefix+=("OUT_CSV=${PERF_CSV}")
 
   # Add component-specific ranks if set
   if [[ -n "${RANK_ATTN}" ]]; then

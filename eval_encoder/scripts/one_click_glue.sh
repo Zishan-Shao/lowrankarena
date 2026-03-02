@@ -98,6 +98,7 @@ SEED="${SEED:-42}"
 
 # 输出配置
 OUTPUT_DIR="${OUTPUT_DIR:-${EVAL_ENCODER_PATH}/glue_results}"
+OUT_CSV="${OUT_CSV:-eval_encoder/eval_results/encoder_runs.csv}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 # Build rank label for log filename:
 # - If component ranks specified, use ra/rf/rw format
@@ -274,7 +275,8 @@ EOF
         --learning_rate \"$LEARNING_RATE\" \
         --seq_len \"$SEQ_LEN\" \
         --seed \"$SEED\" \
-        --output_dir \"$OUTPUT_DIR\""
+        --output_dir \"$OUTPUT_DIR\" \
+        --out_csv \"$OUT_CSV\""
 
     # Add component-specific ranks if specified
     if [ -n "$RANK_ATTN" ]; then
