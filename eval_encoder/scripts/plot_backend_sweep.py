@@ -7,7 +7,7 @@ Output: backend_latency_mnli+stsb_bf16_seq512.png  (and speedup / memory)
 
 Usage:
     python eval_encoder/scripts/plot_backend_sweep.py \
-        --csv     eval_encoder/eval_results/expB_backend.csv \
+        --csv     eval_encoder/eval_results/expB.csv \
         --tasks   mnli stsb \
         --methods svd fwsvd drone adasvd \
         --dtype   bf16  --seq_len 512 \
@@ -347,7 +347,7 @@ def plot_throughput(df, tasks, methods, outdir, dtype, seq_len):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--csv",     default="eval_encoder/eval_results/expB_backend.csv")
+    p.add_argument("--csv",     default="eval_encoder/eval_results/expB.csv")
     p.add_argument("--outdir",  default=None)
     p.add_argument("--tasks",   nargs="+", default=["mnli", "stsb"])
     p.add_argument("--methods", nargs="+", default=["svd", "fwsvd", "drone", "adasvd"])

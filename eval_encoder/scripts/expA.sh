@@ -33,7 +33,7 @@
 # 输出
 #   GLUE      : eval_encoder/glue_results/glue_results_{method}_*.json
 #               → 通过 eval_results/collect_glue_results.py 汇总为 CSV
-#   SuperGLUE : eval_encoder/eval_results/superglue_results.csv
+#   SuperGLUE : eval_encoder/eval_results/expA.csv
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -63,7 +63,7 @@ TASKS_SUPERGLUE="${TASKS_SUPERGLUE:-boolq rte_sg wic hans anli_r1 anli_r2 anli_r
 TWO_STAGE="${TWO_STAGE:-true}"
 RECOMPRESS="${RECOMPRESS:-false}"
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-eval_encoder/models}"
-OUT_CSV_SUPERGLUE="${OUT_CSV_SUPERGLUE:-eval_encoder/eval_results/superglue_results.csv}"
+OUT_CSV_SUPERGLUE="${OUT_CSV_SUPERGLUE:-eval_encoder/eval_results/expA.csv}"
 
 echo "══════════════════════════════════════════════════════════════════════"
 echo "  expA — Quality Experiment"

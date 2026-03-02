@@ -11,7 +11,7 @@
 #   • 无 checkpoint = skip（打印警告，不 abort）
 #   • 4 个 backend：naive(einsum) / naive(sdpa) / flashsvd / flashsvd15
 #     → analyze_compute.py 接受 backend=sdpa，内部自动翻译为 --attn_mode sdpa
-#   • 单一输出：eval_encoder/eval_results/expB_backend.csv
+#   • 单一输出：eval_encoder/eval_results/expB.csv
 #     （同时含 latency/memory 列 和 FLOPs/MFU 列，所有图从同一文件读取）
 #
 # 取代
@@ -33,7 +33,7 @@
 #   WARMUP=10
 #   MEASURE=50
 #   MODEL_BASE_DIR=eval_encoder/models
-#   OUT_CSV=eval_encoder/eval_results/expB_backend.csv
+#   OUT_CSV=eval_encoder/eval_results/expB.csv
 #
 # checkpoint 命名规则（与 expA / glue_pipeline.py 一致）
 #   SVD/FWSVD/DRONE : {task}/{method}_ra{ra}_rf{rf}_rw{rw}_{qkv_mode}_naive
@@ -64,7 +64,7 @@ QKV_MODE="${QKV_MODE:-per_head}"
 BUDGET="${BUDGET:-0.527}"
 
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-eval_encoder/models}"
-OUT_CSV="${OUT_CSV:-eval_encoder/eval_results/expB_backend.csv}"
+OUT_CSV="${OUT_CSV:-eval_encoder/eval_results/expB.csv}"
 
 # ── checkpoint 子目录名 ────────────────────────────────────────────────────────
 _model_subdir() {

@@ -40,7 +40,7 @@
 #   MODEL_BASE_DIR=eval_encoder/models
 #   NSYS_DIR=eval_encoder/eval_results/nsys   # .nsys-rep 文件输出目录
 #   SUMMARY_TXT=eval_encoder/eval_results/nsys/nsys_summary.txt
-#   OUT_CSV=eval_encoder/eval_results/nsys/nsys_parsed.csv
+#   OUT_CSV=eval_encoder/eval_results/expD.csv
 #   FIGURES_DIR=eval_encoder/eval_results/figures
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ BUDGET="${BUDGET:-0.527}"
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-eval_encoder/models}"
 NSYS_DIR="${NSYS_DIR:-eval_encoder/eval_results/nsys}"
 SUMMARY_TXT="${SUMMARY_TXT:-${NSYS_DIR}/nsys_summary.txt}"
-OUT_CSV="${OUT_CSV:-${NSYS_DIR}/nsys_parsed.csv}"
+OUT_CSV="${OUT_CSV:-eval_encoder/eval_results/expD.csv}"
 FIGURES_DIR="${FIGURES_DIR:-eval_encoder/eval_results/figures}"
 
 # ── 检查 nsys ─────────────────────────────────────────────────────────────────

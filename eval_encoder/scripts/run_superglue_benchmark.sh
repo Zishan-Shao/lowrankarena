@@ -26,7 +26,7 @@
 #   BACKENDS="naive sdpa flashsvd"    # fp32 下不含 flashsvd15（会 cast 到 fp16）
 #   DTYPE=fp32 BACKENDS="naive sdpa flashsvd"   # fp32 精度测试（不含 flashsvd15）
 #   RECOMPRESS=true     # 强制重新压缩（忽略已有 checkpoint）
-#   OUT_CSV=eval_encoder/eval_results/superglue_results.csv
+#   OUT_CSV=eval_encoder/eval_results/expA.csv
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -57,7 +57,7 @@ SEQ_LEN="${SEQ_LEN:-512}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
 
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-eval_encoder/models}"
-OUT_CSV="${OUT_CSV:-eval_encoder/eval_results/superglue_results.csv}"
+OUT_CSV="${OUT_CSV:-eval_encoder/eval_results/expA.csv}"
 
 # RECOMPRESS=true 强制忽略已有 checkpoint，重新压缩
 RECOMPRESS="${RECOMPRESS:-false}"

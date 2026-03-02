@@ -6,18 +6,18 @@ per unique combination.
 Designed for CSVs that are written with analyze_compute.py's append strategy:
   rows are appended in run order, so "last occurrence" = most recent run.
 
-Default key columns (cover expB_backend.csv / expC_seqlen.csv / expC_batch.csv):
+Default key columns (cover expB.csv / expC_seqlen.csv / expC_batch.csv):
   task, method, backend, dtype, seq_len, batch_size
 
 Usage
 -----
-  # Deduplicate expB_backend.csv in-place:
+  # Deduplicate expB.csv in-place:
   python eval_encoder/scripts/utils/dedup_csv.py \
-      --csv eval_encoder/eval_results/expB_backend.csv
+      --csv eval_encoder/eval_results/expB.csv
 
   # Dry-run (print stats only, don't overwrite):
   python eval_encoder/scripts/utils/dedup_csv.py \
-      --csv eval_encoder/eval_results/expB_backend.csv --dry_run
+      --csv eval_encoder/eval_results/expB.csv --dry_run
 
   # Custom key columns:
   python eval_encoder/scripts/utils/dedup_csv.py \

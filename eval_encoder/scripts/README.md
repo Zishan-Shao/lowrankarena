@@ -4,10 +4,10 @@
 
 | 脚本 | 实验 | 输出 |
 |------|------|------|
-| `expA.sh` | 质量实验（压缩精度）| `glue_results/*.json`, `superglue_results.csv` |
-| `expB.sh` | 后端性能微基准 | `eval_results/expB_backend.csv` |
-| `expC.sh` | Scaling（seq_len / batch_size）| `expC_seqlen.csv`, `expC_batch.csv` |
-| `expD.sh` | Kernel 分析（nsys）| `nsys/nsys_parsed.csv`, figures |
+| `expA.sh` | 质量实验（压缩精度）| `glue_results/*.json`, `eval_results/expA.csv` |
+| `expB.sh` | 后端性能微基准 | `eval_results/expB.csv` |
+| `expC.sh` | Scaling（seq_len / batch_size）| `eval_results/expC_seqlen.csv`, `eval_results/expC_batch.csv` |
+| `expD.sh` | Kernel 分析（nsys）| `eval_results/expD.csv`, figures |
 
 ### Canonical config（所有实验共用）
 
@@ -65,7 +65,7 @@ BACKENDS="naive flashsvd15" bash eval_encoder/scripts/expB.sh
 > 缺少 checkpoint 时该组合会打印 `[skip]` 并继续，不会自动压缩。
 > 如果 skip 大量出现，先跑 `expA.sh` 补全 checkpoint。
 
-**输出**：`eval_encoder/eval_results/expB_backend.csv`（canonical 路径，固定不变）
+**输出**：`eval_encoder/eval_results/expB.csv`（canonical 路径，固定不变）
 
 > ⚠️ **三张图（plot_backend_sweep / plot_combined_figure / plot_flops_breakdown）默认都读这个路径。**
 > 不要用 `--out_csv` 把数据写到别处，否则画图时需要手动传参。
@@ -131,7 +131,7 @@ SEQ_LENS="128 256 512" METHODS="svd" bash eval_encoder/scripts/expC.sh
 ```bash
 cd lowrankarena/
 
-# 全量（4 个代表点：svd/adasvd × naive/flashsvd）
+# 全量（4 个代表点：svd/adasvd × naive/flashsvd15）
 bash eval_encoder/scripts/expD.sh
 
 # 只跑特定 task（默认 mnli）
@@ -148,14 +148,14 @@ TASK=mnli bash eval_encoder/scripts/expD.sh
 | Tag | Method | Backend |
 |-----|--------|---------|
 | `mnli_svd_naive` | SVD | naive |
-| `mnli_svd_flashsvd` | SVD | flashsvd |
+| `mnli_svd_flashsvd15` | SVD | flashsvd15 |
 | `mnli_adasvd_naive` | AdaSVD | naive |
-| `mnli_adasvd_flashsvd` | AdaSVD | flashsvd |
+| `mnli_adasvd_flashsvd15` | AdaSVD | flashsvd15 |
 
 **输出**：
 - `eval_encoder/eval_results/nsys/*.nsys-rep` — 原始 profile 文件
 - `eval_encoder/eval_results/nsys/nsys_summary.txt` — cuda_gpu_kern_sum 汇总
-- `eval_encoder/eval_results/nsys/nsys_parsed.csv` — 结构化指标
+- `eval_encoder/eval_results/expD.csv` — 结构化指标
 - `eval_encoder/eval_results/figures/nsys_kernel_analysis_mnli_bf16_seq512.png`
 
 **手动调 parse + plot（已有 .nsys-rep 时）**：
@@ -163,10 +163,10 @@ TASK=mnli bash eval_encoder/scripts/expD.sh
 ```bash
 python eval_encoder/scripts/parse_nsys_summary.py \
   --input   eval_encoder/eval_results/nsys/nsys_summary.txt \
-  --out_csv eval_encoder/eval_results/nsys/nsys_parsed.csv
+  --out_csv eval_encoder/eval_results/expD.csv
 
 python eval_encoder/scripts/plot_nsys_kernel.py \
-  --csv    eval_encoder/eval_results/nsys/nsys_parsed.csv \
+  --csv    eval_encoder/eval_results/expD.csv \
   --outdir eval_encoder/eval_results/figures
 ```
 
@@ -186,7 +186,7 @@ python eval_encoder/scripts/plot_nsys_kernel.py \
 
 | 脚本 | 用途 |
 |------|------|
-| `analyze_compute.py` | 计算 FLOPs / MFU / arithmetic intensity，写入 expB_backend.csv |
+| `analyze_compute.py` | 计算 FLOPs / MFU / arithmetic intensity，写入 expB.csv |
 | `plot_backend_sweep.py` | 后端对比图（latency / speedup / memory）|
 | `plot_combined_figure.py` | 综合大图（4 metrics × 2 tasks）|
 | `plot_flops_breakdown.py` | FLOPs breakdown stacked bar（compute quality + seq padding）|
@@ -201,11 +201,13 @@ python eval_encoder/scripts/plot_nsys_kernel.py \
 
 | 文件 | 写入方式 | 来源 |
 |------|----------|------|
-| `expB_backend.csv` | append（文件不存在时写 header）| `analyze_compute.py --out_csv` |
-| `superglue_results.csv` | append | `run_encoder_benchmark.py --out_csv` |
-| `encoder_runs.csv` | append | `run_encoder_benchmark.py --out_csv`（主精度+性能结果）|
+| `expA.csv` | append | `run_encoder_benchmark.py --out_csv`（SuperGLUE 结果）|
+| `expB.csv` | append（文件不存在时写 header）| `analyze_compute.py --out_csv` |
+| `expC_seqlen.csv` | append | `analyze_compute.py --out_csv` |
+| `expC_batch.csv` | append | `analyze_compute.py --out_csv` |
+| `expD.csv` | 覆盖写 | `parse_nsys_summary.py --out_csv` |
 
-> **注意**：若 `analyze_compute.py` 更新了输出列，需删除旧 `expB_backend.csv` 重新生成，
+> **注意**：若 `analyze_compute.py` 更新了输出列，需删除旧 `expB.csv` 重新生成，
 > 否则新旧行列数不一致会导致图表读取错误。
 
 ---
@@ -214,7 +216,7 @@ python eval_encoder/scripts/plot_nsys_kernel.py \
 
 | 脚本 | 归档原因 |
 |------|----------|
-| `run_expA_sdpa.sh` | 已被 `expB.sh` 取代；输出原 `expA_backend.csv`（现已改名 `expB_backend.csv`）|
+| `run_expA_sdpa.sh` | 已被 `expB.sh` 取代；输出原 `expA_backend.csv`（现已改名 `expB.csv`）|
 | `run_sdpa_ablation.sh` | 已被 `expB.sh` 取代；只跑 sdpa 后端且写到 `encoder_runs.csv` |
 | `compare_backends.sh` | 旧版后端对比，调用完整 glue_pipeline，功能已被 `expB.sh` 覆盖 |
 | `test_fwsvd_full_vs_perhead.sh` | 一次性验证脚本 |

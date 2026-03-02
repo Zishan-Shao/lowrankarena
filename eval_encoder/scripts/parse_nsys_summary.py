@@ -21,7 +21,7 @@ Key metrics extracted:
 Usage:
     python eval_encoder/scripts/parse_nsys_summary.py \\
         [--input eval_encoder/eval_results/nsys/nsys_summary_fair.txt] \\
-        [--out_csv eval_encoder/eval_results/nsys/nsys_parsed_fair.csv]
+        [--out_csv eval_encoder/eval_results/expD.csv]
 """
 
 import argparse
@@ -195,7 +195,7 @@ def write_csv(rows: list[dict], path: str):
 def main():
     p = argparse.ArgumentParser(description="Parse nsys cuda_gpu_kern_sum summary into a comparison table")
     p.add_argument("--input",   default="eval_encoder/eval_results/nsys/nsys_summary.txt")
-    p.add_argument("--out_csv", default="eval_encoder/eval_results/nsys/nsys_parsed.csv")
+    p.add_argument("--out_csv", default="eval_encoder/eval_results/expD.csv")
     args = p.parse_args()
 
     if not os.path.exists(args.input):

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Plot nsys kernel analysis figure from nsys_parsed_all.csv.
+Plot nsys kernel analysis figure from expD.csv.
 
 Shows n_gemm_variants and kernel time breakdown (Triton vs GEMM vs other)
-for SVD vs AdaSVD across naive and flashsvd backends.
+for SVD vs AdaSVD across naive and flashsvd15 backends.
 
 Usage:
     python eval_encoder/scripts/plot_nsys_kernel.py \
-        --csv   eval_encoder/eval_results/nsys/nsys_parsed_all.csv \
+        --csv   eval_encoder/eval_results/expD.csv \
         --outdir eval_encoder/eval_results/figures
 """
 
@@ -145,7 +145,7 @@ def plot(df, outdir):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--csv",    default="eval_encoder/eval_results/nsys/nsys_parsed_all.csv")
+    p.add_argument("--csv",    default="eval_encoder/eval_results/expD.csv")
     p.add_argument("--outdir", default="eval_encoder/eval_results/figures")
     args = p.parse_args()
 

@@ -18,7 +18,7 @@ Layout (2 columns × 2 task rows per half + 1 fairness row):
 
 Usage:
     python eval_encoder/scripts/plot_combined_figure.py \\
-        --csv    eval_encoder/eval_results/expB_backend.csv \\
+        --csv    eval_encoder/eval_results/expB.csv \\
         --outdir eval_encoder/eval_results/figures
 """
 
@@ -309,7 +309,7 @@ def plot_combined(df, tasks, methods, outdir, dtype, seq_len):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--csv",     default="eval_encoder/eval_results/expB_backend.csv")
+    p.add_argument("--csv",     default="eval_encoder/eval_results/expB.csv")
     p.add_argument("--outdir",  default=None)
     p.add_argument("--tasks",   nargs="+", default=["mnli", "stsb"])
     p.add_argument("--methods", nargs="+", default=["svd", "fwsvd", "drone", "adasvd"])
