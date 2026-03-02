@@ -78,3 +78,5 @@ eval_encoder/logs/
 eval_encoder/archived/
 *.backup
 *_backup_*.csv
+*.nsys-rep
+*.sqlite

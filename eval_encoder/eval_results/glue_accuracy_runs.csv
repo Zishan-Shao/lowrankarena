@@ -1,0 +1,44 @@
+timestamp,model_id,task,dataset_split,seq_len,batch_size,dtype,method,qkv_mode,rank,budget,backend,stage,seed,metric_name,metric_value,notes
+2026-02-27T13:00:07,eval_encoder/models/cola/drone_ra312_rf256_rw208_full_naive,cola,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,matthews_correlation,0.428524,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T13:46:27,eval_encoder/models/sst2/drone_ra312_rf256_rw208_full_naive,sst2,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,accuracy,0.905963,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T13:49:41,eval_encoder/models/mrpc/drone_ra312_rf256_rw208_full_naive,mrpc,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,f1,0.899145,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T18:09:44,eval_encoder/models/qqp/drone_ra312_rf256_rw208_full_naive,qqp,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,f1,0.877748,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T22:44:30,eval_encoder/models/mnli/drone_ra312_rf256_rw208_full_naive,mnli,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,accuracy,0.828630,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T23:59:03,eval_encoder/models/qnli/drone_ra312_rf256_rw208_full_naive,qnli,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,accuracy,0.898407,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T00:04:35,eval_encoder/models/rte/drone_ra312_rf256_rw208_full_naive,rte,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,accuracy,0.703971,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T00:09:18,eval_encoder/models/stsb/drone_ra312_rf256_rw208_full_naive,stsb,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,pearson,0.873245,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T00:52:20,eval_encoder/models/cola/adasvd_b0.527_full_naive,cola,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,matthews_correlation,0.420606,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T01:23:13,eval_encoder/models/sst2/adasvd_b0.527_full_naive,sst2,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,accuracy,0.910550,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T01:25:12,eval_encoder/models/mrpc/adasvd_b0.527_full_naive,mrpc,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,f1,0.860034,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T04:35:22,eval_encoder/models/qqp/adasvd_b0.527_full_naive,qqp,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,f1,0.871063,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T07:36:16,eval_encoder/models/mnli/adasvd_b0.527_full_naive,mnli,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,accuracy,0.826694,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T08:25:40,eval_encoder/models/qnli/adasvd_b0.527_full_naive,qnli,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,accuracy,0.893831,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T08:27:06,eval_encoder/models/rte/adasvd_b0.527_full_naive,rte,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,accuracy,0.620939,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T08:30:18,eval_encoder/models/stsb/adasvd_b0.527_full_naive,stsb,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,pearson,0.859434,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T16:26:35,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.527523,no_finetune
+2026-02-28T16:26:35,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.525229,no_finetune
+2026-02-28T16:26:35,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.526376,no_finetune
+2026-02-28T16:31:27,bert-base-uncased,sst2,validation,128,32,fp32,svd,per_head,,,naive,compress_eval,42,accuracy,0.526376,no_finetune
+2026-02-28T16:31:27,bert-base-uncased,sst2,validation,128,32,fp32,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.525229,no_finetune
+2026-02-28T16:31:27,bert-base-uncased,sst2,validation,128,32,fp32,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.526376,no_finetune
+2026-02-28T16:35:55,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.511468,no_finetune
+2026-02-28T16:35:55,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.511468,no_finetune
+2026-02-28T16:35:55,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.511468,no_finetune
+2026-02-28T16:38:28,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.672018,no_finetune
+2026-02-28T16:38:28,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.670872,no_finetune
+2026-02-28T16:38:28,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:39:37,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,fp32,svd,per_head,,,naive,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:39:37,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,fp32,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:39:37,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,fp32,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:51:51,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.672018,no_finetune
+2026-02-28T16:51:51,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.670872,no_finetune
+2026-02-28T16:51:51,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:53:57,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.713303,no_finetune
+2026-02-28T16:53:57,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.717890,no_finetune
+2026-02-28T16:53:57,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.711009,no_finetune
+2026-02-28T17:06:18,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.725917,no_finetune
+2026-02-28T17:06:18,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.723624,no_finetune
+2026-02-28T17:06:18,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.725917,no_finetune
+2026-02-28T17:07:16,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T17:07:16,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.674312,no_finetune
+2026-02-28T17:07:16,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.669725,no_finetune

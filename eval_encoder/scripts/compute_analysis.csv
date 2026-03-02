@@ -1,0 +1,3 @@
+task,backend,dtype,seq_len,batch_size,useful_tflops,padding_tflops,total_tflops,padding_pct,arith_intensity,latency_ms,throughput_sps,peak_mem_mb,mfu
+cola,naive,bf16,512,32,28.769,1.150,29.918,3.84,161.5,65.24,490.5,1015.1,0.0408
+cola,flashsvd,bf16,512,32,42.126,1.683,43.809,3.84,161.5,44.55,718.2,368.3,0.0598
