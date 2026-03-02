@@ -9,8 +9,9 @@
 #   若 MODEL_BASE_DIR/{task}/{method_subdir}/ 存在 → --load_model_dir（跳过压缩）
 #   否则 → 重新压缩，并 --save_model --save_dir MODEL_BASE_DIR/{task}
 #
-# 覆盖任务（8 个）：
-#   boolq, cb, rte_sg, wic, hans, anli_r1, anli_r2, anli_r3
+# 覆盖任务（7 个，cb 排除）：
+#   boolq, rte_sg, wic, hans, anli_r1, anli_r2, anli_r3
+# cb 排除原因：验证集仅 56 例 + 无 bert-base 专用 fine-tuned 模型 → 结果不可信
 #
 # 覆盖方法（5 个）：
 #   dense, svd, fwsvd, drone, adasvd
@@ -34,7 +35,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
 # ── 配置 ─────────────────────────────────────────────────────────────────────
-TASKS="${TASKS:-boolq cb rte_sg wic hans anli_r1 anli_r2 anli_r3}"
+TASKS="${TASKS:-boolq rte_sg wic hans anli_r1 anli_r2 anli_r3}"
+# cb 排除：验证集仅 56 例且无 bert-base 专用 fine-tuned 模型，结果不可信
 METHODS="${METHODS:-dense svd fwsvd drone adasvd}"
 
 # SVD / FWSVD / DRONE 的 rank（与 GLUE expA 完全一致）
