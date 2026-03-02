@@ -28,12 +28,12 @@
 #   TASKS_SUPERGLUE="boolq hans"      # SuperGLUE 任务子集
 #   TWO_STAGE=false                   # 只跑 stage1（no_finetune），跳过微调
 #   RECOMPRESS=true                   # 强制重新压缩（忽略已有 checkpoint）
-#   OUT_CSV_SUPERGLUE=path/to.csv     # SuperGLUE 结果写入路径
+#   OUT_CSV=path/to.csv               # 所有 CSV 结果写入路径（GLUE + SuperGLUE 共用）
 #
 # 输出
-#   GLUE      : eval_encoder/glue_results/glue_results_{method}_*.json
+#   GLUE JSON : eval_encoder/glue_results/glue_results_{method}_*.json
 #               → 通过 eval_results/collect_glue_results.py 汇总为 CSV
-#   SuperGLUE : eval_encoder/eval_results/expA.csv
+#   ALL CSV   : eval_encoder/eval_results/expA.csv（GLUE + SuperGLUE 共用）
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -63,7 +63,7 @@ TASKS_SUPERGLUE="${TASKS_SUPERGLUE:-boolq rte_sg wic hans anli_r1 anli_r2 anli_r
 TWO_STAGE="${TWO_STAGE:-true}"
 RECOMPRESS="${RECOMPRESS:-false}"
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-eval_encoder/models}"
-OUT_CSV_SUPERGLUE="${OUT_CSV_SUPERGLUE:-eval_encoder/eval_results/expA.csv}"
+OUT_CSV="${OUT_CSV:-eval_encoder/eval_results/expA.csv}"
 
 echo "══════════════════════════════════════════════════════════════════════"
 echo "  expA — Quality Experiment"
@@ -93,6 +93,7 @@ if [[ "${PHASES}" == *"glue"* ]]; then
     TASK_MODEL_PREFIX="textattack" \
     PRETRAIN_BEFORE_COMPRESS="false" \
     AUTO_FIGURES="false" \
+    PERF_CSV="${OUT_CSV}" \
     bash eval_encoder/scripts/compare_all_methods.sh \
     && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
 
@@ -110,7 +111,7 @@ if [[ "${PHASES}" == *"superglue"* ]]; then
     BACKENDS="naive" \
     RECOMPRESS="${RECOMPRESS}" \
     MODEL_BASE_DIR="${MODEL_BASE_DIR}" \
-    OUT_CSV="${OUT_CSV_SUPERGLUE}" \
+    OUT_CSV="${OUT_CSV}" \
     bash eval_encoder/scripts/run_superglue_benchmark.sh \
     && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
 
@@ -121,8 +122,8 @@ echo "════════════════════════�
 echo "  expA 完成  成功=${OK}  失败=${FAIL}"
 echo ""
 echo "  输出："
-echo "    GLUE      → eval_encoder/glue_results/glue_results_*.json"
-echo "    SuperGLUE → ${OUT_CSV_SUPERGLUE}"
+echo "    GLUE JSON → eval_encoder/glue_results/glue_results_*.json"
+echo "    ALL CSV   → ${OUT_CSV}"
 echo ""
 echo "  汇总图表："
 echo "    python eval_encoder/eval_results/collect_glue_results.py"
