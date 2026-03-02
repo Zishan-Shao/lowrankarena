@@ -683,10 +683,13 @@ def main():
         model, args.batch_size, args.seq_len, dtype)
 
     # ── apply backend ─────────────────────────────────────────────────────
-    if args.backend == "flashsvd":
+    # Dense models have no SVD blocks; skip backend swap silently.
+    if not layer_results and args.backend != "naive":
+        print(f"[backend] No SVD blocks found — skipping {args.backend} swap (dense model)")
+    if layer_results and args.backend == "flashsvd":
         from eval_encoder.flashsvd_backend import enable_flashsvd
         enable_flashsvd(model)
-    elif args.backend == "flashsvd15":
+    elif layer_results and args.backend == "flashsvd15":
         from eval_encoder.flashsvd_backend import enable_flashsvd15
         enable_flashsvd15(model)
     print(f"[backend] {args.backend} enabled")
