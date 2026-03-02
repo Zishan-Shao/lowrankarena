@@ -9,10 +9,10 @@
 #
 # 4 个 profiling 点（与 plot_nsys_kernel.py 硬编码的 POINT_META 一致）
 # ────────────────────────────────────────────────────────────────────────────
-#   mnli_svd_naive       SVD     + naive
-#   mnli_svd_flashsvd    SVD     + flashsvd
-#   mnli_adasvd_naive    AdaSVD  + naive
-#   mnli_adasvd_flashsvd AdaSVD  + flashsvd
+#   mnli_svd_naive          SVD     + naive
+#   mnli_svd_flashsvd15     SVD     + flashsvd15
+#   mnli_adasvd_naive       AdaSVD  + naive
+#   mnli_adasvd_flashsvd15  AdaSVD  + flashsvd15
 #
 # 依赖
 # ────────────────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ DTYPE="${DTYPE:-bf16}"
 SEQ_LEN="${SEQ_LEN:-512}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
 WARMUP="${WARMUP:-5}"
-MEASURE="${MEASURE:-20}"
+MEASURE="${MEASURE:-16}"   # 16 × bs=32 = 512 calib samples
 
 RANK_ATTN="${RANK_ATTN:-48}"
 RANK_FFN="${RANK_FFN:-256}"
@@ -83,9 +83,9 @@ mkdir -p "${NSYS_DIR}" "${FIGURES_DIR}"
 # 格式：POINT_TAG:METHOD:BACKEND
 POINTS=(
     "${TASK}_svd_naive:svd:naive"
-    "${TASK}_svd_flashsvd:svd:flashsvd"
+    "${TASK}_svd_flashsvd15:svd:flashsvd15"
     "${TASK}_adasvd_naive:adasvd:naive"
-    "${TASK}_adasvd_flashsvd:adasvd:flashsvd"
+    "${TASK}_adasvd_flashsvd15:adasvd:flashsvd15"
 )
 
 # ── checkpoint 子目录名 ────────────────────────────────────────────────────────
@@ -135,23 +135,24 @@ for ENTRY in "${POINTS[@]}"; do
     REP_PATH="${NSYS_DIR}/${POINT_TAG}"   # nsys adds .nsys-rep automatically
 
     # Step 1: nsys profile
+    # --profile_nsys 会加 NVTX 注解 + cudaProfilerStart/Stop（只采 measure loop）
+    # --capture-range cudaProfilerApi 让 nsys 仅捕获 profiler API 范围内的 kernel
     echo "   [profile] → ${REP_PATH}.nsys-rep"
     nsys profile \
-        --trace cuda \
+        --trace cuda,nvtx \
+        --capture-range cudaProfilerApi \
         --output "${REP_PATH}" \
         --force-overwrite true \
-        python eval_encoder/run_encoder_benchmark.py \
-            --load_model_dir "${MODEL_DIR}" \
-            --method         "${METHOD}" \
-            --task           "${TASK}" \
-            --backend        "${BACKEND}" \
-            --dtype          "${DTYPE}" \
-            --seq_len        "${SEQ_LEN}" \
-            --batch_size     "${BATCH_SIZE}" \
-            --skip_eval \
-            --warmup_steps   "${WARMUP}" \
-            --measure_steps  "${MEASURE}" \
-            --num_runs       1 \
+        python eval_encoder/scripts/analyze_compute.py \
+            --model_dir  "${MODEL_DIR}" \
+            --task       "${TASK}" \
+            --backend    "${BACKEND}" \
+            --dtype      "${DTYPE}" \
+            --seq_len    "${SEQ_LEN}" \
+            --batch_size "${BATCH_SIZE}" \
+            --warmup     "${WARMUP}" \
+            --measure    "${MEASURE}" \
+            --profile_nsys \
     && OK=$((OK + 1)) || { FAIL=$((FAIL + 1)); echo "   [FAILED] nsys profile for ${POINT_TAG}"; continue; }
 
     # Step 2: extract cuda_gpu_kern_sum, append to summary txt with section header
@@ -195,6 +196,7 @@ echo "  .nsys-rep → ${NSYS_DIR}/"
 echo "  summary   → ${SUMMARY_TXT}"
 echo "  csv       → ${OUT_CSV}"
 echo "  figure    → ${FIGURES_DIR}/nsys_kernel_analysis_${TASK}_${DTYPE}_seq${SEQ_LEN}.png"
+echo "  (plot_nsys_kernel.py 固定命名为 nsys_kernel_analysis_mnli_bf16_seq512.png)"
 echo "══════════════════════════════════════════════════════════════════════"
 
 [[ "${FAIL}" -eq 0 ]]

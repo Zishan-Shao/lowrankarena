@@ -53,8 +53,8 @@ BACKENDS="${BACKENDS:-naive sdpa flashsvd flashsvd15}"
 DTYPE="${DTYPE:-bf16}"
 SEQ_LEN="${SEQ_LEN:-512}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
-WARMUP="${WARMUP:-10}"
-MEASURE="${MEASURE:-50}"
+WARMUP="${WARMUP:-5}"
+MEASURE="${MEASURE:-16}"   # 16 × bs=32 = 512 calib samples
 
 # 与 expA / glue_pipeline.py 命名一致
 RANK_ATTN="${RANK_ATTN:-48}"

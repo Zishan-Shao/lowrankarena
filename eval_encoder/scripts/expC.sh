@@ -50,11 +50,11 @@ cd "${REPO_ROOT}"
 # ── 配置 ──────────────────────────────────────────────────────────────────────
 PHASES="${PHASES:-seqlen batch}"
 TASKS="${TASKS:-mnli stsb}"
-METHODS="${METHODS:-svd adasvd}"
-BACKENDS="${BACKENDS:-naive sdpa flashsvd flashsvd15}"
+METHODS="${METHODS:-svd adasvd dense}"   # dense 作 sanity baseline
+BACKENDS="${BACKENDS:-naive sdpa flashsvd15}"
 DTYPE="${DTYPE:-bf16}"
-WARMUP="${WARMUP:-10}"
-MEASURE="${MEASURE:-50}"
+WARMUP="${WARMUP:-5}"
+MEASURE="${MEASURE:-16}"   # 16 × bs=32 = 512 calib samples
 
 # seqlen phase 参数
 SEQ_LENS="${SEQ_LENS:-128 256 384 512}"

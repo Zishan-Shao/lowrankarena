@@ -25,12 +25,12 @@ import pandas as pd
 # ── config ─────────────────────────────────────────────────────────────────────
 # point name → (method_label, backend_label)
 POINT_META = {
-    "mnli_svd_naive":       ("SVD",    "Naive"),
-    "mnli_svd_flashsvd":    ("SVD",    "FlashSVD"),
-    "mnli_adasvd_naive":    ("AdaSVD", "Naive"),
-    "mnli_adasvd_flashsvd": ("AdaSVD", "FlashSVD"),
+    "mnli_svd_naive":          ("SVD",    "Naive"),
+    "mnli_svd_flashsvd15":     ("SVD",    "FlashSVD 1.5"),
+    "mnli_adasvd_naive":       ("AdaSVD", "Naive"),
+    "mnli_adasvd_flashsvd15":  ("AdaSVD", "FlashSVD 1.5"),
 }
-BACKEND_COLORS = {"Naive": "#9e9e9e", "FlashSVD": "#42a5f5"}
+BACKEND_COLORS = {"Naive": "#9e9e9e", "FlashSVD 1.5": "#ef5350"}
 METHOD_COLORS  = {"SVD": "#5c85d6", "AdaSVD": "#e06c5a"}
 
 # stacked bar colors for kernel time breakdown
@@ -52,8 +52,8 @@ def load(path):
 
 def plot(df, outdir):
     # order: naive first, flashsvd second; SVD before AdaSVD
-    order = ["mnli_svd_naive", "mnli_svd_flashsvd",
-             "mnli_adasvd_naive", "mnli_adasvd_flashsvd"]
+    order = ["mnli_svd_naive", "mnli_svd_flashsvd15",
+             "mnli_adasvd_naive", "mnli_adasvd_flashsvd15"]
     rows = []
     for pt in order:
         r = df[df["point"] == pt]
