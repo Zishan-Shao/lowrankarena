@@ -583,7 +583,16 @@ def parse_args():
                         "If given, skips compression.")
     p.add_argument("--method",    default="svd",
                    choices=["svd", "fwsvd", "drone", "adasvd"])
-    p.add_argument("--rank",      type=int, default=256)
+    p.add_argument("--rank",      type=int, default=None,
+                   help="Unified rank for all components (fallback when --rank_attn/ffn/wo not set)")
+    p.add_argument("--rank_attn", type=int, default=None,
+                   help="Rank for Q/K/V attention (per-head). E.g. 48 for ra48 config.")
+    p.add_argument("--rank_ffn",  type=int, default=None,
+                   help="Rank for FFN intermediate projections. E.g. 256.")
+    p.add_argument("--rank_wo",   type=int, default=None,
+                   help="Rank for attention output projection. E.g. 208.")
+    p.add_argument("--qkv_mode",  default="per_head", choices=["per_head", "full"],
+                   help="QKV factorisation mode (per_head or full).")
     p.add_argument("--budget",    type=float, default=0.5)
 
     p.add_argument("--task",      default="sst2")
@@ -657,7 +666,11 @@ def main():
         loader_tmp = prepare_loader(
             args.task, tokenizer, args.seq_len, 4, split="train")
         model = compress_model(model, args.method, args.rank, args.budget,
-                               "qkv+ffn", loader_tmp, args.device, 4)
+                               "qkv+ffn", loader_tmp, args.device, 4,
+                               rank_attn=args.rank_attn,
+                               rank_ffn=args.rank_ffn,
+                               rank_wo=args.rank_wo,
+                               qkv_mode=args.qkv_mode)
 
     model.eval()
 
