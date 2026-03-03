@@ -1526,27 +1526,94 @@ def benchmark_inference_speed(model, val_loader, device, warmup_steps=10, measur
         "peak_memory_mb": peak_memory_mb,
     }
 
+# Canonical field list for encoder_runs.csv.
+# Used to create the CSV on first write (bootstrap) when no existing file/row exists.
+ENCODER_RUNS_FIELDS = [
+    "timestamp", "model_id", "task", "dataset_split", "dataset_size",
+    "seq_len", "batch_size", "dtype", "method", "rank", "budget", "scope",
+    "backend", "attn_mode", "seed",
+    "calib_dataset", "calib_split", "calib_samples", "calib_batches",
+    "calib_seed", "calib_seq_len", "calib_source", "eval_target",
+    "metric_name", "metric_value",
+    "latency_ms", "throughput_sps",
+    "peak_mem_infer_mb", "peak_mem_e2e_mb", "peak_mem_mb",
+    "param_ratio", "original_params", "compressed_params",
+    "total_param_ratio", "total_original_params", "total_compressed_params",
+    "notes", "git_commit",
+]
+
+
 def _append_flashsvd_csv_row(task, comp_info, speed_metrics, metric_name, metric_value,
                               csv_path="eval_encoder/eval_results/encoder_runs.csv",
                               backend="flashsvd"):
-    """Append a flashsvd/flashsvd15 benchmark row to encoder_runs.csv.
+    """Append a performance benchmark row to encoder_runs.csv.
 
-    Finds the most recent naive row matching (model_id, task, method) and copies
-    all parameter/dataset fields — only backend, speed metrics, and accuracy differ.
-    FlashSVD shares parameters with naive, so param counts are identical.
+    For backend='naive': builds the row from scratch (no template needed).
+      Creates the CSV with a canonical header if it doesn't exist yet.
+
+    For other backends: copies the most recent matching naive row and updates
+      only backend, speed metrics, and accuracy (param counts stay identical).
 
     Parameters
     ----------
     backend : str
-        The backend label to write: ``"flashsvd"`` or ``"flashsvd15"``.
+        One of ``"naive"``, ``"sdpa"``, ``"flashsvd"``, ``"flashsvd15"``.
     """
     import csv as csv_mod
-    if not os.path.exists(csv_path):
-        print(f"[csv] Skipping {backend} row: {csv_path} not found")
-        return
 
     model_id = comp_info.get('model_id', '')
     method   = comp_info.get('method', '')
+
+    # ── naive backend: build from scratch, create CSV if needed ───────────────
+    if backend == "naive":
+        csv_file = Path(csv_path)
+        csv_file.parent.mkdir(parents=True, exist_ok=True)
+
+        need_header = not csv_file.exists()
+
+        # Reuse fieldnames from an existing file to preserve any extra columns;
+        # fall back to the canonical list when creating the file from scratch.
+        if not need_header:
+            with open(csv_path, 'r', newline='', encoding='utf-8') as f:
+                fieldnames = list(csv_mod.DictReader(f).fieldnames or ENCODER_RUNS_FIELDS)
+        else:
+            fieldnames = ENCODER_RUNS_FIELDS
+
+        _pmb = speed_metrics.get('peak_memory_mb', 0.0)
+        naive_row = {f: "" for f in fieldnames}
+        naive_row.update({
+            "timestamp":         datetime.now().isoformat(timespec='seconds'),
+            "model_id":          model_id,
+            "task":              task,
+            "dataset_split":     "validation",
+            "dtype":             comp_info.get('dtype', ''),
+            "method":            method,
+            "rank":              str(comp_info.get('rank') or ''),
+            "budget":            str(comp_info.get('budget') or ''),
+            "backend":           "naive",
+            "attn_mode":         "einsum",
+            "metric_name":       metric_name,
+            "metric_value":      f"{metric_value:.6f}",
+            "latency_ms":        f"{speed_metrics.get('latency_ms_per_batch', 0.0):.2f}",
+            "throughput_sps":    f"{speed_metrics.get('throughput_samples_per_sec', 0.0):.1f}",
+            "peak_mem_infer_mb": f"{_pmb:.1f}",
+            "peak_mem_e2e_mb":   f"{_pmb:.1f}",
+            "peak_mem_mb":       f"{_pmb:.1f}",
+        })
+        naive_row.pop(None, None)
+
+        with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv_mod.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+            if need_header:
+                writer.writeheader()
+            writer.writerow(naive_row)
+        print(f"[csv] ✅ naive row written to {csv_path}")
+        return
+
+    # ── non-naive backends: copy from the matching naive row ──────────────────
+    if not os.path.exists(csv_path):
+        print(f"[csv] Skipping {backend} row: {csv_path} not found")
+        return
 
     with open(csv_path, 'r', newline='', encoding='utf-8') as f:
         reader = csv_mod.DictReader(f)
@@ -1568,7 +1635,7 @@ def _append_flashsvd_csv_row(task, comp_info, speed_metrics, metric_name, metric
               f"model={model_id} task={task} method={method}")
         return
 
-    # Build flashsvd/flashsvd15 row: copy naive row, update only what differs
+    # Build new row: copy naive row, update only what differs
     flash_row = dict(matching_row)
     flash_row['timestamp']        = datetime.now().isoformat(timespec='seconds')
     flash_row['backend']          = backend
@@ -1578,7 +1645,10 @@ def _append_flashsvd_csv_row(task, comp_info, speed_metrics, metric_name, metric
     _pmb = speed_metrics['peak_memory_mb']
     flash_row['peak_mem_infer_mb'] = f"{_pmb:.1f}"
     flash_row['peak_mem_e2e_mb']   = f"{_pmb:.1f}"
-    flash_row['peak_mem_mb']       = f"{_pmb:.1f}"  # legacy field
+    flash_row['peak_mem_mb']       = f"{_pmb:.1f}"
+    # Always update attn_mode for non-naive: sdpa→"sdpa", flashsvd*→backend name
+    if 'attn_mode' in flash_row:
+        flash_row['attn_mode'] = backend
 
     # DictReader may produce a None key for rows that have more columns than the header.
     # Strip it before writing to avoid "dict contains fields not in fieldnames: None".
@@ -1836,6 +1906,16 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         value_flash15=metric_value_flash15,
         value_sdpa=metric_value_sdpa,
         sdpa_path=_sdpa_path,
+    )
+
+    # Write naive efficiency row first — must precede sdpa/flashsvd rows because
+    # _append_flashsvd_csv_row looks for the most-recent naive row to copy from.
+    # Without this write, the derived rows would inherit stale data from a previous run.
+    _append_flashsvd_csv_row(
+        task, comp_info, speed_metrics_naive,
+        cfg["metric"], metric_value,
+        csv_path=args.out_csv,
+        backend="naive",
     )
 
     # Write sdpa efficiency row (naive backend + attn_mode=sdpa)
