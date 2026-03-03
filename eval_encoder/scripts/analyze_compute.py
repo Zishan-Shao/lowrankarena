@@ -277,12 +277,12 @@ def run_alignment_check(model_dir, backends_to_check, device, dtype,
     model0, _, _ = load_compressed_model(model_dir, device=device, dtype=dtype)
     model0.eval()   # (B) disables dropout / stochastic layers
 
-    # Detect SVD blocks so _apply_backend knows whether to patch
-    try:
-        layers = _get_encoder_layers(model0)
-        has_svd = any(hasattr(l.attention, "Pq") for l in layers)
-    except Exception:
-        has_svd = False
+    # Detect SVD blocks so _apply_backend knows whether to patch.
+    # SVD params live in layer.block (BertLayerShim wraps the SVD block),
+    # NOT in layer.attention — checking l.attention.Pq always returns False.
+    # Use the same signal that enable_sdpa/enable_flashsvd* relies on:
+    # any module with an `attn_mode` attribute is an SVD block.
+    has_svd = any(hasattr(m, "attn_mode") for m in model0.modules())
 
     batch = {k: v.to(device) for k, v in batch_cpu.items()}
     if torch.cuda.is_available():
