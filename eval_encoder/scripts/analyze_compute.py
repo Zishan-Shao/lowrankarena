@@ -1187,14 +1187,14 @@ def main():
         # ── alignment check (only when --check_alignment; never added to expB.csv) ──
         if args.check_alignment:
             row["logit_max_diff"] = (
-                "0.000000e+00" if args.backend == "naive"
-                else f"{align_results[args.backend]['max_abs_diff']:.6e}"
+                "0.000000000000e+00" if args.backend == "naive"
+                else f"{align_results[args.backend]['max_abs_diff']:.12e}"
                      if args.backend in align_results
                 else ""
             )
             row["logit_mean_abs_diff"] = (
-                "0.000000e+00" if args.backend == "naive"
-                else f"{align_results[args.backend]['mean_abs_diff']:.6e}"
+                "0.000000000000e+00" if args.backend == "naive"
+                else f"{align_results[args.backend]['mean_abs_diff']:.12e}"
                      if args.backend in align_results
                 else ""
             )
