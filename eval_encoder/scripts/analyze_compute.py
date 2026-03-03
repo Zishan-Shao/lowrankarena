@@ -1187,14 +1187,14 @@ def main():
             # naive backend is the baseline: diff from itself is always 0.
             # Other backends: filled when --check_alignment is passed, else empty.
             "logit_max_diff":       (
-                "0.000000" if args.check_alignment and args.backend == "naive"
-                else f"{align_results[args.backend]['max_abs_diff']:.6f}"
+                "0.000000e+00" if args.check_alignment and args.backend == "naive"
+                else f"{align_results[args.backend]['max_abs_diff']:.6e}"
                      if args.backend in align_results
                 else ""
             ),
             "logit_mean_abs_diff":  (
-                "0.000000" if args.check_alignment and args.backend == "naive"
-                else f"{align_results[args.backend]['mean_abs_diff']:.6f}"
+                "0.000000e+00" if args.check_alignment and args.backend == "naive"
+                else f"{align_results[args.backend]['mean_abs_diff']:.6e}"
                      if args.backend in align_results
                 else ""
             ),
