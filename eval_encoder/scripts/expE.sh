@@ -44,7 +44,7 @@
 #   RANK_ATTN=48  RANK_FFN=256  RANK_WO=208  QKV_MODE=per_head
 #   BUDGET=0.527
 #   MODEL_BASE_DIR=eval_encoder/models
-#   OUT_EXPB=eval_encoder/eval_results/expB.csv
+#   OUT_EXPB=eval_encoder/eval_results/expE_alignment.csv
 #   OUT_E3A=eval_encoder/eval_results/expE_train_timing.csv
 #   OUT_E3B=eval_encoder/eval_results/expE_recovery.csv
 # ─────────────────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ E2_TASKS="${E2_TASKS:-mnli}"
 E2_BACKENDS="${E2_BACKENDS:-naive sdpa flashsvd flashsvd15}"
 E2_INPUT_MODES="${E2_INPUT_MODES:-real}"
 E2_REPEAT="${E2_REPEAT:-1}"
-OUT_EXPB="${OUT_EXPB:-eval_encoder/eval_results/expB.csv}"
+OUT_EXPB="${OUT_EXPB:-eval_encoder/eval_results/expE_alignment.csv}"
 
 # E-3a
 E3A_BACKENDS="${E3A_BACKENDS:-naive sdpa}"
@@ -165,7 +165,7 @@ if [[ "${PHASES}" == *"e2"* ]]; then
     echo "   backends:     ${E2_BACKENDS}"
     echo "   input_modes:  ${E2_INPUT_MODES}"
     echo "   repeat:       ${E2_REPEAT}"
-    echo "   out_csv:      ${OUT_EXPB}  (appends logit_max_diff / logit_mean_abs_diff)"
+    echo "   out_csv:      ${OUT_EXPB}  (独立文件，不污染 expB.csv)"
     echo ""
 
     rc=0
@@ -306,7 +306,7 @@ echo "════════════════════════�
 echo "  expE 完成  成功=${OK}  失败=${FAIL}  跳过=${SKIP}"
 echo ""
 echo "  输出："
-[[ "${PHASES}" == *"e2"*  ]] && echo "    E-2 alignment → ${OUT_EXPB}  (logit_max_diff / logit_mean_abs_diff)"
+[[ "${PHASES}" == *"e2"*  ]] && echo "    E-2 alignment → ${OUT_EXPB}"
 [[ "${PHASES}" == *"e3a"* ]] && echo "    E-3a training → ${OUT_E3A}"
 [[ "${PHASES}" == *"e3b"* ]] && echo "    E-3b recovery → ${OUT_E3B}"
 echo "══════════════════════════════════════════════════════════════════════"
