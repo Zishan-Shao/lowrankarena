@@ -28,9 +28,9 @@ def flashsvd_ffn_v15(P, V1, U2, V2, b1, b2, BL=64, BD=128, BH=64, BR1=32, BR2=32
 
     BR2 is auto-set to next_pow2(R2) so that R2_PAD = ceil(R2/BR2)*BR2 is
     always a power of 2 (Triton tl.arange constraint).
-    Note: adasvd with large ranks (rank_ff>256) will OOM on GPUs with
-    shared memory < 128KB (e.g. 101376 bytes). flashsvd15 is skipped for
-    those cases via the except Exception handler in glue_pipeline.py.
+    For rank_ff>256 (BR2=512): BL is capped at 32 and num_stages=1 to
+    keep Required=1×(32×512×4+32×128×2)=73728 bytes within the hardware
+    shared memory limit (~101376 bytes).
     """
     orig = P.dtype
     if orig == torch.float32:
@@ -41,5 +41,15 @@ def flashsvd_ffn_v15(P, V1, U2, V2, b1, b2, BL=64, BD=128, BH=64, BR1=32, BR2=32
     # R2_PAD = next_pow2(R2) which is always a power of 2.
     R2 = V2.shape[0]
     BR2 = _next_pow2(R2)
-    out = _impl(P, V1, U2, V2, b1, b2, BL=BL, BD=BD, BH=BH, BR1=BR1, BR2=BR2)
+    # Required = num_stages × (BL×R2_PAD×4 + BL×BD×2).
+    # acc_r=[BL,R2_PAD] fp32 spills to shared memory and dominates.
+    # For BR2>=512 (rank_ff>256, e.g. adasvd): reduce BL and num_stages
+    # to stay within hardware shared memory limit (~101376 bytes).
+    # num_stages=1, BL=32, BD=128, BR2=512 → 1×(65536+8192)=73728 ✓
+    ns = 2
+    if BR2 >= 512:
+        BL = min(BL, 32)
+        ns = 1
+    out = _impl(P, V1, U2, V2, b1, b2, BL=BL, BD=BD, BH=BH, BR1=BR1, BR2=BR2,
+                num_stages=ns)
     return out.to(orig) if orig == torch.float32 else out
