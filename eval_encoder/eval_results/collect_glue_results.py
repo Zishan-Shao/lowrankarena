@@ -3,8 +3,13 @@
 Collect GLUE benchmark results from JSON files into a summary CSV.
 
 Scans eval_encoder/glue_results/*.json, groups by (method, qkv_mode, seq_len),
-merges task scores (newer runs overwrite older), and writes:
+picks the LATEST run per stage (s1/s2 independently), and writes:
   eval_encoder/eval_results/glue_summary.csv
+
+Strategy: for each (method, qkv_mode, seq_len) group:
+  - s1: use the single latest skip_finetuning=True  JSON
+  - s2: use the single latest skip_finetuning=False JSON
+This avoids stale partial runs contaminating the merged result.
 
 Run from repo root:
     python eval_encoder/eval_results/collect_glue_results.py
@@ -129,35 +134,38 @@ def main():
 
     rows = []
     for (method, qkv_mode, seq_len), runs in sorted(groups.items()):
-        # merge task scores: newer timestamps overwrite older ones
-        # s1 (compress-eval): always valid — take newest
-        # s2 (compress+finetune): only valid when skip_finetuning=False
-        runs_sorted = sorted(runs, key=lambda x: x["timestamp"])
-        merged_s1 = {}   # task → s1 value
-        merged_s2 = {}   # task → s2 value  (only from finetune runs)
-        g_s1 = g_s2 = None
-        for run in runs_sorted:
-            for task, (s1, s2) in run["task_scores"].items():
-                if s1 is not None:
-                    merged_s1[task] = s1
-                if s2 is not None:   # already None for skip_finetuning runs
-                    merged_s2[task] = s2
-            # Only trust G-Avg from runs that completed all 8 tasks (avoids partial-run G-Avg contamination)
-            run_n_s1 = sum(1 for t in TASKS_8 if run["task_scores"].get(t, (None,None))[0] is not None)
-            run_n_s2 = sum(1 for t in TASKS_8 if run["task_scores"].get(t, (None,None))[1] is not None)
-            if run["g_avg_s1"] is not None and run_n_s1 == len(TASKS_8):
-                g_s1 = run["g_avg_s1"]
-            if run["g_avg_s2"] is not None and run_n_s2 == len(TASKS_8):  # already None for skip_finetuning runs
-                g_s2 = run["g_avg_s2"]
+        # Pick the single latest run per stage independently:
+        #   s1 source: latest skip_finetuning=True  run
+        #   s2 source: latest skip_finetuning=False run
+        # This prevents stale partial runs from contaminating the result.
+        # s1: prefer the latest COMPLETE (all 8 tasks) run; fall back to latest partial
+        # Both skip_ft=True and skip_ft=False files store initial (pre-finetune) scores.
+        def _n_s1(r):
+            return sum(1 for t in TASKS_8 if r["task_scores"].get(t, (None, None))[0] is not None)
+        complete_s1_runs = sorted([r for r in runs if _n_s1(r) == len(TASKS_8)], key=lambda x: x["timestamp"])
+        partial_s1_runs  = sorted([r for r in runs if _n_s1(r) > 0],             key=lambda x: x["timestamp"])
+        latest_s1_run = complete_s1_runs[-1] if complete_s1_runs else (partial_s1_runs[-1] if partial_s1_runs else None)
+
+        # s2: use latest COMPLETE (all 8 tasks) skip_ft=False run; ignore partial runs
+        s2_runs = sorted([r for r in runs if not r["skip_finetuning"]], key=lambda x: x["timestamp"])
+        complete_s2_runs = [r for r in s2_runs
+                            if sum(1 for t in TASKS_8 if r["task_scores"].get(t, (None, None))[1] is not None) == len(TASKS_8)]
+        latest_s2_run = complete_s2_runs[-1] if complete_s2_runs else None
+
+        merged_s1 = {t: s1 for t, (s1, _) in (latest_s1_run["task_scores"].items() if latest_s1_run else {}.items()) if s1 is not None}
+        merged_s2 = {t: s2 for t, (_, s2) in (latest_s2_run["task_scores"].items() if latest_s2_run else {}.items()) if s2 is not None}
+
+        # G-Avg: prefer value from JSON (already normalized); fall back to compute
+        g_s1 = latest_s1_run["g_avg_s1"] if latest_s1_run else None
+        g_s2 = latest_s2_run["g_avg_s2"] if latest_s2_run else None
+
         merged = {t: (merged_s1.get(t), merged_s2.get(t)) for t in set(merged_s1) | set(merged_s2)}
 
-        # Count how many tasks are present in the merged result
+        # Count how many tasks are present
         n_s1 = sum(1 for t in TASKS_8 if merged_s1.get(t) is not None)
         n_s2 = sum(1 for t in TASKS_8 if merged_s2.get(t) is not None)
 
-        # G-AVG: prefer the JSON value from a complete 8-task run (already
-        # normalized by glue_pipeline.py); fall back to compute_gavg() which
-        # applies the same normalization over however many tasks are present.
+        # Fall back to compute_gavg() if JSON didn't store it
         if g_s1 is None and n_s1 > 0:
             g_s1 = compute_gavg(merged, stage=0)
         if g_s2 is None and n_s2 > 0:

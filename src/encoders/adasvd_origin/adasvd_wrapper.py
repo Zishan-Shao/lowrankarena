@@ -160,6 +160,8 @@ def train_adasvd_ranks(
 
     # ── Step 7: Training loop ─────────────────────────────────────────────────
     print(f"[ARS] Training PaperHN for {steps} steps (budget={budget}, λ=100, γ=10) ...")
+    model_dtype   = next(model.parameters()).dtype
+    use_autocast  = model_dtype in (torch.float16, torch.bfloat16)
     batch_idx = 0
     for step in range(steps):
         batch = all_batches[batch_idx % len(all_batches)]
@@ -187,7 +189,8 @@ def train_adasvd_ranks(
             op._current_mask = m.to(op.U.dtype).to(op.U.device)
 
         # Task loss (uses hard masks via _current_mask)
-        outputs   = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+        with torch.autocast('cuda', dtype=model_dtype, enabled=use_autocast):
+            outputs   = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
         task_loss = outputs.loss
 
         # Budget loss: SOFT masks → scalar log (paper Eq.8)
