@@ -1,3 +1,73 @@
+## 实验体系说明
+
+五组实验各司其职，覆盖"精度–性能–可解释性"三个维度：
+
+| 实验 | 脚本 | 核心问题 | 输出 |
+|------|------|---------|------|
+| **expA** | `expA.sh` | 压缩后精度是多少？微调能恢复多少？ | `glue_results/*.json`, `expA.csv` |
+| **expB** | `expB.sh` | 相同模型，不同 backend 的推理速度/显存/FLOPs 差多少？ | `expB.csv` |
+| **expC** | `expC.sh` | 随 seq_len / batch_size 增大，各 backend 的优势如何变化？ | `expC_seqlen.csv`, `expC_batch.csv` |
+| **expD** | `expD.sh` | kernel 级别的时间分布是什么样的？（nsys profiling） | `nsys/nsys_parsed.csv`, figures |
+| **expE** | `expE.sh` | 补充验证：logit 数值对齐、训练步开销、精度恢复曲线 | `expE_alignment.csv`, `expE_train_timing.csv`, `expE_recovery.csv` |
+
+### expA — 精度基准
+
+**问题**：SVD/FWSVD/DRONE/AdaSVD 在 budget≈0.527 下，压缩前后及微调后的 GLUE 精度各是多少？
+
+两阶段设计：
+- **Stage 1**（无微调）：直接评估压缩模型，量化 compression gap
+- **Stage 2**（post-compress finetune）：在压缩模型上继续微调，量化可恢复精度
+
+额外对比维度：per_head（逐头 ra48）vs full_matrix（全矩阵 ra312），两种 QKV 分解粒度下精度的结构性差异。
+
+---
+
+### expB — Backend 性能微基准
+
+**问题**：相同压缩 checkpoint，四个 inference backend 的吞吐/延迟/显存/FLOPs/MFU 如何对比？
+
+四个 backend 代表三档 kernel 实现：
+- `naive`（einsum）：显式物化 [B,H,N,N] attention 矩阵，O(BHN²) 激活
+- `sdpa`：PyTorch SDPA 融合算子，避免物化，tiling 实现
+- `flashsvd`：Triton 自定义 kernel，低秩投影融合进 attention，O(BHNr) 激活
+- `flashsvd15`：flashsvd 的 bf16/fp16 优化版
+
+双输入模式：`real`（真实数据，自然 padding 分布）+ `synthetic`（全有效 token，排除 padding 干扰），两者都使用 `padding="max_length"` 固定 batch shape 为 `[B, 512]`。
+
+---
+
+### expC — Scaling 实验
+
+**问题**：随 seq_len 增大（128→256→384→512）和 batch_size 增大（8→16→32→64），FlashSVD 相对 Naive 的显存/吞吐优势如何变化？
+
+核心结论：FlashSVD 攻击的是 O(BHN²) 项，因此优势随 N 单调增强：
+- 显存节省：−32% → −49% → −65%（seq=128/256/512）
+- 吞吐加速：×1.10 → ×1.37 → ×1.72
+
+---
+
+### expD — Kernel 分析（nsys Profiling）
+
+**问题**：GPU kernel 级别的时间分布是什么？各 CUDA kernel 分别占多少 wall time？
+
+使用 NVIDIA Nsight Systems（`nsys profile`）采集 NVTX 区间 + CUDA kernel timeline，量化每个 op（QKV 投影、attention score、weighted sum、output proj、FFN）的 GPU 执行时间。为 expB 的宏观 latency 数字提供底层解释。
+
+---
+
+### expE — 补充实验
+
+**E-1（Timing Boundary）**：声明所有 expB/expC latency 数字的计时边界——仅测 GPU forward pass，不含 H2D 传输和优化器步骤。无新实验，仅文档说明。
+
+**E-2（Logit Alignment）**：验证 flashsvd/flashsvd15 与 naive backend 的数值等价性。对同一 checkpoint 用不同 backend 各做一次前向，计算 `max|Δlogit|` 和 `mean|Δlogit|`。
+
+预期：bf16 下不同 kernel 路径的浮点重排导致 `max|Δlogit| ~ 1e-2`，但预测标签不变，GLUE 指标一致。
+
+**E-3a（训练步时间）**：只有 `naive`/`sdpa` 支持 autograd；`flashsvd`/`flashsvd15` Triton kernel 无反向传播。测量完整训练步（forward + backward + optimizer.step）的墙钟时间，用于量化"用压缩模型继续训练"的实际开销。
+
+**E-3b（精度恢复曲线）**：以 step=0/200/500/1000 为检查点，追踪 GLUE 指标随训练步数的变化，回答"压缩后需要多少微调步才能恢复到 dense 水平"。
+
+---
+
 ### **Dense baseline（naive，seq=512，bs=32，fp32）**
 | Task | Metric | Dense score | Latency (ms) | Throughput (samples/s) | Peak mem infer (MB) |
 |---|---:|---:|---:|---:|---:|

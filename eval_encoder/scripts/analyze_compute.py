@@ -1183,22 +1183,21 @@ def main():
             "n_repeats":            str(args.repeat),
             "peak_mem_mb":          f"{peak_mb:.1f}",
             "mfu":                  f"{achieved_tflop_rate/gpu_tflops:.4f}" if gpu_tflops else "",
-            # ── alignment check (correctness gate; empty when --check_alignment not set) ──
-            # naive backend is the baseline: diff from itself is always 0.
-            # Other backends: filled when --check_alignment is passed, else empty.
-            "logit_max_diff":       (
-                "0.000000e+00" if args.check_alignment and args.backend == "naive"
+        }
+        # ── alignment check (only when --check_alignment; never added to expB.csv) ──
+        if args.check_alignment:
+            row["logit_max_diff"] = (
+                "0.000000e+00" if args.backend == "naive"
                 else f"{align_results[args.backend]['max_abs_diff']:.6e}"
                      if args.backend in align_results
                 else ""
-            ),
-            "logit_mean_abs_diff":  (
-                "0.000000e+00" if args.check_alignment and args.backend == "naive"
+            )
+            row["logit_mean_abs_diff"] = (
+                "0.000000e+00" if args.backend == "naive"
                 else f"{align_results[args.backend]['mean_abs_diff']:.6e}"
                      if args.backend in align_results
                 else ""
-            ),
-        }
+            )
         write_header = not os.path.exists(args.out_csv)
         with open(args.out_csv, "a", newline="") as f:
             w = csv.DictWriter(f, fieldnames=list(row.keys()))
