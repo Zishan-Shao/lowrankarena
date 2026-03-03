@@ -44,7 +44,7 @@
 #   RANK_ATTN=48  RANK_FFN=256  RANK_WO=208  QKV_MODE=per_head
 #   BUDGET=0.527
 #   MODEL_BASE_DIR=eval_encoder/models
-#   OUT_EXPB=eval_encoder/eval_results/expB_backend.csv
+#   OUT_EXPB=eval_encoder/eval_results/expB.csv
 #   OUT_E3A=eval_encoder/eval_results/expE_train_timing.csv
 #   OUT_E3B=eval_encoder/eval_results/expE_recovery.csv
 # ─────────────────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ E2_TASKS="${E2_TASKS:-mnli}"
 E2_BACKENDS="${E2_BACKENDS:-naive sdpa flashsvd flashsvd15}"
 E2_INPUT_MODES="${E2_INPUT_MODES:-real}"
 E2_REPEAT="${E2_REPEAT:-1}"
-OUT_EXPB="${OUT_EXPB:-eval_encoder/eval_results/expB_backend.csv}"
+OUT_EXPB="${OUT_EXPB:-eval_encoder/eval_results/expB.csv}"
 
 # E-3a
 E3A_BACKENDS="${E3A_BACKENDS:-naive sdpa}"
