@@ -25,13 +25,14 @@ def compute_row_sum_svd_decomposition(A: torch.Tensor, weights: Optional[torch.T
       right_w (torch.Tensor): matrix [r, W] = Vr.T
     """
     h, w = A.shape
+    orig_dtype = A.dtype
 
     if weights is None:
         weights = torch.ones(h)
-    
+
     if weights.ndim > 1:
         weights = weights.sum(dim=1)
-    
+
     i_hat = torch.diag(torch.sqrt(weights + 1e-5))
     i_hat_inv = LA.inv(i_hat)  # actually it's diagonal so we can just take 1 / i_hat
 
@@ -47,8 +48,8 @@ def compute_row_sum_svd_decomposition(A: torch.Tensor, weights: Optional[torch.T
         s = torch.zeros_like(A)
         s[:min(h, w), :min(h, w)] = s_tmp
 
-    left_w = i_hat_inv @ (u @ s)
-    right_w = v
+    left_w = (i_hat_inv @ (u @ s)).to(orig_dtype)
+    right_w = v.to(orig_dtype)
 
     return left_w, right_w
 
