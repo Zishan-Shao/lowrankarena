@@ -712,14 +712,10 @@ def main():
         print(f"[nsys]       Use these numbers only for kernel attribution, not perf claims.")
         print_nsys_command(sys.argv[1:])
     print(f"[timing] Warmup={args.warmup} Measure={args.measure} steps ...")
-    try:
-        lat_ms, sps, peak_mb, avg_eff_tokens = run_timing(
-            model, loader, args.device, args.warmup, args.measure,
-            profile_nsys=args.profile_nsys,
-            nvtx_label=f"inference_{args.backend}_{args.dtype}")
-    except Exception as e:
-        print(f"[skip] run_timing failed ({type(e).__name__}): {e}")
-        sys.exit(0)
+    lat_ms, sps, peak_mb, avg_eff_tokens = run_timing(
+        model, loader, args.device, args.warmup, args.measure,
+        profile_nsys=args.profile_nsys,
+        nvtx_label=f"inference_{args.backend}_{args.dtype}")
 
     # ── print report ──────────────────────────────────────────────────────
     if not layer_results:
