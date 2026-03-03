@@ -1600,7 +1600,7 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
                 model, val_loader, device,
                 warmup_steps=10, measure_steps=50
             )
-        except RuntimeError as e:
+        except Exception as e:
             print(f"[eval] FlashSVD unavailable: {e}")
 
     # Evaluate + benchmark with flashsvd15 backend (SVD methods only, per_head only)
@@ -1621,7 +1621,7 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
                 model, val_loader, device,
                 warmup_steps=10, measure_steps=50
             )
-        except RuntimeError as e:
+        except Exception as e:
             print(f"[eval] FlashSVD15 unavailable: {e}")
 
     results = results_naive
