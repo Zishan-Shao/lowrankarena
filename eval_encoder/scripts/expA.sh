@@ -49,18 +49,24 @@ LOG_FILE="${LOG_DIR}/expA_$(date +%Y%m%d_%H%M%S).log"
 exec > >(tee -a "${LOG_FILE}") 2>&1
 echo "[log] → ${LOG_FILE}"
 
-# ── Canonical config（不要随意修改，改了就不是论文结果了）─────────────────────
-export QKV_MODE="per_head"
-export RANK_ATTN=48
-export RANK_FFN=256
-export RANK_WO=208
-export BUDGET=0.527
-export DTYPE="bf16"
-export SEQ_LEN=512
-export BATCH_SIZE=32
-export CALIB_BATCHES=16
-export ADASVD_CALIB_SAMPLES=4000
-export ADASVD_STEPS=800
+# ── Canonical config（per_head 为论文标准；可通过环境变量覆盖跑 full-matrix）──
+#   per_head (默认):  QKV_MODE=per_head  RANK_ATTN=48   param_ratio≈0.527
+#   full-matrix:      QKV_MODE=full       RANK_ATTN=312  param_ratio≈0.527
+export QKV_MODE="${QKV_MODE:-per_head}"
+if [[ -z "${RANK_ATTN:-}" ]]; then
+    [[ "${QKV_MODE}" == "full" ]] && export RANK_ATTN=312 || export RANK_ATTN=48
+else
+    export RANK_ATTN="${RANK_ATTN}"
+fi
+export RANK_FFN="${RANK_FFN:-256}"
+export RANK_WO="${RANK_WO:-208}"
+export BUDGET="${BUDGET:-0.527}"
+export DTYPE="${DTYPE:-bf16}"
+export SEQ_LEN="${SEQ_LEN:-512}"
+export BATCH_SIZE="${BATCH_SIZE:-32}"
+export CALIB_BATCHES="${CALIB_BATCHES:-16}"
+export ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"
+export ADASVD_STEPS="${ADASVD_STEPS:-800}"
 
 # ── 可覆盖配置 ─────────────────────────────────────────────────────────────────
 PHASES="${PHASES:-glue superglue}"
