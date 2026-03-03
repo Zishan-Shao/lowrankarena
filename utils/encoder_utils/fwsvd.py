@@ -81,11 +81,15 @@ def estimate_fisher_weights_bert_with_attention(
     fisher_int = defaultdict(lambda: torch.zeros(d_model, device=device))
     fisher_out = defaultdict(lambda: torch.zeros(dint,   device=device))
 
+    model_dtype = next(model.parameters()).dtype
+    use_autocast = model_dtype in (torch.float16, torch.bfloat16)
+
     for batch in dataloader:
         # move inputs to device…
         inputs = {k: v.to(device) for k,v in batch.items() if isinstance(v, torch.Tensor)}
-        outputs = model(**inputs)
-        loss    = outputs.loss if hasattr(outputs, 'loss') else outputs[0]
+        with torch.autocast('cuda', dtype=model_dtype, enabled=use_autocast):
+            outputs = model(**inputs)
+            loss    = outputs.loss if hasattr(outputs, 'loss') else outputs[0]
         loss.backward()
 
         for i in range(cfg.num_hidden_layers):
