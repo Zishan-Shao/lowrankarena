@@ -247,6 +247,17 @@ TASK_CFG.update({
         canonical_label2id={"entailment": 0, "neutral": 1, "contradiction": 2},
         model_remap_overrides={"textattack/bert-base-uncased-MNLI": [2, 0, 1]},
     ),
+    # ── COPA ─────────────────────────────────────────────────────────────
+    # Two-choice causal reasoning.  Cannot be scored with standard argmax —
+    # uses NLI-based two-choice scoring (see _prepare_copa_loader / _evaluate_copa).
+    # Model: textattack/bert-base-uncased-MNLI (class 1 = entailment).
+    "copa": dict(
+        num_labels=3, val_split="validation", train_split="train",
+        sentence_keys=("premise", "choice1"),   # unused when copa_style=True
+        metric_name="accuracy",
+        dataset_name="super_glue", dataset_config="copa",
+        copa_style=True,   # activates two-choice NLI evaluation path
+    ),
 })
 
 DTYPE_MAP = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
@@ -347,6 +358,82 @@ def _load_hans_dataset():
     return ds
 
 
+def _prepare_copa_loader(tokenizer, seq_len: int, batch_size: int, split_name: str):
+    """
+    COPA two-choice NLI loader.
+
+    For each COPA example (premise, question, choice1, choice2, label), build two NLI pairs:
+      question=="effect":  (premise, choice_i)
+      question=="cause":   (choice_i, premise)
+
+    Returns a DataLoader with 2*batch_size items per batch:
+      [choice1_pair_0, choice2_pair_0, choice1_pair_1, choice2_pair_1, ...]
+    Labels are the original COPA labels (0 or 1), repeated: [lbl_0, lbl_0, lbl_1, lbl_1, ...]
+    In _evaluate_copa, even indices = choice1, odd indices = choice2.
+    """
+    from datasets import load_dataset
+    from torch.utils.data import DataLoader, Dataset
+
+    raw = load_dataset("super_glue", "copa", split=split_name)
+
+    sents1, sents2, labels_interleaved = [], [], []
+    for ex in raw:
+        q   = ex["question"]
+        p   = ex["premise"]
+        c1, c2, lbl = ex["choice1"], ex["choice2"], ex["label"]
+        if q == "effect":
+            sents1 += [p, p];   sents2 += [c1, c2]
+        else:                   # cause
+            sents1 += [c1, c2]; sents2 += [p, p]
+        labels_interleaved += [lbl, lbl]
+
+    enc = tokenizer(
+        sents1, sents2,
+        padding="max_length", truncation=True, max_length=seq_len,
+        return_tensors="pt",
+    )
+    labels_t = torch.tensor(labels_interleaved, dtype=torch.long)
+    tti      = enc.get("token_type_ids", None)
+
+    class _CopaDataset(Dataset):
+        def __len__(self): return len(labels_t)
+        def __getitem__(self, i):
+            item = {"input_ids": enc["input_ids"][i],
+                    "attention_mask": enc["attention_mask"][i],
+                    "labels": labels_t[i]}
+            if tti is not None:
+                item["token_type_ids"] = tti[i]
+            return item
+
+    return DataLoader(_CopaDataset(), batch_size=batch_size * 2, shuffle=False)
+
+
+@torch.no_grad()
+def _evaluate_copa(model, loader, device) -> float:
+    """
+    Two-choice NLI scoring for COPA.
+
+    Entailment class: textattack MNLI class 1 (0=contra, 1=entail, 2=neutral).
+    For each pair of consecutive items in the batch (choice1, choice2),
+    compare entailment logits and predict the higher-scoring choice.
+    """
+    ENTAIL_IDX = 1   # textattack MNLI: class 1 = entailment
+    correct = total = 0
+    model.eval()
+    for batch in loader:
+        batch   = {k: v.to(device) for k, v in batch.items()}
+        labels  = batch.pop("labels")                  # [2*N]
+        logits  = model(**batch).logits                # [2*N, 3]
+        entail  = logits[:, ENTAIL_IDX]                # [2*N]
+        ec1     = entail[0::2]                         # [N] choice1 scores
+        ec2     = entail[1::2]                         # [N] choice2 scores
+        lbl     = labels[0::2]                         # [N] original labels
+        preds   = (ec2 > ec1).long()                   # 0→choice1 wins, 1→choice2 wins
+        correct += (preds == lbl).sum().item()
+        total   += lbl.shape[0]
+    return correct / total if total > 0 else 0.0
+
+
 def prepare_loader(task: str, tokenizer, seq_len: int, batch_size: int, split: str = "validation"):
     """
     Prepare DataLoader for any supported task (GLUE / SuperGLUE / HANS / ANLI).
@@ -366,6 +453,10 @@ def prepare_loader(task: str, tokenizer, seq_len: int, batch_size: int, split: s
         split_name = cfg["train_split"]
     else:
         split_name = cfg["val_split"]
+
+    # COPA: two-choice NLI scoring — special interleaved loader
+    if cfg.get("copa_style", False):
+        return _prepare_copa_loader(tokenizer, seq_len, batch_size, split_name)
 
     # Generic dataset loading
     ds_name = cfg.get("dataset_name", "glue")
@@ -925,8 +1016,15 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
 # ═══════════════════════════════════════════════════════════════════════════
 @torch.no_grad()
 def evaluate_task(model, loader, task, device):
-    """Return (metric_name, metric_value). Supports GLUE / SuperGLUE / HANS / ANLI."""
+    """Return (metric_name, metric_value). Supports GLUE / SuperGLUE / HANS / ANLI / COPA."""
     cfg = TASK_CFG[task]
+
+    # COPA: two-choice NLI scoring — dedicated evaluation path
+    if cfg.get("copa_style", False):
+        acc = _evaluate_copa(model, loader, device)
+        print(f"[eval] COPA two-choice accuracy: {acc:.4f}")
+        return "accuracy", acc
+
     metric_name = cfg["metric_name"]
     is_regression = cfg.get("is_regression", False)
     ds_name = cfg.get("dataset_name", "glue")
@@ -1293,6 +1391,59 @@ def _git_commit():
         return ""
 
 
+def _log_sdpa_backends(dtype_str: str = "bf16", seq_len: int = 512) -> str:
+    """
+    Log which PyTorch SDPA backends are enabled and which one will likely be chosen.
+
+    This is CRITICAL for reproducibility: on different machines or PyTorch versions,
+    F.scaled_dot_product_attention may dispatch to:
+      - FlashAttention  (fastest; requires GPU + fp16/bf16 + specific head_dim)
+      - Memory-Efficient (moderate; requires GPU + fp16/bf16/fp32)
+      - Math             (slowest; always available; fp32-safe)
+
+    Without recording this, a "sdpa" run on a V100 (no FlashAttention) vs A100
+    may show very different throughput numbers while reporting the same backend.
+
+    Returns:
+        str: Detected path — "flash", "mem_efficient", "math", or "unknown".
+    """
+    if not torch.cuda.is_available():
+        print("[sdpa] CUDA not available — SDPA will use CPU math backend")
+        return "unknown"
+
+    has_api = (
+        hasattr(torch.backends, "cuda") and
+        hasattr(torch.backends.cuda, "flash_sdp_enabled")
+    )
+    if not has_api:
+        print("[sdpa] torch.backends.cuda SDPA query API not available (PyTorch < 2.0?)")
+        return "unknown"
+
+    flash   = torch.backends.cuda.flash_sdp_enabled()
+    mem_eff = torch.backends.cuda.mem_efficient_sdp_enabled()
+    math    = torch.backends.cuda.math_sdp_enabled()
+
+    # Heuristic: flash requires fp16/bf16 and head_dim in {16,32,64,128}
+    is_half = dtype_str in ("fp16", "bf16")
+    gpu_name = torch.cuda.get_device_name(0).lower()
+    # Flash attention not supported on Pascal (GTX 10xx, P100) and older
+    no_flash_gpus = ("v100", "p100", "gtx 10", "rtx 20", "2060", "2070", "2080")
+    gpu_likely_flash = flash and is_half and not any(k in gpu_name for k in no_flash_gpus)
+
+    if gpu_likely_flash:
+        likely = "flash"
+    elif mem_eff and is_half:
+        likely = "mem_efficient"
+    else:
+        likely = "math"
+
+    print(f"[sdpa] Enabled backends: flash={flash}, mem_efficient={mem_eff}, math={math}")
+    print(f"[sdpa] dtype={dtype_str}  GPU={torch.cuda.get_device_name(0)}")
+    print(f"[sdpa] Likely path: {likely.upper()}"
+          f"  ← performance varies across machines; record this for reproducibility")
+    return likely
+
+
 def write_csv_row(args, metric_name, metric_value,
                   latency_ms, throughput_sps, peak_mem_infer_mb, peak_mem_e2e_mb,
                   param_ratio, original_params, compressed_params,
@@ -1621,6 +1772,21 @@ def main():
             else:
                 from eval_encoder.flashsvd_backend import enable_flashsvd15
                 enable_flashsvd15(model)
+
+    # 4b) SDPA path detection & logging
+    # Records which PyTorch SDPA backend (flash/mem_efficient/math) will be used.
+    # The actual path depends on: enabled flags + dtype + seq_len + head_dim + GPU.
+    # Without this log, SDPA runs on different machines may silently use different kernels.
+    # The detected path is appended to args.notes so it appears in the CSV "notes" field.
+    if getattr(args, 'attn_mode', 'einsum') == 'sdpa' and torch.cuda.is_available():
+        sdpa_path = _log_sdpa_backends(args.dtype, args.seq_len)
+        if sdpa_path:
+            prefix = f"sdpa_path={sdpa_path}"
+            args.notes = f"{prefix} {args.notes}".strip() if args.notes else prefix
+        if sdpa_path == "unknown":
+            print("[sdpa] ⚠️  WARNING: SDPA backend path could not be determined.")
+            print("[sdpa]    Rows with sdpa_path=unknown should NOT be included in SDPA")
+            print("[sdpa]    equivalence statistics — different machines may use different kernels.")
 
     # 5) evaluate task metric
     if getattr(args, 'skip_eval', False):

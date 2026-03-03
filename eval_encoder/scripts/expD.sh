@@ -35,8 +35,9 @@
 #   DTYPE=bf16
 #   SEQ_LEN=512
 #   BATCH_SIZE=32
-#   WARMUP=5           # nsys warmup（少几步，省时间）
-#   MEASURE=20         # nsys measure（够采样 kernel 多样性）
+#   INPUT_MODE=synthetic  # real | synthetic（默认 synthetic，kernel attribution 需要 0% padding）
+#   WARMUP=5              # nsys warmup（少几步，省时间）
+#   MEASURE=50            # nsys measure（50 步采样足够的 kernel 多样性）
 #   MODEL_BASE_DIR=eval_encoder/models
 #   NSYS_DIR=eval_encoder/eval_results/nsys   # .nsys-rep 文件输出目录
 #   SUMMARY_TXT=eval_encoder/eval_results/nsys/nsys_summary.txt
@@ -63,7 +64,9 @@ DTYPE="${DTYPE:-bf16}"
 SEQ_LEN="${SEQ_LEN:-512}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
 WARMUP="${WARMUP:-5}"
-MEASURE="${MEASURE:-16}"   # 16 × bs=32 = 512 calib samples
+MEASURE="${MEASURE:-50}"   # 50 步：足够采样 kernel 多样性，与 expB/expC 校准口径一致
+# synthetic: 0% padding，kernel attribution 需要 fully-utilized input（实际 padding 会稀释 GEMM 贡献）
+INPUT_MODE="${INPUT_MODE:-synthetic}"
 
 RANK_ATTN="${RANK_ATTN:-48}"
 RANK_FFN="${RANK_FFN:-256}"
@@ -107,8 +110,9 @@ _model_subdir() {
 
 echo "══════════════════════════════════════════════════════════════════════"
 echo "  expD — Kernel-Level Analysis (nsys)"
-echo "  task:     ${TASK}   dtype: ${DTYPE}   seq_len: ${SEQ_LEN}   bs: ${BATCH_SIZE}"
-echo "  warmup:   ${WARMUP}   measure: ${MEASURE}"
+echo "  task:       ${TASK}   dtype: ${DTYPE}   seq_len: ${SEQ_LEN}   bs: ${BATCH_SIZE}"
+echo "  warmup:     ${WARMUP}   measure: ${MEASURE}"
+echo "  input_mode: ${INPUT_MODE}"
 echo "  nsys_dir: ${NSYS_DIR}"
 echo "  summary:  ${SUMMARY_TXT}"
 echo "══════════════════════════════════════════════════════════════════════"
@@ -154,6 +158,7 @@ for ENTRY in "${POINTS[@]}"; do
             --model_dir  "${MODEL_DIR}" \
             --task       "${TASK}" \
             --backend    "${BACKEND}" \
+            --input_mode "${INPUT_MODE}" \
             --dtype      "${DTYPE}" \
             --seq_len    "${SEQ_LEN}" \
             --batch_size "${BATCH_SIZE}" \

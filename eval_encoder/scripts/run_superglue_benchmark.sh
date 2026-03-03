@@ -9,9 +9,19 @@
 #   压缩只做一次（naive backend），checkpoint 命名带 _naive 后缀。
 #   backend 循环时从 naive checkpoint --load_model_dir，只换 --backend。
 #
-# 覆盖任务（7 个，cb 排除）：
-#   boolq, rte_sg, wic, hans, anli_r1, anli_r2, anli_r3
-#   cb 排除：验证集仅 56 例 + 无 bert-base 专用 fine-tuned 模型 → 结果不可信
+# 任务分类：
+#   SuperGLUE-Core（进平均）: boolq, rte_sg, wic, copa
+#   Diagnostic（不进平均）:   cb   [高方差，56例，仅参考]
+#   Robustness:               hans, anli_r1, anli_r2, anli_r3
+#
+# COPA 说明：
+#   使用 NLI two-choice scoring（非标准分类）。
+#   模型：textattack/bert-base-uncased-MNLI（class 1 = entailment）。
+#   校准：使用 copa 自带的 train split（400 例）。
+#
+# CB 说明：
+#   验证集仅 56 例，高方差诊断任务，不计入 SuperGLUE 平均。
+#   结果仅供参考，建议搭配多 seed 解读。
 #
 # 覆盖方法（5 个）：
 #   dense, svd, fwsvd, drone, adasvd
@@ -21,7 +31,7 @@
 #   bash eval_encoder/scripts/run_superglue_benchmark.sh
 #
 # 可覆盖变量示例：
-#   TASKS="boolq hans"
+#   TASKS="boolq hans copa"
 #   METHODS="svd fwsvd"
 #   BACKENDS="naive sdpa flashsvd"    # fp32 下不含 flashsvd15（会 cast 到 fp16）
 #   DTYPE=fp32 BACKENDS="naive sdpa flashsvd"   # fp32 精度测试（不含 flashsvd15）
@@ -43,7 +53,7 @@ exec > >(tee -a "${LOG_FILE}") 2>&1
 echo "[log] → ${LOG_FILE}"
 
 # ── 配置 ─────────────────────────────────────────────────────────────────────
-TASKS="${TASKS:-boolq rte_sg wic hans anli_r1 anli_r2 anli_r3}"
+TASKS="${TASKS:-boolq rte_sg wic copa cb hans anli_r1 anli_r2 anli_r3}"
 METHODS="${METHODS:-dense svd fwsvd drone adasvd}"
 BACKENDS="${BACKENDS:-naive sdpa flashsvd flashsvd15}"
 
@@ -76,6 +86,7 @@ _model_id_for_task() {
         cb)      echo "textattack/bert-base-uncased-MNLI" ;;
         rte_sg)  echo "howey/bert-base-uncased-rte" ;;
         wic)     echo "rycecorn/Bert-fine-tuned-WiC" ;;
+        copa)    echo "textattack/bert-base-uncased-MNLI" ;;
         hans)    echo "textattack/bert-base-uncased-MNLI" ;;
         anli_r1) echo "textattack/bert-base-uncased-MNLI" ;;
         anli_r2) echo "textattack/bert-base-uncased-MNLI" ;;

@@ -65,6 +65,18 @@ _GPU_BANDWIDTH_GBS = {
     "3080": 760.0, "3070": 448.0,
 }
 
+# Default alignment warn threshold per dtype.
+# Rationale:
+#   bf16 — 7 mantissa bits (~0.8% relative precision); different op-ordering
+#           across backends can produce absolute logit diffs up to ~0.05.
+#   fp16 — 10 mantissa bits (~0.1% relative); tighter than bf16.
+#   fp32 — 23 mantissa bits; backends should agree to within rounding noise.
+_ALIGN_WARN_THRESH_BY_DTYPE = {
+    "bf16": 0.05,
+    "fp16": 0.02,
+    "fp32": 1e-3,
+}
+
 
 def _gpu_specs():
     """Return (peak_tflops, bandwidth_gbs, gpu_name) for the current device."""
@@ -91,12 +103,231 @@ def _dtype_bytes(dtype) -> int:
     }.get(dtype, 4)
 
 
+def _git_commit() -> str:
+    """Return current HEAD short commit hash, or '' if not in a git repo."""
+    import subprocess
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return ""
+
+
 def _get_encoder_layers(model):
     if hasattr(model, "bert"):
         return model.bert.encoder.layer
     if hasattr(model, "roberta"):
         return model.roberta.encoder.layer
     raise RuntimeError("Unsupported architecture (no bert/roberta attribute)")
+
+
+def _make_synthetic_loader(seq_len: int, batch_size: int, num_batches: int,
+                            vocab_size: int = 30522, seed: int = 42):
+    """
+    Synthetic loader: random token IDs with all-1 attention mask (zero sequence padding).
+
+    Purpose: isolates backend kernel performance from dataset-specific padding overhead.
+    Use for the "fully-utilized input" profile in expB alongside the real-data profile.
+
+    The collator returns the same dict structure as real loaders
+    (input_ids, attention_mask, token_type_ids) so the model forward path is identical.
+    No extra CPU preprocessing is triggered — the tensors are pre-generated once.
+
+    Args:
+        seq_len:    Sequence length (every position is an effective token).
+        batch_size: Batch size.
+        num_batches: Number of batches to pre-generate (warmup + measure × repeat + headroom).
+        vocab_size:  Tokenizer vocab size (default BERT 30522).
+                     Uses range [100, vocab_size-100] to avoid special tokens (CLS/SEP/PAD).
+        seed:        RNG seed for reproducibility (default 42).
+                     Performance is insensitive to specific token values,
+                     but fixing the seed aids exact reproducibility.
+    """
+    from torch.utils.data import DataLoader, TensorDataset
+    N = num_batches * batch_size
+    rng = torch.Generator()
+    rng.manual_seed(seed)
+    # Random token IDs in [100, vocab_size-100]; avoids special tokens at vocab boundaries
+    input_ids      = torch.randint(100, vocab_size - 100, (N, seq_len),
+                                   dtype=torch.long, generator=rng)
+    attention_mask = torch.ones(N, seq_len, dtype=torch.long)   # all tokens effective (0% padding)
+    token_type_ids = torch.zeros(N, seq_len, dtype=torch.long)
+
+    ds = TensorDataset(input_ids, attention_mask, token_type_ids)
+
+    # Same dict-based collator as real loaders — model forward path is identical
+    def _collate(batch):
+        ii, am, tt = zip(*batch)
+        return {"input_ids":      torch.stack(ii),
+                "attention_mask": torch.stack(am),
+                "token_type_ids": torch.stack(tt)}
+
+    return DataLoader(ds, batch_size=batch_size, shuffle=False, collate_fn=_collate)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Backend alignment check  (correctness gate)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _extract_logits(outputs):
+    """Extract logit tensor from HuggingFace ModelOutput or plain tuple/tensor."""
+    if hasattr(outputs, "logits") and outputs.logits is not None:
+        return outputs.logits
+    if isinstance(outputs, (tuple, list)) and len(outputs) > 0 and torch.is_tensor(outputs[0]):
+        return outputs[0]
+    if torch.is_tensor(outputs):
+        return outputs
+    raise RuntimeError(
+        f"Cannot extract logits from model output of type {type(outputs)}. "
+        "Expected HuggingFace ModelOutput with .logits, or a tuple/tensor.")
+
+
+def _apply_backend(model, backend, has_svd_blocks: bool):
+    """
+    Patch model in-place to use the requested backend.
+
+    Mirrors the backend-switch block in main() so alignment checks use
+    exactly the same patching path as the production benchmark run.
+    No-op for 'naive' (that is the default state after load_compressed_model).
+    """
+    if not has_svd_blocks or backend == "naive":
+        return
+    if backend == "sdpa":
+        from eval_encoder.flashsvd_backend import enable_sdpa
+        enable_sdpa(model)
+    elif backend == "flashsvd":
+        from eval_encoder.flashsvd_backend import enable_flashsvd
+        enable_flashsvd(model)
+    elif backend == "flashsvd15":
+        from eval_encoder.flashsvd_backend import enable_flashsvd15
+        enable_flashsvd15(model)
+    else:
+        raise ValueError(f"Unknown backend: {backend!r}")
+
+
+@torch.no_grad()
+def run_alignment_check(model_dir, backends_to_check, device, dtype,
+                        seq_len, batch_size, vocab_size, seed, warn_thresh):
+    """
+    Compare logits produced by each backend against the naive baseline
+    on a single fixed synthetic batch (same seed → exactly reproducible).
+
+    For each backend, loads a fresh model copy from disk, applies the backend
+    patch, runs one forward pass, and computes element-wise logit differences.
+    Reloading from disk (rather than deepcopy) ensures the patching path is
+    identical to the production benchmark run.
+
+    Parameters
+    ----------
+    model_dir : str
+        Path to the compressed checkpoint (same as --model_dir in main).
+    backends_to_check : list[str]
+        Backends to compare against naive (do NOT include "naive" itself).
+    device, dtype : str / torch.dtype
+        Match the main benchmark run.
+    seq_len, batch_size : int
+        Sequence length / batch size for the alignment batch.
+    vocab_size, seed : int
+        Synthetic loader parameters (use the same as the timing run for consistency).
+    warn_thresh : float
+        Emit a [WARN] line when max|Δlogit| exceeds this value.
+
+    Returns
+    -------
+    dict[str, dict]
+        backend → {"max_abs_diff": float, "mean_abs_diff": float}
+        Empty dict if backends_to_check is empty or model_dir is None.
+    """
+    if not model_dir or not backends_to_check:
+        return {}
+
+    from eval_encoder.load_compressed_model import load_compressed_model
+
+    # ── determinism guarantees ────────────────────────────────────────────
+    # The following conditions hold for a valid comparison:
+    #
+    #   (A) @torch.no_grad() decorator on this function — no autograd state.
+    #   (B) model.eval() called on EVERY loaded model — disables dropout,
+    #       BatchNorm running-stats updates, and any other training-mode
+    #       stochastic layers.  eval() is the single lever that matters here;
+    #       no manual seed manipulation is needed.
+    #   (C) Fixed synthetic batch: _make_synthetic_loader(seed=seed) always
+    #       produces the same token IDs and all-1 attention mask.
+    #       The batch dict is built ONCE from batch_cpu and the SAME GPU
+    #       tensors are reused for every backend — no re-sampling, no
+    #       re-tokenization, no hidden randomness from DataLoader shuffle.
+    #   (D) logits collected as .float().detach().cpu() so BF16/FP16
+    #       accumulation differences are visible rather than hidden by
+    #       in-place ops.
+    #
+    # If max|Δlogit| is unexpectedly large, the most likely causes are:
+    #   • model NOT in eval mode (dropout active) — check (B)
+    #   • different batch used per backend — check (C)
+    #   • a kernel bug producing numerically wrong outputs — this is what
+    #     the check is designed to catch
+
+    # One fixed synthetic batch — same seed guarantees identical tokens across all backends.
+    _align_loader = _make_synthetic_loader(
+        seq_len, batch_size, num_batches=2, vocab_size=vocab_size, seed=seed)
+    batch_cpu = next(iter(_align_loader))   # take only the first batch; num_batches=2 is headroom
+
+    # ── baseline: naive ────────────────────────────────────────────────────
+    print(f"[align] Loading naive baseline from {model_dir} ...")
+    model0, _, _ = load_compressed_model(model_dir, device=device, dtype=dtype)
+    model0.eval()   # (B) disables dropout / stochastic layers
+
+    # Detect SVD blocks so _apply_backend knows whether to patch
+    try:
+        layers = _get_encoder_layers(model0)
+        has_svd = any(hasattr(l.attention, "Pq") for l in layers)
+    except Exception:
+        has_svd = False
+
+    batch = {k: v.to(device) for k, v in batch_cpu.items()}
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    logits0 = _extract_logits(model0(**batch)).float().detach().cpu()
+    del model0
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    # ── compare each backend ───────────────────────────────────────────────
+    results = {}
+    for bk in backends_to_check:
+        if bk == "naive":
+            continue  # baseline — skip
+        if bk == "flashsvd15" and dtype == torch.float32:
+            print(f"[align] SKIP  backend={bk:<12s}  flashsvd15 requires bf16/fp16, not fp32")
+            continue
+
+        model_b, _, _ = load_compressed_model(model_dir, device=device, dtype=dtype)
+        model_b.eval()   # (B) same eval mode as naive baseline
+        _apply_backend(model_b, bk, has_svd)
+
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        logits_b = _extract_logits(model_b(**batch)).float().detach().cpu()
+        del model_b
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        diff     = (logits_b - logits0).abs()
+        max_abs  = diff.max().item()
+        mean_abs = diff.mean().item()
+        results[bk] = {"max_abs_diff": max_abs, "mean_abs_diff": mean_abs}
+
+        status = "WARN ⚠" if max_abs > warn_thresh else "OK  ✓"
+        print(f"[align] {status}  backend={bk:<12s}  "
+              f"max|Δlogit|={max_abs:.6f}  mean|Δlogit|={mean_abs:.6f}"
+              + (f"  ← > warn_thresh={warn_thresh}" if max_abs > warn_thresh else ""))
+
+    if results:
+        all_ok = all(v["max_abs_diff"] <= warn_thresh for v in results.values())
+        summary = "all backends within threshold ✓" if all_ok else "some backends exceed threshold ⚠"
+        print(f"[align] {summary}  (warn_thresh={warn_thresh})")
+
+    return results
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -416,6 +647,39 @@ def run_timing(model, loader, device, warmup=10, measure=50,
     return lat_ms, sps, peak_mb, avg_eff_tokens
 
 
+def run_timing_repeated(model, loader, device, warmup=10, measure=50, repeat=1,
+                        profile_nsys=False, nvtx_label="inference"):
+    """
+    Run run_timing `repeat` times independently (each with full warmup).
+
+    Returns mean±std across repeat runs.  When repeat=1 behaves identically
+    to run_timing() with std=0.
+
+    Returns
+    -------
+    lat_ms      : float  — mean batch latency (ms)
+    lat_ms_std  : float  — std  batch latency (ms); 0.0 when repeat == 1
+    sps         : float  — mean throughput (samples/s)
+    sps_std     : float  — std  throughput (samples/s); 0.0 when repeat == 1
+    peak_mb     : float  — max peak memory across runs (MB)
+    avg_eff_tokens : float — mean effective tokens across runs
+    """
+    lats, spss, mems, effs = [], [], [], []
+    for r in range(repeat):
+        if repeat > 1:
+            print(f"[timing] Run {r+1}/{repeat} ...")
+        lat, sps, mem, eff = run_timing(
+            model, loader, device, warmup, measure,
+            profile_nsys=profile_nsys, nvtx_label=nvtx_label)
+        lats.append(lat); spss.append(sps); mems.append(mem); effs.append(eff)
+
+    lat_mean = statistics.mean(lats)
+    lat_std  = statistics.stdev(lats) if repeat > 1 else 0.0
+    sps_mean = statistics.mean(spss)
+    sps_std  = statistics.stdev(spss) if repeat > 1 else 0.0
+    return lat_mean, lat_std, sps_mean, sps_std, max(mems), statistics.mean(effs)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Pretty printing
 # ══════════════════════════════════════════════════════════════════════════════
@@ -425,7 +689,8 @@ def _fmt_mb(n): return f"{n/1e6:.1f}MB"
 
 
 def print_report(layer_results, totals, lat_ms, sps, peak_mb, avg_eff_tokens,
-                 B, M, dtype, backend, gpu_name, gpu_tflops, gpu_bw):
+                 B, M, dtype, backend, gpu_name, gpu_tflops, gpu_bw,
+                 lat_ms_std=0.0, sps_std=0.0, n_repeats=1):
     """
     Print the full compute breakdown report.
 
@@ -520,10 +785,19 @@ def print_report(layer_results, totals, lat_ms, sps, peak_mb, avg_eff_tokens,
     achieved_tflop_rate  = totals["total_flops"]    / lat_s / 1e12
     achieved_bw_gbs      = totals["total_traffic"]  / lat_s / 1e9
 
-    print(f"\n  Timing (median over measure steps):")
-    print(f"    Latency                : {lat_ms:.2f} ms/batch")
-    print(f"    Throughput             : {sps:.1f} samples/s")
+    print(f"\n  Timing:")
+    if n_repeats > 1:
+        # std is run-level: each run = full warmup + measure steps → 1 median → n_repeats medians
+        # This is NOT step-level std within a single run.
+        print(f"    Latency                : {lat_ms:.2f} ± {lat_ms_std:.2f} ms/batch"
+              f"  (mean±std over {n_repeats} independent runs,")
+        print(f"                             each run = {n_repeats}×[warmup+measure steps] → median)")
+        print(f"    Throughput             : {sps:.1f} ± {sps_std:.1f} samples/s")
+    else:
+        print(f"    Latency                : {lat_ms:.2f} ms/batch  (median over measure steps)")
+        print(f"    Throughput             : {sps:.1f} samples/s")
     print(f"    Peak Mem               : {peak_mb:.1f} MB")
+    print(f"    Timing scope           : GPU forward only  (H2D transfer excluded)")
 
     print(f"\n  Achieved TFLOP rates (FLOPs/latency — change with backend speed):")
     print(f"    Useful TFLOP rate      : {useful_tflop_rate:.1f} TFLOPs/s  "
@@ -609,6 +883,23 @@ def parse_args():
     p.add_argument("--device",    default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--warmup",    type=int, default=10)
     p.add_argument("--measure",   type=int, default=50)
+    p.add_argument("--repeat",    type=int, default=1,
+                   help="Repeat the full timing measurement N times (each with full warmup). "
+                        "Report mean±std across runs. Default 1 = single run (backward compatible). "
+                        "Use 3 or 5 for publishable benchmarks.")
+    p.add_argument("--input_mode", choices=["real", "synthetic"], default="real",
+                   help="Input distribution for timing. "
+                        "'real' (default): task validation set — includes natural seq padding. "
+                        "'synthetic': random tokens + all-1 attention mask — zero seq padding, "
+                        "fully-utilized input. Use both modes to disentangle backend vs data effects.")
+    p.add_argument("--synthetic_vocab_size", type=int, default=30522,
+                   help="Vocab size for synthetic loader (default 30522, BERT). "
+                        "Token IDs sampled from [100, vocab_size-100] to avoid special tokens. "
+                        "Performance is insensitive to this value; set for reproducibility.")
+    p.add_argument("--synthetic_seed", type=int, default=42,
+                   help="RNG seed for synthetic token generation (default 42). "
+                        "Performance is insensitive to specific token values; "
+                        "fixing the seed ensures exact reproducibility.")
     p.add_argument("--out_csv",   default=None,
                    help="Optional CSV to append one summary row")
     p.add_argument("--profile_nsys", action="store_true",
@@ -617,6 +908,27 @@ def parse_args():
                         "'nsys profile --trace=cuda,nvtx ...' to capture.")
     p.add_argument("--print_nsys_cmd", action="store_true",
                    help="Print the recommended nsys command and exit.")
+
+    # ── alignment check (correctness gate) ───────────────────────────────
+    p.add_argument("--check_alignment", action="store_true",
+                   help="Compare logits of the requested --backend against the naive "
+                        "baseline on a single fixed synthetic batch. "
+                        "Loads a fresh model copy per backend checked — adds startup time "
+                        "but does not affect timing numbers. "
+                        "Writes logit_max_diff / logit_mean_abs_diff to CSV.")
+    p.add_argument("--align_backends", type=str, default=None,
+                   help="Comma-separated backends to check against naive. "
+                        "Default (not set): only the current --backend is checked. "
+                        "When set explicitly, the current --backend is automatically excluded "
+                        "(each job checks OTHER backends; the current one is implicit). "
+                        "To check all backends in a single shot: "
+                        "--backend naive --check_alignment --align_backends sdpa,flashsvd,flashsvd15")
+    p.add_argument("--align_warn_thresh", type=float, default=None,
+                   help="Warn when max|Δlogit| exceeds this value. "
+                        "Default: dtype-dependent auto-selection "
+                        "(bf16=0.05, fp16=0.02, fp32=1e-3). "
+                        "Override with an explicit float to use the same threshold for all dtypes.")
+
     return p.parse_args()
 
 
@@ -633,6 +945,7 @@ def main():
     gpu_tflops, gpu_bw, gpu_name = _gpu_specs()
 
     # ── load model ────────────────────────────────────────────────────────
+    comp_info = {}
     if args.model_dir:
         print(f"[load] Loading pre-compressed model: {args.model_dir}")
         from eval_encoder.load_compressed_model import load_compressed_model
@@ -676,6 +989,28 @@ def main():
 
     model.eval()
 
+    # ── build rank_config string for CSV provenance ───────────────────────
+    # Encodes the compression shape so CSV rows are self-describing
+    # without needing to trace back to the checkpoint directory.
+    if comp_info:
+        _budget = comp_info.get("budget")
+        _qkv    = comp_info.get("qkv_mode", args.qkv_mode)
+        if _budget:
+            rank_config = f"b{_budget}_{_qkv}"
+        else:
+            _ra = comp_info.get("rank_attn") or comp_info.get("rank", "?")
+            _rf = comp_info.get("rank_ffn")  or comp_info.get("rank", "?")
+            _rw = comp_info.get("rank_wo")   or comp_info.get("rank", "?")
+            rank_config = f"ra{_ra}_rf{_rf}_rw{_rw}_{_qkv}"
+    elif args.method == "adasvd":
+        rank_config = f"b{args.budget}_{args.qkv_mode}"
+    elif args.rank_attn:
+        rank_config = f"ra{args.rank_attn}_rf{args.rank_ffn}_rw{args.rank_wo}_{args.qkv_mode}"
+    elif args.rank:
+        rank_config = f"r{args.rank}_{args.qkv_mode}"
+    else:
+        rank_config = "unknown"
+
     # ── static FLOP / traffic analysis (BEFORE backend swap) ─────────────
     # Must run on NaiveSVDBlock so Pq.shape[-1] == rank (not head_dim).
     # After enable_flashsvd15, Pq becomes [H,R,dh] and shape[-1]=dh=64,
@@ -683,6 +1018,47 @@ def main():
     print(f"[analyze] Computing FLOP and traffic breakdown ...")
     layer_results, totals = analyze_model(
         model, args.batch_size, args.seq_len, dtype)
+
+    # ── alignment check (correctness gate, optional) ─────────────────────
+    # Load fresh model copies per backend — does NOT affect the main timing run.
+    # Runs BEFORE the backend switch so the main model stays in naive state
+    # during the check (the fresh copies are loaded independently).
+    align_results = {}
+    if args.check_alignment:
+        if not args.model_dir:
+            print("[align] WARN: --check_alignment requires --model_dir; skipping.")
+        else:
+            if args.align_backends:
+                # Explicit list: remove "naive" AND the current benchmark backend.
+                # Each job checks OTHER backends; the current backend is already being
+                # benchmarked by this job — no need to load it again for alignment.
+                # To check all backends in one shot: --backend naive --align_backends sdpa,...
+                _align_bks = [b.strip() for b in args.align_backends.split(",")
+                              if b.strip() and b.strip() not in ("naive", args.backend)]
+            else:
+                # Default: check only the current backend vs naive baseline.
+                _align_bks = [args.backend] if args.backend != "naive" else []
+            if not _align_bks:
+                if args.backend == "naive":
+                    print("[align] backend='naive' — it IS the baseline; diff=0 by definition.")
+                else:
+                    print(f"[align] nothing to check "
+                          f"(all specified backends excluded or current backend='{args.backend}' filtered).")
+            else:
+                # Resolve warn threshold: explicit override > dtype-based default
+                _align_thresh = (
+                    args.align_warn_thresh
+                    if args.align_warn_thresh is not None
+                    else _ALIGN_WARN_THRESH_BY_DTYPE.get(args.dtype, 0.05)
+                )
+                if args.align_warn_thresh is None:
+                    print(f"[align] warn_thresh={_align_thresh} "
+                          f"(auto, dtype={args.dtype}; override with --align_warn_thresh)")
+                align_results = run_alignment_check(
+                    args.model_dir, _align_bks, args.device, dtype,
+                    args.seq_len, args.batch_size,
+                    args.synthetic_vocab_size, args.synthetic_seed,
+                    _align_thresh)
 
     # ── apply backend ─────────────────────────────────────────────────────
     # Dense models have no SVD blocks; skip backend swap silently.
@@ -699,11 +1075,24 @@ def main():
         enable_flashsvd15(model)
     print(f"[backend] {args.backend} enabled")
 
-    # ── build validation loader ───────────────────────────────────────────
-    from eval_encoder.run_encoder_benchmark import prepare_loader
-    loader = prepare_loader(
-        args.task, tokenizer, args.seq_len, args.batch_size,
-        split="validation")
+    # ── build loader (real dataset or synthetic fully-padded input) ──────
+    if args.input_mode == "synthetic":
+        # Synthetic loader: random tokens, all-1 attention mask (0% seq padding).
+        # Isolates backend kernel performance from dataset-specific padding overhead.
+        # num_batches must cover warmup + measure steps (× repeat for repeated runs).
+        num_batches = (args.warmup + args.measure) * args.repeat + 8   # +8 headroom
+        loader = _make_synthetic_loader(
+            args.seq_len, args.batch_size, num_batches,
+            vocab_size=args.synthetic_vocab_size, seed=args.synthetic_seed)
+        print(f"[input] synthetic: random tokens, all-1 mask, 0% seq-padding "
+              f"(vocab_size={args.synthetic_vocab_size}, seed={args.synthetic_seed}, "
+              f"N={num_batches * args.batch_size} pre-generated samples)")
+    else:
+        from eval_encoder.run_encoder_benchmark import prepare_loader
+        loader = prepare_loader(
+            args.task, tokenizer, args.seq_len, args.batch_size,
+            split="validation")
+        print(f"[input] real: {args.task} validation set (natural seq-padding distribution)")
 
     # ── timing (+ optional nsys NVTX) ────────────────────────────────────
     if args.profile_nsys:
@@ -711,9 +1100,10 @@ def main():
         print(f"[nsys] NOTE: latency/throughput measured under nsys have profiling overhead.")
         print(f"[nsys]       Use these numbers only for kernel attribution, not perf claims.")
         print_nsys_command(sys.argv[1:])
-    print(f"[timing] Warmup={args.warmup} Measure={args.measure} steps ...")
-    lat_ms, sps, peak_mb, avg_eff_tokens = run_timing(
-        model, loader, args.device, args.warmup, args.measure,
+    print(f"[timing] Warmup={args.warmup} Measure={args.measure} steps "
+          f"× Repeat={args.repeat} ...")
+    lat_ms, lat_ms_std, sps, sps_std, peak_mb, avg_eff_tokens = run_timing_repeated(
+        model, loader, args.device, args.warmup, args.measure, args.repeat,
         profile_nsys=args.profile_nsys,
         nvtx_label=f"inference_{args.backend}_{args.dtype}")
 
@@ -725,7 +1115,8 @@ def main():
     else:
         print_report(layer_results, totals, lat_ms, sps, peak_mb, avg_eff_tokens,
                      args.batch_size, args.seq_len, dtype,
-                     args.backend, gpu_name, gpu_tflops, gpu_bw)
+                     args.backend, gpu_name, gpu_tflops, gpu_bw,
+                     lat_ms_std=lat_ms_std, sps_std=sps_std, n_repeats=args.repeat)
 
     # ── optional CSV output ───────────────────────────────────────────────
     if args.out_csv:
@@ -738,13 +1129,24 @@ def main():
         useful_tflop_rate   = totals["useful_flops"]  / lat_s / 1e12
         rank_pad_tflop_rate = totals["padding_flops"] / lat_s / 1e12
         achieved_tflop_rate = totals["total_flops"]   / lat_s / 1e12
+        import datetime
         row = {
+            # ── provenance (who ran what, when, on which checkpoint) ──────
+            "timestamp":            datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "model_id":             model_id,
+            "rank_config":          rank_config,  # e.g. ra48_rf256_rw208_per_head or b0.527_per_head
+            "git_commit":           _git_commit(),
+            # ── experiment axes ───────────────────────────────────────────
             "task":                 args.task,
             "method":               args.method,
             "backend":              args.backend,
             "dtype":                args.dtype,
             "seq_len":              args.seq_len,
             "batch_size":           args.batch_size,
+            # ── input distribution ────────────────────────────────────────
+            "input_mode":           args.input_mode,   # real | synthetic
+            "synthetic_seed":       str(args.synthetic_seed) if args.input_mode == "synthetic" else "",
+            "synthetic_vocab_size": str(args.synthetic_vocab_size) if args.input_mode == "synthetic" else "",
             # ── absolute FLOPs (latency-independent; same across backends) ──
             "useful_flops_abs":     f"{totals['useful_flops']/1e12:.4f}",   # TFLOPs
             "rank_pad_flops_abs":   f"{totals['padding_flops']/1e12:.4f}",  # TFLOPs
@@ -755,15 +1157,33 @@ def main():
             "achieved_tflop_rate":  f"{achieved_tflop_rate:.3f}",
             # ── padding fractions ─────────────────────────────────────────
             "rank_pad_pct":         f"{totals['padding_pct']:.2f}",   # Triton next_pow2(R)
-            "seq_pad_pct":          f"{seq_pad_pct:.2f}",              # sentence padding
+            "seq_pad_pct":          f"{seq_pad_pct:.2f}",              # sentence padding (0 if synthetic)
             "avg_eff_tokens":       f"{avg_eff_tokens:.1f}",
             # ── roofline ──────────────────────────────────────────────────
             "arith_intensity":      f"{totals['arith_intensity']:.1f}",
-            # ── timing / memory ───────────────────────────────────────────
+            # ── timing / memory (mean±std across repeat runs) ────────────
             "latency_ms":           f"{lat_ms:.2f}",
+            "latency_ms_std":       f"{lat_ms_std:.2f}" if args.repeat > 1 else "",
             "throughput_sps":       f"{sps:.1f}",
+            "throughput_sps_std":   f"{sps_std:.1f}" if args.repeat > 1 else "",
+            "n_repeats":            str(args.repeat),
             "peak_mem_mb":          f"{peak_mb:.1f}",
             "mfu":                  f"{achieved_tflop_rate/gpu_tflops:.4f}" if gpu_tflops else "",
+            # ── alignment check (correctness gate; empty when --check_alignment not set) ──
+            # naive backend is the baseline: diff from itself is always 0.
+            # Other backends: filled when --check_alignment is passed, else empty.
+            "logit_max_diff":       (
+                "0.000000" if args.check_alignment and args.backend == "naive"
+                else f"{align_results[args.backend]['max_abs_diff']:.6f}"
+                     if args.backend in align_results
+                else ""
+            ),
+            "logit_mean_abs_diff":  (
+                "0.000000" if args.check_alignment and args.backend == "naive"
+                else f"{align_results[args.backend]['mean_abs_diff']:.6f}"
+                     if args.backend in align_results
+                else ""
+            ),
         }
         write_header = not os.path.exists(args.out_csv)
         with open(args.out_csv, "a", newline="") as f:

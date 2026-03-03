@@ -247,7 +247,9 @@ run_one() {
 
   if [[ "${stage}" == "no_finetune" ]]; then
     skip_finetuning="true"
-    reuse_checkpoint="false"  # 阶段1：重新压缩
+    # Default: always recompress stage1. Set REUSE_CHECKPOINT=true to skip if checkpoint exists
+    # (useful when checkpoint is already on disk and you only want to re-run eval).
+    reuse_checkpoint="${REUSE_CHECKPOINT:-false}"
   elif [[ "${stage}" == "with_finetune" ]]; then
     skip_finetuning="false"
     reuse_checkpoint="true"   # 阶段2：重用阶段1的checkpoint，避免重复压缩

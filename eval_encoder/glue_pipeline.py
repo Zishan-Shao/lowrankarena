@@ -241,6 +241,26 @@ SUPER_GLUE_TASKS = {
             "bert-base-uncased",             # fine-tune from scratch fallback
         ]
     },
+    # ── COPA ─────────────────────────────────────────────────────────────────
+    # Two-choice causal reasoning (500 dev examples).
+    # Scored with NLI-based two-choice method (see _prepare_copa_data / _evaluate_copa).
+    # Model: textattack/bert-base-uncased-MNLI (class 1 = entailment).
+    # SuperGLUE-Core task: enters the SuperGLUE average.
+    "copa": {
+        "num_labels": 3,
+        "train_split": "train",
+        "val_split": "validation",
+        "test_split": "validation",
+        "sentence_keys": ("premise", "choice1"),   # unused when copa_style=True
+        "metric": "accuracy",
+        "is_regression": False,
+        "dataset_name": "super_glue",
+        "dataset_config": "copa",
+        "copa_style": True,   # activates two-choice NLI evaluation path
+        "pretrained_models": [
+            "textattack/bert-base-uncased-MNLI",
+        ]
+    },
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -370,9 +390,12 @@ def parse_args():
     parser.add_argument("--qkv_mode", choices=["per_head", "full"], default="per_head",
                         help="QKV factorization mode: 'per_head' (rank limited to head_dim=64) "
                              "or 'full' (paper-style, rank can be 256+). FlashSVD only supports per_head.")
-    parser.add_argument("--backend", choices=["naive", "flashsvd", "flashsvd15"],
+    parser.add_argument("--backend", choices=["naive", "sdpa", "flashsvd", "flashsvd15"],
                         default="naive",
-                        help="Execution backend")
+                        help="Execution backend. 'sdpa' is an alias for naive + attn_mode=sdpa.")
+    parser.add_argument("--attn_mode", choices=["einsum", "sdpa"], default="einsum",
+                        help="Attention implementation for the naive backend. "
+                             "Overridden to 'sdpa' when --backend sdpa is used.")
     parser.add_argument("--dtype", choices=["fp32", "fp16", "bf16"], default="fp32",
                         help="Model dtype for compression and evaluation "
                              "(flashsvd15 + bf16 gives real speedup with zero cast overhead)")
@@ -620,7 +643,8 @@ def _write_finetune_csv_row(checkpoint_path, task, results: dict, args):
 
 def _write_compress_eval_csv_rows(task, comp_info, metric_name,
                                    value_naive, value_flash, args,
-                                   value_flash15=None):
+                                   value_flash15=None, value_sdpa=None,
+                                   sdpa_path=None):
     """Write stage1 (compress → eval, no finetune) accuracy rows to glue_accuracy_runs.csv."""
     ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     base = {
@@ -638,10 +662,14 @@ def _write_compress_eval_csv_rows(task, comp_info, metric_name,
         "stage": "compress_eval",
         "seed": str(args.seed),
         "metric_name": metric_name,
-        "notes": "no_finetune",
+        "notes": "stage=no_finetune",
     }
     _write_csv_row({**base, "backend": "naive",
                     "metric_value": f"{value_naive:.6f}"})
+    if value_sdpa is not None:
+        sdpa_notes = f"stage=no_finetune sdpa_path={sdpa_path}" if sdpa_path else "stage=no_finetune"
+        _write_csv_row({**base, "backend": "sdpa", "notes": sdpa_notes,
+                        "metric_value": f"{value_sdpa:.6f}"})
     if value_flash is not None:
         _write_csv_row({**base, "backend": "flashsvd",
                         "metric_value": f"{value_flash:.6f}"})
@@ -649,6 +677,7 @@ def _write_compress_eval_csv_rows(task, comp_info, metric_name,
         _write_csv_row({**base, "backend": "flashsvd15",
                         "metric_value": f"{value_flash15:.6f}"})
     print(f"[compress_eval] CSV rows written: naive={value_naive:.4f}"
+          + (f" sdpa={value_sdpa:.4f}" if value_sdpa is not None else "")
           + (f" flash={value_flash:.4f}" if value_flash is not None else "")
           + (f" flash15={value_flash15:.4f}" if value_flash15 is not None else ""))
 
@@ -1068,9 +1097,90 @@ def _load_task_dataset(task: str, split: str):
     return load_dataset(ds_name, split=split)
 
 
+def _prepare_copa_data(task, tokenizer, seq_len, batch_size, cfg):
+    """
+    COPA two-choice NLI loaders.
+
+    For each example (premise, question, choice1, choice2, label), build two NLI pairs:
+      question=="effect":  (premise, choice_i)
+      question=="cause":   (choice_i, premise)
+
+    Returns (train_loader_or_None, val_loader) where each loader yields batches of
+    2*batch_size items: [choice1_pair_0, choice2_pair_0, ...] (interleaved).
+    Labels are the original COPA labels (0/1) repeated twice for deinterleaving.
+    """
+    from datasets import load_dataset
+    from torch.utils.data import DataLoader, Dataset
+
+    def _build(split_name):
+        raw = load_dataset("super_glue", "copa", split=split_name)
+        s1, s2, lbls = [], [], []
+        for ex in raw:
+            q   = ex["question"]
+            p   = ex["premise"]
+            c1, c2, lbl = ex["choice1"], ex["choice2"], ex["label"]
+            if q == "effect":
+                s1 += [p, p];   s2 += [c1, c2]
+            else:
+                s1 += [c1, c2]; s2 += [p, p]
+            lbls += [lbl, lbl]
+        enc = tokenizer(s1, s2, padding="max_length", truncation=True,
+                        max_length=seq_len, return_tensors="pt")
+        labels_t = torch.tensor(lbls, dtype=torch.long)
+        tti = enc.get("token_type_ids", None)
+
+        class _DS(Dataset):
+            def __len__(self): return len(labels_t)
+            def __getitem__(self, i):
+                item = {"input_ids": enc["input_ids"][i],
+                        "attention_mask": enc["attention_mask"][i],
+                        "labels": labels_t[i]}
+                if tti is not None:
+                    item["token_type_ids"] = tti[i]
+                return item
+
+        return DataLoader(_DS(), batch_size=batch_size * 2, shuffle=False)
+
+    val_loader   = _build(cfg["val_split"])
+    train_loader = _build(cfg["train_split"]) if cfg["train_split"] is not None else None
+    return train_loader, val_loader
+
+
+def _evaluate_copa(model, loader, device):
+    """
+    Two-choice NLI scoring for COPA.
+
+    Entailment class: textattack MNLI class 1 (0=contra, 1=entail, 2=neutral).
+    Returns (results_dict, avg_loss) to match evaluate_task's return signature.
+    """
+    ENTAIL_IDX = 1   # textattack MNLI: class 1 = entailment
+    correct = total = 0
+    model.eval()
+    with torch.no_grad():
+        for batch in loader:
+            batch   = {k: v.to(device) for k, v in batch.items()}
+            labels  = batch.pop("labels")               # [2*N]
+            logits  = model(**batch).logits             # [2*N, 3]
+            entail  = logits[:, ENTAIL_IDX]             # [2*N]
+            ec1     = entail[0::2]                      # [N] choice1 scores
+            ec2     = entail[1::2]                      # [N] choice2 scores
+            lbl     = labels[0::2]                      # [N] original labels
+            preds   = (ec2 > ec1).long()
+            correct += (preds == lbl).sum().item()
+            total   += lbl.shape[0]
+    acc = correct / total if total > 0 else 0.0
+    print(f"[eval] COPA two-choice accuracy: {acc:.4f}  ({correct}/{total})")
+    return {"accuracy": acc}, 0.0   # no meaningful cross-entropy loss for 2-choice task
+
+
 def prepare_data(task, tokenizer, seq_len, batch_size):
     """Prepare train and validation dataloaders for any supported task."""
     cfg = ALL_TASKS[task]
+
+    # COPA: two-choice NLI scoring — special interleaved loader
+    if cfg.get("copa_style", False):
+        return _prepare_copa_data(task, tokenizer, seq_len, batch_size, cfg)
+
     label_map = cfg.get("label_map", None)  # e.g. HANS: {"entailment": 0, ...}
 
     # HANS has no train split — return (None, val_loader)
@@ -1221,6 +1331,11 @@ def evaluate_task(model, val_loader, task, device, original_model_id=None):
         original_model_id: Optional original model ID (for models loaded from checkpoint)
     """
     cfg = ALL_TASKS[task]
+
+    # COPA: two-choice NLI scoring — dedicated evaluation path
+    if cfg.get("copa_style", False):
+        return _evaluate_copa(model, val_loader, device)
+
     ds_name = cfg.get("dataset_name", "glue")
 
     # Choose metric loader
@@ -1488,6 +1603,39 @@ def _get_encoder_layers(model):
     return None
 
 
+def _set_attn_mode_naive(model, attn_mode: str):
+    """Set attn_mode on all NaiveSVDBlocks in-place."""
+    changed = 0
+    for module in model.modules():
+        if type(module).__name__ == 'NaiveSVDBlock' and hasattr(module, 'attn_mode'):
+            module.attn_mode = attn_mode
+            changed += 1
+    print(f"[sdpa] Set attn_mode='{attn_mode}' on {changed} NaiveSVDBlocks")
+
+
+def _detect_sdpa_path(dtype_str: str = "bf16") -> str:
+    """Return the SDPA backend path that PyTorch will likely dispatch to.
+
+    Returns one of: 'flash', 'mem_efficient', 'math', 'unknown'.
+    Silent — does not print. Use _log_sdpa_backends in run_encoder_benchmark.py for verbose output.
+    """
+    import torch
+    if not torch.cuda.is_available():
+        return "unknown"
+    if not (hasattr(torch.backends, "cuda") and hasattr(torch.backends.cuda, "flash_sdp_enabled")):
+        return "unknown"
+    flash   = torch.backends.cuda.flash_sdp_enabled()
+    mem_eff = torch.backends.cuda.mem_efficient_sdp_enabled()
+    is_half = dtype_str in ("fp16", "bf16")
+    gpu_name = torch.cuda.get_device_name(0).lower()
+    no_flash_gpus = ("v100", "p100", "gtx 10", "rtx 20", "2060", "2070", "2080")
+    if flash and is_half and not any(k in gpu_name for k in no_flash_gpus):
+        return "flash"
+    if mem_eff and is_half:
+        return "mem_efficient"
+    return "math"
+
+
 def _enable_flashsvd_save(model, backend="flashsvd"):
     """Enable FlashSVD (v1 or v1.5) in-place; return saved (layer, naive_block) pairs for restore.
 
@@ -1582,6 +1730,35 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         warmup_steps=10, measure_steps=50
     )
 
+    # Evaluate + benchmark with SDPA backend (naive + attn_mode=sdpa)
+    # SDPA accuracy should match naive (mathematically equivalent) but validates the pipeline.
+    # Recorded with backend="sdpa" in the CSV for independent filtering.
+    results_sdpa = None
+    speed_metrics_sdpa = None
+    _sdpa_path = _detect_sdpa_path(getattr(args, 'dtype', 'bf16'))
+    print(f"[sdpa] Detected path: {_sdpa_path.upper()} (dtype={getattr(args, 'dtype', 'bf16')})")
+    if _sdpa_path == "unknown":
+        print("[sdpa] ⚠️  WARNING: SDPA backend path could not be determined.")
+        print("[sdpa]    Rows with sdpa_path=unknown should NOT be included in SDPA")
+        print("[sdpa]    equivalence statistics — different machines may use different kernels.")
+    if _comp_method != 'dense':
+        try:
+            _set_attn_mode_naive(model, 'sdpa')
+            print(f"\n[eval] Evaluating with sdpa backend...")
+            results_sdpa, _ = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
+            print(f"[eval] sdpa: {results_sdpa}")
+            print(f"\n{'='*70}")
+            print("STEP 3b: Inference Speed Benchmark (sdpa)")
+            print("="*70)
+            speed_metrics_sdpa = benchmark_inference_speed(
+                model, val_loader, device,
+                warmup_steps=10, measure_steps=50
+            )
+        except Exception as e:
+            print(f"[eval] SDPA eval failed: {e}")
+        finally:
+            _set_attn_mode_naive(model, 'einsum')   # restore for FlashSVD eval below
+
     # Evaluate + benchmark with flashsvd backend (SVD methods only, per_head only)
     results_flashsvd = None
     speed_metrics_flash = None
@@ -1634,6 +1811,8 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
     print(f"Evaluation Complete: {task.upper()}")
     print("="*70)
     print(f"Naive:      {results_naive}")
+    if results_sdpa is not None:
+        print(f"SDPA:       {results_sdpa}")
     if results_flashsvd is not None:
         print(f"FlashSVD:   {results_flashsvd}")
     if results_flashsvd15 is not None:
@@ -1643,6 +1822,8 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
 
     # Since no fine-tuning, initial = final
     metric_value = results_naive.get(cfg["metric"], 0)
+    metric_value_sdpa = (results_sdpa.get(cfg["metric"], 0)
+                         if results_sdpa is not None else None)
     metric_value_flash = (results_flashsvd.get(cfg["metric"], 0)
                           if results_flashsvd is not None else None)
     metric_value_flash15 = (results_flashsvd15.get(cfg["metric"], 0)
@@ -1653,7 +1834,18 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         task, comp_info, cfg["metric"],
         metric_value, metric_value_flash, args,
         value_flash15=metric_value_flash15,
+        value_sdpa=metric_value_sdpa,
+        sdpa_path=_sdpa_path,
     )
+
+    # Write sdpa efficiency row (naive backend + attn_mode=sdpa)
+    if results_sdpa is not None and speed_metrics_sdpa is not None:
+        _append_flashsvd_csv_row(
+            task, comp_info, speed_metrics_sdpa,
+            cfg["metric"], metric_value_sdpa,
+            csv_path=args.out_csv,
+            backend="sdpa",
+        )
 
     # Write flashsvd efficiency row (has mem/sps data)
     if results_flashsvd is not None and speed_metrics_flash is not None:
@@ -1685,13 +1877,16 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
             "primary_metric": cfg["metric"],
             "initial": results_naive,
             "initial_naive": results_naive,
+            "initial_sdpa": results_sdpa,
             "initial_flashsvd": results_flashsvd,
             "initial_flashsvd15": results_flashsvd15,
             "final": results_naive,
             "final_naive": results_naive,
+            "final_sdpa": results_sdpa,
             "final_flashsvd": results_flashsvd,
             "final_flashsvd15": results_flashsvd15,
             "best_value": metric_value,
+            "best_value_sdpa": metric_value_sdpa,
             "best_value_flashsvd": metric_value_flash,
             "best_value_flashsvd15": metric_value_flash15,
             "improvement": 0.0,  # No improvement without fine-tuning
@@ -1706,6 +1901,7 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         },
         "inference_speed": speed_metrics_naive,
         "inference_speed_naive": speed_metrics_naive,
+        "inference_speed_sdpa": speed_metrics_sdpa,
         "inference_speed_flashsvd": speed_metrics_flash,
         "inference_speed_flashsvd15": speed_metrics_flash15,
         # Legacy fields for backward compatibility
@@ -1717,6 +1913,7 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         "final_results_flashsvd": results_flashsvd,
         "best_metric": cfg["metric"],
         "best_value": metric_value,
+        "best_value_sdpa": metric_value_sdpa,
         "best_value_flashsvd": metric_value_flash,
         "best_value_flashsvd15": metric_value_flash15,
     }
