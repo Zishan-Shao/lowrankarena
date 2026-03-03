@@ -19,7 +19,7 @@ def _next_pow2(n: int) -> int:
     return 1 << (n - 1).bit_length()
 
 
-def flashsvd_ffn_v15(P, V1, U2, V2, b1, b2, BL=64, BD=128, BH=64, BR1=32, BR2=32):
+def flashsvd_ffn_v15(P, V1, U2, V2, b1, b2, BL=64, BD=64, BH=64, BR1=32, BR2=32):
     """v1.5 FFN with fp32 auto-cast fallback.
 
     When the model runs in fp16/bf16, tensors arrive at native dtype → zero
