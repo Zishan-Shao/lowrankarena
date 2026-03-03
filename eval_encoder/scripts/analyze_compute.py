@@ -998,9 +998,23 @@ def main():
         if _budget:
             rank_config = f"b{_budget}_{_qkv}"
         else:
-            _ra = comp_info.get("rank_attn") or comp_info.get("rank", "?")
-            _rf = comp_info.get("rank_ffn")  or comp_info.get("rank", "?")
-            _rw = comp_info.get("rank_wo")   or comp_info.get("rank", "?")
+            _ra = comp_info.get("rank_attn")
+            _rf = comp_info.get("rank_ffn")
+            _rw = comp_info.get("rank_wo")
+            # Fallback 1: CLI args (expB/expC pass --rank_attn/ffn/wo explicitly)
+            if _ra is None and args.rank_attn:
+                _ra, _rf, _rw = args.rank_attn, args.rank_ffn, args.rank_wo
+            # Fallback 2: parse from model_dir name (e.g. svd_ra48_rf256_rw208_per_head_naive)
+            if _ra is None and args.model_dir:
+                import re as _re
+                _m = _re.search(r'ra(\d+)_rf(\d+)_rw(\d+)',
+                                os.path.basename(args.model_dir.rstrip('/')))
+                if _m:
+                    _ra, _rf, _rw = int(_m.group(1)), int(_m.group(2)), int(_m.group(3))
+            # Fallback 3: unified rank field (old-style checkpoints)
+            if _ra is None:
+                _r = comp_info.get("rank") or args.rank or "?"
+                _ra = _rf = _rw = _r
             rank_config = f"ra{_ra}_rf{_rf}_rw{_rw}_{_qkv}"
     elif args.method == "adasvd":
         rank_config = f"b{args.budget}_{args.qkv_mode}"
