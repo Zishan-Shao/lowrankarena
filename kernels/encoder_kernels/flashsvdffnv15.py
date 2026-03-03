@@ -40,7 +40,7 @@ def flashsvd_ffn_v15(P, V1, U2, V2, b1, b2, BL=64, BD=128, BH=64, BR1=32, BR2=32
     BR2 = _next_pow2(R2)
     # Auto-reduce BL to avoid shared-memory OOM when BR2 is large.
     # Required ≈ BL × (BR2×4 + BD×2) bytes (fp32 acc_r + fp16 T tile).
-    # e.g. BD=64, BR2=512, BL=64 → 139264 > 101376 (OOM) → BL=32 → 69632 ✓
+    # e.g. BD=128, BR2=512, BL=64 → 147456 > 98304 (OOM) → BL=32 → 73728 ✓
     while BL > 16 and BL * (BR2 * 4 + BD * 2) > 98304:
         BL //= 2
     out = _impl(P, V1, U2, V2, b1, b2, BL=BL, BD=BD, BH=BH, BR1=BR1, BR2=BR2)
