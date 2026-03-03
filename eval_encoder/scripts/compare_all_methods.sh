@@ -287,9 +287,11 @@ run_one() {
     env_prefix+=("RANK_WO=${RANK_WO}")
   fi
 
-  # Add QKV mode, seq_len and calibration batches
+  # Add QKV mode, dtype, seq_len, batch_size and calibration batches
   env_prefix+=("QKV_MODE=${QKV_MODE}")
+  env_prefix+=("DTYPE=${DTYPE}")
   env_prefix+=("SEQ_LEN=${SEQ_LEN}")
+  env_prefix+=("BATCH_SIZE=${BATCH_SIZE}")
   env_prefix+=("CALIB_BATCHES=${CALIB_BATCHES}")
 
   if [[ "${method}" == "adasvd" ]]; then

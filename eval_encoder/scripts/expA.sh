@@ -52,21 +52,24 @@ echo "[log] → ${LOG_FILE}"
 # ── Canonical config（per_head 为论文标准；可通过环境变量覆盖跑 full-matrix）──
 #   per_head (默认):  QKV_MODE=per_head  RANK_ATTN=48   param_ratio≈0.527
 #   full-matrix:      QKV_MODE=full       RANK_ATTN=312  param_ratio≈0.527
-export QKV_MODE="${QKV_MODE:-per_head}"
+#
+# ⚠ 不使用 export：所有 canonical 变量在本脚本内局部计算，通过命令前缀显式传入子脚本。
+#   这样可避免父 shell 中的残留环境变量（如旧跑遗留的 TASKS_GLUE=stsb）污染本次实验。
+QKV_MODE="${QKV_MODE:-per_head}"
 if [[ -z "${RANK_ATTN:-}" ]]; then
-    [[ "${QKV_MODE}" == "full" ]] && export RANK_ATTN=312 || export RANK_ATTN=48
+    [[ "${QKV_MODE}" == "full" ]] && RANK_ATTN=312 || RANK_ATTN=48
 else
-    export RANK_ATTN="${RANK_ATTN}"
+    RANK_ATTN="${RANK_ATTN}"
 fi
-export RANK_FFN="${RANK_FFN:-256}"
-export RANK_WO="${RANK_WO:-208}"
-export BUDGET="${BUDGET:-0.527}"
-export DTYPE="${DTYPE:-bf16}"
-export SEQ_LEN="${SEQ_LEN:-512}"
-export BATCH_SIZE="${BATCH_SIZE:-32}"
-export CALIB_BATCHES="${CALIB_BATCHES:-16}"
-export ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"
-export ADASVD_STEPS="${ADASVD_STEPS:-800}"
+RANK_FFN="${RANK_FFN:-256}"
+RANK_WO="${RANK_WO:-208}"
+BUDGET="${BUDGET:-0.527}"
+DTYPE="${DTYPE:-bf16}"
+SEQ_LEN="${SEQ_LEN:-512}"
+BATCH_SIZE="${BATCH_SIZE:-32}"
+CALIB_BATCHES="${CALIB_BATCHES:-16}"
+ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"
+ADASVD_STEPS="${ADASVD_STEPS:-800}"
 
 # ── 可覆盖配置 ─────────────────────────────────────────────────────────────────
 PHASES="${PHASES:-glue superglue}"
@@ -107,6 +110,17 @@ if [[ "${PHASES}" == *"glue"* ]]; then
     PRETRAIN_BEFORE_COMPRESS="false" \
     AUTO_FIGURES="false" \
     PERF_CSV="${OUT_CSV}" \
+    QKV_MODE="${QKV_MODE}" \
+    RANK_ATTN="${RANK_ATTN}" \
+    RANK_FFN="${RANK_FFN}" \
+    RANK_WO="${RANK_WO}" \
+    BUDGET="${BUDGET}" \
+    DTYPE="${DTYPE}" \
+    SEQ_LEN="${SEQ_LEN}" \
+    BATCH_SIZE="${BATCH_SIZE}" \
+    CALIB_BATCHES="${CALIB_BATCHES}" \
+    ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES}" \
+    ADASVD_STEPS="${ADASVD_STEPS}" \
     bash eval_encoder/scripts/compare_all_methods.sh \
     && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
 
@@ -125,6 +139,17 @@ if [[ "${PHASES}" == *"superglue"* ]]; then
     RECOMPRESS="${RECOMPRESS}" \
     MODEL_BASE_DIR="${MODEL_BASE_DIR}" \
     OUT_CSV="${OUT_CSV}" \
+    QKV_MODE="${QKV_MODE}" \
+    RANK_ATTN="${RANK_ATTN}" \
+    RANK_FFN="${RANK_FFN}" \
+    RANK_WO="${RANK_WO}" \
+    BUDGET="${BUDGET}" \
+    DTYPE="${DTYPE}" \
+    SEQ_LEN="${SEQ_LEN}" \
+    BATCH_SIZE="${BATCH_SIZE}" \
+    CALIB_BATCHES="${CALIB_BATCHES}" \
+    ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES}" \
+    ADASVD_STEPS="${ADASVD_STEPS}" \
     bash eval_encoder/scripts/run_superglue_benchmark.sh \
     && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
 
