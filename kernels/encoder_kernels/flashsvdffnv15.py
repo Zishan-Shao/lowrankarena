@@ -19,7 +19,7 @@ def _next_pow2(n: int) -> int:
     return 1 << (n - 1).bit_length()
 
 
-def flashsvd_ffn_v15(P, V1, U2, V2, b1, b2, BL=64, BD=64, BH=64, BR1=32, BR2=32):
+def flashsvd_ffn_v15(P, V1, U2, V2, b1, b2, BL=64, BD=128, BH=64, BR1=32, BR2=32):
     """v1.5 FFN with fp32 auto-cast fallback.
 
     When the model runs in fp16/bf16, tensors arrive at native dtype → zero
@@ -38,5 +38,10 @@ def flashsvd_ffn_v15(P, V1, U2, V2, b1, b2, BL=64, BD=64, BH=64, BR1=32, BR2=32)
     # R2_PAD = next_pow2(R2) which is always a power of 2.
     R2 = V2.shape[0]
     BR2 = _next_pow2(R2)
+    # Auto-reduce BL to avoid shared-memory OOM when BR2 is large.
+    # Required ≈ BL × (BR2×4 + BD×2) bytes (fp32 acc_r + fp16 T tile).
+    # e.g. BD=64, BR2=512, BL=64 → 139264 > 101376 (OOM) → BL=32 → 69632 ✓
+    while BL > 16 and BL * (BR2 * 4 + BD * 2) > 98304:
+        BL //= 2
     out = _impl(P, V1, U2, V2, b1, b2, BL=BL, BD=BD, BH=BH, BR1=BR1, BR2=BR2)
     return out.to(orig) if orig == torch.float32 else out

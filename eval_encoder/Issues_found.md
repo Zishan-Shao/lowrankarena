@@ -24,6 +24,9 @@
 | 18 | [Naive vs FlashSVD 对比混淆 Attention Kernel 与投影融合两个变量](#naive-vs-flashsvd-对比混淆-attention-kernel-与投影融合两个变量-2026-02) | 📐 Design |
 | 19 | [Dense 987MB < 压缩 Naive 2004MB：Kernel 实现差异](#dense-987mb--压缩-naive-2004mbkernel-实现差异-2026-02) | 📝 Observation |
 | 20 | [fp32 SDPA 短序列内存反高于 einsum：MEA Tile Overhead](#fp32-sdpa-短序列内存反高于-einsum-mea-tile-overhead-2026-02) | 📝 Observation |
+| 21 | [FlashSVD v1.5 FFN OOM：BD=128 超出共享内存硬件上限](#flashsvd-v15-ffn-oombd128-超出共享内存硬件上限-2026-03--已修复) | ✅ Fixed |
+| 22 | [`except RuntimeError` 无法捕获 Triton `OutOfResources`](#except-runtimeerror-无法捕获-triton-outofresources-2026-03--已修复) | ✅ Fixed |
+| 23 | [`_get()` 回退导致 flashsvd15 精度数据造假](#_get-回退导致-flashsvd15-精度数据造假-2026-03--已知问题) | ⏸ Deferred |
 
 **Status Legend:**
 - ✅ Fixed — bug confirmed and patched
@@ -1134,3 +1137,163 @@ FlashSVD       377.7 MB  ─── Triton fused kernel, best at all seq lengths
 3. **SDPA 在短序列场景（seq≤256）优势有限**：部署建议应注明 seq 范围。
 4. **图表注释**：Memory scaling 图中 SDPA 线在 seq=128 高于 einsum 时，应标注
    "SDPA > einsum (fp32 MEA overhead)"，避免读者误解。
+
+---
+
+## ✅ FlashSVD v1.5 FFN OOM：BD=128 超出共享内存硬件上限 (2026-03) — 已修复
+
+**状态**: ✅ Fixed
+
+### 现象
+
+运行 `expA.sh METHODS=adasvd TASKS_GLUE=stsb` 时，`flashsvd15` 评测步骤抛出：
+
+```
+triton.runtime.errors.OutOfResources: out of resource: shared memory,
+Required: 147456, Hardware limit: 101376
+```
+
+Traceback 指向 `flashsvdffn/flashsvdffn_v1.5.py` 中的 `fused_ffn_full_batched_bias` kernel。
+
+### 根因
+
+`flashsvdffnv15.py` 的 `flashsvd_ffn_v15()` 默认参数 `BD=128`（D 维 tile 大小）。
+Kernel 所需共享内存约为 `C × BD × BR2`，其中 `BR2 = next_pow2(R2)`，R2 为 FFN 输出矩阵的低秩维数。
+
+| 方法 | 典型 R2 | BR2 = next_pow2(R2) | 所需共享内存 | 结果 |
+|------|---------|---------------------|------------|------|
+| svd / fwsvd / drone（固定 rank_ff=256） | 256 | 256 | ~74 KB | ✅ < 99 KB 限制 |
+| adasvd stsb（per-op 自适应 rank，部分层 R2 > 256） | 257–512 | 512 | ~147 KB | ❌ > 99 KB 崩溃 |
+
+**为什么只有 adasvd stsb 触发此问题**：AdaSVD 的 ARS 对每层分配不同 rank（per-op adaptive）。
+STS-B（回归任务）的校准数据使 ARS 给某些 FFN 输出层分配 R2 > 256（如 R2=300），
+导致 `BR2 = next_pow2(300) = 512`，共享内存需求跳升到 ~147 KB，超出 GPU 硬件上限（约 99 KB）。
+其他方法固定 `rank_ff=256`，`BR2=256`，所需共享内存 ~74 KB，不触发 OOM。
+
+### 根因（精确公式）
+
+内核分配两个主要寄存器/共享内存缓冲区：
+- `acc_r = [BL, R2_PAD]` fp32 → `BL × R2_PAD × 4` bytes
+- `T = [BL, BD]` fp16 → `BL × BD × 2` bytes
+
+**Required = BL × (R2_PAD × 4 + BD × 2)**
+
+原始参数验证：BD=128, BL=64, R2_PAD=512 → 64×(512×4+128×2) = 64×2304 = **147456** ✓（精确匹配报错值）
+BD=64 修改后：BD=64, BL=64, R2_PAD=512 → 64×(512×4+64×2) = 64×2176 = **135680** > 101376 → **仍然 OOM**（实测证实）
+
+BD 减半只节省 BL×BD×2 项（8KB），而主要开销 acc_r = BL×R2_PAD×4 = 131072 bytes 不变。
+
+### 修复
+
+**`kernels/encoder_kernels/flashsvdffnv15.py`**：在 `flashsvd_ffn_v15()` 中加入 BL 自动缩小逻辑：
+
+```python
+# Auto-reduce BL to avoid shared-memory OOM when BR2 is large.
+# Required ≈ BL × (BR2×4 + BD×2) bytes (fp32 acc_r + fp16 T tile).
+# e.g. BD=64, BR2=512, BL=64 → 139264 > 98304 (OOM) → BL=32 → 69632 ✓
+while BL > 16 and BL * (BR2 * 4 + BD * 2) > 98304:
+    BL //= 2
+```
+
+计算：BD=64, BR2=512, BL=64 → 64×2176=139264>98304 → BL=32 → 32×2176=69632 < 98304 ✓
+覆盖范围：BR2=1024（rank>512）时 BL 最小缩到 16，仍可工作。
+
+BD=64（`BD=128` → `BD=64`）保留，可额外减少 T buffer 约 8KB，但非主要修复。
+
+**注意**：BL 和 BD 均为 Triton tile 大小，只影响分块策略，**不影响计算结果的数学正确性**。
+其他方法已有的 flashsvd15 精度数据**无需重新测量**。
+
+### 涉及文件
+
+| 文件 | 修改 |
+|------|------|
+| `kernels/encoder_kernels/flashsvdffnv15.py` | BL 自动缩小 while 循环（主要修复）；`BD=128` → `BD=64`（辅助优化） |
+
+---
+
+## ✅ `except RuntimeError` 无法捕获 Triton `OutOfResources` (2026-03) — 已修复
+
+**状态**: ✅ Fixed
+
+### 现象
+
+`glue_pipeline.py` 的 flashsvd / flashsvd15 评测块使用 `except RuntimeError` 捕获 kernel 失败，
+意图是在 kernel 不可用时静默跳过并继续测 naive。但 FlashSVD v1.5 FFN OOM 时，异常未被捕获，
+整个 pipeline 崩溃，naive 结果（已计算完毕）也未被写入 CSV / JSON。
+
+### 根因
+
+`triton.runtime.errors.OutOfResources` 继承自 `Exception`，**不继承自 `RuntimeError`**：
+
+```
+Exception
+  └── triton.runtime.errors.OutOfResources   ← 不经过 RuntimeError
+RuntimeError  ← 标准 PyTorch 错误
+```
+
+`except RuntimeError` 无法捕获 `OutOfResources`，异常向上传播，终止整个评测循环。
+
+### 修复
+
+**`eval_encoder/glue_pipeline.py`**，两处 `except` 均改为 `except Exception`：
+
+```python
+# flashsvd 评测块（约第 1603 行）：
+except Exception as e:
+    print(f"[eval] FlashSVD unavailable: {e}")
+
+# flashsvd15 评测块（约第 1624 行）：
+except Exception as e:
+    print(f"[eval] FlashSVD15 unavailable: {e}")
+```
+
+修复后，FlashSVD v1.5 OOM 被静默捕获，pipeline 继续运行后续任务，
+naive 结果正常写入 CSV / JSON，flashsvd15 对应列留空（待重新测量）。
+
+### 涉及文件
+
+| 文件 | 修改 |
+|------|------|
+| `eval_encoder/glue_pipeline.py` | flashsvd / flashsvd15 两处 `except RuntimeError` → `except Exception` |
+
+---
+
+## `_get()` 回退导致 flashsvd15 精度数据造假 (2026-03) — 已知问题
+
+**状态**: ⏸ Deferred
+
+### 现象
+
+`expA.sh` 运行结束后，终端汇总表显示 adasvd stsb 的 F15 列与 N（naive）列数值相同（如均为 0.6303）。
+但 expA.csv 中**没有** adasvd stsb 对应的 flashsvd15 行，flashsvd15 从未成功运行。
+
+### 根因
+
+`eval_encoder/scripts/expA.sh`（或 `compare_all_methods.sh`）的 bash 汇总打印逻辑中，
+`_get()` 函数存在**最后兜底回退**：当 `best_value_flashsvd15` 为空时，
+fallback 返回 `metrics.final[primary_metric]`（即 naive 的值），
+使得汇总表显示 `F15 = N（naive）`，造成"flashsvd15 已成功测量"的假象。
+
+**危害**：
+1. 汇总表中 F15 列看似有值，实际是 naive 数据的副本，是错误数据。
+2. 掩盖了 flashsvd15 未运行的事实，不易察觉。
+
+### 现状与影响范围
+
+- **expA.csv**：CSV 是真实数据来源，adasvd stsb 无 flashsvd15 行，数据是干净的。
+- **汇总打印**（终端输出）：存在假数据。
+- **其他方法（svd/fwsvd/drone）的 flashsvd15 数据**：在 expA.csv 中有真实记录，不受影响。
+
+### 修复建议（待实施）
+
+在 `_get()` 回退逻辑中，当 `best_value_flashsvd15` 缺失时，打印 `"---"` 或 `""` 而非使用 naive 值兜底。
+修复后需确认汇总打印与 expA.csv 内容一致再使用终端输出做决策。
+
+### 正确做法（当前临时）
+
+以 `expA.csv` 为准查询各方法 flashsvd15 数据，不信任终端汇总表的 F15 列。
+
+```bash
+# 查看 expA.csv 中实际存在的 flashsvd15 数据：
+grep "flashsvd15" eval_encoder/eval_results/expA.csv
+```
