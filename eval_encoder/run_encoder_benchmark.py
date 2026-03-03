@@ -1920,6 +1920,14 @@ def main():
     # Calculate overall peak (max of compression and inference)
     overall_peak_mb = max(compression_peak_mb, peak_mem_mb)
 
+    # When compression dominates e2e peak, annotate the notes field so readers know
+    # peak_mem_e2e_mb reflects compression (e.g. AdaSVD ARS training), not inference.
+    # Threshold: compression > 1.5× inference peak.
+    if compression_peak_mb > peak_mem_mb * 1.5:
+        _note = (f"peak_e2e_includes_compression={compression_peak_mb:.0f}MB"
+                 f";infer_only={peak_mem_mb:.0f}MB")
+        args.notes = f"{args.notes} {_note}".strip() if args.notes else _note
+
     # Print detailed memory breakdown
     print(f"\n{'='*60}")
     print(f"Memory Usage Summary:")
