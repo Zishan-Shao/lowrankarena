@@ -4,7 +4,8 @@
 #
 # Fixed canonical config, one-click reproduction of all quality experiments:
 #   Phase 1: GLUE (8 tasks, 4 methods, stage1 + stage2)
-#   Phase 2: SuperGLUE + HANS + ANLI (7 tasks, 4 methods, naive backend)
+#   Phase 2: SuperGLUE + HANS + ANLI (9 tasks, 4 methods, stage1 only, naive backend)
+#   Phase 3: SuperGLUE fine-tune (BoolQ + WiC, 4 methods, stage1 + stage2)
 #
 # Canonical config (the single authoritative parameter set for paper results)
 # ────────────────────────────────────────────────────────────────────────────
@@ -17,18 +18,20 @@
 # Usage
 # ────────────────────────────────────────────────────────────────────────────
 #   cd lowrankarena/
-#   bash benchmark/expA.sh                # full run (GLUE + SuperGLUE)
-#   PHASES=glue bash benchmark/expA.sh    # GLUE only
-#   PHASES=superglue bash benchmark/expA.sh  # SuperGLUE only
+#   bash benchmark/expA.sh                        # full run (all 3 phases)
+#   PHASES=glue bash benchmark/expA.sh            # GLUE only
+#   PHASES=superglue bash benchmark/expA.sh       # SuperGLUE stage1 only
+#   PHASES=superglue_finetune bash benchmark/expA.sh  # BoolQ+WiC fine-tune only
 #
 # Overridable variables
-#   PHASES="glue superglue"           # phase subset
-#   METHODS="svd fwsvd"               # method subset (default: 4 methods)
-#   TASKS_GLUE="mnli stsb"            # GLUE task subset
-#   TASKS_SUPERGLUE="boolq hans"      # SuperGLUE task subset
-#   TWO_STAGE=false                   # run stage1 only (no_finetune), skip fine-tuning
-#   RECOMPRESS=true                   # force recompression (ignore existing checkpoints)
-#   OUT_CSV=path/to.csv               # path for all CSV results (shared by GLUE + SuperGLUE)
+#   PHASES="glue superglue superglue_finetune"  # phase subset
+#   METHODS="svd fwsvd"                         # method subset (default: 4 methods)
+#   TASKS_GLUE="mnli stsb"                      # GLUE task subset
+#   TASKS_SUPERGLUE="boolq hans"                # SuperGLUE stage1 task subset
+#   TASKS_SUPERGLUE_FINETUNE="boolq wic"        # SuperGLUE fine-tune task subset
+#   TWO_STAGE=false                             # run stage1 only (no_finetune), skip fine-tuning
+#   RECOMPRESS=true                             # force recompression (ignore existing checkpoints)
+#   OUT_CSV=path/to.csv                         # path for all CSV results (shared by all phases)
 #
 # Output
 #   GLUE JSON : experiments/glue/glue_results_{method}_*.json
@@ -74,10 +77,11 @@ ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES:-4000}"
 ADASVD_STEPS="${ADASVD_STEPS:-800}"
 
 # ── Overridable configuration ──────────────────────────────────────────────────
-PHASES="${PHASES:-glue superglue}"
+PHASES="${PHASES:-glue superglue superglue_finetune}"
 METHODS="${METHODS:-svd fwsvd drone adasvd}"
 TASKS_GLUE="${TASKS_GLUE:-cola sst2 mrpc qqp mnli qnli rte stsb}"
 TASKS_SUPERGLUE="${TASKS_SUPERGLUE:-boolq rte_sg wic copa cb hans anli_r1 anli_r2 anli_r3}"
+TASKS_SUPERGLUE_FINETUNE="${TASKS_SUPERGLUE_FINETUNE:-boolq wic}"
 TWO_STAGE="${TWO_STAGE:-true}"
 RECOMPRESS="${RECOMPRESS:-false}"
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-compressed_models/bert}"
@@ -96,8 +100,12 @@ echo ""
 OK=0
 FAIL=0
 
+# Phase matching uses space-padded string to avoid "superglue" matching "glue",
+# or "superglue_finetune" matching "superglue".
+_PHASES=" ${PHASES} "
+
 # ── Phase 1: GLUE ─────────────────────────────────────────────────────────────
-if [[ "${PHASES}" == *"glue"* ]]; then
+if [[ "${_PHASES}" == *" glue "* ]]; then
     echo "══ Phase 1: GLUE ══════════════════════════════════════════════════"
     echo "   tasks:  ${TASKS_GLUE}"
     echo "   stages: $([ "${TWO_STAGE}" = "true" ] && echo "no_finetune + with_finetune" || echo "no_finetune only")"
@@ -130,7 +138,7 @@ if [[ "${PHASES}" == *"glue"* ]]; then
 fi
 
 # ── Phase 2: SuperGLUE + HANS + ANLI ─────────────────────────────────────────
-if [[ "${PHASES}" == *"superglue"* ]]; then
+if [[ "${_PHASES}" == *" superglue "* ]]; then
     echo "══ Phase 2: SuperGLUE / HANS / ANLI ══════════════════════════════"
     echo "   tasks: ${TASKS_SUPERGLUE}"
     echo ""
@@ -153,6 +161,42 @@ if [[ "${PHASES}" == *"superglue"* ]]; then
     ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES}" \
     ADASVD_STEPS="${ADASVD_STEPS}" \
     bash benchmark/run_superglue_benchmark.sh \
+    && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
+
+    echo ""
+fi
+
+# ── Phase 3: SuperGLUE fine-tune (BoolQ + WiC) ────────────────────────────────
+# Runs compress (stage1) + fine-tune (stage2) via compare_all_methods.sh.
+# Uses method-first checkpoint structure (compressed_models/bert/{method}/{task}/...)
+# which is independent from the task-first structure in run_superglue_benchmark.sh.
+if [[ "${_PHASES}" == *" superglue_finetune "* ]]; then
+    echo "══ Phase 3: SuperGLUE fine-tune (BoolQ + WiC) ══════════════════════"
+    echo "   tasks:  ${TASKS_SUPERGLUE_FINETUNE}"
+    echo "   stages: compress + fine-tune (TWO_STAGE=true)"
+    echo ""
+
+    TASKS="${TASKS_SUPERGLUE_FINETUNE}" \
+    METHODS="${METHODS}" \
+    TWO_STAGE="true" \
+    BACKENDS="naive" \
+    USE_TASK_MODELS="true" \
+    TASK_MODEL_PREFIX="textattack" \
+    PRETRAIN_BEFORE_COMPRESS="false" \
+    AUTO_FIGURES="false" \
+    PERF_CSV="${OUT_CSV}" \
+    QKV_MODE="${QKV_MODE}" \
+    RANK_ATTN="${RANK_ATTN}" \
+    RANK_FFN="${RANK_FFN}" \
+    RANK_WO="${RANK_WO}" \
+    BUDGET="${BUDGET}" \
+    DTYPE="${DTYPE}" \
+    SEQ_LEN="${SEQ_LEN}" \
+    BATCH_SIZE="${BATCH_SIZE}" \
+    CALIB_BATCHES="${CALIB_BATCHES}" \
+    ADASVD_CALIB_SAMPLES="${ADASVD_CALIB_SAMPLES}" \
+    ADASVD_STEPS="${ADASVD_STEPS}" \
+    bash benchmark/compare_all_methods.sh \
     && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
 
     echo ""
