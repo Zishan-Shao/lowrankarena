@@ -129,7 +129,7 @@ _run_one() {
 
     local subdir model_dir
     subdir="$(_model_subdir "${method}")"
-    model_dir="${MODEL_BASE_DIR}/${task}/${subdir}"
+    model_dir="${MODEL_BASE_DIR}/${method}/${task}/${subdir}"
 
     if [[ ! -d "${model_dir}" ]]; then
         echo "      [skip] Checkpoint not found: ${model_dir}"

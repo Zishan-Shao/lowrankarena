@@ -198,7 +198,7 @@ for TASK in ${TASKS}; do
 
         # ── Compressed methods: require checkpoint ──────────────────────────
         SUBDIR="$(_model_subdir "${METHOD}")"
-        MODEL_DIR="${MODEL_BASE_DIR}/${TASK}/${SUBDIR}"
+        MODEL_DIR="${MODEL_BASE_DIR}/${METHOD}/${TASK}/${SUBDIR}"
 
         if [[ ! -d "${MODEL_DIR}" ]]; then
             echo "[skip] Checkpoint not found: ${MODEL_DIR}"
