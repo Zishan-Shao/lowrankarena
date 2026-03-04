@@ -2048,6 +2048,14 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
     train_size = len(train_loader.dataset)
     val_size = len(val_loader.dataset)
 
+    # Cast to fp32 for numerically stable training.
+    # When model params are bf16/fp16, AdamW stores moments in bf16/fp16 too.
+    # Weight updates of magnitude ~lr*grad (~2e-7 for lr=2e-5, grad=0.01)
+    # fall below bf16's smallest representable step and get truncated to zero.
+    if _dtype != torch.float32:
+        model = model.float()
+        print(f"[train] Cast model to fp32 for stable training (original dtype: {_dtype})")
+
     # Setup optimizer
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -2117,7 +2125,7 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
         model.train()
         epoch_loss = 0.0
 
-        _use_autocast = _dtype in (torch.float16, torch.bfloat16)
+        _use_autocast = _dtype in (torch.float16, torch.bfloat16)  # fp32 master weights + bf16 compute (standard AMP)
         pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.num_epochs}")
         for batch in pbar:
             batch = {k: v.to(device) for k, v in batch.items()}
@@ -2155,6 +2163,11 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
     # Load best model
     if best_model_state is not None:
         model.load_state_dict({k: v.to(device) for k, v in best_model_state.items()})
+
+    # Cast back to original dtype for evaluation (FlashSVD kernels require bf16/fp16)
+    if _dtype != torch.float32:
+        model = model.to(dtype=_dtype)
+        print(f"[eval] Cast model back to {_dtype} for evaluation")
 
     # Final evaluation
     final_results, final_loss = evaluate_task(model, val_loader, task, device, original_model_id=original_model_id)
