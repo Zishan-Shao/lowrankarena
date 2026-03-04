@@ -1,0 +1,4 @@
+timestamp,model_id,task,dataset_split,dataset_size,seq_len,batch_size,dtype,method,rank,budget,scope,backend,seed,calib_dataset,calib_split,calib_samples,calib_batches,calib_seed,calib_seq_len,metric_name,metric_value,latency_ms,throughput_sps,peak_mem_mb,param_ratio,notes,git_commit
+2026-02-09T16:26:35,textattack/bert-base-uncased-SST-2,sst2,validation,872,128,32,fp16,svd,32,,qkv+ffn,naive,0,,,,,,,accuracy,0.508929,52.87,605.3,223.8,0.0625,svd rank=32 backend=naive,886d557
+2026-02-09T16:27:39,textattack/bert-base-uncased-SST-2,sst2,validation,872,128,32,fp16,svd,32,,qkv+ffn,flashsvd,0,,,,,,,accuracy,0.508929,389.39,82.2,133.9,0.0625,svd rank=32 backend=flashsvd,886d557
+2026-02-09T16:28:31,textattack/bert-base-uncased-SST-2,sst2,validation,872,128,32,fp16,fwsvd,32,,qkv+ffn,naive,0,sst2,train,128,4,0,128,accuracy,0.508929,87.02,367.7,232.0,0.0625,fwsvd rank=32 backend=naive,886d557

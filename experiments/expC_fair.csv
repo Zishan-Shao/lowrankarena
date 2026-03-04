@@ -1,5 +1,0 @@
-task,method,backend,dtype,seq_len,batch_size,useful_flops_abs,rank_pad_flops_abs,total_flops_abs,useful_tflop_rate,rank_pad_tflop_rate,achieved_tflop_rate,rank_pad_pct,seq_pad_pct,avg_eff_tokens,arith_intensity,latency_ms,throughput_sps,peak_mem_mb,mfu
-mnli,svd,flashsvd,bf16,512,32,1.6718,0.2561,1.9279,38.014,5.823,43.836,13.28,92.39,39.0,159.9,43.98,727.6,357.4,0.0598
-mnli,fwsvd,flashsvd,bf16,512,32,1.6718,0.2561,1.9279,37.904,5.806,43.710,13.28,92.39,39.0,159.9,44.11,725.5,357.4,0.0596
-mnli,drone,flashsvd,bf16,512,32,1.6718,0.2561,1.9279,37.566,5.754,43.320,13.28,92.39,39.0,159.9,44.50,719.0,357.4,0.0591
-mnli,adasvd,flashsvd,bf16,512,32,1.8674,0.0800,1.9474,42.963,1.841,44.804,4.11,92.39,39.0,161.2,43.47,736.2,366.9,0.0611
