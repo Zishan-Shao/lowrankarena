@@ -253,13 +253,10 @@ if [[ "${PHASES}" == *"nsys"* ]]; then
         printf "\n════ %s ════\n" "${POINT_TAG}" >> "${SUMMARY_TXT}"
         nsys stats \
             --report cuda_gpu_kern_sum \
+            --force-export=true \
             --quiet \
             "${REP_PATH}.nsys-rep" \
-        >> "${SUMMARY_TXT}" 2>&1 || {
-            echo "   [FAILED] nsys stats for ${POINT_TAG} — stderr:"
-            nsys stats --report cuda_gpu_kern_sum --quiet "${REP_PATH}.nsys-rep" 2>&1 | head -5 || true
-            FAIL=$((FAIL + 1)); continue
-        }
+        >> "${SUMMARY_TXT}" 2>&1 || { FAIL=$((FAIL + 1)); echo "   [FAILED] nsys stats for ${POINT_TAG}"; continue; }
 
         OK=$((OK + 1))
 
