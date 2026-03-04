@@ -33,7 +33,7 @@
 # Output
 #   GLUE JSON : experiments/glue/glue_results_{method}_*.json
 #               → summarized to CSV via benchmark/analysis/collect_glue_results.py
-#   ALL CSV   : experiments/expA.csv (shared by GLUE + SuperGLUE)
+#   ALL CSV   : experiments/results/expA.csv (shared by GLUE + SuperGLUE)
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -81,7 +81,7 @@ TASKS_SUPERGLUE="${TASKS_SUPERGLUE:-boolq rte_sg wic copa cb hans anli_r1 anli_r
 TWO_STAGE="${TWO_STAGE:-true}"
 RECOMPRESS="${RECOMPRESS:-false}"
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-compressed_models/bert}"
-OUT_CSV="${OUT_CSV:-experiments/expA.csv}"
+OUT_CSV="${OUT_CSV:-experiments/results/expA.csv}"
 
 echo "══════════════════════════════════════════════════════════════════════"
 echo "  expA — Quality Experiment"

@@ -539,7 +539,7 @@ def calculate_rank_from_retention(retention: float, model_id: str = "bert-base-u
 
 DTYPE_MAP = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
 
-ACCURACY_CSV_PATH   = "experiments/expA_fine_tune.csv"
+ACCURACY_CSV_PATH   = "experiments/results/expA_fine_tune.csv"
 ACCURACY_CSV_FIELDS = [
     "timestamp", "model_id", "task", "dataset_split",
     "seq_len", "batch_size", "dtype",

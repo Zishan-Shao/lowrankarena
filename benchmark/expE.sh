@@ -44,9 +44,9 @@
 #   RANK_ATTN=48  RANK_FFN=256  RANK_WO=208  QKV_MODE=per_head
 #   BUDGET=0.527
 #   MODEL_BASE_DIR=compressed_models/bert
-#   OUT_EXPB=experiments/expE_alignment.csv
-#   OUT_E3A=experiments/expE_train_timing.csv
-#   OUT_E3B=experiments/expE_recovery.csv
+#   OUT_EXPB=experiments/results/expE_alignment.csv
+#   OUT_E3A=experiments/results/expE_train_timing.csv
+#   OUT_E3B=experiments/results/expE_recovery.csv
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -86,19 +86,19 @@ E2_TASKS="${E2_TASKS:-mnli}"
 E2_BACKENDS="${E2_BACKENDS:-naive sdpa flashsvd flashsvd15}"
 E2_INPUT_MODES="${E2_INPUT_MODES:-real}"
 E2_REPEAT="${E2_REPEAT:-1}"
-OUT_EXPB="${OUT_EXPB:-experiments/expE_alignment.csv}"
+OUT_EXPB="${OUT_EXPB:-experiments/results/expE_alignment.csv}"
 
 # E-3a
 E3A_BACKENDS="${E3A_BACKENDS:-naive sdpa}"
 WARMUP="${WARMUP:-50}"
 MEASURE="${MEASURE:-100}"
-OUT_E3A="${OUT_E3A:-experiments/expE_train_timing.csv}"
+OUT_E3A="${OUT_E3A:-experiments/results/expE_train_timing.csv}"
 
 # E-3b
 E3B_EVAL_STEPS="${E3B_EVAL_STEPS:-0 200 500 1000}"
 E3B_NUM_EPOCHS="${E3B_NUM_EPOCHS:-3}"
 E3B_EVAL_BACKENDS="${E3B_EVAL_BACKENDS:-naive}"
-OUT_E3B="${OUT_E3B:-experiments/expE_recovery.csv}"
+OUT_E3B="${OUT_E3B:-experiments/results/expE_recovery.csv}"
 
 # ── Checkpoint subdirectory name ──────────────────────────────────────────────
 _model_subdir() {

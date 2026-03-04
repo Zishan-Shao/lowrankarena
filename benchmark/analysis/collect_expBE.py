@@ -4,8 +4,8 @@ collect_expBE.py  —  Extract E-1 / E-2 / E-3 sub-CSVs from a combined expBE ru
 
 Usage:
     python benchmark/collect_expBE.py \
-        --input  experiments/expBE.csv \
-        --outdir experiments
+        --input  experiments/results/expBE.csv \
+        --outdir experiments/results
 
 Outputs:
     expE1_alignment.csv      E-1: max|Δlogit|, mean|Δlogit| per backend/task
@@ -158,9 +158,9 @@ def extract_e3(df: pd.DataFrame, outdir: str) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--input",  default="experiments/expBE.csv",
+    p.add_argument("--input",  default="experiments/results/expBE.csv",
                    help="Path to the combined expBE CSV (output of expB.sh with ALIGN=1).")
-    p.add_argument("--outdir", default="experiments",
+    p.add_argument("--outdir", default="experiments/results",
                    help="Directory to write expE1/E2/E3 CSVs.")
     args = p.parse_args()
 

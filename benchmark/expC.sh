@@ -47,8 +47,8 @@
 #   WARMUP=10  MEASURE=50           # consistent with expB measurement protocol
 #   ALIGN=0                         # 0=off (default), 1=on (adds --check_alignment, records logit_max_diff)
 #   MODEL_BASE_DIR=compressed_models/bert
-#   OUT_SEQLEN=experiments/expC_seqlen.csv
-#   OUT_BATCH=experiments/expC_batch.csv
+#   OUT_SEQLEN=experiments/results/expC_seqlen.csv
+#   OUT_BATCH=experiments/results/expC_batch.csv
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -94,8 +94,8 @@ QKV_MODE="${QKV_MODE:-per_head}"
 BUDGET="${BUDGET:-0.527}"
 
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-compressed_models/bert}"
-OUT_SEQLEN="${OUT_SEQLEN:-experiments/expC_seqlen.csv}"
-OUT_BATCH="${OUT_BATCH:-experiments/expC_batch.csv}"
+OUT_SEQLEN="${OUT_SEQLEN:-experiments/results/expC_seqlen.csv}"
+OUT_BATCH="${OUT_BATCH:-experiments/results/expC_batch.csv}"
 # Alignment check: 0=off (default); 1=on (each job loads naive once more for logit diff)
 # Usage: ALIGN=1 bash expC.sh
 ALIGN="${ALIGN:-0}"

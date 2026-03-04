@@ -4,7 +4,7 @@ Collect GLUE benchmark results from JSON files into a summary CSV.
 
 Scans experiments/glue/*.json, groups by (method, qkv_mode, seq_len),
 picks the LATEST run per stage (s1/s2 independently), and writes:
-  experiments/glue_summary.csv
+  experiments/results/glue_summary.csv
 
 Strategy: for each (method, qkv_mode, seq_len) group:
   - s1: use the single latest skip_finetuning=True  JSON

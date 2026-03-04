@@ -68,9 +68,9 @@
 #   MODEL_BASE_DIR=compressed_models/bert
 #   NSYS_DIR=experiments/nsys
 #   SUMMARY_TXT=experiments/nsys/nsys_summary_<TAG>.txt  # includes TAG by default
-#   OUT_CSV=experiments/expD_<TAG>.csv          # includes TAG by default
-#   OUT_NCU_CSV=experiments/expD_ncu_<TAG>.csv  # includes TAG by default
-#   FIGURES_DIR=experiments/figures
+#   OUT_CSV=experiments/results/expD_<TAG>.csv          # includes TAG by default
+#   OUT_NCU_CSV=experiments/results/expD_ncu_<TAG>.csv  # includes TAG by default
+#   FIGURES_DIR=experiments/figs
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -132,9 +132,9 @@ NCU_METRICS="${NCU_METRICS:-${_DEFAULT_NCU_METRICS}}"
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-compressed_models/bert}"
 NSYS_DIR="${NSYS_DIR:-experiments/nsys}"
 SUMMARY_TXT="${SUMMARY_TXT:-${NSYS_DIR}/nsys_summary_${TAG}.txt}"
-OUT_CSV="${OUT_CSV:-experiments/expD_${TAG}.csv}"
-OUT_NCU_CSV="${OUT_NCU_CSV:-experiments/expD_ncu_${TAG}.csv}"
-FIGURES_DIR="${FIGURES_DIR:-experiments/figures}"
+OUT_CSV="${OUT_CSV:-experiments/results/expD_${TAG}.csv}"
+OUT_NCU_CSV="${OUT_NCU_CSV:-experiments/results/expD_ncu_${TAG}.csv}"
+FIGURES_DIR="${FIGURES_DIR:-experiments/figs}"
 
 mkdir -p "${NSYS_DIR}" "${FIGURES_DIR}"
 

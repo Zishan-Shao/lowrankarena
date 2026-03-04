@@ -48,7 +48,7 @@
 #   WARMUP=10
 #   MEASURE=50
 #   MODEL_BASE_DIR=compressed_models/bert
-#   OUT_CSV=experiments/expB.csv
+#   OUT_CSV=experiments/results/expB.csv
 #   ALIGN=0                         # 0=off (default), 1=on (adds --check_alignment, records logit_max_diff)
 #
 # Checkpoint naming convention (consistent with expA / glue_pipeline.py)
@@ -96,7 +96,7 @@ QKV_MODE="${QKV_MODE:-per_head}"
 BUDGET="${BUDGET:-0.527}"
 
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-compressed_models/bert}"
-OUT_CSV="${OUT_CSV:-experiments/expB.csv}"
+OUT_CSV="${OUT_CSV:-experiments/results/expB.csv}"
 # Alignment check: 0=off (default, no speed impact); 1=on (each job loads naive once more for logit diff)
 # Usage: ALIGN=1 bash expB.sh
 ALIGN="${ALIGN:-0}"

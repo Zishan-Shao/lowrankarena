@@ -63,8 +63,13 @@ Thumbs.db
 experiments/glue/
 experiments/logs/
 
+# Generated figures and large profiling binaries
+experiments/figs/
+experiments/*.png
+*.qdstrm
+*.nsys-rep
+*.sqlite
+
 # Backup and archived files
 *.backup
 *_backup_*.csv
-*.nsys-rep
-*.sqlite
