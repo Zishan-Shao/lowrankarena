@@ -103,6 +103,29 @@ def _dtype_bytes(dtype) -> int:
     }.get(dtype, 4)
 
 
+def _detect_sdpa_path(dtype_str: str = "bf16") -> str:
+    """Detect which PyTorch SDPA kernel will likely be dispatched to.
+
+    Returns one of: 'flash', 'mem_efficient', 'math', 'unknown'.
+    Mirrors _detect_sdpa_path() in src/encoders/glue_pipeline.py.
+    """
+    if not torch.cuda.is_available():
+        return "unknown"
+    if not (hasattr(torch.backends, "cuda") and
+            hasattr(torch.backends.cuda, "flash_sdp_enabled")):
+        return "unknown"
+    flash   = torch.backends.cuda.flash_sdp_enabled()
+    mem_eff = torch.backends.cuda.mem_efficient_sdp_enabled()
+    is_half = dtype_str in ("fp16", "bf16")
+    gpu_name = torch.cuda.get_device_name(0).lower()
+    no_flash = ("v100", "p100", "gtx 10", "rtx 20", "2060", "2070", "2080")
+    if flash and is_half and not any(k in gpu_name for k in no_flash):
+        return "flash"
+    if mem_eff and is_half:
+        return "mem_efficient"
+    return "math"
+
+
 def _git_commit() -> str:
     """Return current HEAD short commit hash, or '' if not in a git repo."""
     import subprocess
@@ -1090,6 +1113,16 @@ def main():
         enable_flashsvd15(model)
     print(f"[backend] {args.backend} enabled")
 
+    # ── SDPA path detection (only when backend=sdpa) ──────────────────────
+    sdpa_path = ""
+    if args.backend == "sdpa":
+        sdpa_path = _detect_sdpa_path(args.dtype)
+        flash_en  = getattr(torch.backends.cuda, "flash_sdp_enabled",     lambda: "?")()
+        meff_en   = getattr(torch.backends.cuda, "mem_efficient_sdp_enabled", lambda: "?")()
+        math_en   = getattr(torch.backends.cuda, "math_sdp_enabled",      lambda: "?")()
+        print(f"[sdpa]  flash={flash_en}  mem_eff={meff_en}  math={math_en}"
+              f"  → likely path: {sdpa_path}")
+
     # ── build loader (real dataset or synthetic fully-padded input) ──────
     if args.input_mode == "synthetic":
         # Synthetic loader: random tokens, all-1 attention mask (0% seq padding).
@@ -1155,6 +1188,7 @@ def main():
             "task":                 args.task,
             "method":               args.method,
             "backend":              args.backend,
+            "sdpa_path":            sdpa_path,   # flash|mem_efficient|math|'' (non-sdpa backends)
             "dtype":                args.dtype,
             "seq_len":              args.seq_len,
             "batch_size":           args.batch_size,

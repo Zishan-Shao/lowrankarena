@@ -31,8 +31,8 @@
 #   benchmark/figures/plot_nsys_kernel.py
 #
 # Prerequisite: expA must have generated the following checkpoints (missing = skip):
-#   compressed_models/bert/svd/mnli/svd_r256_naive/
-#   compressed_models/bert/adasvd/adasvd_b0.5_flashsvd/   (sst2, no task subfolder)
+#   compressed_models/bert/svd/mnli/svd_ra48_rf256_rw208_per_head_naive/
+#   compressed_models/bert/adasvd/mnli/adasvd_b0.527_per_head_naive/
 #
 # Usage
 # ────────────────────────────────────────────────────────────────────────────
@@ -107,9 +107,12 @@ fi
 #   auto-derived: <task>_<dtype>_s<seq_len>_b<batch> (can be overridden manually)
 TAG="${TAG:-${TASK}_${DTYPE}_s${SEQ_LEN}_b${BATCH_SIZE}}"
 
+RANK_ATTN="${RANK_ATTN:-48}"
 RANK_FFN="${RANK_FFN:-256}"
-BUDGET="${BUDGET:-0.5}"
-ADASVD_TASK="${ADASVD_TASK:-sst2}"
+RANK_WO="${RANK_WO:-208}"
+QKV_MODE="${QKV_MODE:-per_head}"
+BUDGET="${BUDGET:-0.527}"
+ADASVD_TASK="${ADASVD_TASK:-${TASK}}"
 
 # nsys phase
 WARMUP="${WARMUP:-5}"
@@ -147,17 +150,22 @@ POINTS=(
 )
 
 # ── Checkpoint path for each method ──────────────────────────────────────────
-# Actual layout: compressed_models/bert/{method}/{task}/{method}_r{rank}_naive
-#   SVD:    bert/svd/{task}/svd_r{RANK_FFN}_naive    (uniform rank, load naive for all backends)
-#   AdaSVD: bert/adasvd/adasvd_b{BUDGET}_flashsvd    (no task subfolder; use ADASVD_TASK for the run)
+# Layout: compressed_models/bert/{method}/{task}/{subdir_name}
+#   SVD/FWSVD/DRONE: {method}_ra{ra}_rf{rf}_rw{rw}_{qkv_mode}_naive
+#   AdaSVD:          adasvd_b{budget}_{qkv_mode}_naive
+_model_subdir() {
+    local method="$1"
+    if [[ "${method}" == "adasvd" ]]; then
+        echo "adasvd_b${BUDGET}_${QKV_MODE}_naive"
+    else
+        echo "${method}_ra${RANK_ATTN}_rf${RANK_FFN}_rw${RANK_WO}_${QKV_MODE}_naive"
+    fi
+}
+
 _model_dir() {
     local method="$1"
     local task_arg="$2"
-    if [[ "${method}" == "adasvd" ]]; then
-        echo "${MODEL_BASE_DIR}/adasvd/adasvd_b${BUDGET}_flashsvd"
-    else
-        echo "${MODEL_BASE_DIR}/${method}/${task_arg}/${method}_r${RANK_FFN}_naive"
-    fi
+    echo "${MODEL_BASE_DIR}/${method}/${task_arg}/$(_model_subdir "${method}")"
 }
 
 echo "══════════════════════════════════════════════════════════════════════"
