@@ -50,6 +50,18 @@ def load(path, task, dtype, seq_len):
     for col in ["useful_flops_abs", "rank_pad_flops_abs", "total_flops_abs",
                 "rank_pad_pct", "seq_pad_pct"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Separate real vs synthetic rows.
+    # - FLOPs fields (rank_pad_pct etc.) are static — same for both input_modes.
+    # - seq_pad_pct must come from real rows (synthetic always = 0, meaningless for right panel).
+    # Keep one row per method: prefer real, fall back to synthetic.
+    df_real  = df[df.get("input_mode", pd.Series(dtype=str)) == "real"]
+    df_synth = df[df.get("input_mode", pd.Series(dtype=str)) == "synthetic"]
+    if "input_mode" in df.columns and not df_real.empty:
+        # merge: take flops cols from real row (seq_pad_pct is meaningful there)
+        df = df_real.drop_duplicates(subset=["method"])
+    else:
+        df = df.drop_duplicates(subset=["method"])
     return df
 
 
