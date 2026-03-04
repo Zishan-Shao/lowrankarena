@@ -258,7 +258,7 @@ EOF
     print_section "Starting GLUE Pipeline"
 
     # Build command with conditional rank/retention
-    CMD="python src/encoders/evaluate.py \
+    CMD="python src/encoders/glue_pipeline.py \
         --method \"$METHOD\" \
         --backend \"$BACKEND\" \
         --dtype \"$DTYPE\" \

@@ -174,7 +174,7 @@ def main():
 
     # ── prepare data loaders ──────────────────────────────────────────────────
     print(f"[data] Loading task={args.task} ...")
-    from src.encoders.evaluate import prepare_data, evaluate_task
+    from src.encoders.glue_pipeline import prepare_data, evaluate_task
 
     train_loader, val_loader = prepare_data(
         args.task, tokenizer, args.seq_len, args.batch_size)

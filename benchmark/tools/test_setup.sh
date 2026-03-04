@@ -81,7 +81,7 @@ fi
 
 # Test 8: Required files
 echo -n "Testing required files... "
-if [ -f "src/encoders/evaluate.py" ] && \
+if [ -f "src/encoders/glue_pipeline.py" ] && \
    [ -f "src/encoders/io.py" ] && \
    [ -f "src/encoders/compress.py" ]; then
     echo "✓"
