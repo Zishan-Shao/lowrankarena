@@ -239,8 +239,14 @@ if [[ "${PHASES}" == *"nsys"* ]]; then
                 --profile_nsys \
         || rc=$?
 
-        if [[ $rc -ne 0 ]]; then
+        # exit=143 (SIGTERM) is normal: nsys sends SIGTERM to the target process
+        # after --capture-range cudaProfilerApi ends.  Treat it as success if
+        # the .nsys-rep file was actually generated.
+        if [[ $rc -ne 0 && $rc -ne 143 ]]; then
             FAIL=$((FAIL + 1)); echo "   [FAILED] nsys profile for ${POINT_TAG} (exit=${rc})"; continue
+        fi
+        if [[ ! -f "${REP_PATH}.nsys-rep" ]]; then
+            FAIL=$((FAIL + 1)); echo "   [FAILED] nsys profile for ${POINT_TAG}: .nsys-rep not generated"; continue
         fi
 
         echo "   [stats] → ${SUMMARY_TXT}"
@@ -285,9 +291,9 @@ if [[ "${PHASES}" == *"ncu"* ]]; then
     echo ""
 
     if ! command -v ncu &>/dev/null; then
-        echo "[error] ncu not found. Install NVIDIA Nsight Compute:"
-        echo "        https://developer.nvidia.com/nsight-compute"
-        FAIL=$((FAIL + 1))
+        echo "[skip] ncu not found — skipping ncu phase."
+        echo "       Install NVIDIA Nsight Compute: https://developer.nvidia.com/nsight-compute"
+        SKIP=$((SKIP + 1))
     else
         NCU_OK=0
         NCU_FAIL=0
