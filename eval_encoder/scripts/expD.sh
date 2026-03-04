@@ -255,7 +255,11 @@ if [[ "${PHASES}" == *"nsys"* ]]; then
             --report cuda_gpu_kern_sum \
             --quiet \
             "${REP_PATH}.nsys-rep" \
-        >> "${SUMMARY_TXT}" 2>&1 || { FAIL=$((FAIL + 1)); echo "   [FAILED] nsys stats for ${POINT_TAG}"; continue; }
+        >> "${SUMMARY_TXT}" 2>&1 || {
+            echo "   [FAILED] nsys stats for ${POINT_TAG} — stderr:"
+            nsys stats --report cuda_gpu_kern_sum --quiet "${REP_PATH}.nsys-rep" 2>&1 | head -5 || true
+            FAIL=$((FAIL + 1)); continue
+        }
 
         OK=$((OK + 1))
 
