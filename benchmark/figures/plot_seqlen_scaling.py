@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
-FIG_DIR = "eval_encoder/eval_results/figures"
+FIG_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'experiments', 'figs', 'figures')
 os.makedirs(FIG_DIR, exist_ok=True)
 
 # ─────────────────────────────────────────────────────────────────

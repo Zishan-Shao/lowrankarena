@@ -858,7 +858,7 @@ def parse_args():
                         "(e.g. compressed_models/bert/sst2/svd_r256_naive). "
                         "If given, skips compression.")
     p.add_argument("--method",    default="svd",
-                   choices=["svd", "fwsvd", "drone", "adasvd"])
+                   choices=["svd", "fwsvd", "drone", "adasvd", "dense"])
     p.add_argument("--rank",      type=int, default=None,
                    help="Unified rank for all components (fallback when --rank_attn/ffn/wo not set)")
     p.add_argument("--rank_attn", type=int, default=None,
@@ -956,36 +956,35 @@ def main():
         if args.method == "svd":   # default value = not explicitly set
             args.method = comp_info.get("method", args.method)
     else:
-        # on-the-fly compression (slow path)
-        print(f"[compress] Compressing {args.method} rank={args.rank} ...")
-        from src.encoders.compress import (
-            load_model, TASK_CFG, compress_model)
-        if args.model_id is None:
-            _TASK_MODELS = {
-                "cola":  "textattack/bert-base-uncased-CoLA",
-                "sst2":  "textattack/bert-base-uncased-SST-2",
-                "mrpc":  "textattack/bert-base-uncased-MRPC",
-                "qqp":   "textattack/bert-base-uncased-QQP",
-                "mnli":  "textattack/bert-base-uncased-MNLI",
-                "qnli":  "textattack/bert-base-uncased-QNLI",
-                "rte":   "textattack/bert-base-uncased-RTE",
-                "stsb":  "textattack/bert-base-uncased-STS-B",
-            }
-            model_id = _TASK_MODELS.get(args.task, "bert-base-uncased")
-        else:
-            model_id = args.model_id
+        from src.encoders.compress import load_model
+        _TASK_MODELS = {
+            "cola":  "textattack/bert-base-uncased-CoLA",
+            "sst2":  "textattack/bert-base-uncased-SST-2",
+            "mrpc":  "textattack/bert-base-uncased-MRPC",
+            "qqp":   "textattack/bert-base-uncased-QQP",
+            "mnli":  "textattack/bert-base-uncased-MNLI",
+            "qnli":  "textattack/bert-base-uncased-QNLI",
+            "rte":   "textattack/bert-base-uncased-RTE",
+            "stsb":  "textattack/bert-base-uncased-STS-B",
+        }
+        model_id = args.model_id or _TASK_MODELS.get(args.task, "bert-base-uncased")
         model, tokenizer = load_model(model_id, args.task, args.dtype, args.device)
 
-        # build a minimal calibration loader
-        from src.encoders.compress import prepare_loader
-        loader_tmp = prepare_loader(
-            args.task, tokenizer, args.seq_len, 4, split="train")
-        model = compress_model(model, args.method, args.rank, args.budget,
-                               "qkv+ffn", loader_tmp, args.device, 4,
-                               rank_attn=args.rank_attn,
-                               rank_ffn=args.rank_ffn,
-                               rank_wo=args.rank_wo,
-                               qkv_mode=args.qkv_mode)
+        if args.method == "dense":
+            # Dense baseline: no compression, measure as-is
+            print(f"[load] Dense baseline: {model_id}")
+        else:
+            # on-the-fly compression (slow path)
+            print(f"[compress] Compressing {args.method} rank={args.rank} ...")
+            from src.encoders.compress import TASK_CFG, compress_model, prepare_loader
+            loader_tmp = prepare_loader(
+                args.task, tokenizer, args.seq_len, 4, split="train")
+            model = compress_model(model, args.method, args.rank, args.budget,
+                                   "qkv+ffn", loader_tmp, args.device, 4,
+                                   rank_attn=args.rank_attn,
+                                   rank_ffn=args.rank_ffn,
+                                   rank_wo=args.rank_wo,
+                                   qkv_mode=args.qkv_mode)
 
     model.eval()
 
@@ -1016,6 +1015,8 @@ def main():
                 _r = comp_info.get("rank") or args.rank or "?"
                 _ra = _rf = _rw = _r
             rank_config = f"ra{_ra}_rf{_rf}_rw{_rw}_{_qkv}"
+    elif args.method == "dense":
+        rank_config = "dense"
     elif args.method == "adasvd":
         rank_config = f"b{args.budget}_{args.qkv_mode}"
     elif args.rank_attn:

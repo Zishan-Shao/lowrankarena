@@ -32,13 +32,13 @@
 # ────────────────────────────────────────────────────────────────────────────
 #   cd lowrankarena/
 #   bash benchmark/expB.sh                              # default (svd × 4 backends × real+synthetic × 3 repeats)
-#   METHODS="svd fwsvd drone adasvd" bash benchmark/expB.sh  # rank-strategy sensitivity
+#   METHODS="dense svd fwsvd drone adasvd" bash benchmark/expB.sh  # full sweep incl. dense
 #   INPUT_MODES=real REPEAT=1 bash benchmark/expB.sh   # quick single real-data run
 #   TASKS="mnli stsb" bash benchmark/expB.sh           # task subset
 #
 # Overridable variables
 #   TASKS="mnli stsb"               # task subset (default: 8 GLUE tasks)
-#   METHODS="svd"                   # method (default "svd", main table compares backends only)
+#   METHODS="dense svd"             # method (default: dense baseline + svd)
 #   BACKENDS="naive sdpa flashsvd flashsvd15"
 #   INPUT_MODES="real synthetic"    # input distribution (default: run both)
 #   REPEAT=3                        # number of repeated measurements (default 3)
@@ -74,9 +74,10 @@ echo "[log] → ${LOG_FILE}"
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 TASKS="${TASKS:-cola sst2 mrpc qqp mnli qnli rte stsb}"
-# Main table: fixed svd checkpoint, backend comparison only (eliminates rank-allocation interference)
-# For rank-strategy sensitivity, override METHODS="svd fwsvd drone adasvd"
-METHODS="${METHODS:-svd}"
+# Main table: dense baseline + fixed svd checkpoint, backend comparison only
+# dense: loads HuggingFace model directly (no checkpoint needed)
+# For rank-strategy sensitivity, override METHODS="dense svd fwsvd drone adasvd"
+METHODS="${METHODS:-dense svd}"
 BACKENDS="${BACKENDS:-naive sdpa flashsvd flashsvd15}"
 # Dual mode: real (real data, natural padding) + synthetic (all valid tokens, 0% padding)
 INPUT_MODES="${INPUT_MODES:-real synthetic}"
@@ -146,6 +147,38 @@ SKIP=0
 
 for TASK in ${TASKS}; do
     for METHOD in ${METHODS}; do
+
+        # ── Dense baseline: no checkpoint, load directly from HuggingFace ──
+        if [[ "${METHOD}" == "dense" ]]; then
+            echo "── ${TASK} / dense  (HuggingFace baseline)"
+            for BACKEND in ${BACKENDS}; do
+                if [[ "$(_skip_backend "${BACKEND}")" == "true" ]]; then
+                    echo "   [skip] ${BACKEND} requires bf16/fp16, current dtype=${DTYPE}"
+                    SKIP=$((SKIP + 1))
+                    continue
+                fi
+                for INPUT_MODE in ${INPUT_MODES}; do
+                    echo "   → backend=${BACKEND}  input_mode=${INPUT_MODE}"
+                    python benchmark/analysis/analyze_compute.py \
+                        --method     dense \
+                        --task       "${TASK}" \
+                        --backend    "${BACKEND}" \
+                        --input_mode "${INPUT_MODE}" \
+                        --repeat     "${REPEAT}" \
+                        --dtype      "${DTYPE}" \
+                        --seq_len    "${SEQ_LEN}" \
+                        --batch_size "${BATCH_SIZE}" \
+                        --warmup     "${WARMUP}" \
+                        --measure    "${MEASURE}" \
+                        --out_csv    "${OUT_CSV}" \
+                    && OK=$((OK + 1)) || { FAIL=$((FAIL + 1)); echo "   [FAILED] ${TASK}/dense/${BACKEND}/${INPUT_MODE}"; }
+                done
+            done
+            echo ""
+            continue
+        fi
+
+        # ── Compressed methods: require checkpoint ──────────────────────────
         SUBDIR="$(_model_subdir "${METHOD}")"
         MODEL_DIR="${MODEL_BASE_DIR}/${TASK}/${SUBDIR}"
 

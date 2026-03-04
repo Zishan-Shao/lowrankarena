@@ -21,7 +21,7 @@ import csv
 from collections import defaultdict
 
 GLUE_RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "experiments", "glue")
-OUT_CSV          = os.path.join(os.path.dirname(__file__), "..", "..", "experiments", "glue_summary.csv")
+OUT_CSV          = os.path.join(os.path.dirname(__file__), "..", "..", "experiments", "results", "glue_summary.csv")
 
 TASKS_8  = ["cola", "sst2", "mrpc", "qqp", "mnli", "qnli", "rte", "stsb"]
 METRIC   = {

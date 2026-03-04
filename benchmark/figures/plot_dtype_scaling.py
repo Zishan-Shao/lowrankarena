@@ -20,7 +20,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-FIG_DIR = "eval_encoder/eval_results/figures"
+_REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
+FIG_DIR = os.path.join(_REPO_ROOT, 'experiments', 'figs', 'figures')
 os.makedirs(FIG_DIR, exist_ok=True)
 
 # ─────────────────────────────────────────────────────────────────
@@ -42,18 +43,18 @@ THR_FP32 = {
 # ─────────────────────────────────────────────────────────────────
 # bf16 FlashSVD data — read from CSV, average over 8 GLUE tasks
 # ─────────────────────────────────────────────────────────────────
-CSV_PATH = "eval_encoder/eval_results/encoder_runs.csv"
+CSV_PATH = os.path.join(_REPO_ROOT, 'experiments', 'results', 'expC_seqlen.csv')
 
 def load_bf16_flash():
     mem_by_seq = {}
     thr_by_seq = {}
     with open(CSV_PATH) as f:
         for r in csv.DictReader(f):
-            if r.get("dtype") != "bf16":
+            if r.get("dtype") != "bf16" or r.get("backend") != "flashsvd":
                 continue
             try:
                 seq   = int(r["seq_len"])
-                infer = float(r["peak_mem_infer_mb"])
+                infer = float(r.get("peak_mem_mb") or r.get("peak_mem_infer_mb"))
                 thr   = float(r["throughput_sps"])
             except (ValueError, KeyError):
                 continue
@@ -68,6 +69,12 @@ def load_bf16_flash():
     )
 
 BF16_SEQ, MEM_BF16_FLASH, THR_BF16_FLASH = load_bf16_flash()
+
+# Align loaded bf16-flash data to hardcoded SEQ=[128,256,512] for reduction computation
+_mask = np.isin(BF16_SEQ, SEQ)
+BF16_SEQ         = BF16_SEQ[_mask]
+MEM_BF16_FLASH   = MEM_BF16_FLASH[_mask]
+THR_BF16_FLASH   = THR_BF16_FLASH[_mask]
 
 # bf16 Naive: peak_mem_mb from encoder_runs_pre_v2.csv (8 tasks identical per seq)
 MEM_BF16_NAIVE = np.array([257.9, 377.0, 621.2])
