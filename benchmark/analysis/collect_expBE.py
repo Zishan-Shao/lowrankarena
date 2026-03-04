@@ -50,6 +50,9 @@ def extract_e1(df: pd.DataFrame, outdir: str) -> None:
     """
     THRESH = 0.05
 
+    if "logit_max_diff" not in df.columns:
+        print("[E-1] No alignment rows found (run with ALIGN=1).")
+        return
     has_align = df["logit_max_diff"].notna() & (df["logit_max_diff"] != "")
     sub = df[has_align & (df["backend"] != "naive")].copy()
 

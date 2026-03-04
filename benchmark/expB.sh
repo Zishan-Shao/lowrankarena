@@ -148,9 +148,26 @@ SKIP=0
 for TASK in ${TASKS}; do
     for METHOD in ${METHODS}; do
 
-        # ── Dense baseline: no checkpoint, load directly from HuggingFace ──
+        # ── Dense baseline: prefer local checkpoint, fall back to HuggingFace ──
         if [[ "${METHOD}" == "dense" ]]; then
-            echo "── ${TASK} / dense  (HuggingFace baseline)"
+            # Priority: task-specific > global > HuggingFace
+            _DENSE_MODEL_ARG=""
+            for _candidate in \
+                "${MODEL_BASE_DIR}/dense/${TASK}/dense_rNone_naive" \
+                "${MODEL_BASE_DIR}/dense/${TASK}/dense_naive" \
+                "${MODEL_BASE_DIR}/dense/dense_rNone_naive" \
+                "${MODEL_BASE_DIR}/dense/dense_naive"
+            do
+                if [[ -d "${_candidate}" ]]; then
+                    _DENSE_MODEL_ARG="--model_dir ${_candidate}"
+                    break
+                fi
+            done
+            if [[ -n "${_DENSE_MODEL_ARG}" ]]; then
+                echo "── ${TASK} / dense  (local: ${_candidate})"
+            else
+                echo "── ${TASK} / dense  (HuggingFace fallback)"
+            fi
             for BACKEND in ${BACKENDS}; do
                 if [[ "$(_skip_backend "${BACKEND}")" == "true" ]]; then
                     echo "   [skip] ${BACKEND} requires bf16/fp16, current dtype=${DTYPE}"
@@ -161,6 +178,7 @@ for TASK in ${TASKS}; do
                     echo "   → backend=${BACKEND}  input_mode=${INPUT_MODE}"
                     python benchmark/analysis/analyze_compute.py \
                         --method     dense \
+                        ${_DENSE_MODEL_ARG} \
                         --task       "${TASK}" \
                         --backend    "${BACKEND}" \
                         --input_mode "${INPUT_MODE}" \
