@@ -1,0 +1,7 @@
+point,total_kernel_calls,n_unique_kernels,n_gemm_variants,fragmentation_ratio,triton_time_pct,gemm_time_pct,memcpy_time_pct,sync_time_pct,top1_kernel,top1_time_pct
+mnli_svd_naive,21150,22,8,961.4,0.0,37.8,0.0,0.0,ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stages_32x1,19.7
+mnli_svd_flashsvd,0,0,0,0.0,0.0,0.0,0.0,0.0,n/a,0.0
+mnli_svd_flashsvd15,21150,21,5,1007.1,37.5,19.4,0.0,0.0,fused_ffn_full_batched_bias,37.5
+mnli_adasvd_naive,21150,28,14,755.4,0.0,40.2,0.0,0.0,"void <unnamed>::softmax_warp_forward<c10::BFloat16, c10",15.3
+mnli_adasvd_flashsvd,19350,26,10,744.2,73.2,14.3,0.0,0.0,fused_ffn_phase1,50.0
+mnli_adasvd_flashsvd15,13950,24,9,581.2,42.2,27.3,0.0,0.0,fused_ffn_full_batched_bias,42.2
