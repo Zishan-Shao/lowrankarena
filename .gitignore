@@ -64,7 +64,7 @@ experiments/glue/
 experiments/logs/
 
 # Generated figures and large profiling binaries
-experiments/figs/
+experiments/figs/figures/archive_*/
 experiments/*.png
 *.qdstrm
 *.nsys-rep

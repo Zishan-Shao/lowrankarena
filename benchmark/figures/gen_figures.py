@@ -304,7 +304,7 @@ ax.set_xticks(x); ax.set_xticklabels(methods)
 ax.set_ylabel('GLUE Average (G-AVG)')
 ax.set_title('GLUE Average: Stage 2 — Post-compress Finetune\n'
              '(Per-head ra48 vs Full-matrix ra312, param_ratio ≈ 0.527)')
-ax.set_ylim(0, 1.0)
+ax.set_ylim(0, 1.06)
 ax.legend()
 ax.grid(axis='y', linestyle='--', alpha=0.35)
 plt.tight_layout()
@@ -399,14 +399,15 @@ ax.axhline(0.05, color='red', linewidth=0.8, linestyle='--', alpha=0.6)
 
 _COLLAPSE_THRESH = 0.05   # F1 below this → treat as collapsed
 
+_collapse_labeled = set()  # only label once per x position
 for method, vals in data.items():
     ax.plot(xpos, vals,
             color=m_colors[method], marker=m_markers[method],
             linewidth=2.2, markersize=9, label=method, zorder=4)
-    # Label collapsed points inline
     for xi, v in enumerate(vals):
-        if v < _COLLAPSE_THRESH:
-            ax.text(xi, v + 0.03, 'collapse', ha='center', va='bottom',
+        if v < _COLLAPSE_THRESH and xi not in _collapse_labeled:
+            _collapse_labeled.add(xi)
+            ax.text(xi, 0.06, 'collapse', ha='center', va='bottom',
                     fontsize=7.5, color='red', fontstyle='italic', fontweight='bold')
 
 # Annotation: per-head collapse (SVD/AdaSVD)

@@ -31,8 +31,8 @@
 #   benchmark/figures/plot_nsys_kernel.py
 #
 # Prerequisite: expA must have generated the following checkpoints (missing = skip):
-#   compressed_models/bert/mnli/svd_ra48_rf256_rw208_per_head_naive/
-#   compressed_models/bert/mnli/adasvd_b0.527_per_head_naive/
+#   compressed_models/bert/svd/mnli/svd_r256_naive/
+#   compressed_models/bert/adasvd/adasvd_b0.5_flashsvd/   (sst2, no task subfolder)
 #
 # Usage
 # ────────────────────────────────────────────────────────────────────────────
@@ -107,11 +107,9 @@ fi
 #   auto-derived: <task>_<dtype>_s<seq_len>_b<batch> (can be overridden manually)
 TAG="${TAG:-${TASK}_${DTYPE}_s${SEQ_LEN}_b${BATCH_SIZE}}"
 
-RANK_ATTN="${RANK_ATTN:-48}"
 RANK_FFN="${RANK_FFN:-256}"
-RANK_WO="${RANK_WO:-208}"
-QKV_MODE="${QKV_MODE:-per_head}"
-BUDGET="${BUDGET:-0.527}"
+BUDGET="${BUDGET:-0.5}"
+ADASVD_TASK="${ADASVD_TASK:-sst2}"
 
 # nsys phase
 WARMUP="${WARMUP:-5}"
@@ -143,25 +141,29 @@ POINTS=(
     "${TASK}_svd_naive:svd:naive"
     "${TASK}_svd_flashsvd:svd:flashsvd"
     "${TASK}_svd_flashsvd15:svd:flashsvd15"
-    "${TASK}_adasvd_naive:adasvd:naive"
-    "${TASK}_adasvd_flashsvd:adasvd:flashsvd"
-    "${TASK}_adasvd_flashsvd15:adasvd:flashsvd15"
+    "${ADASVD_TASK}_adasvd_naive:adasvd:naive"
+    "${ADASVD_TASK}_adasvd_flashsvd:adasvd:flashsvd"
+    "${ADASVD_TASK}_adasvd_flashsvd15:adasvd:flashsvd15"
 )
 
-# ── Checkpoint subdirectory name ──────────────────────────────────────────────
-_model_subdir() {
+# ── Checkpoint path for each method ──────────────────────────────────────────
+# Actual layout: compressed_models/bert/{method}/{task}/{method}_r{rank}_naive
+#   SVD:    bert/svd/{task}/svd_r{RANK_FFN}_naive    (uniform rank, load naive for all backends)
+#   AdaSVD: bert/adasvd/adasvd_b{BUDGET}_flashsvd    (no task subfolder; use ADASVD_TASK for the run)
+_model_dir() {
     local method="$1"
+    local task_arg="$2"
     if [[ "${method}" == "adasvd" ]]; then
-        echo "adasvd_b${BUDGET}_${QKV_MODE}_naive"
+        echo "${MODEL_BASE_DIR}/adasvd/adasvd_b${BUDGET}_flashsvd"
     else
-        echo "${method}_ra${RANK_ATTN}_rf${RANK_FFN}_rw${RANK_WO}_${QKV_MODE}_naive"
+        echo "${MODEL_BASE_DIR}/${method}/${task_arg}/${method}_r${RANK_FFN}_naive"
     fi
 }
 
 echo "══════════════════════════════════════════════════════════════════════"
 echo "  expD — Kernel-Level Analysis"
 echo "  phases:     ${PHASES}"
-echo "  task:       ${TASK}   dtype: ${DTYPE}   seq_len: ${SEQ_LEN}   bs: ${BATCH_SIZE}"
+echo "  task:       ${TASK} (svd)  ${ADASVD_TASK} (adasvd)   dtype: ${DTYPE}   seq_len: ${SEQ_LEN}   bs: ${BATCH_SIZE}"
 echo "  input_mode: ${INPUT_MODE}"
 echo "  tag:        ${TAG}   gpu: ${CUDA_VISIBLE_DEVICES:-<all>}"
 echo "  nsys:       warmup=${WARMUP}  measure=${MEASURE}  → ${OUT_CSV}"
@@ -210,8 +212,14 @@ if [[ "${PHASES}" == *"nsys"* ]]; then
         METHOD="${REST%%:*}"
         BACKEND="${REST#*:}"
 
-        SUBDIR="$(_model_subdir "${METHOD}")"
-        MODEL_DIR="${MODEL_BASE_DIR}/${TASK}/${SUBDIR}"
+        # Determine which task to use (AdaSVD checkpoint is task-specific)
+        if [[ "${METHOD}" == "adasvd" ]]; then
+            PROFILE_TASK="${ADASVD_TASK}"
+        else
+            PROFILE_TASK="${TASK}"
+        fi
+
+        MODEL_DIR="$(_model_dir "${METHOD}" "${PROFILE_TASK}")"
 
         echo "── ${POINT_TAG}  (${MODEL_DIR})"
 
@@ -232,7 +240,7 @@ if [[ "${PHASES}" == *"nsys"* ]]; then
             --force-overwrite true \
             python benchmark/analysis/analyze_compute.py \
                 --model_dir  "${MODEL_DIR}" \
-                --task       "${TASK}" \
+                --task       "${PROFILE_TASK}" \
                 --backend    "${BACKEND}" \
                 --input_mode "${INPUT_MODE}" \
                 --dtype      "${DTYPE}" \
@@ -310,8 +318,13 @@ if [[ "${PHASES}" == *"ncu"* ]]; then
             METHOD="${REST%%:*}"
             BACKEND="${REST#*:}"
 
-            SUBDIR="$(_model_subdir "${METHOD}")"
-            MODEL_DIR="${MODEL_BASE_DIR}/${TASK}/${SUBDIR}"
+            if [[ "${METHOD}" == "adasvd" ]]; then
+                PROFILE_TASK="${ADASVD_TASK}"
+            else
+                PROFILE_TASK="${TASK}"
+            fi
+
+            MODEL_DIR="$(_model_dir "${METHOD}" "${PROFILE_TASK}")"
 
             echo "── ${POINT_TAG}  (${MODEL_DIR})"
 
@@ -339,7 +352,7 @@ if [[ "${PHASES}" == *"ncu"* ]]; then
                 --force-overwrite \
                 python benchmark/analysis/analyze_compute.py \
                     --model_dir  "${MODEL_DIR}" \
-                    --task       "${TASK}" \
+                    --task       "${PROFILE_TASK}" \
                     --backend    "${BACKEND}" \
                     --input_mode "${INPUT_MODE}" \
                     --dtype      "${DTYPE}" \
