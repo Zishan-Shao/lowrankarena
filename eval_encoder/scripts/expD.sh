@@ -65,8 +65,9 @@
 #                smsp__warp_issue_stalled_math_pipe_throttle_per_warp_active.pct"
 #   MODEL_BASE_DIR=eval_encoder/models
 #   NSYS_DIR=eval_encoder/eval_results/nsys
-#   OUT_CSV=eval_encoder/eval_results/expD.csv          # 默认含 TAG
-#   OUT_NCU_CSV=eval_encoder/eval_results/expD_ncu.csv  # 默认含 TAG
+#   SUMMARY_TXT=eval_encoder/eval_results/nsys/nsys_summary_<TAG>.txt  # 默认含 TAG
+#   OUT_CSV=eval_encoder/eval_results/expD_<TAG>.csv          # 默认含 TAG
+#   OUT_NCU_CSV=eval_encoder/eval_results/expD_ncu_<TAG>.csv  # 默认含 TAG
 #   FIGURES_DIR=eval_encoder/eval_results/figures
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -219,6 +220,7 @@ if [[ "${PHASES}" == *"nsys"* ]]; then
         REP_PATH="${NSYS_DIR}/${POINT_TAG}"
 
         echo "   [profile] → ${REP_PATH}.nsys-rep"
+        rc=0
         nsys profile \
             --trace cuda,nvtx \
             --capture-range cudaProfilerApi \
@@ -235,7 +237,11 @@ if [[ "${PHASES}" == *"nsys"* ]]; then
                 --warmup     "${WARMUP}" \
                 --measure    "${MEASURE}" \
                 --profile_nsys \
-        && OK=$((OK + 1)) || { FAIL=$((FAIL + 1)); echo "   [FAILED] nsys profile for ${POINT_TAG}"; continue; }
+        || rc=$?
+
+        if [[ $rc -ne 0 ]]; then
+            FAIL=$((FAIL + 1)); echo "   [FAILED] nsys profile for ${POINT_TAG} (exit=${rc})"; continue
+        fi
 
         echo "   [stats] → ${SUMMARY_TXT}"
         printf "\n════ %s ════\n" "${POINT_TAG}" >> "${SUMMARY_TXT}"
@@ -243,7 +249,9 @@ if [[ "${PHASES}" == *"nsys"* ]]; then
             --report cuda_gpu_kern_sum \
             --quiet \
             "${REP_PATH}.nsys-rep" \
-        >> "${SUMMARY_TXT}" 2>&1
+        >> "${SUMMARY_TXT}" 2>&1 || { FAIL=$((FAIL + 1)); echo "   [FAILED] nsys stats for ${POINT_TAG}"; continue; }
+
+        OK=$((OK + 1))
 
         echo ""
     done
@@ -302,18 +310,22 @@ if [[ "${PHASES}" == *"ncu"* ]]; then
                 continue
             fi
 
+            NCU_REP="${NSYS_DIR}/ncu_${POINT_TAG}"
             NCU_RAW="${NSYS_DIR}/ncu_raw_${POINT_TAG}.csv"
-            echo "   [ncu] → ${NCU_RAW}"
+            NCU_LOG="${NSYS_DIR}/ncu_log_${POINT_TAG}.txt"
+            echo "   [ncu step1] profile → ${NCU_REP}.ncu-rep"
 
-            # ncu --csv prints raw per-kernel metrics to stdout
-            # --capture-range cudaProfilerApi: only captures the measure loop
-            # --target-processes all: follow child python processes
+            # Step 1: profile → .ncu-rep
+            # Python script's stdout/stderr go to NCU_LOG (not polluting the CSV).
+            # --capture-range cudaProfilerApi: only captures the measure loop.
+            # --target-processes all: follow child python processes.
             rc=0
             ncu \
                 --metrics "${NCU_METRICS}" \
-                --csv \
                 --capture-range cudaProfilerApi \
                 --target-processes all \
+                --output "${NCU_REP}" \
+                --force-overwrite \
                 python eval_encoder/scripts/analyze_compute.py \
                     --model_dir  "${MODEL_DIR}" \
                     --task       "${TASK}" \
@@ -325,14 +337,26 @@ if [[ "${PHASES}" == *"ncu"* ]]; then
                     --warmup     "${NCU_WARMUP}" \
                     --measure    "${NCU_MEASURE}" \
                     --profile_nsys \
-            > "${NCU_RAW}" 2>&1 || rc=$?
+            > "${NCU_LOG}" 2>&1 || rc=$?
+
+            if [[ $rc -ne 0 ]]; then
+                NCU_FAIL=$((NCU_FAIL + 1))
+                echo "   [FAILED] ncu profile for ${POINT_TAG} (exit=${rc})"
+                echo "            log → ${NCU_LOG}"
+                continue
+            fi
+
+            # Step 2: export CSV cleanly from .ncu-rep (no Python stdout mixing)
+            echo "   [ncu step2] export CSV → ${NCU_RAW}"
+            ncu --import "${NCU_REP}.ncu-rep" --csv --page raw \
+            > "${NCU_RAW}" 2>>"${NCU_LOG}" || rc=$?
 
             if [[ $rc -eq 0 ]]; then
                 NCU_OK=$((NCU_OK + 1))
                 echo "   [ok] ${NCU_RAW}"
             else
                 NCU_FAIL=$((NCU_FAIL + 1))
-                echo "   [FAILED] ncu for ${POINT_TAG} (exit=${rc})"
+                echo "   [FAILED] ncu export for ${POINT_TAG} (exit=${rc})"
             fi
             echo ""
         done
