@@ -1,4 +1,4 @@
-# expD GPU info  tag=mnli_bf16_s512_b32  date=2026-03-04T00:32:19-05:00
+# expD GPU info  tag=mnli_bf16_s512_b32  date=2026-03-04T15:59:19-05:00
 index, name, driver_version, memory.total [MiB], compute_cap
 0, NVIDIA L40S, 550.54.15, 46068 MiB, 8.9
 1, NVIDIA L40S, 550.54.15, 46068 MiB, 8.9
