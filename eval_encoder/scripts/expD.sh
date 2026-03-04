@@ -13,12 +13,14 @@
 #     - launch__occupancy_limit_*        （瓶颈类型：寄存器/shmem/warp）
 #     - stall 比例                       （佐证）
 #
-# 4 个 profiling 点（与 plot_nsys_kernel.py POINT_META 一致）
+# 6 个 profiling 点（与 plot_nsys_kernel.py POINT_META 一致）
 # ────────────────────────────────────────────────────────────────────────────
 #   mnli_svd_naive          SVD     + naive
-#   mnli_svd_flashsvd15     SVD     + flashsvd15
+#   mnli_svd_flashsvd       SVD     + flashsvd (v1.0)
+#   mnli_svd_flashsvd15     SVD     + flashsvd15 (v1.5)
 #   mnli_adasvd_naive       AdaSVD  + naive
-#   mnli_adasvd_flashsvd15  AdaSVD  + flashsvd15
+#   mnli_adasvd_flashsvd    AdaSVD  + flashsvd (v1.0)
+#   mnli_adasvd_flashsvd15  AdaSVD  + flashsvd15 (v1.5)
 #
 # 依赖
 # ────────────────────────────────────────────────────────────────────────────
@@ -139,8 +141,10 @@ mkdir -p "${NSYS_DIR}" "${FIGURES_DIR}"
 # ── profiling 点定义（与 plot_nsys_kernel.py POINT_META 一致）─────────────────
 POINTS=(
     "${TASK}_svd_naive:svd:naive"
+    "${TASK}_svd_flashsvd:svd:flashsvd"
     "${TASK}_svd_flashsvd15:svd:flashsvd15"
     "${TASK}_adasvd_naive:adasvd:naive"
+    "${TASK}_adasvd_flashsvd:adasvd:flashsvd"
     "${TASK}_adasvd_flashsvd15:adasvd:flashsvd15"
 )
 

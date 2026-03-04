@@ -26,11 +26,13 @@ import pandas as pd
 # point name → (method_label, backend_label)
 POINT_META = {
     "mnli_svd_naive":          ("SVD",    "Naive"),
+    "mnli_svd_flashsvd":       ("SVD",    "FlashSVD 1.0"),
     "mnli_svd_flashsvd15":     ("SVD",    "FlashSVD 1.5"),
     "mnli_adasvd_naive":       ("AdaSVD", "Naive"),
+    "mnli_adasvd_flashsvd":    ("AdaSVD", "FlashSVD 1.0"),
     "mnli_adasvd_flashsvd15":  ("AdaSVD", "FlashSVD 1.5"),
 }
-BACKEND_COLORS = {"Naive": "#9e9e9e", "FlashSVD 1.5": "#ef5350"}
+BACKEND_COLORS = {"Naive": "#9e9e9e", "FlashSVD 1.0": "#ffa726", "FlashSVD 1.5": "#ef5350"}
 METHOD_COLORS  = {"SVD": "#5c85d6", "AdaSVD": "#e06c5a"}
 
 # stacked bar colors for kernel time breakdown
@@ -51,9 +53,9 @@ def load(path):
 
 
 def plot(df, outdir):
-    # order: naive first, flashsvd second; SVD before AdaSVD
-    order = ["mnli_svd_naive", "mnli_svd_flashsvd15",
-             "mnli_adasvd_naive", "mnli_adasvd_flashsvd15"]
+    # order: naive, flashsvd 1.0, flashsvd 1.5; SVD before AdaSVD
+    order = ["mnli_svd_naive", "mnli_svd_flashsvd", "mnli_svd_flashsvd15",
+             "mnli_adasvd_naive", "mnli_adasvd_flashsvd", "mnli_adasvd_flashsvd15"]
     rows = []
     for pt in order:
         r = df[df["point"] == pt]
@@ -97,10 +99,10 @@ def plot(df, outdir):
     ax1.set_axisbelow(True)
 
     # vertical separator between SVD and AdaSVD groups
-    ax1.axvline(1.5, color="#cccccc", linestyle="--", linewidth=1, zorder=2)
-    ax1.text(0.5, ymax1 * 0.97, "SVD", ha="center", va="top",
+    ax1.axvline(2.5, color="#cccccc", linestyle="--", linewidth=1, zorder=2)
+    ax1.text(1.0, ymax1 * 0.97, "SVD", ha="center", va="top",
              fontsize=8, color="#555555", style="italic")
-    ax1.text(2.5, ymax1 * 0.97, "AdaSVD", ha="center", va="top",
+    ax1.text(4.0, ymax1 * 0.97, "AdaSVD", ha="center", va="top",
              fontsize=8, color="#555555", style="italic")
 
     # ── Panel 2: kernel time breakdown (stacked bars) ─────────────────────────
@@ -131,7 +133,7 @@ def plot(df, outdir):
                   fontsize=10, fontweight="bold")
     ax2.yaxis.grid(True, linestyle="--", alpha=0.45, zorder=0)
     ax2.set_axisbelow(True)
-    ax2.axvline(1.5, color="#cccccc", linestyle="--", linewidth=1, zorder=2)
+    ax2.axvline(2.5, color="#cccccc", linestyle="--", linewidth=1, zorder=2)
     ax2.legend(loc="upper right", fontsize=8, framealpha=0.9)
 
     plt.tight_layout()
