@@ -192,4 +192,17 @@ echo "  完成  成功=${OK}  失败=${FAIL}  跳过=${SKIP}"
 echo "  结果 → ${OUT_CSV}"
 echo "══════════════════════════════════════════════════════════════════════"
 
+# ── 自动提取 E-1/E-2/E-3 子 CSV（仅当主 CSV 存在时）─────────────────────────
+OUT_DIR="$(dirname "${OUT_CSV}")"
+if [[ -f "${OUT_CSV}" ]]; then
+    echo ""
+    echo "── 提取 E-1/E-2/E-3 子 CSV → ${OUT_DIR}"
+    python eval_encoder/scripts/collect_expBE.py \
+        --input  "${OUT_CSV}" \
+        --outdir "${OUT_DIR}" \
+    && echo "   expE1_alignment.csv / expE2_padding.csv / expE3_repeatability.csv" \
+    || echo "   [warn] collect_expBE.py 失败，请手动运行"
+    echo ""
+fi
+
 [[ "${FAIL}" -eq 0 ]]
