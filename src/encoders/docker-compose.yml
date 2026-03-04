@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # 快速测试服务（不微调）
+  quick-test:
+    image: svd-benchmark:latest
+    runtime: nvidia
+    environment:
+      - SKIP_FINETUNING=true
+      - USE_TASK_MODELS=true
+      - RETENTION=0.5
+      - TASKS=sst2
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./glue_results:/workspace/lowrankarena/eval_encoder/glue_results
+    working_dir: /workspace/lowrankarena
+    command: bash eval_encoder/scripts/one_click_glue.sh
+    stdin_open: true
+    tty: true
+
+  # 标准评测服务（完整微调）
+  standard-eval:
+    image: svd-benchmark:latest
+    runtime: nvidia
+    environment:
+      - USE_TASK_MODELS=true
+      - BACKEND=flashsvd
+      - RETENTION=0.5
+      - TASKS=cola sst2 mrpc qnli rte stsb
+      - NUM_EPOCHS=3
+      - BATCH_SIZE=32
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./models:/workspace/lowrankarena/eval_encoder/models
+      - ./glue_results:/workspace/lowrankarena/eval_encoder/glue_results
+    working_dir: /workspace/lowrankarena
+    command: bash eval_encoder/scripts/one_click_glue.sh
+    stdin_open: true
+    tty: true
+
+  # 完整 GLUE 评测
+  full-glue:
+    image: svd-benchmark:latest
+    runtime: nvidia
+    environment:
+      - USE_TASK_MODELS=true
+      - BACKEND=flashsvd
+      - RETENTION=0.5
+      - NUM_EPOCHS=3
+      - BATCH_SIZE=32
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./models:/workspace/lowrankarena/eval_encoder/models
+      - ./glue_results:/workspace/lowrankarena/eval_encoder/glue_results
+    working_dir: /workspace/lowrankarena
+    command: bash eval_encoder/scripts/one_click_glue.sh
+    stdin_open: true
+    tty: true
+
+  # 交互式开发环境
+  dev:
+    image: svd-benchmark:latest
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./models:/workspace/lowrankarena/eval_encoder/models
+      - ./glue_results:/workspace/lowrankarena/eval_encoder/glue_results
+      - ./eval_results:/workspace/lowrankarena/eval_encoder/eval_results
+    working_dir: /workspace/lowrankarena
+    command: bash
+    stdin_open: true
+    tty: true

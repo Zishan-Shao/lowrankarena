@@ -2,11 +2,8 @@
 .claude/
 
 # Compressed and fine-tuned model checkpoints
-eval_encoder/models.bak/
-models/
-eval_encoder/models/
-eval_encoder/finetuned_models/
-eval_encoder/checkpoints/
+compressed_models/
+pretrained/
 
 # Python
 __pycache__/
@@ -62,20 +59,11 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Docker files (for distribution only)
-eval_encoder/Dockerfile
-eval_encoder/docker-compose.yml
-eval_encoder/.dockerignore
-eval_encoder/scripts/docker/
-eval_encoder/docs/docker/
-
 # GLUE evaluation results (runtime generated)
-eval_encoder/glue_results/
-glue_results/
-eval_encoder/logs/
+experiments/glue/
+experiments/logs/
 
 # Backup and archived files
-eval_encoder/archived/
 *.backup
 *_backup_*.csv
 *.nsys-rep

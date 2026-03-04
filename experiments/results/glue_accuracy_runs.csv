@@ -1,0 +1,349 @@
+timestamp,model_id,task,dataset_split,seq_len,batch_size,dtype,method,qkv_mode,rank,budget,backend,stage,seed,metric_name,metric_value,notes
+2026-02-27T13:00:07,eval_encoder/models/cola/drone_ra312_rf256_rw208_full_naive,cola,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,matthews_correlation,0.428524,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T13:46:27,eval_encoder/models/sst2/drone_ra312_rf256_rw208_full_naive,sst2,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,accuracy,0.905963,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T13:49:41,eval_encoder/models/mrpc/drone_ra312_rf256_rw208_full_naive,mrpc,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,f1,0.899145,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T18:09:44,eval_encoder/models/qqp/drone_ra312_rf256_rw208_full_naive,qqp,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,f1,0.877748,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T22:44:30,eval_encoder/models/mnli/drone_ra312_rf256_rw208_full_naive,mnli,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,accuracy,0.828630,post_compress_finetune epochs=3 lr=2e-05
+2026-02-27T23:59:03,eval_encoder/models/qnli/drone_ra312_rf256_rw208_full_naive,qnli,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,accuracy,0.898407,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T00:04:35,eval_encoder/models/rte/drone_ra312_rf256_rw208_full_naive,rte,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,accuracy,0.703971,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T00:09:18,eval_encoder/models/stsb/drone_ra312_rf256_rw208_full_naive,stsb,validation,512,32,fp32,drone,full,ra312_rf256_rw208,,naive,compress_finetune,42,pearson,0.873245,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T00:52:20,eval_encoder/models/cola/adasvd_b0.527_full_naive,cola,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,matthews_correlation,0.420606,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T01:23:13,eval_encoder/models/sst2/adasvd_b0.527_full_naive,sst2,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,accuracy,0.910550,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T01:25:12,eval_encoder/models/mrpc/adasvd_b0.527_full_naive,mrpc,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,f1,0.860034,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T04:35:22,eval_encoder/models/qqp/adasvd_b0.527_full_naive,qqp,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,f1,0.871063,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T07:36:16,eval_encoder/models/mnli/adasvd_b0.527_full_naive,mnli,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,accuracy,0.826694,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T08:25:40,eval_encoder/models/qnli/adasvd_b0.527_full_naive,qnli,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,accuracy,0.893831,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T08:27:06,eval_encoder/models/rte/adasvd_b0.527_full_naive,rte,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,accuracy,0.620939,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T08:30:18,eval_encoder/models/stsb/adasvd_b0.527_full_naive,stsb,validation,512,32,fp32,adasvd,full,,0.527,naive,compress_finetune,42,pearson,0.859434,post_compress_finetune epochs=3 lr=2e-05
+2026-02-28T16:26:35,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.527523,no_finetune
+2026-02-28T16:26:35,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.525229,no_finetune
+2026-02-28T16:26:35,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.526376,no_finetune
+2026-02-28T16:31:27,bert-base-uncased,sst2,validation,128,32,fp32,svd,per_head,,,naive,compress_eval,42,accuracy,0.526376,no_finetune
+2026-02-28T16:31:27,bert-base-uncased,sst2,validation,128,32,fp32,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.525229,no_finetune
+2026-02-28T16:31:27,bert-base-uncased,sst2,validation,128,32,fp32,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.526376,no_finetune
+2026-02-28T16:35:55,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.511468,no_finetune
+2026-02-28T16:35:55,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.511468,no_finetune
+2026-02-28T16:35:55,bert-base-uncased,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.511468,no_finetune
+2026-02-28T16:38:28,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.672018,no_finetune
+2026-02-28T16:38:28,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.670872,no_finetune
+2026-02-28T16:38:28,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:39:37,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,fp32,svd,per_head,,,naive,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:39:37,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,fp32,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:39:37,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,fp32,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:51:51,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.672018,no_finetune
+2026-02-28T16:51:51,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.670872,no_finetune
+2026-02-28T16:51:51,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T16:53:57,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.713303,no_finetune
+2026-02-28T16:53:57,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.717890,no_finetune
+2026-02-28T16:53:57,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.711009,no_finetune
+2026-02-28T17:06:18,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.725917,no_finetune
+2026-02-28T17:06:18,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.723624,no_finetune
+2026-02-28T17:06:18,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.725917,no_finetune
+2026-02-28T17:07:16,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.673165,no_finetune
+2026-02-28T17:07:16,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.674312,no_finetune
+2026-02-28T17:07:16,textattack/bert-base-uncased-SST-2,sst2,validation,128,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.669725,no_finetune
+2026-03-02T17:12:24,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,matthews_correlation,0.021226,no_finetune
+2026-03-02T17:12:24,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,matthews_correlation,0.020807,no_finetune
+2026-03-02T17:12:24,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.016526,no_finetune
+2026-03-02T17:18:50,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.712156,no_finetune
+2026-03-02T17:18:50,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.715596,no_finetune
+2026-03-02T17:18:50,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.712156,no_finetune
+2026-03-02T17:24:30,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.000000,no_finetune
+2026-03-02T17:24:30,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,f1,0.000000,no_finetune
+2026-03-02T17:24:30,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.000000,no_finetune
+2026-03-02T17:43:52,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.167180,no_finetune
+2026-03-02T17:43:52,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,f1,0.166628,no_finetune
+2026-03-02T17:43:52,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.166880,no_finetune
+2026-03-02T17:55:33,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.372491,no_finetune
+2026-03-02T17:55:33,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.373204,no_finetune
+2026-03-02T17:55:33,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.373510,no_finetune
+2026-03-02T18:02:56,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.547135,no_finetune
+2026-03-02T18:02:56,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.547501,no_finetune
+2026-03-02T18:02:56,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.546769,no_finetune
+2026-03-02T18:10:06,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.472924,no_finetune
+2026-03-02T18:10:06,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.472924,no_finetune
+2026-03-02T18:10:06,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472924,no_finetune
+2026-03-02T18:15:42,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,pearson,0.350707,no_finetune
+2026-03-02T18:15:42,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,pearson,0.350958,no_finetune
+2026-03-02T18:15:42,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,pearson,0.352775,no_finetune
+2026-03-02T18:32:57,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,matthews_correlation,0.019193,no_finetune
+2026-03-02T18:32:57,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,matthews_correlation,0.019193,no_finetune
+2026-03-02T18:32:57,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.019193,no_finetune
+2026-03-02T18:37:01,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.854358,no_finetune
+2026-03-02T18:37:01,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,accuracy,0.854358,no_finetune
+2026-03-02T18:37:01,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.853211,no_finetune
+2026-03-02T18:41:30,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.847724,no_finetune
+2026-03-02T18:41:30,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,f1,0.846395,no_finetune
+2026-03-02T18:41:30,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.847724,no_finetune
+2026-03-02T18:52:31,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.762077,no_finetune
+2026-03-02T18:52:31,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,f1,0.761744,no_finetune
+2026-03-02T18:52:31,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.762270,no_finetune
+2026-03-02T18:59:12,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.578706,no_finetune
+2026-03-02T18:59:12,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,accuracy,0.578604,no_finetune
+2026-03-02T18:59:12,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.578808,no_finetune
+2026-03-02T19:05:55,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.602782,no_finetune
+2026-03-02T19:05:55,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,accuracy,0.601684,no_finetune
+2026-03-02T19:05:55,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.602416,no_finetune
+2026-03-02T19:08:40,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.599278,no_finetune
+2026-03-02T19:08:40,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,accuracy,0.599278,no_finetune
+2026-03-02T19:08:40,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.599278,no_finetune
+2026-03-02T19:12:02,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,pearson,0.493580,no_finetune
+2026-03-02T19:12:02,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,pearson,0.493327,no_finetune
+2026-03-02T19:12:02,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,pearson,0.493513,no_finetune
+2026-03-02T19:20:27,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,matthews_correlation,-0.028174,no_finetune
+2026-03-02T19:20:27,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,matthews_correlation,-0.018366,no_finetune
+2026-03-02T19:20:27,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,matthews_correlation,-0.014907,no_finetune
+2026-03-02T19:27:58,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.620413,no_finetune
+2026-03-02T19:27:58,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,accuracy,0.621560,no_finetune
+2026-03-02T19:27:58,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.620413,no_finetune
+2026-03-02T19:34:58,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.007117,no_finetune
+2026-03-02T19:34:58,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,f1,0.007117,no_finetune
+2026-03-02T19:34:58,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.007117,no_finetune
+2026-03-02T19:49:59,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.520844,no_finetune
+2026-03-02T19:49:59,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,f1,0.521380,no_finetune
+2026-03-02T19:49:59,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.521101,no_finetune
+2026-03-02T19:58:38,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.351095,no_finetune
+2026-03-02T19:58:38,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,accuracy,0.352624,no_finetune
+2026-03-02T19:58:38,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.351707,no_finetune
+2026-03-02T20:10:04,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.460004,no_finetune
+2026-03-02T20:10:04,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,accuracy,0.460919,no_finetune
+2026-03-02T20:10:04,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.458539,no_finetune
+2026-03-02T20:16:19,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.545126,no_finetune
+2026-03-02T20:16:19,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,accuracy,0.548736,no_finetune
+2026-03-02T20:16:19,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.548736,no_finetune
+2026-03-02T22:03:08,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,matthews_correlation,0.180833,no_finetune
+2026-03-02T22:03:08,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,matthews_correlation,0.184727,no_finetune
+2026-03-02T22:03:08,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.187305,no_finetune
+2026-03-02T22:08:59,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.720183,no_finetune
+2026-03-02T22:08:59,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.721330,no_finetune
+2026-03-02T22:08:59,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.721330,no_finetune
+2026-03-02T22:13:41,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.460000,no_finetune
+2026-03-02T22:13:41,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,f1,0.457711,no_finetune
+2026-03-02T22:13:41,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.461538,no_finetune
+2026-03-02T22:24:50,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.674192,no_finetune
+2026-03-02T22:24:50,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,f1,0.674322,no_finetune
+2026-03-02T22:24:50,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.674020,no_finetune
+2026-03-02T22:31:34,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.535303,no_finetune
+2026-03-02T22:31:34,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.534896,no_finetune
+2026-03-02T22:31:34,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.534896,no_finetune
+2026-03-02T22:37:43,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.561596,no_finetune
+2026-03-02T22:37:43,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.560498,no_finetune
+2026-03-02T22:37:43,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.561596,no_finetune
+2026-03-02T22:42:24,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.555957,no_finetune
+2026-03-02T22:42:24,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.555957,no_finetune
+2026-03-02T22:42:24,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.559567,no_finetune
+2026-03-02T22:52:12,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,matthews_correlation,0.196552,no_finetune
+2026-03-02T22:52:12,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,matthews_correlation,0.190553,no_finetune
+2026-03-02T22:52:12,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.189250,no_finetune
+2026-03-02T22:56:50,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.719037,no_finetune
+2026-03-02T22:56:50,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.720183,no_finetune
+2026-03-02T22:56:50,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.720183,no_finetune
+2026-03-02T23:01:46,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.101351,no_finetune
+2026-03-02T23:01:46,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,f1,0.094915,no_finetune
+2026-03-02T23:01:46,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.101351,no_finetune
+2026-03-02T23:10:21,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.679344,no_finetune
+2026-03-02T23:10:21,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,f1,0.678913,no_finetune
+2026-03-02T23:10:21,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.678904,no_finetune
+2026-03-02T23:17:45,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.524300,no_finetune
+2026-03-02T23:17:45,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.524401,no_finetune
+2026-03-02T23:17:45,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.524198,no_finetune
+2026-03-02T23:24:19,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.531210,no_finetune
+2026-03-02T23:24:19,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.531210,no_finetune
+2026-03-02T23:24:19,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.531942,no_finetune
+2026-03-02T23:29:06,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.581227,no_finetune
+2026-03-02T23:29:06,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.577617,no_finetune
+2026-03-02T23:29:06,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.581227,no_finetune
+2026-03-02T23:36:24,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,pearson,0.702344,no_finetune
+2026-03-02T23:36:24,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,pearson,0.702042,no_finetune
+2026-03-02T23:36:24,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,pearson,0.702221,no_finetune
+2026-03-03T02:03:52,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.630259,no_finetune
+2026-03-03T02:03:52,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,pearson,0.629421,no_finetune
+2026-03-03T02:19:08,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.630259,no_finetune
+2026-03-03T02:19:08,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,pearson,0.629421,no_finetune
+2026-03-03T02:31:59,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.630259,no_finetune
+2026-03-03T02:31:59,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,pearson,0.629421,no_finetune
+2026-03-03T02:42:33,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.630259,no_finetune
+2026-03-03T02:42:33,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,pearson,0.629421,no_finetune
+2026-03-03T02:50:29,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.630259,no_finetune
+2026-03-03T02:50:29,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,pearson,0.629421,no_finetune
+2026-03-03T02:57:56,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.630259,no_finetune
+2026-03-03T02:57:56,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,pearson,0.629421,no_finetune
+2026-03-03T10:21:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.630259,no_finetune
+2026-03-03T10:21:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,pearson,0.629421,no_finetune
+2026-03-03T10:37:12,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.632567,no_finetune
+2026-03-03T10:37:12,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,pearson,0.632478,no_finetune
+2026-03-03T10:37:12,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,pearson,0.632900,no_finetune
+2026-03-03T13:31:01,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,pearson,0.350707,stage=no_finetune
+2026-03-03T13:31:01,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,pearson,0.350707,stage=no_finetune sdpa_path=flash
+2026-03-03T13:31:01,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,pearson,0.350958,stage=no_finetune
+2026-03-03T13:31:01,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,pearson,0.352775,stage=no_finetune
+2026-03-03T13:31:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,pearson,0.702344,stage=no_finetune
+2026-03-03T13:31:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,pearson,0.702344,stage=no_finetune sdpa_path=flash
+2026-03-03T13:31:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,pearson,0.702042,stage=no_finetune
+2026-03-03T13:31:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,pearson,0.702221,stage=no_finetune
+2026-03-03T13:55:11,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,pearson,0.350707,stage=no_finetune
+2026-03-03T13:55:11,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,pearson,0.350707,stage=no_finetune sdpa_path=flash
+2026-03-03T13:55:11,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,pearson,0.350958,stage=no_finetune
+2026-03-03T13:55:11,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,pearson,0.352775,stage=no_finetune
+2026-03-03T14:08:25,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,matthews_correlation,0.021226,stage=no_finetune
+2026-03-03T14:08:25,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.021226,stage=no_finetune sdpa_path=flash
+2026-03-03T14:08:25,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,matthews_correlation,0.020807,stage=no_finetune
+2026-03-03T14:08:25,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.016526,stage=no_finetune
+2026-03-03T14:08:47,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.712156,stage=no_finetune
+2026-03-03T14:08:47,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.712156,stage=no_finetune sdpa_path=flash
+2026-03-03T14:08:47,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.715596,stage=no_finetune
+2026-03-03T14:08:47,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.712156,stage=no_finetune
+2026-03-03T14:09:07,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.000000,stage=no_finetune
+2026-03-03T14:09:07,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.000000,stage=no_finetune sdpa_path=flash
+2026-03-03T14:09:07,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,f1,0.000000,stage=no_finetune
+2026-03-03T14:09:07,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.000000,stage=no_finetune
+2026-03-03T14:13:43,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.167180,stage=no_finetune
+2026-03-03T14:13:43,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.167180,stage=no_finetune sdpa_path=flash
+2026-03-03T14:13:43,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,f1,0.166628,stage=no_finetune
+2026-03-03T14:13:43,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.166880,stage=no_finetune
+2026-03-03T14:15:04,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.372491,stage=no_finetune
+2026-03-03T14:15:04,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.372491,stage=no_finetune sdpa_path=flash
+2026-03-03T14:15:04,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.373204,stage=no_finetune
+2026-03-03T14:15:04,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.373510,stage=no_finetune
+2026-03-03T14:15:56,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.547135,stage=no_finetune
+2026-03-03T14:15:56,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.547135,stage=no_finetune sdpa_path=flash
+2026-03-03T14:15:56,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.547501,stage=no_finetune
+2026-03-03T14:15:56,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.546769,stage=no_finetune
+2026-03-03T14:16:15,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-03T14:16:15,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.472924,stage=no_finetune sdpa_path=flash
+2026-03-03T14:16:15,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-03T14:16:15,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-03T14:16:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,pearson,0.350707,stage=no_finetune
+2026-03-03T14:16:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,pearson,0.350707,stage=no_finetune sdpa_path=flash
+2026-03-03T14:16:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd,compress_eval,42,pearson,0.350958,stage=no_finetune
+2026-03-03T14:16:41,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,pearson,0.352775,stage=no_finetune
+2026-03-03T14:17:21,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,matthews_correlation,0.196552,stage=no_finetune
+2026-03-03T14:17:21,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.196552,stage=no_finetune sdpa_path=flash
+2026-03-03T14:17:21,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,matthews_correlation,0.190553,stage=no_finetune
+2026-03-03T14:17:21,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.189250,stage=no_finetune
+2026-03-03T14:17:44,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.719037,stage=no_finetune
+2026-03-03T14:17:44,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.719037,stage=no_finetune sdpa_path=flash
+2026-03-03T14:17:44,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.720183,stage=no_finetune
+2026-03-03T14:17:44,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.720183,stage=no_finetune
+2026-03-03T14:18:04,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.101351,stage=no_finetune
+2026-03-03T14:18:04,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,f1,0.101351,stage=no_finetune sdpa_path=flash
+2026-03-03T14:18:04,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,f1,0.094915,stage=no_finetune
+2026-03-03T14:18:04,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.101351,stage=no_finetune
+2026-03-03T14:22:42,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.679344,stage=no_finetune
+2026-03-03T14:22:42,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,f1,0.679344,stage=no_finetune sdpa_path=flash
+2026-03-03T14:22:42,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,f1,0.678913,stage=no_finetune
+2026-03-03T14:22:42,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.678904,stage=no_finetune
+2026-03-03T14:24:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.524300,stage=no_finetune
+2026-03-03T14:24:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.524300,stage=no_finetune sdpa_path=flash
+2026-03-03T14:24:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.524401,stage=no_finetune
+2026-03-03T14:24:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.524198,stage=no_finetune
+2026-03-03T14:24:55,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.531210,stage=no_finetune
+2026-03-03T14:24:55,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.531210,stage=no_finetune sdpa_path=flash
+2026-03-03T14:24:55,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.531210,stage=no_finetune
+2026-03-03T14:24:55,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.531942,stage=no_finetune
+2026-03-03T14:25:13,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.581227,stage=no_finetune
+2026-03-03T14:25:13,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.581227,stage=no_finetune sdpa_path=flash
+2026-03-03T14:25:13,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,accuracy,0.577617,stage=no_finetune
+2026-03-03T14:25:13,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.581227,stage=no_finetune
+2026-03-03T14:25:40,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,pearson,0.702344,stage=no_finetune
+2026-03-03T14:25:40,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,pearson,0.702344,stage=no_finetune sdpa_path=flash
+2026-03-03T14:25:40,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd,compress_eval,42,pearson,0.702042,stage=no_finetune
+2026-03-03T14:25:40,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,pearson,0.702221,stage=no_finetune
+2026-03-03T14:26:20,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,matthews_correlation,0.019193,stage=no_finetune
+2026-03-03T14:26:20,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.019193,stage=no_finetune sdpa_path=flash
+2026-03-03T14:26:20,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,matthews_correlation,0.019193,stage=no_finetune
+2026-03-03T14:26:20,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.019193,stage=no_finetune
+2026-03-03T14:26:43,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.854358,stage=no_finetune
+2026-03-03T14:26:43,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.854358,stage=no_finetune sdpa_path=flash
+2026-03-03T14:26:43,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,accuracy,0.854358,stage=no_finetune
+2026-03-03T14:26:43,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.853211,stage=no_finetune
+2026-03-03T14:27:03,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.847724,stage=no_finetune
+2026-03-03T14:27:03,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,f1,0.847724,stage=no_finetune sdpa_path=flash
+2026-03-03T14:27:03,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,f1,0.846395,stage=no_finetune
+2026-03-03T14:27:03,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.847724,stage=no_finetune
+2026-03-03T14:31:41,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.762077,stage=no_finetune
+2026-03-03T14:31:41,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,f1,0.762077,stage=no_finetune sdpa_path=flash
+2026-03-03T14:31:41,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,f1,0.761744,stage=no_finetune
+2026-03-03T14:31:41,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.762270,stage=no_finetune
+2026-03-03T14:33:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.578706,stage=no_finetune
+2026-03-03T14:33:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.578706,stage=no_finetune sdpa_path=flash
+2026-03-03T14:33:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,accuracy,0.578604,stage=no_finetune
+2026-03-03T14:33:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.578808,stage=no_finetune
+2026-03-03T14:33:54,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.602782,stage=no_finetune
+2026-03-03T14:33:54,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.602782,stage=no_finetune sdpa_path=flash
+2026-03-03T14:33:54,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,accuracy,0.601684,stage=no_finetune
+2026-03-03T14:33:54,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.602416,stage=no_finetune
+2026-03-03T14:34:13,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.599278,stage=no_finetune
+2026-03-03T14:34:13,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.599278,stage=no_finetune sdpa_path=flash
+2026-03-03T14:34:13,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,accuracy,0.599278,stage=no_finetune
+2026-03-03T14:34:13,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.599278,stage=no_finetune
+2026-03-03T14:34:40,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,pearson,0.493580,stage=no_finetune
+2026-03-03T14:34:40,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,pearson,0.493580,stage=no_finetune sdpa_path=flash
+2026-03-03T14:34:40,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,drone,per_head,,,flashsvd,compress_eval,42,pearson,0.493327,stage=no_finetune
+2026-03-03T14:34:40,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,pearson,0.493513,stage=no_finetune
+2026-03-03T14:35:20,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,matthews_correlation,-0.028174,stage=no_finetune
+2026-03-03T14:35:20,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,matthews_correlation,-0.028174,stage=no_finetune sdpa_path=flash
+2026-03-03T14:35:20,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,matthews_correlation,-0.018366,stage=no_finetune
+2026-03-03T14:35:20,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,matthews_correlation,-0.014907,stage=no_finetune
+2026-03-03T14:35:43,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.620413,stage=no_finetune
+2026-03-03T14:35:43,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.620413,stage=no_finetune sdpa_path=flash
+2026-03-03T14:35:43,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,accuracy,0.621560,stage=no_finetune
+2026-03-03T14:35:43,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.620413,stage=no_finetune
+2026-03-03T14:36:03,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.007117,stage=no_finetune
+2026-03-03T14:36:03,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,f1,0.007117,stage=no_finetune sdpa_path=flash
+2026-03-03T14:36:03,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,f1,0.007117,stage=no_finetune
+2026-03-03T14:36:03,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.007117,stage=no_finetune
+2026-03-03T14:40:41,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.520844,stage=no_finetune
+2026-03-03T14:40:41,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,f1,0.520844,stage=no_finetune sdpa_path=flash
+2026-03-03T14:40:41,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,f1,0.521380,stage=no_finetune
+2026-03-03T14:40:41,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.521101,stage=no_finetune
+2026-03-03T14:42:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.351095,stage=no_finetune
+2026-03-03T14:42:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.351095,stage=no_finetune sdpa_path=flash
+2026-03-03T14:42:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,accuracy,0.352624,stage=no_finetune
+2026-03-03T14:42:02,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.351707,stage=no_finetune
+2026-03-03T14:42:53,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.460004,stage=no_finetune
+2026-03-03T14:42:53,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.460004,stage=no_finetune sdpa_path=flash
+2026-03-03T14:42:53,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,accuracy,0.460919,stage=no_finetune
+2026-03-03T14:42:53,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.458539,stage=no_finetune
+2026-03-03T14:43:12,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.545126,stage=no_finetune
+2026-03-03T14:43:12,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.545126,stage=no_finetune sdpa_path=flash
+2026-03-03T14:43:12,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,accuracy,0.548736,stage=no_finetune
+2026-03-03T14:43:12,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.548736,stage=no_finetune
+2026-03-03T14:43:39,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.632567,stage=no_finetune
+2026-03-03T14:43:39,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,pearson,0.632567,stage=no_finetune sdpa_path=flash
+2026-03-03T14:43:39,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd,compress_eval,42,pearson,0.632478,stage=no_finetune
+2026-03-03T14:43:39,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,pearson,0.632900,stage=no_finetune
+2026-03-04T01:33:07,eval_encoder/models/cola/svd_ra48_rf256_rw208_per_head_naive,cola,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,matthews_correlation,0.093283,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T01:33:07,eval_encoder/models/cola/svd_ra48_rf256_rw208_per_head_naive,cola,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,matthews_correlation,0.083592,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T01:52:20,eval_encoder/models/sst2/svd_ra48_rf256_rw208_per_head_naive,sst2,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,accuracy,0.862385,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T01:52:20,eval_encoder/models/sst2/svd_ra48_rf256_rw208_per_head_naive,sst2,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,accuracy,0.862385,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T01:53:38,eval_encoder/models/mrpc/svd_ra48_rf256_rw208_per_head_naive,mrpc,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,f1,0.825301,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T01:53:38,eval_encoder/models/mrpc/svd_ra48_rf256_rw208_per_head_naive,mrpc,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,f1,0.825301,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T03:44:11,eval_encoder/models/qqp/svd_ra48_rf256_rw208_per_head_naive,qqp,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,f1,0.799571,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T03:44:11,eval_encoder/models/qqp/svd_ra48_rf256_rw208_per_head_naive,qqp,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,f1,0.799688,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T05:35:11,eval_encoder/models/mnli/svd_ra48_rf256_rw208_per_head_naive,mnli,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,accuracy,0.750280,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T05:35:11,eval_encoder/models/mnli/svd_ra48_rf256_rw208_per_head_naive,mnli,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,accuracy,0.750484,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:05:33,eval_encoder/models/qnli/svd_ra48_rf256_rw208_per_head_naive,qnli,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,accuracy,0.820794,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:05:33,eval_encoder/models/qnli/svd_ra48_rf256_rw208_per_head_naive,qnli,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,accuracy,0.820794,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:06:28,eval_encoder/models/rte/svd_ra48_rf256_rw208_per_head_naive,rte,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,accuracy,0.563177,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:06:28,eval_encoder/models/rte/svd_ra48_rf256_rw208_per_head_naive,rte,validation,512,32,bf16,svd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,accuracy,0.563177,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:09:36,eval_encoder/models/cola/fwsvd_ra48_rf256_rw208_per_head_naive,cola,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,matthews_correlation,0.395382,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:09:36,eval_encoder/models/cola/fwsvd_ra48_rf256_rw208_per_head_naive,cola,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,matthews_correlation,0.389634,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:28:38,eval_encoder/models/sst2/fwsvd_ra48_rf256_rw208_per_head_naive,sst2,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,accuracy,0.872706,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:28:38,eval_encoder/models/sst2/fwsvd_ra48_rf256_rw208_per_head_naive,sst2,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,accuracy,0.872706,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:29:54,eval_encoder/models/mrpc/fwsvd_ra48_rf256_rw208_per_head_naive,mrpc,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,f1,0.825688,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T06:29:54,eval_encoder/models/mrpc/fwsvd_ra48_rf256_rw208_per_head_naive,mrpc,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,f1,0.825688,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T08:19:54,eval_encoder/models/qqp/fwsvd_ra48_rf256_rw208_per_head_naive,qqp,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,f1,0.824616,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T08:19:54,eval_encoder/models/qqp/fwsvd_ra48_rf256_rw208_per_head_naive,qqp,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,f1,0.824776,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T10:10:59,eval_encoder/models/mnli/fwsvd_ra48_rf256_rw208_per_head_naive,mnli,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,accuracy,0.786551,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T10:10:59,eval_encoder/models/mnli/fwsvd_ra48_rf256_rw208_per_head_naive,mnli,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,accuracy,0.786042,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T10:41:18,eval_encoder/models/qnli/fwsvd_ra48_rf256_rw208_per_head_naive,qnli,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,accuracy,0.861614,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T10:41:18,eval_encoder/models/qnli/fwsvd_ra48_rf256_rw208_per_head_naive,qnli,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,accuracy,0.861065,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T10:42:13,eval_encoder/models/rte/fwsvd_ra48_rf256_rw208_per_head_naive,rte,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,accuracy,0.610108,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T10:42:13,eval_encoder/models/rte/fwsvd_ra48_rf256_rw208_per_head_naive,rte,validation,512,32,bf16,fwsvd,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,accuracy,0.617329,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T10:45:30,eval_encoder/models/cola/drone_ra48_rf256_rw208_per_head_naive,cola,validation,512,32,bf16,drone,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,matthews_correlation,0.333710,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T10:45:30,eval_encoder/models/cola/drone_ra48_rf256_rw208_per_head_naive,cola,validation,512,32,bf16,drone,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,matthews_correlation,0.329401,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T11:04:34,eval_encoder/models/sst2/drone_ra48_rf256_rw208_per_head_naive,sst2,validation,512,32,bf16,drone,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,accuracy,0.888761,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T11:04:34,eval_encoder/models/sst2/drone_ra48_rf256_rw208_per_head_naive,sst2,validation,512,32,bf16,drone,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,accuracy,0.888761,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T11:05:51,eval_encoder/models/mrpc/drone_ra48_rf256_rw208_per_head_naive,mrpc,validation,512,32,bf16,drone,per_head,ra48_rf256_rw208,,naive,compress_finetune,42,f1,0.891566,post_compress_finetune epochs=3 lr=2e-05
+2026-03-04T11:05:51,eval_encoder/models/mrpc/drone_ra48_rf256_rw208_per_head_naive,mrpc,validation,512,32,bf16,drone,per_head,ra48_rf256_rw208,,flashsvd,compress_finetune,42,f1,0.889655,post_compress_finetune epochs=3 lr=2e-05

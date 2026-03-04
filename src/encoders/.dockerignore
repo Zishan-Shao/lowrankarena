@@ -1,0 +1,63 @@
+# Git
+.git
+.gitignore
+
+# Claude Code
+.claude
+.claude/
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+
+# 临时文件
+*.swp
+*.swo
+*~
+.DS_Store
+ars_out
+
+# 大文件目录（不打包到镜像）
+models/*
+finetuned_models/*
+logs/*
+eval_results/*.csv
+eval_results/*.json
+
+# 保留 final 目录结构
+!eval_results/final/.gitkeep
+!models/.gitkeep
+!finetuned_models/.gitkeep
+!logs/.gitkeep
+
+# 归档文件
+archived
+
+# 整理脚本（不需要在容器内）
+organize_files.sh
+cleanup_scripts.sh
+cleanup_docs.sh
+verify_organization.sh
+ORGANIZATION_REPORT.md
+FINAL_CLEANUP_REPORT.md
+cleanup_scripts.sh
+
+# IDE
+.vscode
+.idea
+*.sublime-*
+
+# 其他
+.cache
+*.log
+*.bak
+*.backup
+README.md.backup

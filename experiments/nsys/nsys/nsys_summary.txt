@@ -1,0 +1,208 @@
+════════════════════════════════════════
+  mnli_svd_naive
+════════════════════════════════════════
+--- [cuda_gpu_kern_sum] ---
+Generating SQLite file eval_encoder/eval_results/nsys/mnli_svd_naive.sqlite from eval_encoder/eval_results/nsys/mnli_svd_naive.nsys-rep
+Processing [eval_encoder/eval_results/nsys/mnli_svd_naive.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances  Avg (ns)   Med (ns)   Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  ---------  ---------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
+     17.3      491,406,322      4,800  102,376.3   79,137.0    29,312   323,907     89,769.4  ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stages_32x1_nn                                          
+     13.8      390,982,472        600  651,637.5  651,332.5   643,205   661,957      3,395.3  void <unnamed>::softmax_warp_forward<c10::BFloat16, c10::BFloat16, float, (int)9, (bool)0, (bool)0>…
+     13.0      369,237,991        600  615,396.7  615,348.5   606,276   623,653      2,927.8  void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<c10::BFloat16, c10…
+     11.2      319,397,561        600  532,329.3  532,244.0   525,892   539,012      2,194.9  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+     10.8      306,503,494      3,650   83,973.6   44,608.0    21,921   318,466    100,999.1  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      9.8      277,402,184        600  462,337.0  462,403.5   455,940   467,875      1,785.4  void cutlass::Kernel2<cutlass_80_wmma_tensorop_bf16_s161616gemm_bf16_32x32_64x1_nn_align8>(T1::Para…
+      6.8      193,892,849      4,200   46,165.0   38,689.0     5,280   129,697     41,176.8  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      6.3      178,786,827        600  297,978.0  297,810.5   292,130   305,506      2,221.5  void at::native::vectorized_elementwise_kernel<(int)4, at::native::GeluCUDAKernelImpl(at::TensorIte…
+      3.6      102,414,518        600  170,690.9  170,897.5   159,713   179,521      3,717.1  ampere_bf16_s16816gemm_bf16_128x128_ldg8_f2f_stages_64x3_nn                                         
+      2.8       80,161,407      1,250   64,129.1   55,744.5    20,545    84,576     14,553.7  void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctor_add<c10::BFloat16>, …
+      2.0       56,329,680      1,800   31,294.3   29,888.0    25,536    44,096      4,126.4  ampere_bf16_s16816gemm_bf16_64x64_ldg8_f2f_nn                                                       
+      1.5       42,113,381      1,250   33,690.7   30,048.0    28,416    39,968      4,731.6  void at::native::<unnamed>::vectorized_layer_norm_kernel<c10::BFloat16, float>(int, T2, const T1 *,…
+      0.8       23,377,803        600   38,963.0   39,008.0    37,568    41,441        569.7  ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_nn                                                      
+--- [cuda_api_sum] ---
+
+NOTICE: Existing SQLite export found: eval_encoder/eval_results/nsys/mnli_svd_naive.sqlite
+        It is assumed file was previously exported from: eval_encoder/eval_results/nsys/mnli_svd_naive.nsys-rep
+        Consider using --force-export=true if needed.
+
+Processing [eval_encoder/eval_results/nsys/mnli_svd_naive.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls    Avg (ns)      Med (ns)     Min (ns)    Max (ns)   StdDev (ns)                      Name                     
+ --------  ---------------  ---------  ------------  ------------  ----------  ----------  -----------  ---------------------------------------------
+     47.5    1,192,876,421         31  38,479,884.5  39,605,108.0  27,356,679  42,801,357  3,838,794.0  cudaDeviceSynchronize                        
+     24.5      614,468,365        555   1,107,150.2      10,317.0       3,501  34,594,586  5,983,166.0  cudaStreamSynchronize                        
+     20.3      510,685,833     22,490      22,707.2       8,547.0       5,523  46,440,969    568,914.3  cudaLaunchKernel                             
+      2.3       56,862,316          1  56,862,316.0  56,862,316.0  56,862,316  56,862,316          0.0  cudaProfilerStop                             
+--- [cuda_gpu_mem_time_sum] ---
+
+NOTICE: Existing SQLite export found: eval_encoder/eval_results/nsys/mnli_svd_naive.sqlite
+        It is assumed file was previously exported from: eval_encoder/eval_results/nsys/mnli_svd_naive.nsys-rep
+        Consider using --force-export=true if needed.
+
+Processing [eval_encoder/eval_results/nsys/mnli_svd_naive.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)   Med (ns)   Min (ns)  Max (ns)   StdDev (ns)            Operation           
+
+════════════════════════════════════════
+  mnli_svd_flashsvd
+════════════════════════════════════════
+--- [cuda_gpu_kern_sum] ---
+Generating SQLite file eval_encoder/eval_results/nsys/mnli_svd_flashsvd.sqlite from eval_encoder/eval_results/nsys/mnli_svd_flashsvd.nsys-rep
+Processing [eval_encoder/eval_results/nsys/mnli_svd_flashsvd.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances   Avg (ns)     Med (ns)    Min (ns)   Max (ns)   StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  -----------  -----------  ---------  ---------  -----------  ----------------------------------------------------------------------------------------------------
+     49.4    1,049,563,786        600  1,749,273.0  1,750,238.0  1,702,413  1,797,838     15,605.4  fused_ffn_phase1                                                                                    
+     23.3      495,718,821        600    826,198.0    832,102.5    755,301    853,063     21,755.0  _demo_attn_kernel                                                                                   
+     10.5      223,841,666      3,600     62,178.2     64,464.5     29,441     99,681     23,775.0  ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stages_32x1_nn                                          
+      5.8      122,436,858      7,800     15,697.0      6,368.0      2,017     49,441     16,431.8  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      3.7       78,667,503      1,250     62,934.0     30,848.5     15,040    104,417     37,068.9  void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctor_add<c10::BFloat16>, …
+      2.2       47,148,852      1,250     37,719.1     27,553.0     22,209     53,824     12,052.2  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      2.2       46,682,744      1,250     37,346.2     37,616.5     29,024     44,480      3,587.4  void at::native::<unnamed>::vectorized_layer_norm_kernel<c10::BFloat16, float>(int, T2, const T1 *,…
+      1.2       25,270,410        600     42,117.4     42,113.0     39,617     44,704        667.9  ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_nn                                                      
+      1.0       22,072,797        600     36,788.0     36,768.0     34,240     38,145        387.3  void at::native::vectorized_elementwise_kernel<(int)4, at::native::bfloat16_copy_kernel_cuda(at::Te…
+      0.1        2,915,025        600      4,858.4      5,056.0      2,016      5,920        866.7  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      0.1        2,424,684        150     16,164.6     18,688.5      4,352     32,609      8,775.1  void at::native::vectorized_gather_kernel<(int)16, long>(char *, char *, T2 *, int, long, long, lon…
+      0.1        1,697,704        600      2,829.5      2,656.0      2,368      3,488        332.1  void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIterator…
+      0.1        1,250,247         50     25,004.9     25,104.0     22,560     25,664        568.6  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl<at::native::…
+--- [cuda_api_sum] ---
+
+NOTICE: Existing SQLite export found: eval_encoder/eval_results/nsys/mnli_svd_flashsvd.sqlite
+        It is assumed file was previously exported from: eval_encoder/eval_results/nsys/mnli_svd_flashsvd.nsys-rep
+        Consider using --force-export=true if needed.
+
+Processing [eval_encoder/eval_results/nsys/mnli_svd_flashsvd.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls    Avg (ns)      Med (ns)     Min (ns)    Max (ns)   StdDev (ns)                      Name                     
+ --------  ---------------  ---------  ------------  ------------  ----------  ----------  -----------  ---------------------------------------------
+     42.5      563,253,366         31  18,169,463.4  18,712,918.0  10,923,648  21,872,164  3,200,935.2  cudaDeviceSynchronize                        
+     29.2      386,574,557     18,290      21,135.8       7,818.5       5,292  73,064,118    638,095.1  cudaLaunchKernel                             
+     18.0      238,298,843        555     429,367.3       8,401.0       2,786  18,781,989  2,351,856.2  cudaStreamSynchronize                        
+      2.1       27,903,654          1  27,903,654.0  27,903,654.0  27,903,654  27,903,654          0.0  cudaProfilerStop                             
+--- [cuda_gpu_mem_time_sum] ---
+
+NOTICE: Existing SQLite export found: eval_encoder/eval_results/nsys/mnli_svd_flashsvd.sqlite
+        It is assumed file was previously exported from: eval_encoder/eval_results/nsys/mnli_svd_flashsvd.nsys-rep
+        Consider using --force-export=true if needed.
+
+Processing [eval_encoder/eval_results/nsys/mnli_svd_flashsvd.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)   StdDev (ns)            Operation           
+
+════════════════════════════════════════
+  mnli_adasvd_naive
+════════════════════════════════════════
+--- [cuda_gpu_kern_sum] ---
+Generating SQLite file eval_encoder/eval_results/nsys/mnli_adasvd_naive.sqlite from eval_encoder/eval_results/nsys/mnli_adasvd_naive.nsys-rep
+Processing [eval_encoder/eval_results/nsys/mnli_adasvd_naive.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances  Avg (ns)   Med (ns)   Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  ---------  ---------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
+     13.6      392,436,748        600  654,061.2  654,084.5   645,445   662,309      3,461.5  void <unnamed>::softmax_warp_forward<c10::BFloat16, c10::BFloat16, float, (int)9, (bool)0, (bool)0>…
+     12.8      367,731,759        600  612,886.3  612,837.0   602,020   620,645      2,625.9  void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<c10::BFloat16, c10…
+     11.1      319,414,636        600  532,357.7  532,324.0   527,588   539,108      1,848.9  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+     10.5      302,414,546      3,650   82,853.3   53,409.0    21,664   314,563     93,090.4  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      9.6      276,676,117        600  461,126.9  461,091.0   455,844   466,500      1,925.6  void cutlass::Kernel2<cutlass_80_wmma_tensorop_bf16_s161616gemm_bf16_32x32_64x1_nn_align8>(T1::Para…
+      8.1      232,740,931      1,100  211,582.7  313,155.0    29,728   326,499    121,684.8  ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stages_32x1_nn                                          
+      6.4      183,661,080      4,200   43,728.8   36,608.0     4,640   121,025     38,264.2  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      6.2      178,952,909        600  298,254.8  298,082.5   292,194   307,331      2,075.5  void at::native::vectorized_elementwise_kernel<(int)4, at::native::GeluCUDAKernelImpl(at::TensorIte…
+      5.7      164,767,096      1,800   91,537.3   91,680.5    85,025   104,321      3,561.4  void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_relu_bf16_256x128_32x3_nn_align8>(T1::Par…
+      4.9      140,580,811      1,400  100,414.9   75,904.0    45,792   207,874     57,816.5  void cutlass::Kernel2<cutlass_75_tensorop_bf16_s1688gemm_bf16_256x128_nn_align1>(T1::Params)        
+      3.0       87,441,026      1,000   87,441.0   53,264.5    28,577   164,609     58,195.5  void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_bf16_256x128_32x3_nn_align2>(T1::Params)  
+      2.1       61,762,007      1,250   49,409.6   48,064.5    15,616    94,752      9,580.2  void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctor_add<c10::BFloat16>, …
+      1.8       51,582,062      1,800   28,656.7   28,544.0    26,048    31,648        911.8  ampere_bf16_s16816gemm_bf16_64x64_ldg8_f2f_nn                                                       
+--- [cuda_api_sum] ---
+
+NOTICE: Existing SQLite export found: eval_encoder/eval_results/nsys/mnli_adasvd_naive.sqlite
+        It is assumed file was previously exported from: eval_encoder/eval_results/nsys/mnli_adasvd_naive.nsys-rep
+        Consider using --force-export=true if needed.
+
+Processing [eval_encoder/eval_results/nsys/mnli_adasvd_naive.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls    Avg (ns)      Med (ns)     Min (ns)    Max (ns)   StdDev (ns)                      Name                     
+ --------  ---------------  ---------  ------------  ------------  ----------  ----------  -----------  ---------------------------------------------
+     50.1    1,284,820,236         31  41,445,814.1  41,902,601.0  37,499,809  42,987,732  1,799,858.7  cudaDeviceSynchronize                        
+     20.9      536,500,593     17,990      29,822.2       8,536.0       5,309  76,673,002    832,577.2  cudaLaunchKernel                             
+     20.5      524,831,277        555     945,641.9      10,244.0       2,840  34,939,523  5,146,147.9  cudaStreamSynchronize                        
+      1.7       43,919,011      5,200       8,446.0       7,465.0       5,323      68,840      3,349.8  cuLaunchKernel                               
+--- [cuda_gpu_mem_time_sum] ---
+
+NOTICE: Existing SQLite export found: eval_encoder/eval_results/nsys/mnli_adasvd_naive.sqlite
+        It is assumed file was previously exported from: eval_encoder/eval_results/nsys/mnli_adasvd_naive.nsys-rep
+        Consider using --force-export=true if needed.
+
+Processing [eval_encoder/eval_results/nsys/mnli_adasvd_naive.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)   Med (ns)   Min (ns)  Max (ns)   StdDev (ns)            Operation           
+
+════════════════════════════════════════
+  mnli_adasvd_flashsvd
+════════════════════════════════════════
+--- [cuda_gpu_kern_sum] ---
+Generating SQLite file eval_encoder/eval_results/nsys/mnli_adasvd_flashsvd.sqlite from eval_encoder/eval_results/nsys/mnli_adasvd_flashsvd.nsys-rep
+Processing [eval_encoder/eval_results/nsys/mnli_adasvd_flashsvd.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances   Avg (ns)     Med (ns)    Min (ns)   Max (ns)   StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  -----------  -----------  ---------  ---------  -----------  ----------------------------------------------------------------------------------------------------
+     48.3    1,008,942,266        600  1,681,570.4  1,813,518.0  1,380,459  1,922,351    202,585.2  fused_ffn_phase1                                                                                    
+     23.8      497,373,547        600    828,955.9    830,294.0    776,677    863,463     17,581.5  _demo_attn_kernel                                                                                   
+      7.5      157,397,176      1,800     87,442.9     85,921.0     80,513    103,361      4,991.9  void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_relu_bf16_256x128_32x3_nn_align8>(T1::Par…
+      4.3       90,363,190      7,800     11,585.0      7,424.0      2,048     29,920      9,298.2  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      3.8       80,104,398      1,050     76,289.9     80,353.0     47,104    109,537     20,218.2  void cutlass::Kernel2<cutlass_75_tensorop_bf16_s1688gemm_bf16_256x128_nn_align1>(T1::Params)        
+      2.8       58,659,347      1,250     46,927.5     45,825.0     16,032    100,512     11,667.8  void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctor_add<c10::BFloat16>, …
+      2.1       42,966,234      1,250     34,373.0     34,368.0     28,736     42,432      2,230.4  void at::native::<unnamed>::vectorized_layer_norm_kernel<c10::BFloat16, float>(int, T2, const T1 *,…
+      1.9       38,735,988      1,250     30,988.8     25,089.0     22,336     60,320     12,315.1  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      1.4       30,065,316        600     50,108.9     49,984.0     48,833     52,160        599.9  void at::native::vectorized_elementwise_kernel<(int)4, at::native::bfloat16_copy_kernel_cuda(at::Te…
+      1.2       25,483,884        600     42,473.1     37,600.0     28,800     74,208     12,638.5  void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_bf16_256x128_32x3_nn_align2>(T1::Params)  
+      0.8       17,086,834        150    113,912.2    114,257.0    106,465    118,145      2,368.4  void cutlass::Kernel2<cutlass_75_tensorop_bf16_s1688gemm_bf16_128x256_nn_align1>(T1::Params)        
+      0.6       12,162,773        300     40,542.6     30,784.0     29,728     63,521     14,259.0  ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stages_32x1_nn                                          
+      0.4        8,468,721        200     42,343.6     42,160.5     37,665     48,193      2,057.0  ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_nn                                                      
+--- [cuda_api_sum] ---
+
+NOTICE: Existing SQLite export found: eval_encoder/eval_results/nsys/mnli_adasvd_flashsvd.sqlite
+        It is assumed file was previously exported from: eval_encoder/eval_results/nsys/mnli_adasvd_flashsvd.nsys-rep
+        Consider using --force-export=true if needed.
+
+Processing [eval_encoder/eval_results/nsys/mnli_adasvd_flashsvd.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls    Avg (ns)      Med (ns)     Min (ns)    Max (ns)   StdDev (ns)                      Name                     
+ --------  ---------------  ---------  ------------  ------------  ----------  ----------  -----------  ---------------------------------------------
+     45.0      635,288,027         31  20,493,162.2  20,684,379.0  12,436,440  21,652,800  1,612,522.0  cudaDeviceSynchronize                        
+     23.1      326,122,001     14,590      22,352.4       7,823.0       5,219  61,090,217    625,157.8  cudaLaunchKernel                             
+     16.9      238,872,438        555     430,400.8      10,747.0       3,337  18,176,062  2,374,505.6  cudaStreamSynchronize                        
+      4.6       64,771,440          1  64,771,440.0  64,771,440.0  64,771,440  64,771,440          0.0  cudaProfilerStop                             
+--- [cuda_gpu_mem_time_sum] ---
+
+NOTICE: Existing SQLite export found: eval_encoder/eval_results/nsys/mnli_adasvd_flashsvd.sqlite
+        It is assumed file was previously exported from: eval_encoder/eval_results/nsys/mnli_adasvd_flashsvd.nsys-rep
+        Consider using --force-export=true if needed.
+
+Processing [eval_encoder/eval_results/nsys/mnli_adasvd_flashsvd.sqlite] with [/opt/nvidia/nsight-systems/2023.4.4/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)   StdDev (ns)            Operation           
+
