@@ -68,7 +68,7 @@ PHASES="${PHASES:-seqlen batch}"
 TASKS="${TASKS:-mnli stsb}"
 # dense 已移除：其模型路径命名与 SVD checkpoint 不同，会导致路径查找失败
 METHODS="${METHODS:-svd adasvd}"
-BACKENDS="${BACKENDS:-naive sdpa flashsvd15}"
+BACKENDS="${BACKENDS:-naive sdpa flashsvd flashsvd15}"
 DTYPE="${DTYPE:-bf16}"
 WARMUP="${WARMUP:-10}"
 MEASURE="${MEASURE:-50}"
