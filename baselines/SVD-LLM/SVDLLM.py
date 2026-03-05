@@ -2,6 +2,9 @@
 import os
 import sys
 import argparse
+import json
+import resource
+import time
 import torch.jit
 from tqdm import tqdm
 import torch
@@ -17,6 +20,133 @@ from evaluater import *
 current_path = os.path.dirname(os.path.abspath(__file__))
 parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(current_path)
+
+# -------------------------
+# Timing + memory helpers (DF-SVD-style instrumentation)
+# -------------------------
+def _perf_now_iso() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+
+def _perf_timing_write(out_dir: str, filename: str, payload: dict) -> str:
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, filename)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+    return path
+
+
+def _perf_cpu_maxrss_bytes():
+    try:
+        r = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        if sys.platform == "darwin":
+            return int(r)
+        return int(r * 1024)
+    except Exception:
+        return None
+
+
+def _perf_cuda_devices():
+    if not torch.cuda.is_available():
+        return []
+    return [torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())]
+
+
+def _perf_cuda_sync_all():
+    if not torch.cuda.is_available():
+        return
+    for d in _perf_cuda_devices():
+        try:
+            torch.cuda.synchronize(d)
+        except Exception:
+            try:
+                torch.cuda.synchronize()
+            except Exception:
+                pass
+
+
+def _perf_reset_cuda_peak_stats_all():
+    if not torch.cuda.is_available():
+        return
+    for d in _perf_cuda_devices():
+        try:
+            torch.cuda.reset_peak_memory_stats(d)
+        except Exception:
+            try:
+                torch.cuda.reset_peak_memory_stats()
+            except Exception:
+                pass
+
+
+def _perf_cuda_mem_snapshot(device: torch.device):
+    if device.type != "cuda" or not torch.cuda.is_available():
+        return {}
+    try:
+        free, total = torch.cuda.mem_get_info(device)
+    except Exception:
+        free, total = torch.cuda.mem_get_info()
+    try:
+        alloc = torch.cuda.memory_allocated(device)
+        reserved = torch.cuda.memory_reserved(device)
+        max_alloc = torch.cuda.max_memory_allocated(device)
+        max_reserved = torch.cuda.max_memory_reserved(device)
+    except Exception:
+        alloc = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
+        max_alloc = torch.cuda.max_memory_allocated()
+        max_reserved = torch.cuda.max_memory_reserved()
+    return {
+        "alloc_bytes": int(alloc),
+        "reserved_bytes": int(reserved),
+        "max_alloc_bytes": int(max_alloc),
+        "max_reserved_bytes": int(max_reserved),
+        "free_bytes": int(free),
+        "total_bytes": int(total),
+    }
+
+
+def _perf_cuda_mem_snapshot_all():
+    snap = {}
+    for d in _perf_cuda_devices():
+        snap[str(d)] = _perf_cuda_mem_snapshot(d)
+    return snap
+
+
+def _perf_model_size_bytes(model: nn.Module):
+    try:
+        pb = 0
+        pc = 0
+        for p in model.parameters():
+            pc += int(p.numel())
+            pb += int(p.numel()) * int(p.element_size())
+        bb = 0
+        bc = 0
+        for b in model.buffers():
+            bc += int(b.numel())
+            bb += int(b.numel()) * int(b.element_size())
+        return {"param_bytes": int(pb), "buffer_bytes": int(bb), "param_count": int(pc), "buffer_count": int(bc)}
+    except Exception:
+        return None
+
+
+def _perf_record_stage(timing: dict, name: str, fn, *args, **kwargs):
+    """Run fn(*args, **kwargs) and record synchronized timing + CUDA memory."""
+    _perf_cuda_sync_all()
+    _perf_reset_cuda_peak_stats_all()
+    t0 = time.perf_counter()
+    out = fn(*args, **kwargs)
+    _perf_cuda_sync_all()
+    sec = time.perf_counter() - t0
+    timing.setdefault("stages", []).append(
+        {
+            "name": str(name),
+            "sec": float(sec),
+            "gpu_mem": _perf_cuda_mem_snapshot_all(),
+            "cpu_maxrss_bytes": _perf_cpu_maxrss_bytes(),
+        }
+    )
+    return out
+
 
 
 def _safe_cholesky_spd(mat: torch.Tensor, base_eps: float = 1e-6, max_tries: int = 10) -> torch.Tensor:
@@ -278,16 +408,10 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
     use_cpu_buffers = True if str(dev).startswith('cuda') else False
     buf_device = torch.device('cpu') if use_cpu_buffers else dev
     pin = True if use_cpu_buffers else False
-    # keep the seqlen set by the caller (args.model_seq_len)
-    calib_seqlen = int(getattr(model, "seqlen", calib_loader[0]["input_ids"].shape[-1]))
-
-    # never exceed the model's max position embeddings (important for LLaMA-1)
-    max_pos = getattr(model.config, "max_position_embeddings", None)
-    calib_seqlen = min(calib_seqlen, int(max_pos))
-
+    calib_seqlen = int(calib_loader[0]["input_ids"].shape[-1])
     model.seqlen = calib_seqlen
     inps = torch.zeros(
-        (len(calib_loader), model.seqlen, model.config.hidden_size),
+        (len(calib_loader), calib.seqlen, model.config.hidden_size),
         dtype=dtype,
         device=buf_device,
         pin_memory=pin,
@@ -320,15 +444,6 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
     layers[0] = Catcher(layers[0])
     for batch in calib_loader:
         try:
-            # enforce seqlen cap
-            if "input_ids" in batch and batch["input_ids"].shape[-1] > calib_seqlen:
-                batch = dict(batch)
-                batch["input_ids"] = batch["input_ids"][:, :calib_seqlen]
-                if "attention_mask" in batch and batch["attention_mask"] is not None:
-                    batch["attention_mask"] = batch["attention_mask"][:, :calib_seqlen]
-                if "position_ids" in batch and batch.get("position_ids", None) is not None:
-                    batch["position_ids"] = batch["position_ids"][:, :calib_seqlen]
-
             batch = {k: v.to(dev) for k, v in batch.items()}
             model(**batch)
         except ValueError:
@@ -960,103 +1075,290 @@ if __name__ == '__main__':
     parser.add_argument('--svdllm_compat_whitening', action='store_true', help='Use original whitening accumulation (raw X^T X without centering).')
     parser.add_argument('--svdllm_compat_ranks', action='store_true', help='Use original SVD rank formulas for attention/MLP modules.')
     parser.add_argument('--svdllm_compat_attention', action='store_true', help='Force explicit attention (matmul+softmax) and 3-value return like HF.')
-    
+
+    # Instrumentation outputs
+    parser.add_argument('--timing_dir', type=str, default=None, help='Directory to write timing json (defaults to --save_path if set, else ./output).')
+    parser.add_argument('--timing_file', type=str, default='svdllm_timing.json', help='Filename for timing json written under --timing_dir.')
+
     args = parser.parse_args()
-    # Apply compat flags via environment for downstream modules
-    if args.svdllm_compat_all:
-        os.environ['SVDLLM_COMPAT_ALL'] = '1'
-    if args.svdllm_compat_whitening:
-        os.environ['SVDLLM_COMPAT_WHITENING'] = '1'
-    if args.svdllm_compat_ranks:
-        os.environ['SVDLLM_COMPAT_RANKS'] = '1'
-    if args.svdllm_compat_attention:
-        os.environ['SVDLLM_COMPAT_ATTENTION'] = '1'
-    args.ratio = 1- args.ratio
-    if args.step == 1:
-        model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
-        model.seqlen = args.model_seq_len
-        tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
-        model = model.eval()
-        if args.profiling_mat_path is None:
-            cali_white_data = get_calib_train_data(args.dataset, tokenizer, args.whitening_nsamples, seqlen=args.model_seq_len)
-            profiling_mat = profle_svdllm_low_resource(args.model, model, cali_white_data, args.DEV)
-            if args.save_path is not None:
-                torch.save(profiling_mat, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_profiling_'+ args.dataset + '_' + str(args.whitening_nsamples)  + '_' + str(args.seed)+ '.pt')
-        else:
-            profiling_mat = torch.load(args.profiling_mat_path)
-        whitening(args.model, model, profiling_mat, args.ratio, args.DEV)
-        if args.save_path is not None:
-            torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_whitening_only_' + str(args.ratio) + '.pt')   # fp32
-    elif args.step == 2:
-        model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
-        model.seqlen = args.model_seq_len
-        tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
-        dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
-        model = model.eval()
-        model = model.float()  # need to set to float
-        if args.profiling_mat_path is None:
-            cali_white_data = get_calib_train_data(args.dataset, tokenizer, args.whitening_nsamples, seqlen=args.model_seq_len)
-            profiling_mat = profle_svdllm_low_resource(args.model, model, cali_white_data, args.DEV)
-            if args.save_path is not None:
-                torch.save(profiling_mat, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_profiling_'+ args.dataset + '_' + str(args.whitening_nsamples)  + '_' + str(args.seed)+ '.pt')
-        else:
-            profiling_mat = torch.load(args.profiling_mat_path)
-        whitening_local_update(args.model, model, dataloader, profiling_mat, args.ratio, args.DEV)
-        if args.save_path is not None:
-            torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_whitening_then_update_' + str(args.ratio) + '.pt')  # fp32
-    elif args.step == 3:
-        model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
-        tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
-        model = model.eval()
-        model = model.float()
-        dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
-        whitening_local_update(model_name=args.model, model=model, dataloader=dataloader, profiling_mat=None, ratio=args.ratio, dev=args.DEV, direct_update=True)
-        if args.save_path is not None:
-            torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_update_only_' + str(args.ratio) + '.pt')   # fp32
-    elif args.step >= 4:
-        print(f"evaluating {args.model_path}...")
-        if args.model_path == "original":
-            model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
-        else:
-            model, tokenizer = get_model_from_local(args.model_path)
-            if args.lora is not None:
-                from utils.peft import PeftModel
-                model = PeftModel.from_pretrained(
-                    model,
-                    args.lora,
-                    torch_dtype=torch.float16,
+
+    perf_run_start = time.perf_counter()
+    perf_out_dir = args.timing_dir if args.timing_dir is not None else (args.save_path if args.save_path is not None else "output")
+    os.makedirs(perf_out_dir, exist_ok=True)
+
+    timing = {
+        "started_at": _perf_now_iso(),
+        "args": vars(args),
+        "stages": [],
+        "step": int(args.step),
+        "paths": {"timing_dir": perf_out_dir},
+    }
+    timing["gpu_mem_begin"] = _perf_cuda_mem_snapshot_all()
+    timing["cpu_maxrss_bytes_begin"] = _perf_cpu_maxrss_bytes()
+
+    timing_json_path = None
+    try:
+        # Apply compat flags via environment for downstream modules
+        if args.svdllm_compat_all:
+            os.environ['SVDLLM_COMPAT_ALL'] = '1'
+        if args.svdllm_compat_whitening:
+            os.environ['SVDLLM_COMPAT_WHITENING'] = '1'
+        if args.svdllm_compat_ranks:
+            os.environ['SVDLLM_COMPAT_RANKS'] = '1'
+        if args.svdllm_compat_attention:
+            os.environ['SVDLLM_COMPAT_ATTENTION'] = '1'
+
+        # Original script semantics: internally treat `ratio` as keep_ratio (1 - compression_ratio)
+        timing["args"]["ratio_input"] = float(getattr(args, "ratio", 0.0))
+        args.ratio = 1 - args.ratio
+        timing["args_effective"] = vars(args)
+
+        if args.step == 1:
+            model, tokenizer = _perf_record_stage(
+                timing, "load_model_hf", get_model_from_huggingface, model_id=args.model, hf_token=args.hf_token
+            )
+            model.seqlen = args.model_seq_len
+            tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
+            model = model.eval()
+            timing["model_size_before"] = _perf_model_size_bytes(model)
+
+            if args.profiling_mat_path is None:
+                cali_white_data = _perf_record_stage(
+                    timing,
+                    "build_calib_train_data_whitening",
+                    get_calib_train_data,
+                    args.dataset,
+                    tokenizer,
+                    args.whitening_nsamples,
+                    seqlen=args.model_seq_len,
                 )
-                model = model.merge_and_unload()
-                torch.save({'model': model, 'tokenizer': tokenizer}, args.lora + '/merge.pt')
-        model.eval()
-        # Optional dtype override for evaluation to control GPU memory
-        # Default behavior preserved (float32) when no override is set.
-        try:
-            from argparse import SUPPRESS as _SUPPRESS
-        except Exception:
-            _SUPPRESS = None
-        # Backward compatible: allow --dtype from CLI to select eval dtype if provided
-        eval_dtype = None
-        try:
-            # argparse may include args.dtype if our caller provided it
-            eval_dtype = getattr(args, 'dtype', None)
-        except Exception:
-            eval_dtype = None
-        if isinstance(eval_dtype, str) and eval_dtype:
-            _map = {
-                'float16': torch.float16, 'fp16': torch.float16,
-                'bfloat16': torch.bfloat16, 'bf16': torch.bfloat16,
-                'float32': torch.float32, 'fp32': torch.float32,
-            }
-            tgt = _map.get(eval_dtype.lower(), None)
-            if tgt is not None:
-                model = model.to(dtype=tgt)
-        else:
-            # Preserve original default behavior
+                profiling_mat = _perf_record_stage(
+                    timing, "profile_whitening_matrix", profle_svdllm_low_resource, args.model, model, cali_white_data, args.DEV
+                )
+                if args.save_path is not None:
+                    prof_path = (
+                        args.save_path + "/" + args.model.replace("/", "_").replace("-", "_")
+                        + '_profiling_' + args.dataset + '_' + str(args.whitening_nsamples) + '_' + str(args.seed) + '.pt'
+                    )
+                    _perf_record_stage(timing, "save_profiling_mat", torch.save, profiling_mat, prof_path)
+                    timing["paths"]["profiling_mat"] = prof_path
+            else:
+                profiling_mat = _perf_record_stage(timing, "load_profiling_mat", torch.load, args.profiling_mat_path)
+                timing["paths"]["profiling_mat"] = args.profiling_mat_path
+
+            _perf_record_stage(timing, "whitening_svd_decompose", whitening, args.model, model, profiling_mat, args.ratio, args.DEV)
+            timing["model_size_after"] = _perf_model_size_bytes(model)
+
+            if args.save_path is not None:
+                ckpt_path = (
+                    args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_whitening_only_' + str(args.ratio) + '.pt'
+                )
+                _perf_record_stage(timing, "save_checkpoint", torch.save, {'model': model, 'tokenizer': tokenizer}, ckpt_path)
+                timing["paths"]["checkpoint"] = ckpt_path
+
+        elif args.step == 2:
+            model, tokenizer = _perf_record_stage(
+                timing, "load_model_hf", get_model_from_huggingface, model_id=args.model, hf_token=args.hf_token
+            )
+            model.seqlen = args.model_seq_len
+            tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
+            dataloader, _ = _perf_record_stage(
+                timing,
+                "build_dataloader_update",
+                get_loaders,
+                args.dataset,
+                nsamples=args.updating_nsamples,
+                seed=args.seed,
+                tokenizer=tokenizer,
+                seqlen=args.model_seq_len,
+            )
+            model = model.eval()
+            model = model.float()  # need to set to float
+            timing["model_size_before"] = _perf_model_size_bytes(model)
+
+            if args.profiling_mat_path is None:
+                cali_white_data = _perf_record_stage(
+                    timing,
+                    "build_calib_train_data_whitening",
+                    get_calib_train_data,
+                    args.dataset,
+                    tokenizer,
+                    args.whitening_nsamples,
+                    seqlen=args.model_seq_len,
+                )
+                profiling_mat = _perf_record_stage(
+                    timing, "profile_whitening_matrix", profle_svdllm_low_resource, args.model, model, cali_white_data, args.DEV
+                )
+                if args.save_path is not None:
+                    prof_path = (
+                        args.save_path + "/" + args.model.replace("/", "_").replace("-", "_")
+                        + '_profiling_' + args.dataset + '_' + str(args.whitening_nsamples) + '_' + str(args.seed) + '.pt'
+                    )
+                    _perf_record_stage(timing, "save_profiling_mat", torch.save, profiling_mat, prof_path)
+                    timing["paths"]["profiling_mat"] = prof_path
+            else:
+                profiling_mat = _perf_record_stage(timing, "load_profiling_mat", torch.load, args.profiling_mat_path)
+                timing["paths"]["profiling_mat"] = args.profiling_mat_path
+
+            _perf_record_stage(
+                timing, "whitening_then_local_update", whitening_local_update, args.model, model, dataloader, profiling_mat, args.ratio, args.DEV
+            )
+            timing["model_size_after"] = _perf_model_size_bytes(model)
+
+            if args.save_path is not None:
+                ckpt_path = (
+                    args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_whitening_then_update_' + str(args.ratio) + '.pt'
+                )
+                _perf_record_stage(timing, "save_checkpoint", torch.save, {'model': model, 'tokenizer': tokenizer}, ckpt_path)
+                timing["paths"]["checkpoint"] = ckpt_path
+
+        elif args.step == 3:
+            model, tokenizer = _perf_record_stage(
+                timing, "load_model_hf", get_model_from_huggingface, args.model, hf_token=args.hf_token
+            )
+            tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
+            model = model.eval()
             model = model.float()
-        model = model.to(args.DEV)
-        if args.step == 4:
-            label = 'Baseline PPL' if args.model_path == 'original' else 'PPL after pruning'
-            ppl_eval(model, tokenizer, datasets=['wikitext2'], model_seq_len=args.model_seq_len, batch_size=args.eval_batch_size, device=args.DEV, label=label)
-        elif args.step == 5:
-            eff_eval(model, tokenizer, generated_len=args.gen_seq_len, batch_size=args.eval_batch_size, device=args.DEV)
+            dataloader, _ = _perf_record_stage(
+                timing,
+                "build_dataloader_update",
+                get_loaders,
+                args.dataset,
+                nsamples=args.updating_nsamples,
+                seed=args.seed,
+                tokenizer=tokenizer,
+                seqlen=args.model_seq_len,
+            )
+            timing["model_size_before"] = _perf_model_size_bytes(model)
+
+            _perf_record_stage(
+                timing,
+                "local_update_only",
+                whitening_local_update,
+                model_name=args.model,
+                model=model,
+                dataloader=dataloader,
+                profiling_mat=None,
+                ratio=args.ratio,
+                dev=args.DEV,
+                direct_update=True,
+            )
+            timing["model_size_after"] = _perf_model_size_bytes(model)
+
+            if args.save_path is not None:
+                ckpt_path = (
+                    args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_update_only_' + str(args.ratio) + '.pt'
+                )
+                _perf_record_stage(timing, "save_checkpoint", torch.save, {'model': model, 'tokenizer': tokenizer}, ckpt_path)
+                timing["paths"]["checkpoint"] = ckpt_path
+
+        elif args.step >= 4:
+            print(f"evaluating {args.model_path}...")
+
+            if args.model_path == "original":
+                model, tokenizer = _perf_record_stage(
+                    timing, "load_model_hf", get_model_from_huggingface, args.model, hf_token=args.hf_token
+                )
+            else:
+                model, tokenizer = _perf_record_stage(timing, "load_model_local", get_model_from_local, args.model_path)
+                if args.lora is not None:
+                    from utils.peft import PeftModel
+                    model = _perf_record_stage(
+                        timing,
+                        "apply_lora",
+                        PeftModel.from_pretrained,
+                        model,
+                        args.lora,
+                        torch_dtype=torch.float16,
+                    )
+                    model = _perf_record_stage(timing, "merge_lora", model.merge_and_unload)
+                    _perf_record_stage(timing, "save_lora_merged", torch.save, {'model': model, 'tokenizer': tokenizer}, args.lora + '/merge.pt')
+                    timing["paths"]["lora_merged"] = args.lora + '/merge.pt'
+
+            model.eval()
+
+            # Optional dtype override for evaluation to control GPU memory
+            eval_dtype = None
+            try:
+                eval_dtype = getattr(args, 'dtype', None)
+            except Exception:
+                eval_dtype = None
+
+            if isinstance(eval_dtype, str) and eval_dtype:
+                _map = {
+                    'float16': torch.float16, 'fp16': torch.float16,
+                    'bfloat16': torch.bfloat16, 'bf16': torch.bfloat16,
+                    'float32': torch.float32, 'fp32': torch.float32,
+                }
+                tgt = _map.get(eval_dtype.lower(), None)
+                if tgt is not None:
+                    model = _perf_record_stage(timing, "set_eval_dtype", model.to, dtype=tgt)
+            else:
+                model = _perf_record_stage(timing, "set_eval_dtype_default_fp32", model.float)
+
+            model = _perf_record_stage(timing, "move_model_to_device", model.to, args.DEV)
+            timing["model_size_eval"] = _perf_model_size_bytes(model)
+
+            if args.step == 4:
+                label = 'Baseline PPL' if args.model_path == 'original' else 'PPL after pruning'
+                _perf_record_stage(
+                    timing,
+                    "ppl_eval",
+                    ppl_eval,
+                    model,
+                    tokenizer,
+                    datasets=['wikitext2'],
+                    model_seq_len=args.model_seq_len,
+                    batch_size=args.eval_batch_size,
+                    device=args.DEV,
+                    label=label,
+                )
+            elif args.step == 5:
+                _perf_record_stage(
+                    timing,
+                    "eff_eval",
+                    eff_eval,
+                    model,
+                    tokenizer,
+                    generated_len=args.gen_seq_len,
+                    batch_size=args.eval_batch_size,
+                    device=args.DEV,
+                )
+
+    finally:
+        timing["ended_at"] = _perf_now_iso()
+        timing["total_sec"] = float(time.perf_counter() - perf_run_start)
+        timing["gpu_mem_end"] = _perf_cuda_mem_snapshot_all()
+        timing["cpu_maxrss_bytes_end"] = _perf_cpu_maxrss_bytes()
+
+        # Aggregate peak GPU usage across stages
+        peaks_by_dev = {}
+        for st in timing.get("stages", []):
+            gm = st.get("gpu_mem", {}) if isinstance(st, dict) else {}
+            if not isinstance(gm, dict):
+                continue
+            for dev, mem in gm.items():
+                if not isinstance(mem, dict):
+                    continue
+                ma = int(mem.get("max_alloc_bytes", 0))
+                mr = int(mem.get("max_reserved_bytes", 0))
+                cur = peaks_by_dev.get(dev, {"max_alloc_bytes": 0, "max_reserved_bytes": 0})
+                if ma > int(cur.get("max_alloc_bytes", 0)):
+                    cur["max_alloc_bytes"] = ma
+                if mr > int(cur.get("max_reserved_bytes", 0)):
+                    cur["max_reserved_bytes"] = mr
+                peaks_by_dev[dev] = cur
+        timing["gpu_peak_by_device"] = peaks_by_dev
+        timing["gpu_peak_alloc_bytes"] = int(max([v.get("max_alloc_bytes", 0) for v in peaks_by_dev.values()] + [0]))
+        timing["gpu_peak_reserved_bytes"] = int(max([v.get("max_reserved_bytes", 0) for v in peaks_by_dev.values()] + [0]))
+
+        try:
+            timing_json_path = _perf_timing_write(perf_out_dir, args.timing_file, timing)
+            timing["paths"]["timing_json"] = timing_json_path
+        except Exception as e:
+            print(f"[Warn] Failed to write timing json: {e}", flush=True)
+            timing_json_path = None
+
+        if timing_json_path:
+            print(f"[Time] total={timing['total_sec']:.2f}s timing_json={timing_json_path}", flush=True)
+

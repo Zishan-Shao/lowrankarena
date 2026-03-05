@@ -42,6 +42,7 @@ import json
 import math
 import os
 import random
+import resource
 import sys
 import time
 from dataclasses import dataclass
@@ -140,6 +141,138 @@ def _timing_write(out_dir: str, filename: str, timing: Dict[str, Any]) -> str:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(timing, f, indent=2, ensure_ascii=False)
     return path
+
+
+# -------------------------
+# Timing + memory helpers (DF-SVD-style instrumentation)
+# -------------------------
+def _canon_device(dev: torch.device) -> torch.device:
+    """Normalize 'cuda' (no index) to 'cuda:<current_device>' for consistent stats."""
+    if dev is None:
+        return dev
+    if dev.type != "cuda":
+        return dev
+    if dev.index is None:
+        try:
+            idx = int(torch.cuda.current_device())
+        except Exception:
+            idx = 0
+        return torch.device(f"cuda:{idx}")
+    return dev
+
+
+def _unique_devices(devs: List[torch.device]) -> List[torch.device]:
+    seen = set()
+    out: List[torch.device] = []
+    for d in devs:
+        if d is None:
+            continue
+        d2 = _canon_device(d)
+        key = str(d2)
+        if key not in seen:
+            seen.add(key)
+            out.append(d2)
+    return out
+
+
+def _cuda_sync(device: torch.device) -> None:
+    """Synchronize CUDA to make wall-clock timing accurate."""
+    device = _canon_device(device)
+    if device.type == "cuda":
+        try:
+            torch.cuda.synchronize(device)
+        except Exception:
+            torch.cuda.synchronize()
+
+
+def _cuda_sync_many(devices: List[torch.device]) -> None:
+    for d in _unique_devices(devices):
+        _cuda_sync(d)
+
+
+def _reset_cuda_peak_stats(device: torch.device) -> None:
+    """Reset CUDA peak memory stats for the given device."""
+    device = _canon_device(device)
+    if device.type == "cuda":
+        try:
+            torch.cuda.reset_peak_memory_stats(device)
+        except Exception:
+            torch.cuda.reset_peak_memory_stats()
+
+
+def _reset_cuda_peak_stats_many(devices: List[torch.device]) -> None:
+    for d in _unique_devices(devices):
+        _reset_cuda_peak_stats(d)
+
+
+def _cuda_mem_snapshot(device: torch.device) -> Dict[str, int]:
+    """Snapshot of CUDA memory stats in bytes."""
+    device = _canon_device(device)
+    if device.type != "cuda":
+        return {}
+    try:
+        free, total = torch.cuda.mem_get_info(device)
+    except Exception:
+        free, total = torch.cuda.mem_get_info()
+    try:
+        alloc = torch.cuda.memory_allocated(device)
+        reserved = torch.cuda.memory_reserved(device)
+        max_alloc = torch.cuda.max_memory_allocated(device)
+        max_reserved = torch.cuda.max_memory_reserved(device)
+    except Exception:
+        alloc = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
+        max_alloc = torch.cuda.max_memory_allocated()
+        max_reserved = torch.cuda.max_memory_reserved()
+    return {
+        "alloc_bytes": int(alloc),
+        "reserved_bytes": int(reserved),
+        "max_alloc_bytes": int(max_alloc),
+        "max_reserved_bytes": int(max_reserved),
+        "free_bytes": int(free),
+        "total_bytes": int(total),
+    }
+
+
+def _cuda_mem_snapshot_many(devices: List[torch.device]) -> Dict[str, Dict[str, int]]:
+    snap: Dict[str, Dict[str, int]] = {}
+    for d in _unique_devices(devices):
+        if d.type == "cuda":
+            snap[str(d)] = _cuda_mem_snapshot(d)
+    return snap
+
+
+def _cpu_maxrss_bytes() -> Optional[int]:
+    """Best-effort peak CPU RSS in bytes for this process."""
+    try:
+        r = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # ru_maxrss: KB on Linux, bytes on macOS.
+        if sys.platform == "darwin":
+            return int(r)
+        return int(r * 1024)
+    except Exception:
+        return None
+
+
+def _model_size_bytes(model: nn.Module) -> Dict[str, int]:
+    """Persistent model footprint from parameters + buffers."""
+    param_bytes = 0
+    param_count = 0
+    for p in model.parameters():
+        param_count += int(p.numel())
+        param_bytes += int(p.numel()) * int(p.element_size())
+    buffer_bytes = 0
+    buffer_count = 0
+    for b in model.buffers():
+        buffer_count += int(b.numel())
+        buffer_bytes += int(b.numel()) * int(b.element_size())
+    return {
+        "param_bytes": int(param_bytes),
+        "buffer_bytes": int(buffer_bytes),
+        "param_count": int(param_count),
+        "buffer_count": int(buffer_count),
+    }
+
 
 
 def set_seed(seed: int) -> None:
@@ -564,6 +697,7 @@ def saes_whitened_factorize(
     svd_lowrank: bool = True,
     oversample: int = 32,
     n_iter: int = 2,
+    return_timing: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, float]:
     """
     SAES factorization (fixed implementation):
@@ -591,17 +725,26 @@ def saes_whitened_factorize(
         raise ValueError(f"beta must be in [0,1), got {beta}")
     r = min(max(1, int(rank)), min(out_dim, in_dim))
     dev = compute_device if compute_device is not None else W.device
+    dev = _canon_device(dev)
+
+    # Accurate timing for CUDA kernels.
+    _cuda_sync(dev)
+    t_total0 = time.perf_counter()
 
     Wc = W.to(device=dev, dtype=compute_dtype)
     Hc = H.to(device=dev, dtype=compute_dtype)
     Dc = Delta.to(device=dev, dtype=compute_dtype)
 
+    t0 = time.perf_counter()
     chol, used_lam = _safe_cholesky(Hc, damping=damping, max_tries=max_tries)
+    _cuda_sync(dev)
+    chol_sec = time.perf_counter() - t0
     Hbeta = Hc + float(beta) * Dc
 
     # IMPORTANT: Use L^{-T} here (not L^{-1}), so final AB includes L^{-T}L^{-1} = (H+lambda I)^{-1}.
     G = right_whiten_inv_lt(Wc @ Hbeta, chol)
 
+    t0 = time.perf_counter()
     U_r, S_r, Vh_r = _truncated_svd(
         G,
         r,
@@ -609,6 +752,8 @@ def saes_whitened_factorize(
         oversample=oversample,
         n_iter=n_iter,
     )
+    _cuda_sync(dev)
+    svd_sec = time.perf_counter() - t0
 
     sqrtS = torch.sqrt(torch.clamp(S_r, min=0.0))
     A = U_r * sqrtS.unsqueeze(0)
@@ -617,6 +762,11 @@ def saes_whitened_factorize(
     VhL = right_whiten(Vh_r, chol)
     B = sqrtS.unsqueeze(1) * VhL
 
+    _cuda_sync(dev)
+    total_sec = time.perf_counter() - t_total0
+    tinfo = {"chol_sec": float(chol_sec), "svd_sec": float(svd_sec), "total_sec": float(total_sec)}
+    if return_timing:
+        return A, B, used_lam, tinfo
     return A, B, used_lam
 
 
@@ -1076,6 +1226,8 @@ def compress_one_layer(
 
     phase_submodule_groups = [PHASE1_SUBMODULES, PHASE2_SUBMODULES]
     for phase_submodules in phase_submodule_groups:
+        _cuda_sync_many([student_device, teacher_device])
+        t_stats0 = time.perf_counter()
         stats_by_sub = collect_layer_saes_stats(
             student_model,
             teacher_model,
@@ -1090,6 +1242,8 @@ def compress_one_layer(
             sample_tokens_per_batch=sample_tokens_per_batch,
             tqdm_enabled=tqdm_enabled,
         )
+        _cuda_sync_many([student_device, teacher_device])
+        stats_sec = time.perf_counter() - t_stats0
 
         for sub in phase_submodules:
             name = f"model.layers.{layer_idx}.{sub}"
@@ -1101,6 +1255,8 @@ def compress_one_layer(
             rank = compute_base_rank(out_features, in_features, compression_ratio=compression_ratio)
             H, Delta, n_tokens = stats_by_sub[sub].get()
 
+            _cuda_sync(compute_device)
+            t_beta0 = time.perf_counter()
             if beta_mode == "aces":
                 beta = select_beta_fixed_subspace_aces(
                     W,
@@ -1129,8 +1285,10 @@ def compress_one_layer(
                     beta_cap=beta_cap,
                     beta_shrink=beta_shrink,
                 )
+            _cuda_sync(compute_device)
+            beta_sec = time.perf_counter() - t_beta0
 
-            A, B, used_damping = saes_whitened_factorize(
+            A, B, used_damping, factor_timing = saes_whitened_factorize(
                 W=W,
                 H=H,
                 Delta=Delta,
@@ -1143,6 +1301,7 @@ def compress_one_layer(
                 svd_lowrank=svd_lowrank,
                 oversample=svd_oversample,
                 n_iter=svd_niter,
+                return_timing=True,
             )
 
             new_mod = SAESFactorizedLinear(
@@ -1170,6 +1329,11 @@ def compress_one_layer(
                     "n_tokens": int(n_tokens),
                     "beta": float(beta),
                     "used_damping": float(used_damping),
+                    "stats_sec": float(stats_sec),
+                    "beta_sec": float(beta_sec),
+                    "chol_sec": None if factor_timing is None else float(factor_timing.get("chol_sec", 0.0)),
+                    "svd_sec": None if factor_timing is None else float(factor_timing.get("svd_sec", 0.0)),
+                    "factor_total_sec": None if factor_timing is None else float(factor_timing.get("total_sec", 0.0)),
                     "svd_lowrank": bool(svd_lowrank),
                     "aces_objective": str(aces_objective),
                 }
@@ -1343,6 +1507,11 @@ def main() -> None:
     factor_dtype = parse_dtype(args.factor_dtype)
     compute_dtype = parse_dtype(args.compute_dtype)
 
+    perf_devices = _unique_devices([student_device, teacher_device, stats_device, compute_device])
+    timing["devices"] = [str(d) for d in perf_devices]
+    timing["cpu_maxrss_bytes_begin"] = _cpu_maxrss_bytes()
+    timing["gpu_mem_begin"] = _cuda_mem_snapshot_many(perf_devices)
+
     t0 = time.perf_counter()
     tokenizer_hint = args.model_id if args.tokenizer_model is None else str(args.tokenizer_model)
     try:
@@ -1370,14 +1539,16 @@ def main() -> None:
     student_model = AutoModelForCausalLM.from_pretrained(args.model_id, torch_dtype=model_dtype).to(student_device)
     student_model.config.use_cache = False
     student_model.eval()
-    timing["stages"].append({"name": "load_student_model", "sec": time.perf_counter() - t0})
+    timing["stages"].append({"name": "load_student_model", "sec": time.perf_counter() - t0, "gpu_mem": _cuda_mem_snapshot_many(perf_devices)})
+    timing["student_model_size"] = _model_size_bytes(student_model)
 
     t0 = time.perf_counter()
     teacher_model = AutoModelForCausalLM.from_pretrained(args.model_id, torch_dtype=teacher_dtype).to(teacher_device)
     teacher_model.config.use_cache = False
     teacher_model.eval()
     teacher_model.requires_grad_(False)
-    timing["stages"].append({"name": "load_teacher_model", "sec": time.perf_counter() - t0})
+    timing["stages"].append({"name": "load_teacher_model", "sec": time.perf_counter() - t0, "gpu_mem": _cuda_mem_snapshot_many(perf_devices)})
+    timing["teacher_model_size"] = _model_size_bytes(teacher_model)
 
     t0 = time.perf_counter()
     if args.calib_mix:
@@ -1434,6 +1605,8 @@ def main() -> None:
     timing_path: Optional[str] = None
     try:
         for layer_idx in range(args.layer_start, layer_end):
+            _cuda_sync_many(perf_devices)
+            _reset_cuda_peak_stats_many(perf_devices)
             layer_t0 = time.perf_counter()
             module_records = compress_one_layer(
                 student_model,
@@ -1465,8 +1638,10 @@ def main() -> None:
                 svd_niter=args.svd_niter,
                 tqdm_enabled=tqdm_enabled,
             )
+            _cuda_sync_many(perf_devices)
             layer_sec = time.perf_counter() - layer_t0
-            timing["layers"].append({"layer": int(layer_idx), "sec": float(layer_sec), "modules": len(module_records)})
+            layer_mem = _cuda_mem_snapshot_many(perf_devices)
+            timing["layers"].append({"layer": int(layer_idx), "sec": float(layer_sec), "modules": len(module_records), "gpu_mem": layer_mem})
             timing["modules"].extend(module_records)
             if not tqdm_enabled:
                 _log(f"[Layer] {layer_idx}: {layer_sec:.2f}s", tqdm_enabled=False)
@@ -1474,14 +1649,41 @@ def main() -> None:
             if student_device.type == "cuda":
                 torch.cuda.empty_cache()
 
+        timing["compressed_student_model_size"] = _model_size_bytes(student_model)
+        timing["gpu_mem_before_save"] = _cuda_mem_snapshot_many(perf_devices)
+
         t0 = time.perf_counter()
         manifest = extract_saes_manifest(student_model, args.layer_start, layer_end)
         save_saes_checkpoint(student_model, tokenizer, args.output_dir, manifest)
-        timing["stages"].append({"name": "save_checkpoint", "sec": time.perf_counter() - t0})
+        timing["stages"].append({"name": "save_checkpoint", "sec": time.perf_counter() - t0, "gpu_mem": _cuda_mem_snapshot_many(perf_devices)})
         _log(f"[OK] Saved SAES-SVD checkpoint to: {args.output_dir}", tqdm_enabled=tqdm_enabled)
     finally:
         timing["ended_at"] = _now_iso()
         timing["total_sec"] = time.perf_counter() - run_start
+        timing["cpu_maxrss_bytes_end"] = _cpu_maxrss_bytes()
+        timing["gpu_mem_end"] = _cuda_mem_snapshot_many(perf_devices)
+
+        # Aggregate peak GPU usage across recorded layer snapshots.
+        peaks_by_dev: Dict[str, Dict[str, int]] = {}
+        for lr in timing.get("layers", []):
+            gm = lr.get("gpu_mem", {}) if isinstance(lr, dict) else {}
+            if not isinstance(gm, dict):
+                continue
+            for dev, mem in gm.items():
+                if not isinstance(mem, dict):
+                    continue
+                ma = int(mem.get("max_alloc_bytes", 0))
+                mr = int(mem.get("max_reserved_bytes", 0))
+                cur = peaks_by_dev.get(dev, {"max_alloc_bytes": 0, "max_reserved_bytes": 0})
+                if ma > int(cur.get("max_alloc_bytes", 0)):
+                    cur["max_alloc_bytes"] = ma
+                if mr > int(cur.get("max_reserved_bytes", 0)):
+                    cur["max_reserved_bytes"] = mr
+                peaks_by_dev[dev] = cur
+        timing["gpu_peak_by_device"] = peaks_by_dev
+        timing["gpu_peak_alloc_bytes"] = int(max([v.get("max_alloc_bytes", 0) for v in peaks_by_dev.values()] + [0]))
+        timing["gpu_peak_reserved_bytes"] = int(max([v.get("max_reserved_bytes", 0) for v in peaks_by_dev.values()] + [0]))
+
         try:
             timing_path = _timing_write(args.output_dir, args.timing_file, timing)
         except Exception as e:

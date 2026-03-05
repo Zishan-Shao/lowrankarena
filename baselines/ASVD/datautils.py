@@ -1,16 +1,20 @@
 import os
+import io
+import json
+import random
+from typing import Any, Dict, Optional
+
 import numpy as np
 import torch
 from datasets import load_dataset
-import random
-import io
-import json
 
 """
-doc https://huggingface.co/docs/datasets/loading
-doc https://huggingface.co/docs/datasets/process
-doc https://huggingface.co/blog/llama2#how-to-prompt-llama-2
+Docs:
+- https://huggingface.co/docs/datasets/loading
+- https://huggingface.co/docs/datasets/process
+- https://huggingface.co/blog/llama2#how-to-prompt-llama-2
 """
+
 # Added for PTB dataset of new version 4.4.0
 PTB_URL_BASE = "https://raw.githubusercontent.com/wojzaremba/lstm/master/data/"
 PTB_FILES = {
@@ -19,19 +23,118 @@ PTB_FILES = {
     "test": PTB_URL_BASE + "ptb.test.txt",
 }
 
-def set_seed(seed):
-    np.random.seed(seed)
-    torch.random.manual_seed(seed)
+# ----------------------------------------------------------------------
+# Tokenizer safety guard
+# ----------------------------------------------------------------------
+_TOKENIZER_CACHE: Dict[str, Any] = {}
 
 
-def sample_train_loaders(name, tokenizer, nsamples=128, seed=0, seqlen=2048):
-    set_seed(seed)
-    if "wikitext2" in name:
-        traindata = load_dataset(
-            "wikitext",
-            "wikitext-2-raw-v1",
-            split="train",
+def _resolve_hf_token() -> Optional[str]:
+    """Best-effort Hugging Face token from common env vars."""
+    for k in ("HF_TOKEN", "HUGGINGFACE_HUB_TOKEN", "HUGGINGFACE_TOKEN", "HF_ACCESS_TOKEN"):
+        v = os.getenv(k)
+        if v and str(v).strip():
+            return str(v).strip()
+    return None
+
+
+
+def _ensure_tokenizer(tokenizer: Any, model_id: Optional[str] = None) -> Any:
+    """Return a callable Hugging Face tokenizer.
+
+    Some call sites accidentally pass a boolean (e.g., False) instead of a tokenizer.
+    This guard prevents: TypeError: 'bool' object is not callable.
+
+    If `tokenizer` is invalid, we reload a tokenizer from `model_id`.
+    """
+    try:
+        if tokenizer is not None and not isinstance(tokenizer, bool) and callable(tokenizer):
+            # Ensure pad token exists for LLaMA-like tokenizers.
+            if getattr(tokenizer, "pad_token", None) is None and getattr(tokenizer, "eos_token", None) is not None:
+                tokenizer.pad_token = tokenizer.eos_token
+            return tokenizer
+    except Exception:
+        pass
+
+    model_key = str(model_id).strip() if model_id is not None else ""
+    if model_key and model_key in _TOKENIZER_CACHE:
+        cached = _TOKENIZER_CACHE.get(model_key)
+    # Guard against corrupted cache entries (e.g., bool False).
+    try:
+        if cached is not None and not isinstance(cached, bool) and callable(cached):
+            return cached
+    except Exception:
+        pass
+    # Drop invalid cache entry and rebuild.
+    try:
+        del _TOKENIZER_CACHE[model_key]
+    except Exception:
+        pass
+
+    if not model_key:
+        raise TypeError(
+            "Tokenizer is not callable (likely a bool). "
+            "Pass a Hugging Face tokenizer object, or provide model_id so it can be reloaded."
         )
+
+    # Lazy import to avoid importing transformers at module import time.
+    from transformers import AutoTokenizer  # type: ignore
+
+    hf_token = _resolve_hf_token()
+    kwargs: Dict[str, Any] = {"trust_remote_code": True, "use_fast": True}
+    if hf_token:
+        kwargs["token"] = hf_token
+
+    # Try fast tokenizer first; fall back to slow. Also support older transformers token arg.
+    try:
+        tok = AutoTokenizer.from_pretrained(model_key, **kwargs)
+    except TypeError:
+        # Older transformers versions use `use_auth_token` instead of `token`.
+        if "token" in kwargs:
+            kwargs.pop("token", None)
+            if hf_token:
+                kwargs["use_auth_token"] = hf_token
+        tok = AutoTokenizer.from_pretrained(model_key, **kwargs)
+    except Exception:
+        kwargs["use_fast"] = False
+        try:
+            tok = AutoTokenizer.from_pretrained(model_key, **kwargs)
+        except TypeError:
+            if "token" in kwargs:
+                kwargs.pop("token", None)
+                if hf_token:
+                    kwargs["use_auth_token"] = hf_token
+            tok = AutoTokenizer.from_pretrained(model_key, **kwargs)
+
+    if getattr(tok, "pad_token", None) is None and getattr(tok, "eos_token", None) is not None:
+        tok.pad_token = tok.eos_token
+
+    try:
+        if tok is not None and not isinstance(tok, bool) and callable(tok):
+            _TOKENIZER_CACHE[model_key] = tok
+    except Exception:
+        pass
+    return tok
+
+
+# ----------------------------------------------------------------------
+# Reproducibility
+# ----------------------------------------------------------------------
+def set_seed(seed: int) -> None:
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+
+
+# ----------------------------------------------------------------------
+# Calibration / loaders
+# ----------------------------------------------------------------------
+def sample_train_loaders(name, tokenizer, nsamples=128, seed=0, seqlen=2048, model_id: Optional[str] = None):
+    set_seed(seed)
+    tokenizer = _ensure_tokenizer(tokenizer, model_id)
+
+    if "wikitext2" in name:
+        traindata = load_dataset("wikitext", "wikitext-2-raw-v1", split="train")
         traindata = "\n\n".join(traindata["text"])
     elif "c4" in name:
         traindata = load_dataset(
@@ -48,14 +151,18 @@ def sample_train_loaders(name, tokenizer, nsamples=128, seed=0, seqlen=2048):
     for _ in range(nsamples):
         i = random.randint(0, len(traindata) - seqlen * 2 - 1)
         j = i + seqlen * 2
-        # breakpoint()
+        # Extra safety: re-check callable (protects against accidental reassignment).
+        if not callable(tokenizer):
+            tokenizer = _ensure_tokenizer(tokenizer, model_id)
         trainenc = tokenizer(traindata[i:j], return_tensors="pt")
         inp = trainenc.input_ids[:, :seqlen]
         trainloader.append(inp)
     return trainloader
 
 
-def get_redpajama_train(tokenizer, percent=10, seed=3, batch_size=128, max_length=2048):
+def get_redpajama_train(tokenizer, percent=10, seed=3, batch_size=128, max_length=2048, model_id: Optional[str] = None):
+    tokenizer = _ensure_tokenizer(tokenizer, model_id)
+
     def tokenization(example):
         return tokenizer(example["text"], truncation=True, max_length=max_length)
 
@@ -64,23 +171,23 @@ def get_redpajama_train(tokenizer, percent=10, seed=3, batch_size=128, max_lengt
     else:
         split = "train"
     dataset = load_dataset("togethercomputer/RedPajama-Data-1T-Sample", split=split)
-
     processed_dataset = dataset.map(tokenization, batched=True, batch_size=batch_size, num_proc=os.cpu_count())
     return processed_dataset
 
 
-def get_english_quote(dataset_name, tokenizer):
+def get_english_quote(dataset_name, tokenizer, model_id: Optional[str] = None):
+    tokenizer = _ensure_tokenizer(tokenizer, model_id)
     data = load_dataset(dataset_name)
     data = data.map(lambda samples: tokenizer(samples["quote"]), batched=True)
     return data["train"]
 
 
-def get_qat_dataset(name, tokenizer, data_percent):
+def get_qat_dataset(name, tokenizer, data_percent, model_id: Optional[str] = None):
+    tokenizer = _ensure_tokenizer(tokenizer, model_id)
     if name == "red_pajama":
-        data = get_redpajama_train(tokenizer, data_percent)
-
+        data = get_redpajama_train(tokenizer, data_percent, model_id=model_id)
     elif name == "Abirate/english_quotes":
-        data = get_english_quote(name, tokenizer)
+        data = get_english_quote(name, tokenizer, model_id=model_id)
     else:
         raise NotImplementedError
     data = data.shuffle()
@@ -110,18 +217,23 @@ def jload(f, mode="r"):
 
 
 def get_calib_data(name, tokenizer, model_id, nsamples, seqlen=2048, seed=3, use_bos=False):
+    # IMPORTANT: enforce callable tokenizer here to avoid bool-tokenizer crashes.
+    tokenizer = _ensure_tokenizer(tokenizer, model_id)
+    set_seed(seed)
+
     print(f" get_ptq_calib_data {name}, nsamples={nsamples}, seqlen={seqlen}, {seed}")
-    cache_file = f"cache/{name}_{model_id.replace('/','_')}_{nsamples}_{seqlen}_{seed}_bos{use_bos}.pt"
+    cache_file = f"cache/{name}_{str(model_id).replace('/','_')}_{nsamples}_{seqlen}_{seed}_bos{use_bos}.pt"
     print(f"cache_file={cache_file}")
+
     if not os.path.exists("cache"):
         os.makedirs("cache")
+
     if os.path.exists(cache_file):
         traindataset = torch.load(cache_file)
         return traindataset
+
     if name == "c4":
-        traindata = load_dataset(
-            "allenai/c4", data_files={"train": "en/c4-train.00000-of-01024.json.gz"}, split="train"
-        )
+        traindata = load_dataset("allenai/c4", data_files={"train": "en/c4-train.00000-of-01024.json.gz"}, split="train")
         tot_text = "\n\n".join(traindata["text"])
     elif name == "wikitext2":
         traindata = load_dataset("wikitext", "wikitext-2-raw-v1", split="train")
@@ -138,6 +250,8 @@ def get_calib_data(name, tokenizer, model_id, nsamples, seqlen=2048, seed=3, use
         for example in selected_data_dict:
             if example.get("input", "") == "":
                 s = llama_chat_format.format(instruction=example["instruction"], response=example["output"])
+                if not callable(tokenizer):
+                    tokenizer = _ensure_tokenizer(tokenizer, model_id)
                 trainenc = tokenizer(s, return_tensors="pt")
                 inp = trainenc.input_ids[:, :seqlen]
                 attention_mask = torch.ones_like(inp)
@@ -145,9 +259,9 @@ def get_calib_data(name, tokenizer, model_id, nsamples, seqlen=2048, seed=3, use
         return traindataset
     elif name == "selfgen":
         raise NotImplementedError
-
     else:
         raise NotImplementedError
+
     print(f"tot_text={len(tot_text)}")
     traindataset = []
     for _ in range(nsamples):
@@ -156,25 +270,31 @@ def get_calib_data(name, tokenizer, model_id, nsamples, seqlen=2048, seed=3, use
         txt = tot_text[i:j]
         ind = txt.find(".")
         txt = txt[ind + 1 :].strip()
+
         if use_bos:
-            txt = tokenizer.bos_token + txt
+            bos = getattr(tokenizer, "bos_token", None) or getattr(tokenizer, "eos_token", None)
+            if bos is not None:
+                txt = str(bos) + txt
+
+        if not callable(tokenizer):
+            tokenizer = _ensure_tokenizer(tokenizer, model_id)
         trainenc = tokenizer(txt, return_tensors="pt")
         inp = trainenc.input_ids[:, :seqlen]
         attention_mask = torch.ones_like(inp)
         traindataset.append({"input_ids": inp, "attention_mask": attention_mask})
+
     torch.save(traindataset, cache_file)
     return traindataset
 
 
-def get_eval_loaders(name, tokenizer):
+def get_eval_loaders(name, tokenizer, model_id: Optional[str] = None):
+    tokenizer = _ensure_tokenizer(tokenizer, model_id)
+
     if "wikitext2" in name:
-        testdata = load_dataset(
-            "wikitext",
-            "wikitext-2-raw-v1",
-            split="test",
-        )
+        testdata = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
         testenc = tokenizer("\n\n".join(testdata["text"]), return_tensors="pt")
         return testenc
+
     if "ptb" in name:
         valdata = load_dataset("text", data_files=PTB_FILES, split="validation")
         testenc = tokenizer("\n\n".join(valdata["text"]), return_tensors="pt")
@@ -189,4 +309,5 @@ def get_eval_loaders(name, tokenizer):
         )
         testenc = tokenizer("\n\n".join(testdata["text"]), return_tensors="pt")
         return testenc
+
     raise NotImplementedError

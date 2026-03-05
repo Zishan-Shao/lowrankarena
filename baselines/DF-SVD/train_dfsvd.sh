@@ -1,7 +1,7 @@
 # train llama-7b with 40% params
-CUDA_VISIBLE_DEVICES=2 python df_svd.py \
-  --model_id huggyllama/llama-7b \
-  --output_dir ./llama7b_dfsvd_0.4 \
+CUDA_VISIBLE_DEVICES=0 python df_svd.py \
+  --model_id jeffwan/llama-7b-hf \
+  --output_dir ./jeffwan_llama7b_dfsvd_0.4 \
   --compression_ratio 0.4 \
   --base_update_rank 8 \
   --seq_len 2048 \

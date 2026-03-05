@@ -16,9 +16,9 @@
 
 
 # train with llama-7b with 40% params
-CUDA_VISIBLE_DEVICES=3 python saes_svd.py \
-  --model_id huggyllama/llama-7b \
-  --output_dir robust/llama7b_saes_r0.4 \
+CUDA_VISIBLE_DEVICES=0 python saes_svd.py \
+  --model_id jeffwan/llama-7b-hf \
+  --output_dir jeffwan_llama7b_saes_r0.4 \
   --compression_ratio 0.4 \
   --seq_len 2048 \
   --calib_sequences 128 \

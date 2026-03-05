@@ -67,6 +67,7 @@ import json
 import math
 import os
 import random
+import resource
 import sys
 import time
 from dataclasses import dataclass
@@ -116,6 +117,85 @@ def _log(msg: str, *, tqdm_enabled: bool) -> None:
             pass
     print(msg, flush=True)
 
+
+
+
+def _cuda_sync(device: torch.device) -> None:
+    """Synchronize CUDA to make wall-clock timing accurate."""
+    if device.type == "cuda":
+        try:
+            torch.cuda.synchronize(device)
+        except Exception:
+            torch.cuda.synchronize()
+
+
+def _reset_cuda_peak_stats(device: torch.device) -> None:
+    """Reset CUDA peak memory stats for the current device."""
+    if device.type == "cuda":
+        try:
+            torch.cuda.reset_peak_memory_stats(device)
+        except Exception:
+            torch.cuda.reset_peak_memory_stats()
+
+
+def _cuda_mem_snapshot(device: torch.device) -> Dict[str, int]:
+    """Return a snapshot of (current + peak) CUDA memory stats in bytes."""
+    if device.type != "cuda":
+        return {}
+    try:
+        free, total = torch.cuda.mem_get_info(device)
+    except Exception:
+        free, total = torch.cuda.mem_get_info()
+    try:
+        alloc = torch.cuda.memory_allocated(device)
+        reserved = torch.cuda.memory_reserved(device)
+        max_alloc = torch.cuda.max_memory_allocated(device)
+        max_reserved = torch.cuda.max_memory_reserved(device)
+    except Exception:
+        alloc = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
+        max_alloc = torch.cuda.max_memory_allocated()
+        max_reserved = torch.cuda.max_memory_reserved()
+    return {
+        "alloc_bytes": int(alloc),
+        "reserved_bytes": int(reserved),
+        "max_alloc_bytes": int(max_alloc),
+        "max_reserved_bytes": int(max_reserved),
+        "free_bytes": int(free),
+        "total_bytes": int(total),
+    }
+
+
+def _cpu_maxrss_bytes() -> Optional[int]:
+    """Best-effort peak CPU RSS (resident set size) in bytes for this process."""
+    try:
+        r = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # ru_maxrss: KB on Linux, bytes on macOS.
+        if sys.platform == "darwin":
+            return int(r)
+        return int(r * 1024)
+    except Exception:
+        return None
+
+
+def _model_size_bytes(model: nn.Module) -> Dict[str, int]:
+    """Compute persistent model footprint from parameters + buffers."""
+    param_bytes = 0
+    param_count = 0
+    for p in model.parameters():
+        param_count += int(p.numel())
+        param_bytes += int(p.numel()) * int(p.element_size())
+    buffer_bytes = 0
+    buffer_count = 0
+    for b in model.buffers():
+        buffer_count += int(b.numel())
+        buffer_bytes += int(b.numel()) * int(b.element_size())
+    return {
+        "param_bytes": int(param_bytes),
+        "buffer_bytes": int(buffer_bytes),
+        "param_count": int(param_count),
+        "buffer_count": int(buffer_count),
+    }
 
 def _whitening_cache_entry_path(cache_dir: str, module_name: str) -> str:
     # module_name contains '.' which is safe for filenames; keep it for readability.
@@ -1434,7 +1514,18 @@ def main() -> None:
     t0 = time.perf_counter()
     model = AutoModelForCausalLM.from_pretrained(args.model_id, torch_dtype=dtype).to(device)
     model.config.use_cache = False  # avoid kv-cache during calibration/training
+    _cuda_sync(device)
     timing["stages"].append({"name": "load_model", "sec": time.perf_counter() - t0})
+
+    # Persistent model footprint (parameters + buffers).
+    try:
+        _ms = _model_size_bytes(model)
+        timing["model_param_bytes"] = int(_ms.get("param_bytes", 0))
+        timing["model_buffer_bytes"] = int(_ms.get("buffer_bytes", 0))
+        timing["model_param_count"] = int(_ms.get("param_count", 0))
+        timing["model_buffer_count"] = int(_ms.get("buffer_count", 0))
+    except Exception:
+        pass
 
     t0 = time.perf_counter()
     dataloader = build_calibration_dataloader(
@@ -1464,6 +1555,7 @@ def main() -> None:
     lambdas = None
     lambda_minmax = None
     if use_global_lambda_norm:
+        _cuda_sync(device)
         t0 = time.perf_counter()
         lambdas = compute_lambdas_two_pass(
             model,
@@ -1487,12 +1579,14 @@ def main() -> None:
             whitening_cache_dtype=whitening_cache_dtype,
             whitening_cache_overwrite=bool(args.whitening_cache_overwrite),
         )
+        _cuda_sync(device)
         vals = list(lambdas.values())
         lambda_minmax = (min(vals), max(vals))
         timing["stages"].append({"name": "lambda_global_prepass", "sec": time.perf_counter() - t0, "min": lambda_minmax[0], "max": lambda_minmax[1]})
 
     # Paper Alg.1: optionally build whitening cache on the teacher/original model before compression.
     if (not use_global_lambda_norm) and whitening_cache_dir:
+        _cuda_sync(device)
         t0 = time.perf_counter()
         populate_whitening_cache(
             model,
@@ -1510,6 +1604,7 @@ def main() -> None:
             tqdm_enabled=tqdm_enabled,
             log_every=args.lambda_log_every,
         )
+        _cuda_sync(device)
         timing["stages"].append({"name": "whitening_cache_prepass", "sec": time.perf_counter() - t0})
 
     layers = model.model.layers
@@ -1521,9 +1616,13 @@ def main() -> None:
     timing_path: Optional[str] = None
     try:
         for i in range(args.layer_start, layer_end):
-            layer_rec: Dict[str, Any] = {"layer": i, "compress_sec": None, "train_sec": None, "total_sec": None}
+            layer_rec: Dict[str, Any] = {"layer": i, "compress_sec": None, "train_sec": None, "total_sec": None, "compress_gpu_mem": None, "train_gpu_mem": None}
             layer_t0 = time.perf_counter()
 
+            if device.type == "cuda":
+                _cuda_sync(device)
+                _reset_cuda_peak_stats(device)
+            _cuda_sync(device)
             t0 = time.perf_counter()
             dense_w = compress_layer_modules(
                 model,
@@ -1547,9 +1646,16 @@ def main() -> None:
                 whitening_cache_overwrite=False,
                 timing_modules=timing["modules"],
             )
+            _cuda_sync(device)
             layer_rec["compress_sec"] = time.perf_counter() - t0
+            if device.type == "cuda":
+                layer_rec["compress_gpu_mem"] = _cuda_mem_snapshot(device)
 
             if args.do_train:
+                if device.type == "cuda":
+                    _cuda_sync(device)
+                    _reset_cuda_peak_stats(device)
+                _cuda_sync(device)
                 t0 = time.perf_counter()
                 train_one_layer(
                     model,
@@ -1563,12 +1669,16 @@ def main() -> None:
                     tqdm_enabled=tqdm_enabled,
                     train_log_every=args.train_log_every,
                 )
+                _cuda_sync(device)
                 layer_rec["train_sec"] = time.perf_counter() - t0
+                if device.type == "cuda":
+                    layer_rec["train_gpu_mem"] = _cuda_mem_snapshot(device)
 
             del dense_w
             if device.type == "cuda":
                 torch.cuda.empty_cache()
 
+            _cuda_sync(device)
             layer_rec["total_sec"] = time.perf_counter() - layer_t0
             timing["layers"].append(layer_rec)
             if not tqdm_enabled:
@@ -1584,8 +1694,38 @@ def main() -> None:
 
         _log(f"[OK] Saved DF-SVD checkpoint to: {args.output_dir}", tqdm_enabled=tqdm_enabled)
     finally:
+        # Ensure all outstanding GPU work is finished before recording wall-clock times / peak memory.
+        _cuda_sync(device)
+
         timing["ended_at"] = _now_iso()
         timing["total_sec"] = time.perf_counter() - run_start
+
+        # Aggregate per-layer times (useful as a "training time" proxy for Bm/Am updates).
+        try:
+            timing["compress_total_sec"] = sum(float(l.get("compress_sec") or 0.0) for l in timing.get("layers", []))
+            timing["train_total_sec"] = sum(float(l.get("train_sec") or 0.0) for l in timing.get("layers", []))
+        except Exception:
+            pass
+
+        # Peak CPU RSS (best-effort).
+        _rss = _cpu_maxrss_bytes()
+        if _rss is not None:
+            timing["cpu_maxrss_bytes"] = int(_rss)
+
+        # Summarize GPU peak memory over all layer-stages (best-effort).
+        if device.type == "cuda":
+            peak_alloc = 0
+            peak_reserved = 0
+            for _l in timing.get("layers", []):
+                for _k in ("compress_gpu_mem", "train_gpu_mem"):
+                    _d = _l.get(_k)
+                    if isinstance(_d, dict):
+                        peak_alloc = max(peak_alloc, int(_d.get("max_alloc_bytes", 0)))
+                        peak_reserved = max(peak_reserved, int(_d.get("max_reserved_bytes", 0)))
+            timing["gpu_peak_alloc_bytes"] = int(peak_alloc)
+            timing["gpu_peak_reserved_bytes"] = int(peak_reserved)
+            timing["gpu_mem_final"] = _cuda_mem_snapshot(device)
+
         try:
             timing_path = _timing_write(args.output_dir, args.timing_file, timing)
         except Exception as e:
@@ -1593,7 +1733,19 @@ def main() -> None:
 
     if timing_path:
         total = float(timing.get("total_sec", 0.0))
-        _log(f"[Time] total={total:.2f}s timing_json={timing_path}", tqdm_enabled=tqdm_enabled)
+        comp_total = float(timing.get("compress_total_sec", 0.0))
+        train_total = float(timing.get("train_total_sec", 0.0))
+        msg = (
+            f"[Time] total={total:.2f}s "
+            f"compress_total={comp_total:.2f}s "
+            f"train_total={train_total:.2f}s "
+            f"timing_json={timing_path}"
+        )
+        if isinstance(timing.get("gpu_peak_alloc_bytes"), (int, float)) and isinstance(timing.get("gpu_peak_reserved_bytes"), (int, float)):
+            ga = float(timing.get("gpu_peak_alloc_bytes", 0.0)) / (1024.0 ** 3)
+            gr = float(timing.get("gpu_peak_reserved_bytes", 0.0)) / (1024.0 ** 3)
+            msg += f" gpu_peak_alloc={ga:.2f}GB gpu_peak_reserved={gr:.2f}GB"
+        _log(msg, tqdm_enabled=tqdm_enabled)
 
 
 if __name__ == "__main__":
