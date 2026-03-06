@@ -1,0 +1,14 @@
+{
+  "target_budget": 0.527,
+  "achieved_ratio": 0.52685546875,
+  "total_params": 44748288,
+  "original_model_params": 84934656,
+  "original_linear_params": 84934656,
+  "total_svd_params": 44748288,
+  "num_operations": 72,
+  "steps": 800,
+  "max_calib_samples": 4000,
+  "actual_calib_samples": 4000,
+  "engineering_stable": false,
+  "hn_type": "PaperHN"
+}
