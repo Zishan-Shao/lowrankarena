@@ -154,6 +154,7 @@ def estimate_fisher_weights_modernbert(
     fisher_q      = defaultdict(lambda: torch.zeros(d_model, device=device))
     fisher_k      = defaultdict(lambda: torch.zeros(d_model, device=device))
     fisher_v      = defaultdict(lambda: torch.zeros(d_model, device=device))
+    fisher_wo_attn= defaultdict(lambda: torch.zeros(d_model, device=device))
     fisher_wi     = defaultdict(lambda: torch.zeros(d_model, device=device))
     fisher_wo_ffn = defaultdict(lambda: torch.zeros(d_ffn,   device=device))
 
@@ -178,6 +179,9 @@ def estimate_fisher_weights_modernbert(
             fisher_k[i]   += (gk.t() ** 2).sum(dim=1)
             fisher_v[i]   += (gv.t() ** 2).sum(dim=1)
 
+            # attn.Wo grad: [D, D] → .t() → [D, D] → sum → [D]
+            fisher_wo_attn[i] += (layer.attn.Wo.weight.grad.data.t() ** 2).sum(dim=1)
+
             # mlp.Wi grad: [2*d_ffn, D] → .t() → [D, 2*d_ffn] → sum → [D]
             fisher_wi[i] += (layer.mlp.Wi.weight.grad.data.t() ** 2).sum(dim=1)
 
@@ -190,7 +194,7 @@ def estimate_fisher_weights_modernbert(
         return {i: v / (v.max() + 1e-8) for i, v in d.items()}
 
     return (normalize(fisher_q), normalize(fisher_k), normalize(fisher_v),
-            normalize(fisher_wi), normalize(fisher_wo_ffn))
+            normalize(fisher_wo_attn), normalize(fisher_wi), normalize(fisher_wo_ffn))
 
 
 def build_fwsvd_helpers_modernbert(
@@ -207,12 +211,11 @@ def build_fwsvd_helpers_modernbert(
     Internally builds a data_ptr → fisher_vector map that the two closures
     look up when called from NaiveModernBertSVDBlock.__init__:
       - per_head_fn is called for Wq, Wk, Wv (split from Wqkv)
-      - low_rank_fn is called for Wi and Wo_ffn
-      - Wo_attn is kept dense → NOT mapped
+      - low_rank_fn is called for Wo_attn, Wi, and Wo_ffn
     """
     model = model.to(device).train()
 
-    fisher_q, fisher_k, fisher_v, fisher_wi, fisher_wo_ffn = \
+    fisher_q, fisher_k, fisher_v, fisher_wo_attn, fisher_wi, fisher_wo_ffn = \
         estimate_fisher_weights_modernbert(model, dataloader, device)
 
     H = model.config.num_attention_heads
@@ -227,6 +230,8 @@ def build_fwsvd_helpers_modernbert(
         fw_map[Wq.t().data_ptr()] = fisher_q[i]      + eps
         fw_map[Wk.t().data_ptr()] = fisher_k[i]      + eps
         fw_map[Wv.t().data_ptr()] = fisher_v[i]      + eps
+
+        fw_map[layer.attn.Wo.weight.data.data_ptr()] = fisher_wo_attn[i] + eps
 
         # Wi.weight.data.t() has the same data_ptr as Wi.weight.data
         fw_map[layer.mlp.Wi.weight.data.data_ptr()] = fisher_wi[i]     + eps

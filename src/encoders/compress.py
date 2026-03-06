@@ -917,7 +917,7 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
         """Create the correct SVD block + shim for the detected architecture."""
         if arch == "modernbert":
             blk = NaiveModernBertSVDBlock(
-                layer, model.config, r_attn, r_ff, per_head_fn, low_rank_fn,
+                layer, model.config, r_attn, r_ff, r_wo, per_head_fn, low_rank_fn,
             )
             return ModernBertLayerShim(blk).to(device).eval()
         else:

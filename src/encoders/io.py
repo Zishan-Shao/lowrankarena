@@ -339,19 +339,18 @@ def load_compressed_model(
             else:
                 blk.mlp_norm = _copy.deepcopy(hf_layer.mlp_norm)
 
-            # Wo_attn (kept dense in ModernBERT SVD)
-            wo_w = f"{layer_prefix}Wo_attn.weight"
-            wo_b = f"{layer_prefix}Wo_attn.bias"
-            if wo_w in state_dict:
-                out_f, in_f = state_dict[wo_w].shape
-                has_bias = wo_b in state_dict
-                blk.Wo_attn = nn.Linear(in_f, out_f, bias=has_bias)
-                blk.Wo_attn.weight = nn.Parameter(state_dict[wo_w])
-                if has_bias:
-                    blk.Wo_attn.bias = nn.Parameter(state_dict[wo_b])
-                loaded_params += (2 if has_bias else 1)
-            else:
-                blk.Wo_attn = _copy.deepcopy(hf_layer.attn.Wo)
+            # Wo_attn (SVD factorized: Uo/Vo/bo_attn, same as BERT Wo)
+            for pname in ("Uo", "Vo"):
+                key = f"{layer_prefix}{pname}"
+                if key in state_dict:
+                    setattr(blk, pname, nn.Parameter(state_dict[key]))
+                    loaded_params += 1
+                else:
+                    print(f"[warn] Layer {i} missing parameter: {pname}")
+            bo_key = f"{layer_prefix}bo_attn"
+            if bo_key in state_dict:
+                blk.bo_attn = nn.Parameter(state_dict[bo_key])
+                loaded_params += 1
 
             encoder_layers[i] = ModernBertLayerShim(blk)
 
@@ -644,7 +643,10 @@ class MinimalModernBertSVDBlock(nn.Module):
 
         attn = _F.scaled_dot_product_attention(Q, K, V, attn_mask=sdpa_mask, dropout_p=0.0)
         attn = attn.transpose(1, 2).reshape(B, M, D)
-        x = x + self.Wo_attn(attn)
+        attn_out = (attn @ self.Uo) @ self.Vo
+        if getattr(self, 'bo_attn', None) is not None:
+            attn_out = attn_out + self.bo_attn
+        x = x + attn_out
 
         # FFN (pre-norm, GeGLU or GELU)
         xn2 = self.mlp_norm(x)

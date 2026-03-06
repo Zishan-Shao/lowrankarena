@@ -251,6 +251,7 @@ class NaiveModernBertSVDBlock(nn.Module):
         config,
         rank_attn: int,
         rank_ff: int,
+        rank_wo: int,
         svd_per_head_fn: Callable,
         svd_low_rank_fn: Callable,
     ):
@@ -295,8 +296,12 @@ class NaiveModernBertSVDBlock(nn.Module):
         self.bk = nn.Parameter(bk.clone()) if bk is not None else None
         self.bv = nn.Parameter(bv.clone()) if bv is not None else None
 
-        # Attention output projection (kept dense)
-        self.Wo_attn = copy.deepcopy(hf_layer.attn.Wo)
+        # Attention output projection (SVD factorized, same as BERT Wo)
+        Wo_a = hf_layer.attn.Wo
+        U_wo, V_wo = svd_low_rank_fn(Wo_a.weight.data.t(), rank_wo)
+        self.Uo = nn.Parameter(U_wo)   # [D, rank_wo]
+        self.Vo = nn.Parameter(V_wo)   # [rank_wo, D]
+        self.bo_attn = nn.Parameter(Wo_a.bias.data.clone()) if Wo_a.bias is not None else None
 
         # --- FFN: Wi [2*D_ffn, D] (GeGLU), Wo [D, D_ffn] ---
         Wi = hf_layer.mlp.Wi
@@ -371,7 +376,10 @@ class NaiveModernBertSVDBlock(nn.Module):
             Q, K, V, attn_mask=sdpa_mask, dropout_p=0.0,
         )
         attn = attn.transpose(1, 2).reshape(B, M, D)
-        x = x + self.Wo_attn(attn)
+        attn_out = (attn @ self.Uo) @ self.Vo
+        if self.bo_attn is not None:
+            attn_out = attn_out + self.bo_attn
+        x = x + attn_out
 
         # === FFN (pre-norm, GeGLU) ===
         xn2 = self.mlp_norm(x)

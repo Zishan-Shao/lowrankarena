@@ -492,7 +492,7 @@ def compress_adasvd_modernbert(
     Module name convention (from named_modules() on AutoModelForSequenceClassification):
       model.layers.{i}.attn.Wqkv  — fused QKV rank → capped to head_dim for per-head
       model.layers.{i}.mlp.Wi     — FFN input rank  (used as rank_ff for both Wi and Wo)
-      model.layers.{i}.attn.Wo    — kept DENSE in NaiveModernBertSVDBlock (rank ignored)
+      model.layers.{i}.attn.Wo    — SVD factorized with rank_wo (from ranks_dict)
       model.layers.{i}.mlp.Wo     — rank_ff from Wi applies (Wo shares rank_ff)
     """
     _repo_root = os.path.dirname(
@@ -557,8 +557,11 @@ def compress_adasvd_modernbert(
         # (NaiveModernBertSVDBlock takes a single rank_ff for the whole FFN)
         rank_ff = ranks_dict.get(f"{prefix}.{i}.mlp.Wi", d_model)
 
+        # attn.Wo rank → factorized like BERT's Wo
+        rank_wo = ranks_dict.get(f"{prefix}.{i}.attn.Wo", d_model)
+
         block   = NaiveModernBertSVDBlock(
-            layer, config, rank_attn, rank_ff, _svd_per_head, _svd_low_rank,
+            layer, config, rank_attn, rank_ff, rank_wo, _svd_per_head, _svd_low_rank,
         )
         shimmed = ModernBertLayerShim(block)
         encoder_layers[i] = shimmed.to(device).eval()
