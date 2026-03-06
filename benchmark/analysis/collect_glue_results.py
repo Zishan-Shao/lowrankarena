@@ -77,8 +77,10 @@ def parse_json(path):
 
     seq_len = cfg.get("seq_len", 128)
 
-    return dict(method=method, qkv_mode=qkv_mode, seq_len=seq_len, timestamp=timestamp,
-                skip_finetuning=skip_finetuning,
+    dtype = cfg.get("dtype", "fp32")   # old JSONs pre-dating --dtype arg default to fp32
+
+    return dict(method=method, qkv_mode=qkv_mode, seq_len=seq_len, dtype=dtype,
+                timestamp=timestamp, skip_finetuning=skip_finetuning,
                 task_scores=task_scores, g_avg_s1=g_avg_s1, g_avg_s2=g_avg_s2)
 
 
@@ -127,13 +129,13 @@ def main():
     for f in files:
         try:
             info = parse_json(f)
-            groups[(info["method"], info["qkv_mode"], info["seq_len"])].append(info)
+            groups[(info["method"], info["qkv_mode"], info["seq_len"], info["dtype"])].append(info)
         except Exception as e:
             print(f"  SKIP {os.path.basename(f)}: {e}")
             skipped += 1
 
     rows = []
-    for (method, qkv_mode, seq_len), runs in sorted(groups.items()):
+    for (method, qkv_mode, seq_len, dtype), runs in sorted(groups.items()):
         # Pick the single latest run per stage independently:
         #   s1 source: latest skip_finetuning=True  run
         #   s2 source: latest skip_finetuning=False run
@@ -175,6 +177,7 @@ def main():
             "method":      method,
             "qkv_mode":    qkv_mode,
             "seq_len":     seq_len,
+            "dtype":       dtype,
             "g_avg_s1":    round(g_s1, 6) if g_s1 is not None else "",
             "g_avg_s2":    round(g_s2, 6) if g_s2 is not None else "",
             "n_tasks_s1":  n_s1,
@@ -186,7 +189,7 @@ def main():
             row[f"{task}_s2"] = round(s2, 6) if s2 is not None else ""
         rows.append(row)
 
-    fieldnames = ["method", "qkv_mode", "seq_len",
+    fieldnames = ["method", "qkv_mode", "seq_len", "dtype",
                   "g_avg_s1", "g_avg_s2", "n_tasks_s1", "n_tasks_s2"] + \
                  [f"{t}_{s}" for t in TASKS_8 for s in ("s1", "s2")]
 

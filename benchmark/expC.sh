@@ -93,9 +93,11 @@ RANK_WO="${RANK_WO:-208}"
 QKV_MODE="${QKV_MODE:-per_head}"
 BUDGET="${BUDGET:-0.527}"
 
+MODEL_ID="${MODEL_ID:-bert-base-uncased}"
+_MODEL_SLUG="${MODEL_ID##*/}"; _MODEL_SLUG="${_MODEL_SLUG,,}"
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-compressed_models/bert}"
-OUT_SEQLEN="${OUT_SEQLEN:-experiments/results/expC_seqlen.csv}"
-OUT_BATCH="${OUT_BATCH:-experiments/results/expC_batch.csv}"
+OUT_SEQLEN="${OUT_SEQLEN:-experiments/results/expC_seqlen_${_MODEL_SLUG}.csv}"
+OUT_BATCH="${OUT_BATCH:-experiments/results/expC_batch_${_MODEL_SLUG}.csv}"
 # Alignment check: 0=off (default); 1=on (each job loads naive once more for logit diff)
 # Usage: ALIGN=1 bash expC.sh
 ALIGN="${ALIGN:-0}"

@@ -67,6 +67,16 @@ TWO_STAGE="${TWO_STAGE:-false}"
 BACKENDS="${BACKENDS:-naive}"
 MODEL_ID="${MODEL_ID:-bert-base-uncased}"
 PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS:-false}"
+CALIB_TASK="${CALIB_TASK:-}"           # Override calibration task (e.g. mnli for hans/anli)
+# Derived from MODEL_ID; can be overridden (e.g. compressed_models/modernbert)
+MODEL_BASE_DIR="${MODEL_BASE_DIR:-}"
+if [[ -z "${MODEL_BASE_DIR}" ]]; then
+    if [[ "${MODEL_ID,,}" == *"modernbert"* ]]; then
+        MODEL_BASE_DIR="${REPO_ROOT}/compressed_models/modernbert"
+    else
+        MODEL_BASE_DIR="${REPO_ROOT}/compressed_models/bert"
+    fi
+fi
 
 # ── PERF_ONLY mode ────────────────────────────────────────────────────────────
 # When PERF_ONLY=true: skip compression entirely, load existing checkpoints and
@@ -164,9 +174,9 @@ _run_perf_only() {
 
   local model_dir
   if [[ "${USE_TASK_MODELS}" == "true" || -n "${LOCAL_PRETRAINED_DIR}" ]]; then
-    model_dir="${REPO_ROOT}/compressed_models/bert/${task}/${subdir}"
+    model_dir="${MODEL_BASE_DIR}/${task}/${subdir}"
   else
-    model_dir="${REPO_ROOT}/compressed_models/bert/${subdir}"
+    model_dir="${MODEL_BASE_DIR}/${subdir}"
   fi
 
   if [[ ! -d "${model_dir}" ]]; then
@@ -270,6 +280,7 @@ run_one() {
   env_prefix+=("SKIP_COMPRESSION=false")
   env_prefix+=("REUSE_CHECKPOINT=${reuse_checkpoint}")
   env_prefix+=("PRETRAIN_BEFORE_COMPRESS=${PRETRAIN_BEFORE_COMPRESS}")
+  [[ -n "${CALIB_TASK}" ]] && env_prefix+=("CALIB_TASK=${CALIB_TASK}")
   env_prefix+=("NON_INTERACTIVE=true")
   env_prefix+=("AUTO_FIGURES=false")  # compare_all_methods.sh handles figure generation at the end
   env_prefix+=("OUT_CSV=${PERF_CSV}")

@@ -691,6 +691,16 @@ def _write_compress_eval_csv_rows(task, comp_info, metric_name,
           + (f" flash15={value_flash15:.4f}" if value_flash15 is not None else ""))
 
 
+def _is_modernbert(model_id: str) -> bool:
+    """Return True if model_id refers to a ModernBERT variant."""
+    return "modernbert" in model_id.lower()
+
+
+def _model_base_dir(model_id: str) -> str:
+    """Return the compressed_models sub-directory for the given base model."""
+    return "compressed_models/modernbert" if _is_modernbert(model_id) else "compressed_models/bert"
+
+
 def pretrain_base_model(args, task: str) -> Path:
     """Fine-tune the base model (bert-base-uncased) on a task before compression.
 
@@ -701,7 +711,7 @@ def pretrain_base_model(args, task: str) -> Path:
     print(f"STEP 0: Pre-training base model on {task.upper()}")
     print("="*70)
 
-    pretrain_dir = Path("compressed_models/bert/dense") / task / "pretrained_base"
+    pretrain_dir = Path(_model_base_dir(args.model_id)) / "dense" / task / "pretrained_base"
     pretrain_info_file = pretrain_dir / "pretrain_info.json"
 
     # Reuse if already exists (pretrain is expensive and deterministic; always reuse)
@@ -947,12 +957,13 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
         model_id_override is not None or
         getattr(args, 'local_pretrained_dir', None) is not None
     )
+    _base = _model_base_dir(args.model_id)
     if task and _has_per_task_model:
-        checkpoint_path = Path("compressed_models/bert") / args.method / task / model_name
-        save_dir = str(Path("compressed_models/bert") / args.method / task)
+        checkpoint_path = Path(_base) / args.method / task / model_name
+        save_dir = str(Path(_base) / args.method / task)
     else:
-        checkpoint_path = Path("compressed_models/bert") / args.method / model_name
-        save_dir = str(Path("compressed_models/bert") / args.method)
+        checkpoint_path = Path(_base) / args.method / model_name
+        save_dir = str(Path(_base) / args.method)
 
     # Check if already exists
     if checkpoint_path.exists():
@@ -2416,6 +2427,17 @@ def run_pipeline(args):
     print("="*70)
     if args.pretrain_before_compress:
         print(f"[mode] Pretrain-before-compress: base → finetune → compress → finetune")
+
+    # ── ModernBERT auto-configuration ─────────────────────────────────────────
+    if _is_modernbert(args.model_id):
+        print("[modernbert] Architecture detected")
+        if args.use_task_models:
+            print("[modernbert] Disabling use_task_models — no per-task HuggingFace checkpoints for ModernBERT")
+            args.use_task_models = False
+        if args.backend in ('flashsvd', 'flashsvd15'):
+            print(f"[modernbert] Backend '{args.backend}' not supported — forcing naive")
+            args.backend = 'naive'
+    # ──────────────────────────────────────────────────────────────────────────
 
     # Step 0/1/2: For each task
     for task in args.tasks:

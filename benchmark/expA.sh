@@ -84,8 +84,14 @@ TASKS_SUPERGLUE="${TASKS_SUPERGLUE:-boolq rte_sg wic copa cb hans anli_r1 anli_r
 TASKS_SUPERGLUE_FINETUNE="${TASKS_SUPERGLUE_FINETUNE:-boolq wic}"
 TWO_STAGE="${TWO_STAGE:-true}"
 RECOMPRESS="${RECOMPRESS:-false}"
+PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS:-false}"
+MODEL_ID="${MODEL_ID:-bert-base-uncased}"
 MODEL_BASE_DIR="${MODEL_BASE_DIR:-compressed_models/bert}"
-OUT_CSV="${OUT_CSV:-experiments/results/expA.csv}"
+# Auto-name CSV by model slug so BERT and ModernBERT results don't overwrite each other.
+# e.g. bert-base-uncased → expA_bert-base-uncased.csv
+#      answerdotai/ModernBERT-base → expA_modernbert-base.csv
+_MODEL_SLUG="${MODEL_ID##*/}"; _MODEL_SLUG="${_MODEL_SLUG,,}"
+OUT_CSV="${OUT_CSV:-experiments/results/expA_${_MODEL_SLUG}.csv}"
 
 echo "══════════════════════════════════════════════════════════════════════"
 echo "  expA — Quality Experiment"
@@ -93,7 +99,8 @@ echo "  phases:    ${PHASES}"
 echo "  methods:   ${METHODS}"
 echo "  config:    qkv=${QKV_MODE} ra${RANK_ATTN}_rf${RANK_FFN}_rw${RANK_WO}  budget=${BUDGET}"
 echo "  dtype:     ${DTYPE}   seq_len=${SEQ_LEN}   bs=${BATCH_SIZE}"
-echo "  two_stage: ${TWO_STAGE}   recompress: ${RECOMPRESS}"
+echo "  two_stage: ${TWO_STAGE}   recompress: ${RECOMPRESS}   pretrain_before_compress: ${PRETRAIN_BEFORE_COMPRESS}"
+echo "  model_id:  ${MODEL_ID}"
 echo "══════════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -117,7 +124,8 @@ if [[ "${_PHASES}" == *" glue "* ]]; then
     BACKENDS="naive" \
     USE_TASK_MODELS="true" \
     TASK_MODEL_PREFIX="textattack" \
-    PRETRAIN_BEFORE_COMPRESS="false" \
+    PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS}" \
+    MODEL_ID="${MODEL_ID}" \
     AUTO_FIGURES="false" \
     PERF_CSV="${OUT_CSV}" \
     QKV_MODE="${QKV_MODE}" \
@@ -182,7 +190,8 @@ if [[ "${_PHASES}" == *" superglue_finetune "* ]]; then
     BACKENDS="naive" \
     USE_TASK_MODELS="true" \
     TASK_MODEL_PREFIX="textattack" \
-    PRETRAIN_BEFORE_COMPRESS="false" \
+    PRETRAIN_BEFORE_COMPRESS="${PRETRAIN_BEFORE_COMPRESS}" \
+    MODEL_ID="${MODEL_ID}" \
     AUTO_FIGURES="false" \
     PERF_CSV="${OUT_CSV}" \
     QKV_MODE="${QKV_MODE}" \

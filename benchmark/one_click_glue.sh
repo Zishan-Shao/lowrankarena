@@ -47,6 +47,7 @@ QKV_MODE="${QKV_MODE:-per_head}"       # QKV decomposition mode: per_head (per-h
                                        # full: SVD on the full 768x768 matrix (paper style, rank can reach 256+)
                                        # Note: FlashSVD backend only supports per_head mode
 CALIB_BATCHES="${CALIB_BATCHES:-4}"    # Number of calibration batches (fwsvd/drone/adasvd)
+CALIB_TASK="${CALIB_TASK:-}"           # Override calibration task (e.g. mnli for hans/anli which have no train split)
                                        # Recommended: 4-16 (fast) or 16-32 (better Fisher estimation)
 BUDGET="${BUDGET:-0.6}"                # AdaSVD budget (only used when METHOD=adasvd)
                                        # Recommended: 0.5 (retain 50% params) or 0.6 (retain 60% params)
@@ -296,6 +297,7 @@ EOF
     # Add QKV mode and calibration batches
     CMD="$CMD --qkv_mode $QKV_MODE"
     CMD="$CMD --calib_batches $CALIB_BATCHES"
+    [[ -n "$CALIB_TASK" ]] && CMD="$CMD --calib_task $CALIB_TASK"
 
     # Add budget and ARS params for AdaSVD (calib_batches is ignored for adasvd_origin)
     if [ "$METHOD" = "adasvd" ]; then
