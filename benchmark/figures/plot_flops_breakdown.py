@@ -53,12 +53,15 @@ def load(path, task, dtype, seq_len):
 
     # Separate real vs synthetic rows.
     # - FLOPs fields (rank_pad_pct etc.) are static — same for both input_modes.
-    # - seq_pad_pct must come from real rows (synthetic always = 0, meaningless for right panel).
-    # Keep one row per method: prefer real, fall back to synthetic.
-    df_real  = df[df.get("input_mode", pd.Series(dtype=str)) == "real"]
+    # - seq_pad_pct: synthetic=0% (fully-utilized input), real=~92% (MNLI fixed seq=512).
+    # Prefer synthetic: isolates rank-pad overhead without seq-padding confound;
+    # consistent with left panel which already excludes seq-padding.
+    # Fall back to real if synthetic not present.
     df_synth = df[df.get("input_mode", pd.Series(dtype=str)) == "synthetic"]
-    if "input_mode" in df.columns and not df_real.empty:
-        # merge: take flops cols from real row (seq_pad_pct is meaningful there)
+    df_real  = df[df.get("input_mode", pd.Series(dtype=str)) == "real"]
+    if "input_mode" in df.columns and not df_synth.empty:
+        df = df_synth.drop_duplicates(subset=["method"])
+    elif not df_real.empty:
         df = df_real.drop_duplicates(subset=["method"])
     else:
         df = df.drop_duplicates(subset=["method"])
@@ -84,91 +87,45 @@ def plot(df, task, dtype, seq_len, outdir):
     xlabels = [METHOD_LABELS.get(m, m) for m in methods]
     x = np.arange(len(methods))
 
-    fig, (ax_left, ax_right) = plt.subplots(
-        1, 2, figsize=(12, 5.5),
-        gridspec_kw={"wspace": 0.35},
-    )
     task_label = TASK_LABELS.get(task, task)
-    fig.suptitle(
+
+    fig, ax = plt.subplots(figsize=(6.5, 5.0))
+    ax.set_title(
         f"FLOPs Breakdown  |  {task_label}  dtype={dtype}  seq_len={seq_len}",
-        fontsize=12, fontweight="bold",
+        fontsize=11, fontweight="bold", pad=10,
     )
 
-    # ── Panel 1: compute quality (useful vs rank-pad, normalized to total_flops) ──
-    ax_left.set_title(
-        "Compute Quality\n(excl. sequence-padding tokens)",
-        fontsize=10, fontweight="bold",
-    )
     for xi, method in enumerate(methods):
         row = df[df["method"] == method].iloc[0]
         rpad_pct   = float(row["rank_pad_pct"])
         useful_pct = 100.0 - rpad_pct
 
-        b_u = ax_left.bar(xi, useful_pct, BAR_W, color=C_USEFUL,   zorder=3)
-        b_r = ax_left.bar(xi, rpad_pct,   BAR_W, color=C_RANKPAD,
-                          bottom=useful_pct, zorder=3)
-        _annotate(ax_left, b_u, useful_pct,  bottom=0.0,        color="white")
-        _annotate(ax_left, b_r, rpad_pct,    bottom=useful_pct, color="white", min_pct=1.0)
+        b_u = ax.bar(xi, useful_pct, BAR_W, color=C_USEFUL,  zorder=3)
+        b_r = ax.bar(xi, rpad_pct,   BAR_W, color=C_RANKPAD,
+                     bottom=useful_pct, zorder=3)
+        _annotate(ax, b_u, useful_pct,  bottom=0.0,        color="white")
+        _annotate(ax, b_r, rpad_pct,    bottom=useful_pct, color="white", min_pct=1.0)
 
-    ax_left.set_xticks(x)
-    ax_left.set_xticklabels(xlabels, fontsize=10)
-    ax_left.set_ylabel("Proportion of total FLOPs (%)", fontsize=9)
-    ax_left.set_ylim(0, 108)
-    ax_left.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
-    ax_left.set_axisbelow(True)
-    ax_left.set_yticks(range(0, 101, 20))
+    ax.set_xticks(x)
+    ax.set_xticklabels(xlabels, fontsize=11)
+    ax.set_ylabel("Proportion of total FLOPs (%)", fontsize=10)
+    ax.set_ylim(0, 108)
+    ax.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax.set_axisbelow(True)
+    ax.set_yticks(range(0, 101, 20))
 
-    # no per-panel legend on the left; a single shared legend sits right of the right panel
-
-    # ── Panel 2: full inference budget (including seq-padding) ────────────────
-    ax_right.set_title(
-        "Full Inference Budget\n(incl. sequence-padding tokens)",
-        fontsize=10, fontweight="bold",
-    )
-    for xi, method in enumerate(methods):
-        row = df[df["method"] == method].iloc[0]
-        total      = float(row["total_flops_abs"])
-        useful_abs = float(row["useful_flops_abs"])
-        rpad_abs   = float(row["rank_pad_flops_abs"])
-        seq_pad_f  = float(row["seq_pad_pct"]) / 100.0   # fraction
-
-        # split each component into seq-content portion vs seq-pad portion
-        content_f = 1.0 - seq_pad_f
-        eff_useful  = 100.0 * (useful_abs / total) * content_f
-        eff_rpad    = 100.0 * (rpad_abs   / total) * content_f
-        eff_seqpad  = 100.0 * seq_pad_f
-
-        b_s = ax_right.bar(xi, eff_seqpad, BAR_W, color=C_SEQPAD,  zorder=3)
-        b_r = ax_right.bar(xi, eff_rpad,   BAR_W, color=C_RANKPAD,
-                           bottom=eff_seqpad, zorder=3)
-        b_u = ax_right.bar(xi, eff_useful, BAR_W, color=C_USEFUL,
-                           bottom=eff_seqpad + eff_rpad, zorder=3)
-        _annotate(ax_right, b_s, eff_seqpad, bottom=0.0,                    color="#555555")
-        _annotate(ax_right, b_r, eff_rpad,   bottom=eff_seqpad,            color="white", min_pct=0.4)
-        _annotate(ax_right, b_u, eff_useful, bottom=eff_seqpad + eff_rpad, color="white")
-
-    ax_right.set_xticks(x)
-    ax_right.set_xticklabels(xlabels, fontsize=10)
-    ax_right.set_ylabel("Proportion of total FLOPs (%)", fontsize=9)
-    ax_right.set_ylim(0, 108)
-    ax_right.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
-    ax_right.set_axisbelow(True)
-    ax_right.set_yticks(range(0, 101, 20))
-
-    # Single shared legend to the right of the right panel — covers all 3 colors used in both panels
-    ax_right.legend(
+    ax.legend(
         handles=[
             plt.Rectangle((0, 0), 1, 1, color=C_USEFUL,  label="Effective / useful compute"),
             plt.Rectangle((0, 0), 1, 1, color=C_RANKPAD, label="Rank-alignment overhead\n(Triton next_pow2(R))"),
-            plt.Rectangle((0, 0), 1, 1, color=C_SEQPAD,  label="Sequence-padding tokens\n(input-level waste)"),
         ],
-        loc="upper left", bbox_to_anchor=(1.03, 1),
-        fontsize=8.5, framealpha=0.9, borderaxespad=0,
+        loc="upper left", bbox_to_anchor=(1.02, 1),
+        fontsize=9, framealpha=0.9, borderaxespad=0,
     )
 
     # ── save ──────────────────────────────────────────────────────────────────
     os.makedirs(outdir, exist_ok=True)
-    fname = f"flops_breakdown_{task}_{dtype}_seq{seq_len}.png"
+    fname = "fig13_flops_breakdown.png"
     out   = os.path.join(outdir, fname)
     plt.tight_layout()
     fig.savefig(out, dpi=150, bbox_inches="tight")

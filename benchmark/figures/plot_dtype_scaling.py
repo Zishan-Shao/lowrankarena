@@ -114,11 +114,8 @@ def _setup_xax(ax):
 
 def _save(fig, stem):
     png = f"{FIG_DIR}/{stem}.png"
-    pdf = f"{FIG_DIR}/{stem}.pdf"
     fig.savefig(png, dpi=180, bbox_inches="tight")
-    fig.savefig(pdf,           bbox_inches="tight")
     print(f"Saved: {png}")
-    print(f"Saved: {pdf}")
     plt.close(fig)
 
 # ─────────────────────────────────────────────────────────────────
@@ -140,19 +137,18 @@ ax.plot(SEQ, MEM_BF16_NAIVE,  color=C_BF16_NAIVE,  marker="o",
 ax.plot(BF16_SEQ, MEM_BF16_FLASH, color=C_BF16_FLASH, marker="D",
         lw=LW + 0.6, ms=MS, label="bf16-Flash", zorder=5)
 
-# Annotate bf16 FlashSVD reduction vs bf16 Naive
+# Annotate bf16 FlashSVD reduction vs bf16 Naive — labels below the Flash line
 MEM_RED_BF16 = (MEM_BF16_NAIVE - MEM_BF16_FLASH) / MEM_BF16_NAIVE * 100
 for sl, mn, mf, red in zip(SEQ, MEM_BF16_NAIVE, MEM_BF16_FLASH, MEM_RED_BF16):
-    mid = (mn + mf) / 2
-    ax.text(sl + 14, mid, f"−{red:.0f}%",
-            color=C_BF16_FLASH, fontsize=8.5,
-            va="center", ha="left", fontstyle="italic")
+    ax.text(sl, mf - 60, f"−{red:.0f}%",
+            color=C_BF16_FLASH, fontsize=9,
+            va="top", ha="center", fontstyle="italic")
 
 # fp32 SDPA cross-over annotation
 ax.annotate(
     "fp32 SDPA > einsum\n(MEA tile overhead)",
     xy=(128, MEM_FP32["sdpa"][0]), xytext=(148, 1380),
-    fontsize=7.5, color=C_SDPA,
+    fontsize=8, color=C_SDPA,
     arrowprops=dict(arrowstyle="->", color=C_SDPA, lw=0.8),
 )
 
@@ -165,7 +161,7 @@ ax.legend(loc="upper left", framealpha=0.9, fontsize=9)
 ax.grid(axis="y", alpha=0.25, lw=0.8)
 fig.text(0.5, -0.04, SUBTITLE, ha="center", fontsize=8.5, color="#555555")
 fig.tight_layout()
-_save(fig, "dtype_memory_scaling")
+_save(fig, "fig14_dtype_A")
 
 # ─────────────────────────────────────────────────────────────────
 # Figure 2 – Memory Reduction (%) — bf16 FlashSVD vs bf16 Naive
@@ -186,13 +182,13 @@ ax.plot(SEQ, MEM_RED_FP32,
         label="fp32  FlashSVD vs Naive(einsum)")
 ax.fill_between(SEQ, 0, MEM_RED_FP32, color=C_FLASH, alpha=0.06)
 
-# Annotate values
+# Annotate values — unified fontsize
 for sl, r in zip(SEQ, MEM_RED_BF16):
     ax.text(sl, r + 1.5, f"{r:.1f}%",
-            color=C_BF16_FLASH, fontsize=11,
-            va="bottom", ha="center", fontweight="bold")
+            color=C_BF16_FLASH, fontsize=9,
+            va="bottom", ha="center")
 for sl, r in zip(SEQ, MEM_RED_FP32):
-    ax.text(sl, r - 3.5, f"{r:.1f}%",
+    ax.text(sl, r - 2.5, f"{r:.1f}%",
             color=C_FLASH, fontsize=9,
             va="top", ha="center")
 
@@ -201,11 +197,11 @@ ax.yaxis.set_major_locator(ticker.MultipleLocator(20))
 ax.set_ylabel("Peak inference memory reduction (%)", fontsize=11)
 ax.set_title("FlashSVD Memory Reduction by dtype", fontweight="bold")
 _setup_xax(ax)
-ax.legend(loc="upper left", framealpha=0.9)
+ax.legend(loc="upper left", framealpha=0.9, fontsize=9)
 ax.grid(axis="y", alpha=0.25, lw=0.8)
 fig.text(0.5, -0.04, SUBTITLE, ha="center", fontsize=8.5, color="#555555")
 fig.tight_layout()
-_save(fig, "dtype_memory_reduction")
+_save(fig, "fig14_dtype_A_reduction")
 
 # ─────────────────────────────────────────────────────────────────
 # Figure 3 – Throughput Scaling (fp32 all backends + bf16 FlashSVD)
@@ -229,8 +225,8 @@ tf_bf16 = THR_BF16_FLASH[-1]
 spd = tf_bf16 / tf_fp32
 ax.annotate(
     f"×{spd:.1f} vs fp32",
-    xy=(sl512, tf_bf16), xytext=(sl512 - 110, tf_bf16 + 280),
-    color=C_BF16_FLASH, fontsize=9.5, fontstyle="italic",
+    xy=(sl512, tf_bf16), xytext=(sl512 - 180, tf_bf16 + 650),
+    color=C_BF16_FLASH, fontsize=9, fontstyle="italic",
     arrowprops=dict(arrowstyle="->", color=C_BF16_FLASH, lw=1.0),
 )
 
@@ -243,7 +239,7 @@ ax.legend(loc="upper right", framealpha=0.9, fontsize=9)
 ax.grid(axis="y", alpha=0.25, lw=0.8)
 fig.text(0.5, -0.04, SUBTITLE, ha="center", fontsize=8.5, color="#555555")
 fig.tight_layout()
-_save(fig, "dtype_throughput_scaling")
+_save(fig, "fig14_dtype_B")
 
 # ─────────────────────────────────────────────────────────────────
 # Print summary table

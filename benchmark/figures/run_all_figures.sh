@@ -44,12 +44,12 @@ run() {
 }
 
 # ── expA: accuracy figures (fig1-6, GLUE G-AVG, MRPC collapse, Pareto) ────────
-run "expA: fig1-6 (accuracy + memory + Pareto)" \
+run "expA: fig01-06 (accuracy + memory + Pareto)" \
     python benchmark/figures/gen_figures.py
 
-# ── expB: backend comparison (latency / throughput / speedup / memory) ─────────
+# ── expB: backend comparison (fig09-12, fig13) ────────────────────────────────
 if [[ -f "${RESULTS}/expB.csv" ]]; then
-    run "expB: backend latency/throughput/speedup/memory (mnli+stsb, bf16, seq512)" \
+    run "expB: fig09-12 backend latency/throughput/speedup/memory (mnli+stsb, bf16, seq512)" \
         python benchmark/figures/plot_backend_sweep.py \
             --csv     "${RESULTS}/expB.csv" \
             --tasks   mnli stsb \
@@ -58,16 +58,7 @@ if [[ -f "${RESULTS}/expB.csv" ]]; then
             --seq_len 512 \
             --outdir  "${OUTDIR}"
 
-    run "expB: combined 2×2 figure (mnli+stsb, bf16, seq512)" \
-        python benchmark/figures/plot_combined_figure.py \
-            --csv     "${RESULTS}/expB.csv" \
-            --tasks   mnli stsb \
-            --methods svd fwsvd drone adasvd \
-            --dtype   bf16 \
-            --seq_len 512 \
-            --outdir  "${OUTDIR}"
-
-    run "expB: FLOPs breakdown (mnli, bf16, seq512)" \
+    run "expB: fig13 FLOPs breakdown (mnli, bf16, seq512)" \
         python benchmark/figures/plot_flops_breakdown.py \
             --csv     "${RESULTS}/expB.csv" \
             --task    mnli \
@@ -79,26 +70,25 @@ else
     echo ""
 fi
 
-# ── expC: seq-len + dtype scaling ─────────────────────────────────────────────
-run "expC: seq-len memory/throughput scaling (fp32, hardcoded)" \
+# ── expC: seq-len + dtype scaling (fig07-08, fig14) ──────────────────────────
+run "expC: fig07-08 seqlen/batch scaling" \
     python benchmark/figures/plot_seqlen_scaling.py
 
 if [[ -f "${RESULTS}/expC_seqlen.csv" ]]; then
-    run "expC: dtype×backend memory/throughput scaling (fp32+bf16)" \
+    run "expC: fig14 dtype×backend memory/throughput scaling" \
         python benchmark/figures/plot_dtype_scaling.py
 else
     echo "── expC dtype scaling: skipped (${RESULTS}/expC_seqlen.csv not found)"
     echo ""
 fi
 
-# ── expD: nsys kernel analysis ─────────────────────────────────────────────────
+# ── expD: nsys kernel analysis (fig15) ────────────────────────────────────────
 _EXPD_CSV="${RESULTS}/expD_mnli_bf16_s512_b32.csv"
 if [[ ! -f "${_EXPD_CSV}" ]]; then
-    # Try alternate name
     _EXPD_CSV="$(ls ${RESULTS}/expD*.csv 2>/dev/null | head -1 || true)"
 fi
 if [[ -n "${_EXPD_CSV}" && -f "${_EXPD_CSV}" ]]; then
-    run "expD: nsys kernel analysis (mnli, bf16, seq512)" \
+    run "expD: fig15 nsys kernel analysis" \
         python benchmark/figures/plot_nsys_kernel.py \
             --csv     "${_EXPD_CSV}" \
             --outdir  "${OUTDIR}"

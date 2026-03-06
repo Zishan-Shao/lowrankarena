@@ -31,8 +31,8 @@ BATCH_CSV  = os.path.join(_REPO, 'experiments', 'results', 'expC_batch.csv')
 
 # ── backend style ──────────────────────────────────────────────────────────────
 BACKEND_ORDER  = ["naive", "sdpa", "flashsvd", "flashsvd15"]
-COLORS  = {"naive": "#D32F2F", "sdpa": "#F57C00",
-           "flashsvd": "#1565C0", "flashsvd15": "#6A1B9A"}
+COLORS  = {"naive": "#9e9e9e", "sdpa": "#bdbdbd",
+           "flashsvd": "#42a5f5", "flashsvd15": "#ef5350"}
 LABELS  = {"naive": "Naive (einsum)", "sdpa": "Naive (SDPA)",
            "flashsvd": "FlashSVD v1", "flashsvd15": "FlashSVD v1.5"}
 DASHES  = {"naive": (4, 2), "sdpa": (2, 2), "flashsvd": (), "flashsvd15": ()}
@@ -117,27 +117,29 @@ for b in BACKEND_ORDER:
             dashes=DASHES[b] if DASHES[b] else [],
             label=LABELS[b], zorder=4 if 'flash' in b else 3)
 
-# Annotate FlashSVD v1.5 reduction vs naive at each seq_len
+# Annotate FlashSVD v1.5 reduction vs naive — only at last (max) seq point
 if "flashsvd15" in data_seq and _ref_b in data_seq:
     fxs, fmem, _ = data_seq["flashsvd15"]
-    for x, mf, mn in zip(fxs, fmem, _ref_mem):
-        pct = (mn - mf) / mn * 100
-        mid = (mn + mf) / 2
-        ax.text(x + 12, mid, f"−{pct:.0f}%",
-                color=COLORS["flashsvd15"], fontsize=8.5,
-                va='center', ha='left', fontstyle='italic')
+    x_last, mf_last = fxs[-1], fmem[-1]
+    idx_n = np.where(_ref_xs == x_last)[0]
+    if len(idx_n):
+        pct = (_ref_mem[idx_n[0]] - mf_last) / _ref_mem[idx_n[0]] * 100
+        ax.text(x_last + 14, mf_last, f"−{pct:.0f}%\nvs Naive",
+                color=COLORS["flashsvd15"], fontsize=9,
+                va='center', ha='left', fontstyle='italic', fontweight='bold')
 
-ax.yaxis.set_major_locator(ticker.MultipleLocator(500))
+ax.yaxis.set_major_locator(ticker.MultipleLocator(200))
+ax.set_ylim(bottom=150)
 ax.set_ylabel("Peak GPU Memory (MB)", fontsize=11)
 ax.set_title("Peak Memory vs. Sequence Length", fontweight='bold')
 ax.set_xticks(_ref_xs); ax.set_xticklabels([str(x) for x in _ref_xs])
-ax.set_xlim(_ref_xs[0] - 32, _ref_xs[-1] + 48)
+ax.set_xlim(_ref_xs[0] - 32, _ref_xs[-1] + 80)
 ax.set_xlabel("Sequence Length", fontsize=11)
 ax.legend(loc='upper left', framealpha=0.9)
 ax.grid(axis='y', alpha=0.25, lw=0.8)
 fig.text(0.5, -0.04, SUBTITLE_SEQ, ha='center', fontsize=8.5, color='#555555')
 fig.tight_layout()
-_save(fig, "fig7_seqlen_memory")
+_save(fig, "fig07_seqlen_A")
 
 # Figure 2 — Throughput vs seq_len
 fig, ax = plt.subplots(figsize=(5.5, 4.2))
@@ -151,17 +153,33 @@ for b in BACKEND_ORDER:
             dashes=DASHES[b] if DASHES[b] else [],
             label=LABELS[b], zorder=4 if 'flash' in b else 3)
 
-# Annotate best flash speedup vs naive at seq=512
+# Annotate flashsvd15 speedup vs naive — only at last seq point
 if "flashsvd15" in data_seq and _ref_b in data_seq:
     fxs, _, fthr = data_seq["flashsvd15"]
-    _idx = np.where(fxs == 512)[0]
-    if len(_idx):
-        tf = fthr[_idx[0]]
-        tn = _ref_thr[np.where(_ref_xs == 512)[0][0]]
-        ax.annotate(f"×{tf/tn:.2f} vs. Naive",
-                    xy=(512, tf), xytext=(420, tf + 180),
-                    color=COLORS["flashsvd15"], fontsize=9.5, fontstyle='italic',
-                    arrowprops=dict(arrowstyle="->", color=COLORS["flashsvd15"], lw=1.0))
+    x_last = fxs[-1];  tf_last = fthr[-1]
+    idx_n = np.where(_ref_xs == x_last)[0]
+    if len(idx_n):
+        spd = tf_last / _ref_thr[idx_n[0]]
+        ax.annotate(f"×{spd:.2f}",
+                    xy=(x_last, tf_last), xytext=(x_last - 40, tf_last + 200),
+                    color=COLORS["flashsvd15"], fontsize=9, fontstyle='italic',
+                    ha='center',
+                    arrowprops=dict(arrowstyle="->", color=COLORS["flashsvd15"],
+                                    lw=0.8))
+
+# Annotate SDPA path switch at seq=256 (short label)
+if "sdpa" in data_seq:
+    _sx, _, _sthr = data_seq["sdpa"]
+    _idx256 = np.where(_sx == 256)[0]
+    _idx128 = np.where(_sx == 128)[0]
+    if len(_idx256) and len(_idx128):
+        _t256 = _sthr[_idx256[0]]; _t128 = _sthr[_idx128[0]]
+        if _t256 > _t128:
+            ax.annotate("path switch",
+                        xy=(256, _t256), xytext=(196, _t256),
+                        color=COLORS["sdpa"], fontsize=8.5, fontstyle="italic",
+                        ha="center",
+                        arrowprops=dict(arrowstyle="->", color=COLORS["sdpa"], lw=1.0))
 
 ax.yaxis.set_major_locator(ticker.MultipleLocator(500))
 ax.set_ylabel("Throughput (samples / sec)", fontsize=11)
@@ -173,7 +191,7 @@ ax.legend(loc='upper right', framealpha=0.9)
 ax.grid(axis='y', alpha=0.25, lw=0.8)
 fig.text(0.5, -0.04, SUBTITLE_SEQ, ha='center', fontsize=8.5, color='#555555')
 fig.tight_layout()
-_save(fig, "fig8_seqlen_throughput")
+_save(fig, "fig07_seqlen_B")
 
 # Figure 3 — Memory Reduction (%) vs seq_len
 fig, ax = plt.subplots(figsize=(5.5, 4.2))
@@ -217,7 +235,7 @@ ax.legend(loc='upper left', framealpha=0.9)
 ax.grid(axis='y', alpha=0.25, lw=0.8)
 fig.text(0.5, -0.04, SUBTITLE_SEQ, ha='center', fontsize=8.5, color='#555555')
 fig.tight_layout()
-_save(fig, "fig9_seqlen_reduction")
+_save(fig, "fig07_seqlen_C")
 
 
 # ── batch figures ──────────────────────────────────────────────────────────────
@@ -249,7 +267,7 @@ ax.legend(loc='upper left', framealpha=0.9)
 ax.grid(axis='y', alpha=0.25, lw=0.8)
 fig.text(0.5, -0.04, SUBTITLE_BATCH, ha='center', fontsize=8.5, color='#555555')
 fig.tight_layout()
-_save(fig, "fig10_batch_memory")
+_save(fig, "fig08_batch_A")
 
 # Figure 5 — Throughput vs batch_size
 fig, ax = plt.subplots(figsize=(5.5, 4.2))
@@ -273,7 +291,7 @@ ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1), borderaxespad=0, framealph
 ax.grid(axis='y', alpha=0.25, lw=0.8)
 fig.text(0.5, -0.04, SUBTITLE_BATCH, ha='center', fontsize=8.5, color='#555555')
 fig.tight_layout()
-_save(fig, "fig11_batch_throughput")
+_save(fig, "fig08_batch_B")
 
 
 # ── summary table ──────────────────────────────────────────────────────────────

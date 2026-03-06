@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Plot backend comparison — 3 separate figures (Latency / Speedup / Memory),
-each with 2 task rows + 1 fairness-check row at the bottom.
+Plot backend comparison — one figure per (metric × task).
 
-Output: backend_latency_mnli+stsb_bf16_seq512.png  (and speedup / memory)
+Backends plotted: SDPA, FlashSVD 1.0, FlashSVD 1.5  (Naive used only as speedup denominator)
+Highlights:       AdaSVD + FlashSVD 1.5  → bold border + ★ label
 
 Usage:
-    python eval_encoder/scripts/plot_backend_sweep.py \
-        --csv     eval_encoder/eval_results/expB.csv \
+    python benchmark/figures/plot_backend_sweep.py \
+        --csv     experiments/results/expB.csv \
         --tasks   mnli stsb \
         --methods svd fwsvd drone adasvd \
-        --dtype   bf16  --seq_len 512 \
-        --outdir  eval_encoder/eval_results/figures
+        --dtype   bf16 --seq_len 512 \
+        --outdir  experiments/figs/figures
 """
 
 import argparse
@@ -22,23 +22,37 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.transforms import blended_transform_factory
 
 
 # ── visual config ──────────────────────────────────────────────────────────────
-BACKEND_ORDER  = ["naive", "sdpa", "flashsvd", "flashsvd15"]
-BACKEND_COLORS = {"naive": "#9e9e9e", "sdpa": "#66bb6a",
-                  "flashsvd": "#42a5f5", "flashsvd15": "#ef5350"}
-BACKEND_LABELS = {"naive": "Naive", "sdpa": "SDPA",
-                  "flashsvd": "FlashSVD", "flashsvd15": "FlashSVD 1.5"}
-METHOD_LABELS  = {"svd": "SVD", "fwsvd": "FWSVD", "drone": "DRONE", "adasvd": "AdaSVD"}
-TASK_LABELS    = {"mnli": "MNLI", "cola": "CoLA", "stsb": "STS-B",
-                  "sst2": "SST-2", "mrpc": "MRPC", "qqp": "QQP",
-                  "qnli": "QNLI", "rte": "RTE"}
+# Naive excluded from plots (used only as speedup baseline)
+BACKEND_ORDER  = ["sdpa", "flashsvd", "flashsvd15"]
+BACKEND_COLORS = {
+    "sdpa":       "#bdbdbd",   # light gray
+    "flashsvd":   "#42a5f5",   # blue
+    "flashsvd15": "#ef5350",   # red — proposed best backend
+}
+BACKEND_LABELS = {
+    "sdpa":       "SDPA",
+    "flashsvd":   "FlashSVD 1.0",
+    "flashsvd15": "FlashSVD 1.5",
+}
+METHOD_LABELS = {"svd": "SVD", "fwsvd": "FWSVD", "drone": "DRONE", "adasvd": "AdaSVD"}
+TASK_LABELS   = {"mnli": "MNLI", "cola": "CoLA", "stsb": "STS-B",
+                 "sst2": "SST-2", "mrpc": "MRPC", "qqp": "QQP",
+                 "qnli": "QNLI", "rte": "RTE"}
+TASK_SUFFIX   = "ABCDEFGHIJ"
+
+METRIC_FIG_NUM   = {"latency": "09", "throughput": "10", "speedup": "11", "memory": "12"}
+HIGHLIGHT_BACKEND = "flashsvd15"
+HIGHLIGHT_METHOD  = "adasvd"
 
 
 def load_all(path, tasks, dtype, seq_len, methods):
     df = pd.read_csv(path)
     df.columns = [c.strip().lower() for c in df.columns]
+    # Keep all backends in df (naive needed for speedup denominator)
     mask = (
         df["task"].isin(tasks) &
         (df["dtype"] == dtype) &
@@ -46,308 +60,180 @@ def load_all(path, tasks, dtype, seq_len, methods):
         df["method"].isin(methods)
     )
     df = df[mask].copy()
-    for col in ["latency_ms", "throughput_sps", "total_flops_abs",
-                "rank_pad_pct", "seq_pad_pct", "peak_mem_mb"]:
+    for col in ["latency_ms", "throughput_sps", "peak_mem_mb",
+                "rank_pad_pct", "seq_pad_pct"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+    if "input_mode" in df.columns:
+        syn = df[df["input_mode"] == "synthetic"]
+        df  = syn if not syn.empty else df
+    df = df.drop_duplicates(subset=["task", "method", "backend"])
     return df
 
 
-# ── bar drawing helpers ────────────────────────────────────────────────────────
+# ── bar helpers ────────────────────────────────────────────────────────────────
 
-def _draw_bars(ax, df_task, methods, col, ylabel, higher_better,
-               fmt="{:.1f}", show_xlabel=True):
-    n_m = len(methods)
-    n_b = len(BACKEND_ORDER)
-    bw  = 0.62 / n_b
-    x   = np.arange(n_m)
-
-    all_vals = []
+def _bar_vals(df_task, methods, col):
+    """Return {backend: [val_per_method]} for BACKEND_ORDER only."""
+    vals = {}
     for b in BACKEND_ORDER:
+        row = []
         for m in methods:
             r = df_task[(df_task["backend"] == b) & (df_task["method"] == m)]
-            if len(r) > 0:
-                all_vals.append(float(r[col].values[0]))
+            row.append(float(r[col].values[0]) if len(r) > 0 else 0.0)
+        vals[b] = row
+    return vals
+
+
+def _draw_bars(ax, df_task, methods, col, ylabel, higher_better, fmt="{:.1f}"):
+    bv  = _bar_vals(df_task, methods, col)
+    n_m = len(methods)
+    n_b = len(BACKEND_ORDER)
+    bw  = 0.72 / n_b   # wider per-backend bar since fewer backends
+    x   = np.arange(n_m)
+
+    all_vals = [v for b in BACKEND_ORDER for v in bv[b] if v > 0]
     ymax = max(all_vals) if all_vals else 1.0
 
     for bi, backend in enumerate(BACKEND_ORDER):
-        sub  = df_task[df_task["backend"] == backend]
-        vals = [float(sub[sub["method"] == m][col].values[0])
-                if len(sub[sub["method"] == m]) > 0 else 0.0
-                for m in methods]
-
         offset = (bi - (n_b - 1) / 2) * bw
-        bars = ax.bar(x + offset, vals, width=bw * 0.88,
-                      color=BACKEND_COLORS[backend],
-                      label=BACKEND_LABELS[backend], zorder=3)
-        for rect, v in zip(bars, vals):
+        for mi, (m, v) in enumerate(zip(methods, bv[backend])):
+            is_star = (backend == HIGHLIGHT_BACKEND and m == HIGHLIGHT_METHOD)
+            ax.bar(x[mi] + offset, v, width=bw * 0.88,
+                   color=BACKEND_COLORS[backend], zorder=3,
+                   edgecolor="#111111" if is_star else "none",
+                   linewidth=2.0 if is_star else 0,
+                   label=BACKEND_LABELS[backend] if mi == 0 else "")
             if v > 0:
-                ax.text(rect.get_x() + rect.get_width() / 2,
-                        rect.get_height() + ymax * 0.016,
-                        fmt.format(v),
-                        ha="center", va="bottom", fontsize=8, color="#222222")
+                txt = fmt.format(v) + (" ★" if is_star else "")
+                ax.text(x[mi] + offset,
+                        v + ymax * 0.018,
+                        txt,
+                        ha="center", va="bottom",
+                        fontsize=8 if backend != HIGHLIGHT_BACKEND else 9,
+                        color="#111111",
+                        fontweight="bold" if is_star else "normal")
 
-    ax.set_ylabel(ylabel, fontsize=9)
-    ax.set_ylim(0, ymax * 1.20)
+    ax.set_ylabel(ylabel, fontsize=11)
+    ax.set_ylim(0, ymax * 1.28)
     ax.yaxis.grid(True, linestyle="--", alpha=0.45, zorder=0)
     ax.set_axisbelow(True)
-    if show_xlabel:
-        ax.set_xticks(x)
-        ax.set_xticklabels([METHOD_LABELS.get(m, m) for m in methods], fontsize=9)
-    else:
-        ax.set_xticks(x)
-        ax.set_xticklabels([""] * n_m)
+    ax.set_xticks(x)
+    ax.set_xticklabels([METHOD_LABELS.get(m, m) for m in methods], fontsize=11)
     ax.text(0.99, 0.97, "↑" if higher_better else "↓",
             transform=ax.transAxes, ha="right", va="top",
-            fontsize=11, color="#555555", fontweight="bold")
+            fontsize=13, color="#555555", fontweight="bold")
 
 
-def _draw_speedup(ax, df_task, methods, show_xlabel=True):
+def _draw_speedup(ax, df_task, methods):
     n_m = len(methods)
     n_b = len(BACKEND_ORDER)
-    bw  = 0.62 / n_b
+    bw  = 0.72 / n_b
     x   = np.arange(n_m)
 
+    spd = {}
     all_spd = []
     for b in BACKEND_ORDER:
+        row = []
         for m in methods:
             nr = df_task[(df_task["method"] == m) & (df_task["backend"] == "naive")]
             br = df_task[(df_task["method"] == m) & (df_task["backend"] == b)]
             if len(nr) > 0 and len(br) > 0:
                 nv = float(nr["throughput_sps"].values[0])
                 bv = float(br["throughput_sps"].values[0])
-                if nv > 0:
-                    all_spd.append(bv / nv)
-    ymax = max(all_spd) if all_spd else 3.0
+                s  = bv / nv if nv > 0 else 0.0
+            else:
+                s = 0.0
+            row.append(s)
+            if s > 0:
+                all_spd.append(s)
+        spd[b] = row
+
+    ymax  = max(all_spd) if all_spd else 3.0
+    y_min = 0.9   # tight y-range to emphasize differences
 
     for bi, backend in enumerate(BACKEND_ORDER):
-        speedups = []
-        for m in methods:
-            nr = df_task[(df_task["method"] == m) & (df_task["backend"] == "naive")]
-            br = df_task[(df_task["method"] == m) & (df_task["backend"] == backend)]
-            if len(nr) > 0 and len(br) > 0:
-                nv = float(nr["throughput_sps"].values[0])
-                bv = float(br["throughput_sps"].values[0])
-                speedups.append(bv / nv if nv > 0 else 0.0)
-            else:
-                speedups.append(0.0)
-
         offset = (bi - (n_b - 1) / 2) * bw
-        bars = ax.bar(x + offset, speedups, width=bw * 0.88,
-                      color=BACKEND_COLORS[backend],
-                      label=BACKEND_LABELS[backend], zorder=3)
-        for rect, v in zip(bars, speedups):
+        for mi, (m, v) in enumerate(zip(methods, spd[backend])):
+            is_star = (backend == HIGHLIGHT_BACKEND and m == HIGHLIGHT_METHOD)
+            ax.bar(x[mi] + offset, v, width=bw * 0.88,
+                   color=BACKEND_COLORS[backend], zorder=3,
+                   edgecolor="#111111" if is_star else "none",
+                   linewidth=2.0 if is_star else 0,
+                   label=BACKEND_LABELS[backend] if mi == 0 else "")
             if v > 0:
-                ax.text(rect.get_x() + rect.get_width() / 2,
-                        rect.get_height() + ymax * 0.016,
-                        f"{v:.2f}×",
-                        ha="center", va="bottom", fontsize=8, color="#222222")
+                txt = f"{v:.2f}×" + (" ★" if is_star else "")
+                ax.text(x[mi] + offset,
+                        v + (ymax - y_min) * 0.025,
+                        txt,
+                        ha="center", va="bottom",
+                        fontsize=8 if backend != HIGHLIGHT_BACKEND else 9,
+                        color="#111111",
+                        fontweight="bold" if is_star else "normal")
 
-    ax.axhline(1.0, color="#888888", linestyle="--", linewidth=0.9, zorder=2)
-    ax.set_ylabel("Speedup vs Naive", fontsize=9)
-    ax.set_ylim(0, ymax * 1.20)
+    ax.axhline(1.0, color="#888888", linestyle="--", linewidth=1.0, zorder=2)
+    trans = blended_transform_factory(ax.transAxes, ax.transData)
+    ax.text(1.02, 1.0, "Naive baseline (1.0×)",
+            transform=trans, fontsize=8.5, color="#888888",
+            va="center", ha="left", clip_on=False)
+    ax.set_ylabel("Throughput Speedup vs Naive", fontsize=11)
+    ax.set_ylim(y_min, ymax * 1.28)
     ax.yaxis.grid(True, linestyle="--", alpha=0.45, zorder=0)
     ax.set_axisbelow(True)
-    if show_xlabel:
-        ax.set_xticks(x)
-        ax.set_xticklabels([METHOD_LABELS.get(m, m) for m in methods], fontsize=9)
-    else:
-        ax.set_xticks(x)
-        ax.set_xticklabels([""] * n_m)
+    ax.set_xticks(x)
+    ax.set_xticklabels([METHOD_LABELS.get(m, m) for m in methods], fontsize=11)
     ax.text(0.99, 0.97, "↑", transform=ax.transAxes,
-            ha="right", va="top", fontsize=11, color="#555555", fontweight="bold")
+            ha="right", va="top", fontsize=13, color="#555555", fontweight="bold")
+    return max(spd[HIGHLIGHT_BACKEND]) if spd.get(HIGHLIGHT_BACKEND) else 0.0
 
 
-# ── fairness check panel ───────────────────────────────────────────────────────
+# ── per-(metric, task) figure ──────────────────────────────────────────────────
 
-def _draw_fairness_panel(ax, df, tasks, methods):
-    """
-    Bottom row: compact table showing the 3 invariant / semi-invariant quantities
-    that prove the backend comparison is apples-to-apples.
+def _make_single(df, task, methods, metric, dtype, seq_len, suffix, outdir):
+    sub        = df[df["task"] == task]
+    task_label = TASK_LABELS.get(task, task)
+    fig_num    = METRIC_FIG_NUM.get(metric, "XX")
 
-      total_flops_abs  — same per (method, backend) ✓
-      rank_pad_pct     — fixed model property (differs across methods)
-      seq_pad_pct      — same across all backends ✓ (input batch identical)
-    """
-    ax.axis("off")
+    fig, ax = plt.subplots(figsize=(8, 4.8))
 
-    ref = df[df["backend"] == "naive"]   # values are backend-invariant; use naive as reference
+    if metric == "latency":
+        title = f"Latency  —  {task_label}  |  dtype={dtype}  seq={seq_len}"
+        _draw_bars(ax, sub, methods, "latency_ms", "ms / batch",
+                   higher_better=False, fmt="{:.1f}")
+    elif metric == "throughput":
+        title = f"Throughput  —  {task_label}  |  dtype={dtype}  seq={seq_len}"
+        _draw_bars(ax, sub, methods, "throughput_sps", "samples / s",
+                   higher_better=True, fmt="{:.0f}")
+    elif metric == "speedup":
+        max_spd = _draw_speedup(ax, sub, methods)
+        title = (f"FlashSVD 1.5 Achieves Up to {max_spd:.2f}× Speedup  —  "
+                 f"{task_label}  |  dtype={dtype}  seq={seq_len}")
+    elif metric == "memory":
+        title = f"Peak GPU Memory  —  {task_label}  |  dtype={dtype}  seq={seq_len}"
+        _draw_bars(ax, sub, methods, "peak_mem_mb", "MB",
+                   higher_better=False, fmt="{:.0f}")
 
-    # Group methods sharing the same (total_flops, rank_pad) → compact table
-    t0     = tasks[0]
-    groups = {}   # key=(total_str, rpad_str) → list of method labels
-    for method in methods:
-        mr = ref[(ref["method"] == method) & (ref["task"] == t0)]
-        if len(mr) == 0:
-            continue
-        r = mr.iloc[0]
-        total_str = f"{float(r['total_flops_abs']):.3f} TF"
-        rpad_str  = f"{float(r['rank_pad_pct']):.2f}%"
-        key = (total_str, rpad_str)
-        groups.setdefault(key, []).append(METHOD_LABELS.get(method, method))
+    ax.set_title(title, fontsize=11, fontweight="bold", pad=8)
 
-    # seq_pad: per task (same across methods and backends within a task)
-    seq_parts = []
-    for task in tasks:
-        tr = ref[ref["task"] == task]
-        if len(tr) > 0:
-            sp = float(tr["seq_pad_pct"].values[0])
-            seq_parts.append(f"{TASK_LABELS.get(task, task)}: {sp:.1f}%")
-    seq_str = "  |  ".join(seq_parts)
-
-    # Table rows
-    col_labels = ["Method", "total_flops_abs", "rank_pad %", "seq_pad %"]
-    table_data = []
-    for (total_str, rpad_str), mlabels in groups.items():
-        table_data.append([" / ".join(mlabels), total_str, rpad_str, seq_str])
-
-    # Invariance note row
-    table_data.append([
-        "backend invariant?",
-        "✓ identical per method",
-        "✓ fixed (model property)",
-        "✓ identical across all backends",
-    ])
-
-    tbl = ax.table(
-        cellText=table_data,
-        colLabels=col_labels,
-        loc="center",
-        cellLoc="center",
-    )
-    tbl.auto_set_font_size(False)
-    tbl.set_fontsize(8.5)
-    tbl.scale(1, 1.55)
-
-    # header: blue-grey
-    for j in range(len(col_labels)):
-        c = tbl[(0, j)]
-        c.set_facecolor("#cfd8dc")
-        c.set_text_props(fontweight="bold", color="#1a3a5c")
-
-    # note row: light green
-    nr = len(table_data)
-    for j in range(len(col_labels)):
-        c = tbl[(nr, j)]
-        c.set_facecolor("#e8f5e9")
-        c.set_text_props(color="#2e7d32", style="italic")
-
-    ax.set_title(
-        "Fairness Check  —  all 3 backends receive identical inputs; "
-        "FLOPs are backend-independent",
-        fontsize=8.5, pad=6, color="#444444", style="italic",
-    )
-
-
-# ── figure builders ────────────────────────────────────────────────────────────
-
-def _make_fig(tasks):
-    """Create figure with len(tasks) task rows + 1 fairness row."""
-    heights = [3.5] * len(tasks) + [1.4]
-    fig, axes = plt.subplots(
-        len(tasks) + 1, 1,
-        figsize=(9, 3.8 * len(tasks) + 2.2),
-        gridspec_kw={"height_ratios": heights},
-        squeeze=False,
-    )
-    return fig, axes
-
-
-def _make_legend(fig):
     handles = [plt.Rectangle((0, 0), 1, 1, color=BACKEND_COLORS[b],
-                               label=BACKEND_LABELS[b])
-               for b in BACKEND_ORDER]
-    fig.legend(handles=handles, loc="lower center", ncol=3,
-               fontsize=10, frameon=True, bbox_to_anchor=(0.5, 0.01))
+                              label=BACKEND_LABELS[b]) for b in BACKEND_ORDER]
+    ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1),
+              borderaxespad=0, fontsize=10, framealpha=0.9)
 
-
-def _save(fig, outdir, name):
+    fname = f"fig{fig_num}_{metric}_{suffix}.png"
     os.makedirs(outdir, exist_ok=True)
-    path = os.path.join(outdir, name)
+    path  = os.path.join(outdir, fname)
+    plt.tight_layout()
     fig.savefig(path, dpi=150, bbox_inches="tight")
     print(f"[plot] Saved → {path}")
     plt.close(fig)
 
 
-def _fname(metric, tasks, dtype, seq_len):
-    return f"backend_{metric}_{'+'.join(tasks)}_{dtype}_seq{seq_len}.png"
-
-
-# ── three main plots ───────────────────────────────────────────────────────────
-
-def plot_latency(df, tasks, methods, outdir, dtype, seq_len):
-    fig, axes = _make_fig(tasks)
-    fig.suptitle(f"End-to-end Inference Latency (ms per batch)  |  dtype={dtype}  seq_len={seq_len}",
-                 fontsize=12, fontweight="bold")
-    for i, task in enumerate(tasks):
-        sub = df[df["task"] == task]
-        _draw_bars(axes[i, 0], sub, methods, "latency_ms",
-                   ylabel=f"{TASK_LABELS.get(task, task)}\nms / batch",
-                   higher_better=False, fmt="{:.1f}",
-                   show_xlabel=(i == len(tasks) - 1))
-        axes[i, 0].set_title(TASK_LABELS.get(task, task), fontsize=10,
-                              loc="left", pad=4)
-    _draw_fairness_panel(axes[-1, 0], df, tasks, methods)
-    _make_legend(fig)
-    plt.tight_layout(rect=[0, 0.06, 1, 1])
-    _save(fig, outdir, _fname("latency", tasks, dtype, seq_len))
-
-
-def plot_speedup(df, tasks, methods, outdir, dtype, seq_len):
-    fig, axes = _make_fig(tasks)
-    fig.suptitle(f"Throughput Speedup vs. Naive Backend  |  dtype={dtype}  seq_len={seq_len}",
-                 fontsize=12, fontweight="bold")
-    for i, task in enumerate(tasks):
-        sub = df[df["task"] == task]
-        _draw_speedup(axes[i, 0], sub, methods,
-                      show_xlabel=(i == len(tasks) - 1))
-        axes[i, 0].set_title(TASK_LABELS.get(task, task), fontsize=10,
-                              loc="left", pad=4)
-    _draw_fairness_panel(axes[-1, 0], df, tasks, methods)
-    _make_legend(fig)
-    plt.tight_layout(rect=[0, 0.06, 1, 1])
-    _save(fig, outdir, _fname("speedup", tasks, dtype, seq_len))
-
-
-def plot_memory(df, tasks, methods, outdir, dtype, seq_len):
-    fig, axes = _make_fig(tasks)
-    fig.suptitle(f"Peak GPU Memory Footprint (MB)  |  dtype={dtype}  seq_len={seq_len}",
-                 fontsize=12, fontweight="bold")
-    for i, task in enumerate(tasks):
-        sub = df[df["task"] == task]
-        _draw_bars(axes[i, 0], sub, methods, "peak_mem_mb",
-                   ylabel=f"{TASK_LABELS.get(task, task)}\nMB",
-                   higher_better=False, fmt="{:.0f}",
-                   show_xlabel=(i == len(tasks) - 1))
-        axes[i, 0].set_title(TASK_LABELS.get(task, task), fontsize=10,
-                              loc="left", pad=4)
-    _draw_fairness_panel(axes[-1, 0], df, tasks, methods)
-    _make_legend(fig)
-    plt.tight_layout(rect=[0, 0.06, 1, 1])
-    _save(fig, outdir, _fname("memory", tasks, dtype, seq_len))
-
-
-def plot_throughput(df, tasks, methods, outdir, dtype, seq_len):
-    fig, axes = _make_fig(tasks)
-    fig.suptitle(f"Throughput (samples / s)  |  dtype={dtype}  seq_len={seq_len}",
-                 fontsize=12, fontweight="bold")
-    for i, task in enumerate(tasks):
-        sub = df[df["task"] == task]
-        _draw_bars(axes[i, 0], sub, methods, "throughput_sps",
-                   ylabel=f"{TASK_LABELS.get(task, task)}\nsamples / s",
-                   higher_better=True, fmt="{:.0f}",
-                   show_xlabel=(i == len(tasks) - 1))
-        axes[i, 0].set_title(TASK_LABELS.get(task, task), fontsize=10,
-                              loc="left", pad=4)
-    _draw_fairness_panel(axes[-1, 0], df, tasks, methods)
-    _make_legend(fig)
-    plt.tight_layout(rect=[0, 0.06, 1, 1])
-    _save(fig, outdir, _fname("throughput", tasks, dtype, seq_len))
-
+# ── main ───────────────────────────────────────────────────────────────────────
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--csv",     default="eval_encoder/eval_results/expB.csv")
+    p.add_argument("--csv",     default="experiments/results/expB.csv")
     p.add_argument("--outdir",  default=None)
     p.add_argument("--tasks",   nargs="+", default=["mnli", "stsb"])
     p.add_argument("--methods", nargs="+", default=["svd", "fwsvd", "drone", "adasvd"])
@@ -360,27 +246,18 @@ def main():
 
     df = load_all(args.csv, args.tasks, args.dtype, args.seq_len, args.methods)
     if df.empty:
-        raw = pd.read_csv(args.csv)
-        raise SystemExit(
-            f"[error] No rows matched. Available:\n"
-            f"{raw[['task','method','backend','dtype','seq_len']].drop_duplicates().to_string()}"
-        )
+        raise SystemExit("[error] No rows matched.")
 
-    present = df["method"].unique().tolist()
-    methods = [m for m in args.methods if m in present]
-    t_present = df["task"].unique().tolist()
-    tasks = [t for t in args.tasks if t in t_present]
-
-    missing = [t for t in args.tasks if t not in t_present]
-    if missing:
-        print(f"[warn] Tasks not found: {missing}")
-
+    methods = [m for m in args.methods if m in df["method"].unique()]
+    tasks   = [t for t in args.tasks   if t in df["task"].unique()]
     print(f"[plot] tasks={tasks}  methods={methods}  outdir={args.outdir}")
 
-    plot_latency(    df, tasks, methods, args.outdir, args.dtype, args.seq_len)
-    plot_throughput( df, tasks, methods, args.outdir, args.dtype, args.seq_len)
-    plot_speedup(    df, tasks, methods, args.outdir, args.dtype, args.seq_len)
-    plot_memory(     df, tasks, methods, args.outdir, args.dtype, args.seq_len)
+    for ti, task in enumerate(tasks):
+        suffix = TASK_SUFFIX[ti] if ti < len(TASK_SUFFIX) else str(ti)
+        for metric in ["latency", "throughput", "speedup", "memory"]:
+            _make_single(df, task, methods, metric,
+                         args.dtype, args.seq_len,
+                         suffix, args.outdir)
 
 
 if __name__ == "__main__":

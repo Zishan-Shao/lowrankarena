@@ -26,13 +26,13 @@ import pandas as pd
 # point name → (method_label, backend_label)
 POINT_META = {
     "mnli_svd_naive":          ("SVD",    "Naive"),
-    "mnli_svd_flashsvd":       ("SVD",    "FlashSVD 1.0"),
-    "mnli_svd_flashsvd15":     ("SVD",    "FlashSVD 1.5"),
+    "mnli_svd_flashsvd":       ("SVD",    "Flash 1.0"),
+    "mnli_svd_flashsvd15":     ("SVD",    "Flash 1.5"),
     "mnli_adasvd_naive":       ("AdaSVD", "Naive"),
-    "mnli_adasvd_flashsvd":    ("AdaSVD", "FlashSVD 1.0"),
-    "mnli_adasvd_flashsvd15":  ("AdaSVD", "FlashSVD 1.5"),
+    "mnli_adasvd_flashsvd":    ("AdaSVD", "Flash 1.0"),
+    "mnli_adasvd_flashsvd15":  ("AdaSVD", "Flash 1.5"),
 }
-BACKEND_COLORS = {"Naive": "#9e9e9e", "FlashSVD 1.0": "#ffa726", "FlashSVD 1.5": "#ef5350"}
+BACKEND_COLORS = {"Naive": "#9e9e9e", "Flash 1.0": "#42a5f5", "Flash 1.5": "#ef5350"}
 METHOD_COLORS  = {"SVD": "#5c85d6", "AdaSVD": "#e06c5a"}
 
 # stacked bar colors for kernel time breakdown
@@ -72,44 +72,62 @@ def plot(df, outdir):
     x        = np.arange(len(rows))
     bar_w    = 0.55
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
-    fig.suptitle("Kernel-Level Analysis  |  MNLI  bf16  seq=512\n"
-                 "(nsys cuda_gpu_kern_sum)",
-                 fontsize=11, fontweight="bold")
+    os.makedirs(outdir, exist_ok=True)
 
-    # ── Panel 1: n_gemm_variants ──────────────────────────────────────────────
+    # ── Figure A: n_gemm_variants ─────────────────────────────────────────────
+    fig_a, ax1 = plt.subplots(figsize=(6.5, 4.5))
+    fig_a.suptitle("Rank Heterogeneity Improves Kernel Utilization"
+                   "  (MNLI, bf16, seq=512)",
+                   fontsize=11, fontweight="bold")
+
     colors1 = [BACKEND_COLORS[POINT_META[r["point"]][1]] for r in rows]
     vals1   = [r["n_gemm_variants"] for r in rows]
     bars1   = ax1.bar(x, vals1, width=bar_w, color=colors1, zorder=3,
                       edgecolor="white", linewidth=0.8)
-    ymax1   = max(vals1) * 1.25
+    ymax1   = 15   # max observed is 14; fixed range makes gap clearer
     for rect, v in zip(bars1, vals1):
         ax1.text(rect.get_x() + rect.get_width() / 2,
-                 rect.get_height() + ymax1 * 0.02,
+                 rect.get_height() + 0.2,
                  str(int(v)), ha="center", va="bottom",
                  fontsize=10, fontweight="bold", color="#222222")
 
     ax1.set_xticks(x)
-    ax1.set_xticklabels(labels, fontsize=9)
+    ax1.set_xticklabels(labels, fontsize=8)
     ax1.set_ylabel("# Distinct GEMM Kernel Configs", fontsize=9)
-    ax1.set_title("GEMM Kernel Diversity\n(higher → more rank heterogeneity)",
+    ax1.set_title("GEMM Kernel Diversity\n(AdaSVD heterogeneous ranks → more configs)",
                   fontsize=10, fontweight="bold")
     ax1.set_ylim(0, ymax1)
     ax1.yaxis.grid(True, linestyle="--", alpha=0.45, zorder=0)
     ax1.set_axisbelow(True)
 
-    # vertical separator between SVD and AdaSVD groups
     ax1.axvline(2.5, color="#cccccc", linestyle="--", linewidth=1, zorder=2)
-    ax1.text(1.0, ymax1 * 0.97, "SVD", ha="center", va="top",
+    ax1.text(1.0, ymax1 * 0.96, "Uniform ranks", ha="center", va="top",
              fontsize=8, color="#555555", style="italic")
-    ax1.text(4.0, ymax1 * 0.97, "AdaSVD", ha="center", va="top",
+    ax1.text(4.0, ymax1 * 0.96, "Heterogeneous ranks", ha="center", va="top",
              fontsize=8, color="#555555", style="italic")
 
-    # ── Panel 2: kernel time breakdown (stacked bars) ─────────────────────────
+    legend_patches = [mpatches.Patch(color=BACKEND_COLORS[b], label=b)
+                      for b in ["Naive", "Flash 1.0", "Flash 1.5"]]
+    ax1.legend(handles=legend_patches, loc="upper left", fontsize=8, framealpha=0.9)
+
+    fig_a.tight_layout()
+    out_a = os.path.join(outdir, "fig15_nsys_kernel_A.png")
+    fig_a.savefig(out_a, dpi=150, bbox_inches="tight")
+    print(f"[plot] Saved → {out_a}")
+    plt.close(fig_a)
+
+    # ── Figure B: kernel time breakdown (stacked bars) ────────────────────────
     triton_pct = [r["triton_time_pct"] for r in rows]
     gemm_pct   = [r["gemm_time_pct"]   for r in rows]
     other_pct  = [max(0.0, 100.0 - r["triton_time_pct"] - r["gemm_time_pct"])
                   for r in rows]
+
+    HIGHLIGHT = {4, 5}
+
+    fig_b, ax2 = plt.subplots(figsize=(6.5, 4.5))
+    fig_b.suptitle("Rank Heterogeneity Improves Kernel Utilization"
+                   "  (MNLI, bf16, seq=512)",
+                   fontsize=11, fontweight="bold")
 
     b_triton = ax2.bar(x, triton_pct, width=bar_w, color=C_TRITON,
                        label="Triton fused\n(FlashSVD)", zorder=3)
@@ -119,30 +137,45 @@ def plot(df, outdir):
     b_other  = ax2.bar(x, other_pct, width=bar_w, bottom=bottom2,
                        color=C_OTHER, label="Other\n(elementwise, LN…)", zorder=3)
 
-    # annotate total GEMM+Triton %
-    for i, r in enumerate(rows):
-        total = r["triton_time_pct"] + r["gemm_time_pct"]
-        ax2.text(x[i], 101, f"{total:.0f}%", ha="center", va="bottom",
-                 fontsize=8, color="#333333")
+    for i in HIGHLIGHT:
+        total_h = triton_pct[i] + gemm_pct[i] + other_pct[i]
+        rect = mpatches.Rectangle((x[i] - bar_w / 2, 0), bar_w, total_h,
+                                   linewidth=2.2, edgecolor="#111111",
+                                   facecolor="none", zorder=5)
+        ax2.add_patch(rect)
+        ax2.text(x[i], total_h + 1.5, "★", ha="center", va="bottom",
+                 fontsize=11, color="#111111", zorder=6)
+
+    for i, t in enumerate(triton_pct):
+        if t >= 8:
+            label = f"{t:.0f}%\nTriton"
+            ax2.text(x[i], t / 2, label, ha="center", va="center",
+                     fontsize=7.5, color="white", fontweight="bold", zorder=4)
+        elif t > 0:
+            ax2.text(x[i], t + 1, f"{t:.0f}%", ha="center", va="bottom",
+                     fontsize=7.5, color=C_TRITON, fontweight="bold", zorder=4)
 
     ax2.set_xticks(x)
-    ax2.set_xticklabels(labels, fontsize=9)
+    ax2.set_xticklabels(labels, fontsize=8)
     ax2.set_ylabel("GPU Time (%)", fontsize=9)
     ax2.set_ylim(0, 115)
-    ax2.set_title("Kernel Time Breakdown\n(stacked, per-point)",
+    ax2.set_title("Kernel Time Breakdown\n(Triton share ↑ = better kernel utilization)",
                   fontsize=10, fontweight="bold")
     ax2.yaxis.grid(True, linestyle="--", alpha=0.45, zorder=0)
     ax2.set_axisbelow(True)
     ax2.axvline(2.5, color="#cccccc", linestyle="--", linewidth=1, zorder=2)
-    ax2.legend(loc="upper right", fontsize=8, framealpha=0.9)
+    ax2.text(1.0, 113, "Uniform ranks", ha="center", va="top",
+             fontsize=8, color="#555555", style="italic")
+    ax2.text(4.0, 113, "Heterogeneous ranks", ha="center", va="top",
+             fontsize=8, color="#555555", style="italic")
+    ax2.legend(loc="upper left", bbox_to_anchor=(1.02, 1),
+               borderaxespad=0, fontsize=8.5, framealpha=0.9)
 
-    plt.tight_layout()
-    fname = "nsys_kernel_analysis_mnli_bf16_seq512.png"
-    os.makedirs(outdir, exist_ok=True)
-    out = os.path.join(outdir, fname)
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    print(f"[plot] Saved → {out}")
-    plt.close(fig)
+    fig_b.tight_layout()
+    out_b = os.path.join(outdir, "fig15_nsys_kernel_B.png")
+    fig_b.savefig(out_b, dpi=150, bbox_inches="tight")
+    print(f"[plot] Saved → {out_b}")
+    plt.close(fig_b)
 
 
 def main():
