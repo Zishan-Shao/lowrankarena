@@ -21,7 +21,10 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from src.encoders.blocks_misc import BertLayerShim, NaiveSVDBlock
+import copy as _copy
+from src.encoders.blocks_misc import (
+    BertLayerShim, ModernBertLayerShim, NaiveSVDBlock, _apply_rotary,
+)
 
 
 class _LowRankLinear(nn.Module):
@@ -266,73 +269,158 @@ def load_compressed_model(
     print("[load] Creating SVD block structure and loading parameters...")
     loaded_params = 0
 
-    for i in range(num_layers):
-        layer_prefix = f"{encoder_prefix}.{i}.block."
+    if arch == "modernbert":
+        for i in range(num_layers):
+            layer_prefix = f"{encoder_prefix}.{i}.block."
+            has_svd_params = (
+                f"{layer_prefix}Pq" in state_dict or
+                f"{layer_prefix}Uq" in state_dict
+            )
+            if not has_svd_params:
+                print(f"[warn] Layer {i} missing SVD parameters, skipping")
+                continue
 
-        # Check if this layer has SVD parameters (support both Pq and Uq formats)
-        has_svd_params = (
-            f"{layer_prefix}Pq" in state_dict or
-            f"{layer_prefix}Uq" in state_dict
-        )
-        if not has_svd_params:
-            print(f"[warn] Layer {i} missing SVD parameters, skipping")
-            continue
+            blk = MinimalModernBertSVDBlock()
+            hf_layer = encoder_layers[i]  # original ModernBertEncoderLayer
 
-        # Create minimal SVD block
-        svd_block = MinimalSVDBlock()
-        svd_block.num_heads = base_model.config.num_attention_heads  # Store for 2D path
+            # Metadata
+            blk.num_heads = base_model.config.num_attention_heads
+            blk.head_dim = base_model.config.hidden_size // blk.num_heads
+            blk.rotary_emb = hf_layer.attn.rotary_emb  # shared reference
+            blk.gelu_approximate = "none"
 
-        # Manually load all SVD parameters from state_dict
-        # Support both formats:
-        # 1. Full-matrix format: Uq/Vq, Uk/Vk, Uv/Vv (with bq_full, bk_full, bv_full)
-        # 2. Per-head format: Pq/Vq, Pk/Vk, Pv/Vv (with bq, bk, bv)
-        param_names = [
-            # Q projection (try both Pq and Uq)
-            ("Pq", ["Pq", "Uq"]), ("Vq", ["Vq"]), ("bq", ["bq", "bq_full"]),
-            # K projection (try both Pk and Uk)
-            ("Pk", ["Pk", "Uk"]), ("Vk", ["Vk"]), ("bk", ["bk", "bk_full"]),
-            # V projection (try both Pv and Uv)
-            ("Pv", ["Pv", "Uv"]), ("Vv", ["Vv"]), ("bv", ["bv", "bv_full"]),
-            # Output projection
-            ("Uo", ["Uo"]), ("Vo", ["Vo"]), ("bo_attn", ["bo_attn"]),
-            # FFN
-            ("U1", ["U1"]), ("V1", ["V1"]), ("b1", ["b1"]),
-            ("U2", ["U2"]), ("V2", ["V2"]), ("b2", ["b2"])
-        ]
+            # ffn_is_geglu: U1.shape[0] == 2 * V2.shape[1]  (GeGLU doubles intermediate dim)
+            u1_key = f"{layer_prefix}U1"
+            v2_key = f"{layer_prefix}V2"
+            if u1_key in state_dict and v2_key in state_dict:
+                blk.ffn_is_geglu = (state_dict[u1_key].shape[0] == 2 * state_dict[v2_key].shape[1])
+            else:
+                blk.ffn_is_geglu = False
 
-        for target_name, candidate_names in param_names:
-            loaded = False
-            for candidate_name in candidate_names:
-                full_key = f"{layer_prefix}{candidate_name}"
-                if full_key in state_dict:
-                    setattr(svd_block, target_name, nn.Parameter(state_dict[full_key]))
+            # Required SVD params
+            for pname in ("Pq", "Vq", "Pk", "Vk", "Pv", "Vv", "U1", "V1", "U2", "V2"):
+                key = f"{layer_prefix}{pname}"
+                if key in state_dict:
+                    setattr(blk, pname, nn.Parameter(state_dict[key]))
                     loaded_params += 1
-                    loaded = True
-                    break
-            # Only warn if it's a critical parameter (not bias which might be missing)
-            if not loaded and target_name in ["Pq", "Vq", "Pk", "Vk", "Pv", "Vv"]:
-                print(f"[warn] Layer {i} missing parameter: {target_name}")
+                else:
+                    print(f"[warn] Layer {i} missing parameter: {pname}")
 
-        # Load LayerNorms
-        ln1_weight_key = f"{layer_prefix}ln1.weight"
-        ln1_bias_key = f"{layer_prefix}ln1.bias"
-        ln2_weight_key = f"{layer_prefix}ln2.weight"
-        ln2_bias_key = f"{layer_prefix}ln2.bias"
+            # Optional bias params
+            for pname in ("bq", "bk", "bv", "b1", "b2"):
+                key = f"{layer_prefix}{pname}"
+                if key in state_dict:
+                    setattr(blk, pname, nn.Parameter(state_dict[key]))
+                    loaded_params += 1
 
-        if all(k in state_dict for k in [ln1_weight_key, ln1_bias_key]):
-            svd_block.ln1 = nn.LayerNorm(state_dict[ln1_weight_key].shape[0])
-            svd_block.ln1.weight = nn.Parameter(state_dict[ln1_weight_key])
-            svd_block.ln1.bias = nn.Parameter(state_dict[ln1_bias_key])
-            loaded_params += 2
+            # attn_norm
+            w_key = f"{layer_prefix}attn_norm.weight"
+            b_key = f"{layer_prefix}attn_norm.bias"
+            if w_key in state_dict:
+                blk.attn_norm = nn.LayerNorm(state_dict[w_key].shape[0])
+                blk.attn_norm.weight = nn.Parameter(state_dict[w_key])
+                if b_key in state_dict:
+                    blk.attn_norm.bias = nn.Parameter(state_dict[b_key])
+                loaded_params += (2 if b_key in state_dict else 1)
+            else:
+                blk.attn_norm = _copy.deepcopy(hf_layer.attn_norm)
 
-        if all(k in state_dict for k in [ln2_weight_key, ln2_bias_key]):
-            svd_block.ln2 = nn.LayerNorm(state_dict[ln2_weight_key].shape[0])
-            svd_block.ln2.weight = nn.Parameter(state_dict[ln2_weight_key])
-            svd_block.ln2.bias = nn.Parameter(state_dict[ln2_bias_key])
-            loaded_params += 2
+            # mlp_norm
+            w_key = f"{layer_prefix}mlp_norm.weight"
+            b_key = f"{layer_prefix}mlp_norm.bias"
+            if w_key in state_dict:
+                blk.mlp_norm = nn.LayerNorm(state_dict[w_key].shape[0])
+                blk.mlp_norm.weight = nn.Parameter(state_dict[w_key])
+                if b_key in state_dict:
+                    blk.mlp_norm.bias = nn.Parameter(state_dict[b_key])
+                loaded_params += (2 if b_key in state_dict else 1)
+            else:
+                blk.mlp_norm = _copy.deepcopy(hf_layer.mlp_norm)
 
-        # Wrap in shim
-        encoder_layers[i] = BertLayerShim(svd_block)
+            # Wo_attn (kept dense in ModernBERT SVD)
+            wo_w = f"{layer_prefix}Wo_attn.weight"
+            wo_b = f"{layer_prefix}Wo_attn.bias"
+            if wo_w in state_dict:
+                out_f, in_f = state_dict[wo_w].shape
+                has_bias = wo_b in state_dict
+                blk.Wo_attn = nn.Linear(in_f, out_f, bias=has_bias)
+                blk.Wo_attn.weight = nn.Parameter(state_dict[wo_w])
+                if has_bias:
+                    blk.Wo_attn.bias = nn.Parameter(state_dict[wo_b])
+                loaded_params += (2 if has_bias else 1)
+            else:
+                blk.Wo_attn = _copy.deepcopy(hf_layer.attn.Wo)
+
+            encoder_layers[i] = ModernBertLayerShim(blk)
+
+    else:
+        for i in range(num_layers):
+            layer_prefix = f"{encoder_prefix}.{i}.block."
+
+            # Check if this layer has SVD parameters (support both Pq and Uq formats)
+            has_svd_params = (
+                f"{layer_prefix}Pq" in state_dict or
+                f"{layer_prefix}Uq" in state_dict
+            )
+            if not has_svd_params:
+                print(f"[warn] Layer {i} missing SVD parameters, skipping")
+                continue
+
+            # Create minimal SVD block
+            svd_block = MinimalSVDBlock()
+            svd_block.num_heads = base_model.config.num_attention_heads  # Store for 2D path
+
+            # Manually load all SVD parameters from state_dict
+            # Support both formats:
+            # 1. Full-matrix format: Uq/Vq, Uk/Vk, Uv/Vv (with bq_full, bk_full, bv_full)
+            # 2. Per-head format: Pq/Vq, Pk/Vk, Pv/Vv (with bq, bk, bv)
+            param_names = [
+                # Q projection (try both Pq and Uq)
+                ("Pq", ["Pq", "Uq"]), ("Vq", ["Vq"]), ("bq", ["bq", "bq_full"]),
+                # K projection (try both Pk and Uk)
+                ("Pk", ["Pk", "Uk"]), ("Vk", ["Vk"]), ("bk", ["bk", "bk_full"]),
+                # V projection (try both Pv and Uv)
+                ("Pv", ["Pv", "Uv"]), ("Vv", ["Vv"]), ("bv", ["bv", "bv_full"]),
+                # Output projection
+                ("Uo", ["Uo"]), ("Vo", ["Vo"]), ("bo_attn", ["bo_attn"]),
+                # FFN
+                ("U1", ["U1"]), ("V1", ["V1"]), ("b1", ["b1"]),
+                ("U2", ["U2"]), ("V2", ["V2"]), ("b2", ["b2"])
+            ]
+
+            for target_name, candidate_names in param_names:
+                loaded = False
+                for candidate_name in candidate_names:
+                    full_key = f"{layer_prefix}{candidate_name}"
+                    if full_key in state_dict:
+                        setattr(svd_block, target_name, nn.Parameter(state_dict[full_key]))
+                        loaded_params += 1
+                        loaded = True
+                        break
+                # Only warn if it's a critical parameter (not bias which might be missing)
+                if not loaded and target_name in ["Pq", "Vq", "Pk", "Vk", "Pv", "Vv"]:
+                    print(f"[warn] Layer {i} missing parameter: {target_name}")
+
+            # Load LayerNorms
+            ln1_weight_key = f"{layer_prefix}ln1.weight"
+            ln1_bias_key = f"{layer_prefix}ln1.bias"
+            ln2_weight_key = f"{layer_prefix}ln2.weight"
+            ln2_bias_key = f"{layer_prefix}ln2.bias"
+
+            if all(k in state_dict for k in [ln1_weight_key, ln1_bias_key]):
+                svd_block.ln1 = nn.LayerNorm(state_dict[ln1_weight_key].shape[0])
+                svd_block.ln1.weight = nn.Parameter(state_dict[ln1_weight_key])
+                svd_block.ln1.bias = nn.Parameter(state_dict[ln1_bias_key])
+                loaded_params += 2
+
+            if all(k in state_dict for k in [ln2_weight_key, ln2_bias_key]):
+                svd_block.ln2 = nn.LayerNorm(state_dict[ln2_weight_key].shape[0])
+                svd_block.ln2.weight = nn.Parameter(state_dict[ln2_weight_key])
+                svd_block.ln2.bias = nn.Parameter(state_dict[ln2_bias_key])
+                loaded_params += 2
+
+            # Wrap in shim
+            encoder_layers[i] = BertLayerShim(svd_block)
 
     print(f"[info] Loaded {loaded_params} SVD parameters across {num_layers} layers")
 
@@ -488,6 +576,96 @@ class MinimalSVDBlock(nn.Module):
         midA = F.gelu(midV + self.b1)
         y = (midA @ self.U2) @ self.V2 + self.b2
         return self.ln2(x1 + y)
+
+
+class MinimalModernBertSVDBlock(nn.Module):
+    """ModernBERT SVD block for load_compressed_model.
+
+    Mirrors NaiveModernBertSVDBlock.forward() exactly.
+    All parameters and sub-modules are injected at load time from the
+    checkpoint state dict (SVD params, LayerNorms, Wo_attn) and base
+    model (rotary_emb).
+    """
+
+    def __init__(self):
+        super().__init__()
+        # Injected at load time — no parameters created in __init__
+
+    def forward(self, hidden_states, attention_mask=None,
+                sliding_window_mask=None, position_ids=None,
+                output_attentions=False, **kwargs):
+        import torch.nn.functional as _F
+
+        B, M, D = hidden_states.shape
+        H, dh = self.num_heads, self.head_dim
+        x = hidden_states
+
+        # Pre-norm
+        xn = self.attn_norm(x)
+
+        def project(xn, P, V, b):
+            tmp = torch.einsum("bmd,hdr->bhmr", xn, P)
+            out = torch.einsum("bhmr,hrd->bhmd", tmp, V)
+            if b is not None:
+                out = out + b.view(1, H, 1, dh)
+            return out  # [B, H, M, dh]
+
+        Q = project(xn, self.Pq, self.Vq, getattr(self, 'bq', None))
+        K = project(xn, self.Pk, self.Vk, getattr(self, 'bk', None))
+        V = project(xn, self.Pv, self.Vv, getattr(self, 'bv', None))
+
+        # RoPE
+        if position_ids is None:
+            position_ids = torch.arange(M, device=x.device).unsqueeze(0).expand(B, M)
+        qf = Q.reshape(B * H, M, dh)
+        kf = K.reshape(B * H, M, dh)
+        posf = position_ids.unsqueeze(1).expand(B, H, M).reshape(B * H, M)
+        cos, sin = self.rotary_emb(qf, position_ids=posf)
+        Q = _apply_rotary(qf, cos, sin).view(B, H, M, dh)
+        K = _apply_rotary(kf, cos, sin).view(B, H, M, dh)
+
+        # SDPA mask (same logic as NaiveModernBertSVDBlock)
+        sdpa_mask = None
+        if sliding_window_mask is not None:
+            sm = sliding_window_mask
+            if sm.dtype.is_floating_point and sm.dtype != Q.dtype:
+                sm = sm.to(Q.dtype)
+            sdpa_mask = sm
+        elif attention_mask is not None:
+            if attention_mask.dim() == 2:
+                sdpa_mask = ~(attention_mask.to(torch.bool))[:, None, None, :]
+            elif attention_mask.dim() == 4:
+                sm = attention_mask
+                if sm.dtype.is_floating_point and sm.dtype != Q.dtype:
+                    sm = sm.to(Q.dtype)
+                sdpa_mask = sm
+
+        attn = _F.scaled_dot_product_attention(Q, K, V, attn_mask=sdpa_mask, dropout_p=0.0)
+        attn = attn.transpose(1, 2).reshape(B, M, D)
+        x = x + self.Wo_attn(attn)
+
+        # FFN (pre-norm, GeGLU or GELU)
+        xn2 = self.mlp_norm(x)
+        z = (xn2 @ self.U1) @ self.V1
+        b1 = getattr(self, 'b1', None)
+        if b1 is not None:
+            z = z + b1
+
+        if self.ffn_is_geglu:
+            z1, z2 = z.chunk(2, dim=-1)
+            h = _F.gelu(z1, approximate=self.gelu_approximate) * z2
+        else:
+            h = _F.gelu(z, approximate=self.gelu_approximate)
+
+        y = (h @ self.U2) @ self.V2
+        b2 = getattr(self, 'b2', None)
+        if b2 is not None:
+            y = y + b2
+        x = x + y
+
+        if output_attentions:
+            return (x, None)
+        return (x,)
 
 
 def test_loading():
