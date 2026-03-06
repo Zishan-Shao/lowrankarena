@@ -289,11 +289,13 @@ def load_compressed_model(
             blk.rotary_emb = hf_layer.attn.rotary_emb  # shared reference
             blk.gelu_approximate = "none"
 
-            # ffn_is_geglu: U1.shape[0] == 2 * V2.shape[1]  (GeGLU doubles intermediate dim)
-            u1_key = f"{layer_prefix}U1"
-            v2_key = f"{layer_prefix}V2"
-            if u1_key in state_dict and v2_key in state_dict:
-                blk.ffn_is_geglu = (state_dict[u1_key].shape[0] == 2 * state_dict[v2_key].shape[1])
+            # ffn_is_geglu: V1.shape[1] == 2 * U2.shape[0]
+            # V1: [R, Wi.out_features]  U2: [Wo.in_features, R]
+            # GeGLU: Wi.out_features = 2 * intermediate_size, Wo.in_features = intermediate_size
+            v1_key = f"{layer_prefix}V1"
+            u2_key = f"{layer_prefix}U2"
+            if v1_key in state_dict and u2_key in state_dict:
+                blk.ffn_is_geglu = (state_dict[v1_key].shape[1] == 2 * state_dict[u2_key].shape[0])
             else:
                 blk.ffn_is_geglu = False
 
