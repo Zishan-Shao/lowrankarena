@@ -63,6 +63,7 @@ def ppl_eval(
     model,
     tokenizer,
     *,
+    model_id: Optional[str] = None,
     datasets: Sequence[str] = ("wikitext2",),
     model_seq_len: int = 2048,
     batch_size: int = 1,
@@ -75,6 +76,17 @@ def ppl_eval(
     This matches the SVD-LLM scripts' expectations (prints Weight/Peak memory),
     while also reporting wall-time and tokens/s so we can measure end-to-end speedup.
     """
+    # Guard: reload tokenizer from model_id if the passed tokenizer is not callable
+    if not callable(tokenizer):
+        if not model_id:
+            raise ValueError(
+                f"tokenizer is not callable ({tokenizer!r}) and no model_id fallback was provided. "
+                "Pass model_id=<hf_model_id> to ppl_eval."
+            )
+        from transformers import AutoTokenizer as _AutoTok
+        print(f"[ppl_eval] tokenizer={tokenizer!r} is not callable; reloading from model_id={model_id!r}")
+        tokenizer = _AutoTok.from_pretrained(model_id, trust_remote_code=True)
+        print(f"[ppl_eval] reloaded tokenizer: {type(tokenizer)}")
     model.eval()
     if torch.cuda.is_available() and "cuda" in str(device):
         torch.cuda.synchronize()
