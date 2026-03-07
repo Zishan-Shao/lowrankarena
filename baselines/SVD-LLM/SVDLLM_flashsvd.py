@@ -212,8 +212,13 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
             kwargs_j = {}
             if attention_masks is not None:
                 kwargs_j['attention_mask'] = attention_masks[j].unsqueeze(0).to(dev)
-            if "opt" not in model_name and position_ids is not None:
-                kwargs_j['position_ids'] = position_ids[j].unsqueeze(0).to(dev)
+            if "opt" not in model_name:
+                pos_j = (position_ids[j].unsqueeze(0).to(dev) if position_ids is not None
+                         else torch.arange(inps.shape[1], device=dev).unsqueeze(0))
+                if hasattr(model.model, 'rotary_emb'):
+                    kwargs_j['position_embeddings'] = model.model.rotary_emb(inps[j].unsqueeze(0), pos_j)
+                else:
+                    kwargs_j['position_ids'] = pos_j
             outs[j] = layer(inps[j].unsqueeze(0), **kwargs_j)[0]
         for h in handles:
             h.remove()
@@ -374,14 +379,17 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp
             cache['i'] += 1
+            attn_mask = kwargs.get('attention_mask', None)
+            pos_ids = kwargs.get('position_ids', None)
             if cache['attention_mask'] is None:
-                cache['attention_mask'] = kwargs['attention_mask']
+                cache['attention_mask'] = attn_mask if attn_mask is not None else None
                 if "opt" not in model_name:
-                    cache['position_ids'] = kwargs['position_ids']
+                    cache['position_ids'] = pos_ids if pos_ids is not None else None
             else:
-                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask']), dim=0)
-                if "opt" not in model_name:
-                    cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids']), dim=0)
+                if attn_mask is not None:
+                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attn_mask), dim=0)
+                if "opt" not in model_name and pos_ids is not None and cache['position_ids'] is not None:
+                    cache['position_ids'] = torch.cat((cache['position_ids'], pos_ids), dim=0)
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
@@ -427,8 +435,13 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         _kw = {}
         if attention_masks is not None:
             _kw['attention_mask'] = attention_masks
-        if "opt" not in model_name and position_ids is not None:
-            _kw['position_ids'] = position_ids
+        if "opt" not in model_name:
+            pos = (position_ids.to(dev) if position_ids is not None
+                   else torch.arange(inps.shape[1], device=dev).unsqueeze(0).expand(inps.shape[0], -1))
+            if hasattr(model.model, 'rotary_emb'):
+                _kw['position_embeddings'] = model.model.rotary_emb(inps, pos)
+            else:
+                _kw['position_ids'] = pos
         outs = layer(inps, **_kw)[0]
         for h in handles:
             h.remove()
@@ -491,8 +504,13 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         _kw2 = {}
         if attention_masks is not None:
             _kw2['attention_mask'] = attention_masks
-        if "opt" not in model_name and position_ids is not None:
-            _kw2['position_ids'] = position_ids
+        if "opt" not in model_name:
+            pos2 = (position_ids.to(dev) if position_ids is not None
+                    else torch.arange(inps.shape[1], device=dev).unsqueeze(0).expand(inps.shape[0], -1))
+            if hasattr(model.model, 'rotary_emb'):
+                _kw2['position_embeddings'] = model.model.rotary_emb(inps, pos2)
+            else:
+                _kw2['position_ids'] = pos2
         outs = layer(inps, **_kw2)[0]
         layers[i] = layer.cpu()
         del gpts
