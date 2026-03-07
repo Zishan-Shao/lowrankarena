@@ -157,14 +157,17 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp.cpu()
             cache['i'] += 1
+            attn_mask = kwargs.get('attention_mask', None)
+            pos_ids = kwargs.get('position_ids', None)
             if cache['attention_mask'] is None:
-                cache['attention_mask'] = kwargs['attention_mask'].cpu()
+                cache['attention_mask'] = attn_mask.cpu() if attn_mask is not None else None
                 if "opt" not in model_name:
-                    cache['position_ids'] = kwargs['position_ids'].cpu()
+                    cache['position_ids'] = pos_ids.cpu() if pos_ids is not None else None
             else:
-                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask'].cpu()), dim=0)
-                if "opt" not in model_name:
-                    cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids'].cpu()), dim=0)
+                if attn_mask is not None:
+                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attn_mask.cpu()), dim=0)
+                if "opt" not in model_name and pos_ids is not None and cache['position_ids'] is not None:
+                    cache['position_ids'] = torch.cat((cache['position_ids'], pos_ids.cpu()), dim=0)
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in calib_loader:
