@@ -25,7 +25,6 @@ from __future__ import annotations
 import math
 import os
 import sys
-import importlib.util
 import types
 from typing import Optional, Tuple
 
@@ -39,9 +38,8 @@ _REPO = os.path.dirname(os.path.dirname(_HERE))             # lowrankarena/
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
-# ── import kernels from src/kernels ──────────────────────────────────────────
-from src.kernels.decoder.flashsvdswiglu_v15 import flashsvd_ffn_swiglu                          # noqa: E402
-from src.kernels.decoder.flashsvdropeattn_dense_decode import reconstruct_qkv_token_shared  # noqa: E402
+from src.kernels.decoder.flashsvdswiglu_v15 import flashsvd_ffn_swiglu
+from src.kernels.decoder.flashsvdropeattn_dense_decode import reconstruct_qkv_token_shared
 
 try:
     from flash_attn import flash_attn_with_kvcache as _flash_attn_kvcache

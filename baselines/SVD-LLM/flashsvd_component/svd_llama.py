@@ -17,12 +17,6 @@ from src.kernels.decoder.flashsvdropeattn_v16 import (
     flashsvd_attn_decode_packed,
 )
 
-try:
-    from flash_attn import flash_attn_with_kvcache as _flash_attn_kvcache
-    _HAS_FLASH_ATTN = True
-except Exception:
-    _HAS_FLASH_ATTN = False
-
 
 logger = logging.get_logger(__name__)
 
@@ -124,29 +118,16 @@ class SVD_LlamaMLP(nn.Module):
         # Fast path: Triton FlashSVD SwiGLU on CUDA using shared rank-space P
         if x.is_cuda:
             B, L, _ = x.shape
-            R1 = self.up_v_proj.out_features
             D = self.up_u_proj.out_features
-
-            # Rank-space input P via one low-rank projection (shared)
-            P = self.up_v_proj(x)  # [B, L, R1]
-
-            # Combine rank->intermediate factors for up and gate into V1 = [R1, 2D]
-            V1u = self.up_u_proj.weight.t()    # [R1, D]
-            V1v = self.gate_u_proj.weight.t()  # [R1, D]
-            V1 = torch.cat([V1u, V1v], dim=1)
-
-            # Down path factors
-            U2 = self.down_v_proj.weight.t()   # [D,  R2]
-            V2 = self.down_u_proj.weight.t()   # [R2, H]
-
-            # Biases are absent in this module; pass zeros
+            P  = self.up_v_proj(x)
+            V1 = torch.cat([self.up_u_proj.weight.t(), self.gate_u_proj.weight.t()], dim=1)
+            U2 = self.down_v_proj.weight.t()
+            V2 = self.down_u_proj.weight.t()
             b1 = torch.zeros(2 * D, device=x.device, dtype=x.dtype)
             b2 = torch.zeros(V2.shape[1], device=x.device, dtype=x.dtype)
+            return flashsvd_ffn_swiglu(P, V1, U2, V2, b1, b2, use_autotune=True)
 
-            y = flashsvd_ffn_swiglu(P, V1, U2, V2, b1, b2, use_autotune=True)
-            return y
-
-        # Fallback (CPU or non-CUDA): baseline low-rank SwiGLU
+        # Fallback: baseline low-rank SwiGLU
         up = self.up_u_proj(self.up_v_proj(x))
         gate = self.gate_u_proj(self.gate_v_proj(x))
         return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
@@ -231,6 +212,8 @@ class SVD_LlamaAttention(nn.Module):
         H, dh   = self.num_heads, self.head_dim
         R       = self.q_v_proj.out_features
 
+        use_flashsvd = hidden_states.is_cuda
+
         # V factor matrices [H, R, dh] — shared across prefill and decode
         Vq = self._eff_weight(self.q_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
         Vk = self._eff_weight(self.k_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
@@ -238,13 +221,11 @@ class SVD_LlamaAttention(nn.Module):
 
         # ── Decode path (use_cache or incremental) ────────────────────────────
         if past_key_value is not None or use_cache:
-            # Low-rank KV cache stores P vectors [B, L, 1, R] (head-shared).
-            # expand to [B, L, H, R] only at kernel call time (stride-0, no copy).
-            Pk_tok = self.k_v_proj(hidden_states).view(B, S, 1, R)  # [B, 1, 1, R]
+            Pk_tok = self.k_v_proj(hidden_states).view(B, S, 1, R)
             Pv_tok = self.v_v_proj(hidden_states).view(B, S, 1, R)
 
             if past_key_value is not None:
-                Pk_cache = torch.cat([past_key_value[0], Pk_tok], dim=1)  # [B, L+1, 1, R]
+                Pk_cache = torch.cat([past_key_value[0], Pk_tok], dim=1)
                 Pv_cache = torch.cat([past_key_value[1], Pv_tok], dim=1)
             else:
                 Pk_cache = Pk_tok
@@ -253,39 +234,54 @@ class SVD_LlamaAttention(nn.Module):
             past_key_value = (Pk_cache, Pv_cache) if use_cache else None
             seqlen_k = int(Pk_cache.shape[1])
 
-            # Query P: [B, 1, R] → expand to [B, H, R] (stride-0 across heads)
-            Pq_q = self.q_v_proj(hidden_states).view(B * S, R)
-            Pq_q = Pq_q.view(B, S, R)[:, 0, :]           # first (only) query token [B, R]
-            Pq_q = Pq_q.unsqueeze(1).expand(B, H, R)      # [B, H, R], stride-0 on H
+            if use_flashsvd:
+                Pq_q = self.q_v_proj(hidden_states).view(B, S, R)[:, 0, :]
+                Pq_q = Pq_q.unsqueeze(1).expand(B, H, R)
+                Pk_exp = Pk_cache.expand(B, seqlen_k, H, R)
+                Pv_exp = Pv_cache.expand(B, seqlen_k, H, R)
+                cos, sin = self._get_rope_tables(seqlen_k, hidden_states.device, hidden_states.dtype)
+                f_dec = DecodePackedFactors(
+                    Pq=Pq_q.contiguous(), Pk=Pk_exp.contiguous(), Pv=Pv_exp.contiguous(),
+                    Vq=Vq, Vk=Vk, Vv=Vv,
+                )
+                out_bhd = flashsvd_attn_decode_packed(f_dec, cos, sin, seqlen_k=seqlen_k, causal=True)
+                attn_output = out_bhd.reshape(B, S, H * dh)
+            else:
+                # Fallback: reconstruct dense Q/K/V and run SDPA
+                Q = (self.q_v_proj(hidden_states) @ self._eff_weight(self.q_u_proj).t()).view(B, S, H, dh).transpose(1, 2)
+                K = Pk_cache.squeeze(2) @ self._eff_weight(self.k_u_proj).t()  # not quite right for cache
+                # Simple fallback: re-expand cache
+                K_all = Pk_cache.squeeze(2).view(B, seqlen_k, R) @ self._eff_weight(self.k_u_proj).t()
+                V_all = Pv_cache.squeeze(2).view(B, seqlen_k, R) @ self._eff_weight(self.v_u_proj).t()
+                K_all = K_all.view(B, seqlen_k, H, dh).transpose(1, 2)
+                V_all = V_all.view(B, seqlen_k, H, dh).transpose(1, 2)
+                import torch.nn.functional as F
+                attn_out = F.scaled_dot_product_attention(Q, K_all, V_all, is_causal=(S > 1))
+                attn_output = attn_out.transpose(1, 2).reshape(B, S, H * dh)
 
-            # Expand KV cache head dim with stride-0 [B, L, H, R]
-            Pk_exp = Pk_cache.expand(B, seqlen_k, H, R)
-            Pv_exp = Pv_cache.expand(B, seqlen_k, H, R)
-
-            cos, sin = self._get_rope_tables(seqlen_k, hidden_states.device, hidden_states.dtype)
-
-            f_dec = DecodePackedFactors(
-                Pq=Pq_q.contiguous(), Pk=Pk_exp.contiguous(), Pv=Pv_exp.contiguous(),
-                Vq=Vq, Vk=Vk, Vv=Vv,
-            )
-            # Returns [B, H, dh]
-            out_bhd = flashsvd_attn_decode_packed(f_dec, cos, sin, seqlen_k=seqlen_k, causal=True)
-            attn_output = out_bhd.reshape(B, S, H * dh)
             attn_output = self.o_u_proj(self.o_v_proj(attn_output))
             return attn_output, None, past_key_value
 
         # ── Prefill path ───────────────────────────────────────────────────────
-        # P factors [B, S, R]; expand to [B, S, H, R] with stride-0 on H
-        Pq = self.q_v_proj(hidden_states).unsqueeze(2).expand(B, S, H, R)  # [B, S, H, R]
-        Pk = self.k_v_proj(hidden_states).unsqueeze(2).expand(B, S, H, R)
-        Pv = self.v_v_proj(hidden_states).unsqueeze(2).expand(B, S, H, R)
-
-        cos, sin = self._get_rope_tables(S, hidden_states.device, hidden_states.dtype)
-
-        f = PackedFactors(Pq=Pq, Pk=Pk, Pv=Pv, Vq=Vq, Vk=Vk, Vv=Vv)
-        # Returns [B, S, H, dh]
-        attn_bmhsd = flashsvd_attn_packed(f, cos, sin, causal=True)
-        attn_output = attn_bmhsd.reshape(B, S, H * dh)
+        if use_flashsvd:
+            Pq = self.q_v_proj(hidden_states).unsqueeze(2).expand(B, S, H, R)
+            Pk = self.k_v_proj(hidden_states).unsqueeze(2).expand(B, S, H, R)
+            Pv = self.v_v_proj(hidden_states).unsqueeze(2).expand(B, S, H, R)
+            cos, sin = self._get_rope_tables(S, hidden_states.device, hidden_states.dtype)
+            f = PackedFactors(Pq=Pq, Pk=Pk, Pv=Pv, Vq=Vq, Vk=Vk, Vv=Vv)
+            attn_bmhsd = flashsvd_attn_packed(f, cos, sin, causal=True)
+            attn_output = attn_bmhsd.reshape(B, S, H * dh)
+        else:
+            # Fallback: standard low-rank matmul + SDPA
+            Q = self.q_u_proj(self.q_v_proj(hidden_states)).view(B, S, H, dh).transpose(1, 2)
+            K = self.k_u_proj(self.k_v_proj(hidden_states)).view(B, S, H, dh).transpose(1, 2)
+            V = self.v_u_proj(self.v_v_proj(hidden_states)).view(B, S, H, dh).transpose(1, 2)
+            cos_4d, sin_4d = self.rotary_emb(V, seq_len=S)
+            pos = torch.arange(S, device=hidden_states.device).unsqueeze(0).expand(B, S)
+            Q, K = apply_rotary_pos_emb(Q, K, cos_4d, sin_4d, pos)
+            import torch.nn.functional as F
+            attn_out = F.scaled_dot_product_attention(Q, K, V, is_causal=True)
+            attn_output = attn_out.transpose(1, 2).reshape(B, S, H * dh)
 
         attn_output = self.o_u_proj(self.o_v_proj(attn_output))
         return attn_output, None, None
