@@ -264,6 +264,9 @@ class NaiveModernBertSVDBlock(nn.Module):
         self.num_heads = num_heads
         self.head_dim = head_dim
 
+        # Preserve model dtype so SVD factors (computed in float32) match activations
+        _dt = hf_layer.attn.Wqkv.weight.dtype
+
         # Pre-norm layers
         self.attn_norm = copy.deepcopy(hf_layer.attn_norm)
         self.mlp_norm = copy.deepcopy(hf_layer.mlp_norm)
@@ -285,23 +288,23 @@ class NaiveModernBertSVDBlock(nn.Module):
         Uk, Vk = svd_per_head_fn(Wk.t(), rank_attn)
         Uv, Vv = svd_per_head_fn(Wv.t(), rank_attn)
 
-        self.Pq = nn.Parameter(Uq)   # [H, D, R]
-        self.Vq = nn.Parameter(Vq)   # [H, R, dh]
-        self.Pk = nn.Parameter(Uk)
-        self.Vk = nn.Parameter(Vk)
-        self.Pv = nn.Parameter(Uv)
-        self.Vv = nn.Parameter(Vv)
+        self.Pq = nn.Parameter(Uq.to(_dt))   # [H, D, R]
+        self.Vq = nn.Parameter(Vq.to(_dt))   # [H, R, dh]
+        self.Pk = nn.Parameter(Uk.to(_dt))
+        self.Vk = nn.Parameter(Vk.to(_dt))
+        self.Pv = nn.Parameter(Uv.to(_dt))
+        self.Vv = nn.Parameter(Vv.to(_dt))
 
-        self.bq = nn.Parameter(bq.clone()) if bq is not None else None
-        self.bk = nn.Parameter(bk.clone()) if bk is not None else None
-        self.bv = nn.Parameter(bv.clone()) if bv is not None else None
+        self.bq = nn.Parameter(bq.clone().to(_dt)) if bq is not None else None
+        self.bk = nn.Parameter(bk.clone().to(_dt)) if bk is not None else None
+        self.bv = nn.Parameter(bv.clone().to(_dt)) if bv is not None else None
 
         # Attention output projection (SVD factorized, same as BERT Wo)
         Wo_a = hf_layer.attn.Wo
         U_wo, V_wo = svd_low_rank_fn(Wo_a.weight.data.t(), rank_wo)
-        self.Uo = nn.Parameter(U_wo)   # [D, rank_wo]
-        self.Vo = nn.Parameter(V_wo)   # [rank_wo, D]
-        self.bo_attn = nn.Parameter(Wo_a.bias.data.clone()) if Wo_a.bias is not None else None
+        self.Uo = nn.Parameter(U_wo.to(_dt))   # [D, rank_wo]
+        self.Vo = nn.Parameter(V_wo.to(_dt))   # [rank_wo, D]
+        self.bo_attn = nn.Parameter(Wo_a.bias.data.clone().to(_dt)) if Wo_a.bias is not None else None
 
         # --- FFN: Wi [2*D_ffn, D] (GeGLU), Wo [D, D_ffn] ---
         Wi = hf_layer.mlp.Wi
@@ -309,12 +312,12 @@ class NaiveModernBertSVDBlock(nn.Module):
         U1, V1 = svd_low_rank_fn(Wi.weight.data.t(), rank_ff)
         U2, V2 = svd_low_rank_fn(Wo.weight.data.t(), rank_ff)
 
-        self.U1 = nn.Parameter(U1)
-        self.V1 = nn.Parameter(V1)
-        self.b1 = nn.Parameter(Wi.bias.data.clone()) if Wi.bias is not None else None
-        self.U2 = nn.Parameter(U2)
-        self.V2 = nn.Parameter(V2)
-        self.b2 = nn.Parameter(Wo.bias.data.clone()) if Wo.bias is not None else None
+        self.U1 = nn.Parameter(U1.to(_dt))
+        self.V1 = nn.Parameter(V1.to(_dt))
+        self.b1 = nn.Parameter(Wi.bias.data.clone().to(_dt)) if Wi.bias is not None else None
+        self.U2 = nn.Parameter(U2.to(_dt))
+        self.V2 = nn.Parameter(V2.to(_dt))
+        self.b2 = nn.Parameter(Wo.bias.data.clone().to(_dt)) if Wo.bias is not None else None
 
         # GeGLU detection
         self.ffn_D = Wo.in_features
@@ -330,17 +333,16 @@ class NaiveModernBertSVDBlock(nn.Module):
                 output_attentions=False, **kwargs):
         B, M, D = hidden_states.shape
         H, dh = self.num_heads, self.head_dim
-        dt = hidden_states.dtype
 
         # === Attention (pre-norm) ===
         x = hidden_states
         xn = self.attn_norm(x)
 
         def project(xn, P, V, b):
-            tmp = torch.einsum("bmd,hdr->bhmr", xn, P.to(dt))
-            out = torch.einsum("bhmr,hrd->bhmd", tmp, V.to(dt))
+            tmp = torch.einsum("bmd,hdr->bhmr", xn, P)
+            out = torch.einsum("bhmr,hrd->bhmd", tmp, V)
             if b is not None:
-                out = out + b.to(dt).view(1, H, 1, dh)
+                out = out + b.view(1, H, 1, dh)
             return out
 
         Q = project(xn, self.Pq, self.Vq, self.bq)
@@ -377,16 +379,16 @@ class NaiveModernBertSVDBlock(nn.Module):
             Q, K, V, attn_mask=sdpa_mask, dropout_p=0.0,
         )
         attn = attn.transpose(1, 2).reshape(B, M, D)
-        attn_out = (attn @ self.Uo.to(dt)) @ self.Vo.to(dt)
+        attn_out = (attn @ self.Uo) @ self.Vo
         if self.bo_attn is not None:
-            attn_out = attn_out + self.bo_attn.to(dt)
+            attn_out = attn_out + self.bo_attn
         x = x + attn_out
 
         # === FFN (pre-norm, GeGLU) ===
         xn2 = self.mlp_norm(x)
-        z = (xn2 @ self.U1.to(dt)) @ self.V1.to(dt)
+        z = (xn2 @ self.U1) @ self.V1
         if self.b1 is not None:
-            z = z + self.b1.to(dt)
+            z = z + self.b1
 
         if self.ffn_is_geglu:
             z1, z2 = z.chunk(2, dim=-1)
@@ -394,9 +396,9 @@ class NaiveModernBertSVDBlock(nn.Module):
         else:
             h = F.gelu(z, approximate=self.gelu_approximate)
 
-        y = (h @ self.U2.to(dt)) @ self.V2.to(dt)
+        y = (h @ self.U2) @ self.V2
         if self.b2 is not None:
-            y = y + self.b2.to(dt)
+            y = y + self.b2
         x = x + y
 
         if output_attentions:
