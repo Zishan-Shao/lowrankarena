@@ -157,9 +157,14 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp.cpu()
             cache['i'] += 1
-            cache['attention_mask'] = kwargs['attention_mask'].cpu()
-            if "opt" not in model_name:
-                cache['position_ids'] = kwargs['position_ids'].cpu()
+            if cache['attention_mask'] is None:
+                cache['attention_mask'] = kwargs['attention_mask'].cpu()
+                if "opt" not in model_name:
+                    cache['position_ids'] = kwargs['position_ids'].cpu()
+            else:
+                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask'].cpu()), dim=0)
+                if "opt" not in model_name:
+                    cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids'].cpu()), dim=0)
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in calib_loader:
@@ -364,9 +369,14 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp
             cache['i'] += 1
-            cache['attention_mask'] = kwargs['attention_mask']
-            if "opt" not in model_name:
-                cache['position_ids'] = kwargs['position_ids']
+            if cache['attention_mask'] is None:
+                cache['attention_mask'] = kwargs['attention_mask']
+                if "opt" not in model_name:
+                    cache['position_ids'] = kwargs['position_ids']
+            else:
+                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask']), dim=0)
+                if "opt" not in model_name:
+                    cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids']), dim=0)
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
