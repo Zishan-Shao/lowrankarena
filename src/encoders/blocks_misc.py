@@ -339,10 +339,10 @@ class NaiveModernBertSVDBlock(nn.Module):
         xn = self.attn_norm(x)
 
         def project(xn, P, V, b):
-            tmp = torch.einsum("bmd,hdr->bhmr", xn, P)
-            out = torch.einsum("bhmr,hrd->bhmd", tmp, V)
+            tmp = torch.einsum("bmd,hdr->bhmr", xn, P.to(xn.dtype))
+            out = torch.einsum("bhmr,hrd->bhmd", tmp, V.to(xn.dtype))
             if b is not None:
-                out = out + b.view(1, H, 1, dh)
+                out = out + b.to(xn.dtype).view(1, H, 1, dh)
             return out
 
         Q = project(xn, self.Pq, self.Vq, self.bq)
