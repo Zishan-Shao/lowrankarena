@@ -659,6 +659,7 @@ if __name__ == '__main__':
         model = model.to(args.DEV)
         if args.step == 4:
             label = 'Baseline PPL' if args.model_path == 'original' else 'PPL after pruning'
+            print(f"DEBUG tokenizer type before ppl_eval: {type(tokenizer)}, value: {tokenizer!r:.80}")
             ppl_eval(model, tokenizer, datasets=['wikitext2'], model_seq_len=args.model_seq_len, batch_size=args.eval_batch_size, device=args.DEV, label=label)
         elif args.step == 5:
             eff_eval(model, tokenizer, generated_len=args.gen_seq_len, batch_size=args.eval_batch_size, device=args.DEV)
