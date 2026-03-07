@@ -433,26 +433,27 @@ class FlashModernBertSVDBlock(nn.Module):
         _import_kernels_modernbert()
 
         # Share all parameters — no copy
+        # Use getattr for optional bias attributes (MinimalModernBertSVDBlock may not have them)
         self.Pq = naive_block.Pq
         self.Vq = naive_block.Vq
-        self.bq = naive_block.bq
+        self.bq = getattr(naive_block, 'bq', None)
         self.Pk = naive_block.Pk
         self.Vk = naive_block.Vk
-        self.bk = naive_block.bk
+        self.bk = getattr(naive_block, 'bk', None)
         self.Pv = naive_block.Pv
         self.Vv = naive_block.Vv
-        self.bv = naive_block.bv
+        self.bv = getattr(naive_block, 'bv', None)
 
         self.Uo = naive_block.Uo
         self.Vo = naive_block.Vo
-        self.bo_attn = naive_block.bo_attn
+        self.bo_attn = getattr(naive_block, 'bo_attn', None)
 
         self.U1 = naive_block.U1
         self.V1 = naive_block.V1
-        self.b1 = naive_block.b1
+        self.b1 = getattr(naive_block, 'b1', None)
         self.U2 = naive_block.U2
         self.V2 = naive_block.V2
-        self.b2 = naive_block.b2
+        self.b2 = getattr(naive_block, 'b2', None)
 
         self.attn_norm = naive_block.attn_norm
         self.mlp_norm  = naive_block.mlp_norm
