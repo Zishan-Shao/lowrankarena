@@ -157,17 +157,9 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp.cpu()
             cache['i'] += 1
-            attn_mask = kwargs.get('attention_mask', None)
-            pos_ids = kwargs.get('position_ids', None)
-            if cache['attention_mask'] is None:
-                cache['attention_mask'] = attn_mask.cpu() if attn_mask is not None else None
-                if "opt" not in model_name:
-                    cache['position_ids'] = pos_ids.cpu() if pos_ids is not None else None
-            else:
-                if attn_mask is not None:
-                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attn_mask.cpu()), dim=0)
-                if "opt" not in model_name and pos_ids is not None and cache['position_ids'] is not None:
-                    cache['position_ids'] = torch.cat((cache['position_ids'], pos_ids.cpu()), dim=0)
+            cache['attention_mask'] = kwargs['attention_mask'].cpu()
+            if "opt" not in model_name:
+                cache['position_ids'] = kwargs['position_ids'].cpu()
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in calib_loader:
@@ -209,16 +201,10 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
             subset[name].scaling_diag_matrix = 0
             handles.append(subset[name].register_forward_hook(hook))
         for j in range(inps.shape[0]):
-            kwargs_j = {}
-            if attention_masks is not None and j < attention_masks.shape[0]:
-                kwargs_j['attention_mask'] = attention_masks[j].unsqueeze(0).to(dev)
             if "opt" not in model_name:
-                pos_j = torch.arange(inps.shape[1], device=dev).unsqueeze(0)
-                if hasattr(model.model, 'rotary_emb'):
-                    kwargs_j['position_embeddings'] = model.model.rotary_emb(inps[j].unsqueeze(0), pos_j)
-                else:
-                    kwargs_j['position_ids'] = pos_j
-            outs[j] = layer(inps[j].unsqueeze(0), **kwargs_j)[0]
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_masks[j].unsqueeze(0).to(dev), position_ids=position_ids[j].unsqueeze(0).to(dev))[0]
+            else:
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_masks[j].unsqueeze(0).to(dev))[0]
         for h in handles:
             h.remove()
         layer = layer.cpu()
@@ -378,17 +364,9 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp
             cache['i'] += 1
-            attn_mask = kwargs.get('attention_mask', None)
-            pos_ids = kwargs.get('position_ids', None)
-            if cache['attention_mask'] is None:
-                cache['attention_mask'] = attn_mask if attn_mask is not None else None
-                if "opt" not in model_name:
-                    cache['position_ids'] = pos_ids if pos_ids is not None else None
-            else:
-                if attn_mask is not None:
-                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attn_mask), dim=0)
-                if "opt" not in model_name and pos_ids is not None and cache['position_ids'] is not None:
-                    cache['position_ids'] = torch.cat((cache['position_ids'], pos_ids), dim=0)
+            cache['attention_mask'] = kwargs['attention_mask']
+            if "opt" not in model_name:
+                cache['position_ids'] = kwargs['position_ids']
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
@@ -431,16 +409,10 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         handles = []
         for name in gpts:
             handles.append(subset[name].register_forward_hook(add_batch(name)))
-        _kw = {}
-        if attention_masks is not None:
-            _kw['attention_mask'] = attention_masks
         if "opt" not in model_name:
-            pos = torch.arange(inps.shape[1], device=dev).unsqueeze(0).expand(inps.shape[0], -1)
-            if hasattr(model.model, 'rotary_emb'):
-                _kw['position_embeddings'] = model.model.rotary_emb(inps, pos)
-            else:
-                _kw['position_ids'] = pos
-        outs = layer(inps, **_kw)[0]
+            outs = layer(inps, attention_mask=attention_masks, position_ids=position_ids)[0]
+        else:
+            outs = layer(inps, attention_mask=attention_masks)[0]
         for h in handles:
             h.remove()
         for name in gpts:
@@ -499,16 +471,10 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
                     svd_mlp.up_v_proj.weight.data = svd_v
                     layer.mlp = svd_mlp
         layer = layer.to(dev)
-        _kw2 = {}
-        if attention_masks is not None:
-            _kw2['attention_mask'] = attention_masks
         if "opt" not in model_name:
-            pos2 = torch.arange(inps.shape[1], device=dev).unsqueeze(0).expand(inps.shape[0], -1)
-            if hasattr(model.model, 'rotary_emb'):
-                _kw2['position_embeddings'] = model.model.rotary_emb(inps, pos2)
-            else:
-                _kw2['position_ids'] = pos2
-        outs = layer(inps, **_kw2)[0]
+            outs = layer(inps, attention_mask=attention_masks, position_ids=position_ids)[0]
+        else:
+            outs = layer(inps, attention_mask=attention_masks)[0]
         layers[i] = layer.cpu()
         del gpts
         torch.cuda.empty_cache()
@@ -643,10 +609,6 @@ if __name__ == '__main__':
             model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
         else:
             model, tokenizer = get_model_from_local(args.model_path)
-            print(f"DEBUG after get_model_from_local: tokenizer={type(tokenizer)}")
-            from transformers import AutoTokenizer
-            tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True, token=args.hf_token)
-            print(f"DEBUG after AutoTokenizer.from_pretrained: tokenizer={type(tokenizer)}")
             if args.lora is not None:
                 from utils.peft import PeftModel
                 model = PeftModel.from_pretrained(
@@ -656,16 +618,11 @@ if __name__ == '__main__':
                 )
                 model = model.merge_and_unload()
                 torch.save({'model': model, 'tokenizer': tokenizer}, args.lora + '/merge.pt')
-        print(f"DEBUG after if/else block: tokenizer={type(tokenizer)}")
         model.eval()
-        print(f"DEBUG after model.eval(): tokenizer={type(tokenizer)}")
         model = model.float()
-        print(f"DEBUG after model.float(): tokenizer={type(tokenizer)}")
         model = model.to(args.DEV)
-        print(f"DEBUG after model.to(dev): tokenizer={type(tokenizer)}")
         if args.step == 4:
             label = 'Baseline PPL' if args.model_path == 'original' else 'PPL after pruning'
-            print(f"DEBUG tokenizer type before ppl_eval: {type(tokenizer)}, value: {tokenizer!r:.80}")
-            ppl_eval(model, tokenizer, model_id=args.model, datasets=['wikitext2'], model_seq_len=args.model_seq_len, batch_size=args.eval_batch_size, device=args.DEV, label=label)
+            ppl_eval(model, tokenizer, datasets=['wikitext2'], model_seq_len=args.model_seq_len, batch_size=args.eval_batch_size, device=args.DEV, label=label)
         elif args.step == 5:
             eff_eval(model, tokenizer, generated_len=args.gen_seq_len, batch_size=args.eval_batch_size, device=args.DEV)
