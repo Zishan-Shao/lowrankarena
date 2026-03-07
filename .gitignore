@@ -73,3 +73,11 @@ experiments/*.png
 # Backup and archived files
 *.backup
 *_backup_*.csv
+
+# FlashSVD kernel source (large, not tracked)
+flashsvd-v1.5/
+flashsvd-v2/
+
+# Large binary / document files
+*.zip
+*.pdf

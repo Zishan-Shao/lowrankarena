@@ -9,8 +9,19 @@ from transformers.activations import ACT2FN
 from transformers.utils import logging
 from transformers import LlamaConfig
 
-from kernels.flashsvdropeattn import FlashSVDRoPEAttention, QKVFactors
-from kernels.flashsvdswiglu import flashsvd_ffn_swiglu
+from src.kernels.decoder.flashsvdswiglu_v15 import flashsvd_ffn_swiglu
+from src.kernels.decoder.flashsvdropeattn_v16 import (
+    PackedFactors, DecodePackedFactors,
+    build_rope_tables,
+    flashsvd_attn_packed,
+    flashsvd_attn_decode_packed,
+)
+
+try:
+    from flash_attn import flash_attn_with_kvcache as _flash_attn_kvcache
+    _HAS_FLASH_ATTN = True
+except Exception:
+    _HAS_FLASH_ATTN = False
 
 
 logger = logging.get_logger(__name__)
@@ -173,15 +184,34 @@ class SVD_LlamaAttention(nn.Module):
 
         self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
 
-        # Flash SVD + RoPE attention kernel wrapper
-        self.flash_attn = FlashSVDRoPEAttention(
-            num_heads=self.num_heads,
-            head_dim=self.head_dim,
-            rotary_emb=self.rotary_emb,
-        )
+        # Cached RoPE tables for v1.6 kernel: [max_len, dh/2]
+        self._rope_cos: torch.Tensor = None
+        self._rope_sin: torch.Tensor = None
 
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
         return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
+
+    def _get_rope_tables(self, seqlen: int, device, dtype):
+        """Return (cos, sin) [seqlen, dh/2], rebuilding cache if needed."""
+        if self._rope_cos is None or self._rope_cos.shape[0] < seqlen or \
+                self._rope_cos.device != device or self._rope_cos.dtype != dtype:
+            max_len = max(seqlen, self.max_position_embeddings)
+            cos, sin = build_rope_tables(max_len, self.head_dim, 10000.0, device, dtype)
+            self._rope_cos = cos
+            self._rope_sin = sin
+        return self._rope_cos[:seqlen], self._rope_sin[:seqlen]
+
+    def _eff_weight(self, linear: nn.Module) -> torch.Tensor:
+        """Return effective weight, merging LoRA delta if present."""
+        W = linear.weight
+        if hasattr(linear, 'lora_A') and hasattr(linear, 'lora_B'):
+            adapter = getattr(linear, 'active_adapter', None)
+            try:
+                if adapter is not None and adapter in linear.lora_A and adapter in linear.lora_B:
+                    W = W + (linear.lora_B[adapter].weight @ linear.lora_A[adapter].weight) * linear.scaling[adapter]
+            except Exception:
+                pass
+        return W
 
     def forward(
         self,
@@ -191,85 +221,72 @@ class SVD_LlamaAttention(nn.Module):
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
-        # HF >=4.40 passes `past_key_values`; accept it for compatibility
         past_key_values: Optional[Tuple[torch.Tensor]] = None,
         **kwargs,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         if past_key_value is None and past_key_values is not None:
             past_key_value = past_key_values
-        bsz, q_len, _ = hidden_states.size()
 
+        B, S, _ = hidden_states.size()
+        H, dh   = self.num_heads, self.head_dim
+        R       = self.q_v_proj.out_features
+
+        # V factor matrices [H, R, dh] — shared across prefill and decode
+        Vq = self._eff_weight(self.q_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
+        Vk = self._eff_weight(self.k_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
+        Vv = self._eff_weight(self.v_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
+
+        # ── Decode path (use_cache or incremental) ────────────────────────────
         if past_key_value is not None or use_cache:
-            # The FlashSVDRoPEAttention kernel currently computes full-sequence attention
-            # and does not implement KV caching. Fall back is not provided here.
-            raise NotImplementedError("KV cache not supported with FlashSVDRoPEAttention in this path.")
+            # Low-rank KV cache stores P vectors [B, L, 1, R] (head-shared).
+            # expand to [B, L, H, R] only at kernel call time (stride-0, no copy).
+            Pk_tok = self.k_v_proj(hidden_states).view(B, S, 1, R)  # [B, 1, 1, R]
+            Pv_tok = self.v_v_proj(hidden_states).view(B, S, 1, R)
 
-        # Build low-rank P factors: [B, M, R] -> expand to [B, H, M, R]
-        Pq = self.q_v_proj(hidden_states)  # [B, M, R]
-        Pk = self.k_v_proj(hidden_states)  # [B, M, R]
-        Pv = self.v_v_proj(hidden_states)  # [B, M, R]
-
-        B, M, R = Pq.shape
-        H, dh = self.num_heads, self.head_dim
-
-        # Expand along heads (rank factors are shared across heads)
-        # Expand across heads as views (zero stride on H) to avoid materialization
-        Pq = Pq.unsqueeze(1).expand(B, H, M, R)
-        Pk = Pk.unsqueeze(1).expand(B, H, M, R)
-        Pv = Pv.unsqueeze(1).expand(B, H, M, R)
-
-        # Build V factors from effective projection weights: [H, R, dh]
-        # Include LoRA delta if adapters are active by reading lora_A/lora_B
-        def _eff_weight(linear: nn.Module):
-            W = linear.weight
-            if hasattr(linear, 'lora_A') and hasattr(linear, 'lora_B'):
-                adapter = getattr(linear, 'active_adapter', None)
-                try:
-                    if adapter is not None and adapter in linear.lora_A and adapter in linear.lora_B:
-                        W = W + (linear.lora_B[adapter].weight @ linear.lora_A[adapter].weight) * linear.scaling[adapter]
-                except Exception:
-                    pass
-            return W
-
-        Vq = _eff_weight(self.q_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
-        Vk = _eff_weight(self.k_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
-        Vv = _eff_weight(self.v_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
-
-        # No biases in low-rank projections by default
-        bq = bk = bv = None
-
-        # Position ids default: [B, M]
-        if position_ids is None:
-            position_ids = torch.arange(M, device=hidden_states.device).unsqueeze(0).expand(B, M)
-
-        # Attention mask handling: support 2D pad mask [B, M] or 4D additive [B,1,M,M]
-        add_mask = None
-        pad_mask = None
-        if attention_mask is not None:
-            if attention_mask.dim() == 2:
-                pad_mask = attention_mask
-            elif attention_mask.dim() == 4:
-                if attention_mask.shape[-2] != M or attention_mask.shape[-1] != M:
-                    raise NotImplementedError("Attention mask with differing q/k lengths not supported here.")
-                add_mask = attention_mask
+            if past_key_value is not None:
+                Pk_cache = torch.cat([past_key_value[0], Pk_tok], dim=1)  # [B, L+1, 1, R]
+                Pv_cache = torch.cat([past_key_value[1], Pv_tok], dim=1)
             else:
-                raise ValueError(f"Unsupported attention_mask shape: {tuple(attention_mask.shape)}")
+                Pk_cache = Pk_tok
+                Pv_cache = Pv_tok
 
-        qkv = QKVFactors(Pq=Pq, Pk=Pk, Pv=Pv, Vq=Vq, Vk=Vk, Vv=Vv, bq=bq, bk=bk, bv=bv)
+            past_key_value = (Pk_cache, Pv_cache) if use_cache else None
+            seqlen_k = int(Pk_cache.shape[1])
 
-        attn_bmhd = self.flash_attn(
-            qkv,
-            attention_mask=add_mask if add_mask is not None else pad_mask,
-            position_ids=position_ids,
-        )  # [B, M, H, dh]
+            # Query P: [B, 1, R] → expand to [B, H, R] (stride-0 across heads)
+            Pq_q = self.q_v_proj(hidden_states).view(B * S, R)
+            Pq_q = Pq_q.view(B, S, R)[:, 0, :]           # first (only) query token [B, R]
+            Pq_q = Pq_q.unsqueeze(1).expand(B, H, R)      # [B, H, R], stride-0 on H
 
-        # Fold heads back to [B, M, D]
-        attn_output = attn_bmhd.reshape(B, M, H * dh)
+            # Expand KV cache head dim with stride-0 [B, L, H, R]
+            Pk_exp = Pk_cache.expand(B, seqlen_k, H, R)
+            Pv_exp = Pv_cache.expand(B, seqlen_k, H, R)
 
-        # Low-rank output projection
+            cos, sin = self._get_rope_tables(seqlen_k, hidden_states.device, hidden_states.dtype)
+
+            f_dec = DecodePackedFactors(
+                Pq=Pq_q.contiguous(), Pk=Pk_exp.contiguous(), Pv=Pv_exp.contiguous(),
+                Vq=Vq, Vk=Vk, Vv=Vv,
+            )
+            # Returns [B, H, dh]
+            out_bhd = flashsvd_attn_decode_packed(f_dec, cos, sin, seqlen_k=seqlen_k, causal=True)
+            attn_output = out_bhd.reshape(B, S, H * dh)
+            attn_output = self.o_u_proj(self.o_v_proj(attn_output))
+            return attn_output, None, past_key_value
+
+        # ── Prefill path ───────────────────────────────────────────────────────
+        # P factors [B, S, R]; expand to [B, S, H, R] with stride-0 on H
+        Pq = self.q_v_proj(hidden_states).unsqueeze(2).expand(B, S, H, R)  # [B, S, H, R]
+        Pk = self.k_v_proj(hidden_states).unsqueeze(2).expand(B, S, H, R)
+        Pv = self.v_v_proj(hidden_states).unsqueeze(2).expand(B, S, H, R)
+
+        cos, sin = self._get_rope_tables(S, hidden_states.device, hidden_states.dtype)
+
+        f = PackedFactors(Pq=Pq, Pk=Pk, Pv=Pv, Vq=Vq, Vk=Vk, Vv=Vv)
+        # Returns [B, S, H, dh]
+        attn_bmhsd = flashsvd_attn_packed(f, cos, sin, causal=True)
+        attn_output = attn_bmhsd.reshape(B, S, H * dh)
+
         attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-
-        attn_weights = None
-        past_key_value = None
-        return attn_output, attn_weights, past_key_value
+        return attn_output, None, None
     

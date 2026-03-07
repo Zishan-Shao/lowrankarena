@@ -1,6 +1,13 @@
 #coding:utf8
 import os
 import sys
+
+# Add repo root so `from src.kernels.xxx import ...` resolves correctly.
+_here = os.path.dirname(os.path.abspath(__file__))           # baselines/SVD-LLM/
+_repo_root = os.path.dirname(os.path.dirname(_here))         # lowrankarena/
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
 import argparse
 import torch.jit
 from tqdm import tqdm
