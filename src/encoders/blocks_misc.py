@@ -330,16 +330,17 @@ class NaiveModernBertSVDBlock(nn.Module):
                 output_attentions=False, **kwargs):
         B, M, D = hidden_states.shape
         H, dh = self.num_heads, self.head_dim
+        dt = hidden_states.dtype
 
         # === Attention (pre-norm) ===
         x = hidden_states
         xn = self.attn_norm(x)
 
         def project(xn, P, V, b):
-            tmp = torch.einsum("bmd,hdr->bhmr", xn, P)
-            out = torch.einsum("bhmr,hrd->bhmd", tmp, V)
+            tmp = torch.einsum("bmd,hdr->bhmr", xn, P.to(dt))
+            out = torch.einsum("bhmr,hrd->bhmd", tmp, V.to(dt))
             if b is not None:
-                out = out + b.view(1, H, 1, dh)
+                out = out + b.to(dt).view(1, H, 1, dh)
             return out
 
         Q = project(xn, self.Pq, self.Vq, self.bq)
@@ -376,16 +377,16 @@ class NaiveModernBertSVDBlock(nn.Module):
             Q, K, V, attn_mask=sdpa_mask, dropout_p=0.0,
         )
         attn = attn.transpose(1, 2).reshape(B, M, D)
-        attn_out = (attn @ self.Uo) @ self.Vo
+        attn_out = (attn @ self.Uo.to(dt)) @ self.Vo.to(dt)
         if self.bo_attn is not None:
-            attn_out = attn_out + self.bo_attn
+            attn_out = attn_out + self.bo_attn.to(dt)
         x = x + attn_out
 
         # === FFN (pre-norm, GeGLU) ===
         xn2 = self.mlp_norm(x)
-        z = (xn2 @ self.U1) @ self.V1
+        z = (xn2 @ self.U1.to(dt)) @ self.V1.to(dt)
         if self.b1 is not None:
-            z = z + self.b1
+            z = z + self.b1.to(dt)
 
         if self.ffn_is_geglu:
             z1, z2 = z.chunk(2, dim=-1)
@@ -393,9 +394,9 @@ class NaiveModernBertSVDBlock(nn.Module):
         else:
             h = F.gelu(z, approximate=self.gelu_approximate)
 
-        y = (h @ self.U2) @ self.V2
+        y = (h @ self.U2.to(dt)) @ self.V2.to(dt)
         if self.b2 is not None:
-            y = y + self.b2
+            y = y + self.b2.to(dt)
         x = x + y
 
         if output_attentions:
