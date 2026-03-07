@@ -461,7 +461,7 @@ class FlashModernBertSVDBlock(nn.Module):
 
         self.num_heads   = naive_block.num_heads
         self.head_dim    = naive_block.head_dim
-        self.hidden_size = naive_block.hidden_size
+        self.hidden_size = getattr(naive_block, 'hidden_size', naive_block.num_heads * naive_block.head_dim)
         self.ffn_is_geglu     = naive_block.ffn_is_geglu
         self.gelu_approximate = naive_block.gelu_approximate
 
