@@ -532,6 +532,7 @@ class FlashModernBertSVDBlock(nn.Module):
             y = _flashsvd_ffn_geglu_v15_fn(
                 P_ffn, self.V1, self.U2, self.V2, b1, b2,
                 gelu_approx=self.gelu_approximate,
+                prefer_fused=False,  # fused path reloads P O(D/BD × H/BH) times — much slower for encoder shapes
             )
         else:
             # Non-GeGLU fallback (plain GELU, no split): stay in PyTorch
