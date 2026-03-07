@@ -643,8 +643,10 @@ if __name__ == '__main__':
             model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
         else:
             model, tokenizer = get_model_from_local(args.model_path)
+            print(f"DEBUG after get_model_from_local: tokenizer={type(tokenizer)}")
             from transformers import AutoTokenizer
             tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True, token=args.hf_token)
+            print(f"DEBUG after AutoTokenizer.from_pretrained: tokenizer={type(tokenizer)}")
             if args.lora is not None:
                 from utils.peft import PeftModel
                 model = PeftModel.from_pretrained(
@@ -654,9 +656,13 @@ if __name__ == '__main__':
                 )
                 model = model.merge_and_unload()
                 torch.save({'model': model, 'tokenizer': tokenizer}, args.lora + '/merge.pt')
+        print(f"DEBUG after if/else block: tokenizer={type(tokenizer)}")
         model.eval()
+        print(f"DEBUG after model.eval(): tokenizer={type(tokenizer)}")
         model = model.float()
+        print(f"DEBUG after model.float(): tokenizer={type(tokenizer)}")
         model = model.to(args.DEV)
+        print(f"DEBUG after model.to(dev): tokenizer={type(tokenizer)}")
         if args.step == 4:
             label = 'Baseline PPL' if args.model_path == 'original' else 'PPL after pruning'
             print(f"DEBUG tokenizer type before ppl_eval: {type(tokenizer)}, value: {tokenizer!r:.80}")
