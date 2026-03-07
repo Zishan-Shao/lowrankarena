@@ -629,7 +629,6 @@ if __name__ == '__main__':
                 model = model.merge_and_unload()
                 torch.save({'model': model, 'tokenizer': tokenizer}, args.lora + '/merge.pt')
         model.eval()
-        model = model.float()
         model = model.to(args.DEV)
         if args.step == 4:
             label = 'Baseline PPL' if args.model_path == 'original' else 'PPL after pruning'
