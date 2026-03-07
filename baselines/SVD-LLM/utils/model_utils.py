@@ -11,6 +11,15 @@ sys.path.append(current_path)
 # bandaid fix
 dev = torch.device("cuda")
 
+
+def mib(nbytes: int) -> float:
+    return nbytes / (1024 ** 2)
+
+
+def measure_param_bytes(model: nn.Module) -> int:
+    return sum(p.numel() * p.element_size() for p in model.parameters())
+
+
 def get_model_from_huggingface(model_id, hf_token: str = None):
     from transformers import AutoModelForCausalLM, AutoTokenizer
     # Pick up token from env if not provided
