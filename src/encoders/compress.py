@@ -72,7 +72,7 @@ def parse_args():
     p.add_argument("--rank_wo", type=int, default=None,
                    help="Rank for attention output projection (Wo). If specified, overrides --rank for Wo.")
     p.add_argument("--budget", type=float, default=None)
-    p.add_argument("--scope", choices=["qkv", "ffn", "qkv+ffn"], default="qkv+ffn")
+    p.add_argument("--scope", choices=["qkv", "ffn", "qkv+ffn", "qkv+wo+ffn"], default="qkv+ffn")
     p.add_argument("--qkv_mode", choices=["per_head", "full"], default="per_head",
                    help="QKV factorization mode: 'per_head' (rank limited to dh=64) or 'full' (paper-style, rank can be 256+)")
     # backend
@@ -1372,7 +1372,7 @@ def _count_model_params(model):
     return sum(p.numel() for p in model.parameters())
 
 
-def _calculate_param_ratio(model, method, original_total_params, rank=None, budget=None, scope="qkv+ffn", arch="bert"):
+def _calculate_param_ratio(model, method, original_total_params, rank=None, budget=None, scope="qkv+ffn", arch="bert"):  # scope: qkv+ffn or qkv+wo+ffn
     """
     Calculate compression ratio using ACTUAL parameter counts from the model.
     Returns a tuple: (ratio, original_params, compressed_params, total_original, total_compressed)
@@ -1698,6 +1698,9 @@ def main():
     # 1) load model
     model, tokenizer = load_model(args.model_id, args.task, args.dtype, args.device)
     arch, _ = _detect_arch(model)
+    # ModernBERT always compresses Wo_attn (qkv+wo+ffn); auto-correct default scope
+    if arch == "modernbert" and args.scope == "qkv+ffn":
+        args.scope = "qkv+wo+ffn"
     # Save original total parameter count BEFORE compression (for accurate total_model_params calculation)
     original_total_params = _count_model_params(model)
     print(f"[load] Model loaded: {original_total_params/1e6:.1f}M params  arch={arch}")
