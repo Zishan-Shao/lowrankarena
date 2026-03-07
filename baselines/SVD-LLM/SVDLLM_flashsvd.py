@@ -209,10 +209,12 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
             subset[name].scaling_diag_matrix = 0
             handles.append(subset[name].register_forward_hook(hook))
         for j in range(inps.shape[0]):
-            if "opt" not in model_name:
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_masks[j].unsqueeze(0).to(dev), position_ids=position_ids[j].unsqueeze(0).to(dev))[0]
-            else:
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_masks[j].unsqueeze(0).to(dev))[0]
+            kwargs_j = {}
+            if attention_masks is not None:
+                kwargs_j['attention_mask'] = attention_masks[j].unsqueeze(0).to(dev)
+            if "opt" not in model_name and position_ids is not None:
+                kwargs_j['position_ids'] = position_ids[j].unsqueeze(0).to(dev)
+            outs[j] = layer(inps[j].unsqueeze(0), **kwargs_j)[0]
         for h in handles:
             h.remove()
         layer = layer.cpu()
@@ -422,10 +424,12 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         handles = []
         for name in gpts:
             handles.append(subset[name].register_forward_hook(add_batch(name)))
-        if "opt" not in model_name:
-            outs = layer(inps, attention_mask=attention_masks, position_ids=position_ids)[0]
-        else:
-            outs = layer(inps, attention_mask=attention_masks)[0]
+        _kw = {}
+        if attention_masks is not None:
+            _kw['attention_mask'] = attention_masks
+        if "opt" not in model_name and position_ids is not None:
+            _kw['position_ids'] = position_ids
+        outs = layer(inps, **_kw)[0]
         for h in handles:
             h.remove()
         for name in gpts:
@@ -484,10 +488,12 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
                     svd_mlp.up_v_proj.weight.data = svd_v
                     layer.mlp = svd_mlp
         layer = layer.to(dev)
-        if "opt" not in model_name:
-            outs = layer(inps, attention_mask=attention_masks, position_ids=position_ids)[0]
-        else:
-            outs = layer(inps, attention_mask=attention_masks)[0]
+        _kw2 = {}
+        if attention_masks is not None:
+            _kw2['attention_mask'] = attention_masks
+        if "opt" not in model_name and position_ids is not None:
+            _kw2['position_ids'] = position_ids
+        outs = layer(inps, **_kw2)[0]
         layers[i] = layer.cpu()
         del gpts
         torch.cuda.empty_cache()
