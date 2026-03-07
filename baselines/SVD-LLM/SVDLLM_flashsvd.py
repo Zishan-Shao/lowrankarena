@@ -643,8 +643,7 @@ if __name__ == '__main__':
             model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
         else:
             model, tokenizer = get_model_from_local(args.model_path)
-            from transformers import PreTrainedTokenizerBase
-            if not isinstance(tokenizer, PreTrainedTokenizerBase):
+            if not hasattr(tokenizer, 'eos_token_id'):
                 from transformers import AutoTokenizer
                 tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True, token=args.hf_token)
             if args.lora is not None:
