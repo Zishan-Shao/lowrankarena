@@ -14,13 +14,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.encoders.blocks_misc import NaiveSVDBlock, BertLayerShim
+from src.encoders.blocks_misc import NaiveSVDBlock, BertLayerShim, NaiveModernBertSVDBlock
 
-# Import MinimalSVDBlock if available (for models loaded from checkpoint)
+# Import MinimalSVDBlock / MinimalModernBertSVDBlock if available (for checkpoint loading)
 try:
     from src.encoders.io import MinimalSVDBlock
 except ImportError:
     MinimalSVDBlock = None
+
+try:
+    from src.encoders.io import MinimalModernBertSVDBlock
+except ImportError:
+    MinimalModernBertSVDBlock = None
 
 # ---------------------------------------------------------------------------
 # Lazy kernel imports – fail fast with a human-readable message
@@ -29,6 +34,7 @@ _flash_svd_attention = None
 _flashsvd_ffn_v1 = None
 _flash_svd_attention_v15 = None
 _flashsvd_ffn_v15_fn = None
+_flashsvd_ffn_geglu_v15_fn = None
 
 
 def _next_pow2(n: int) -> int:
@@ -99,6 +105,28 @@ def _import_kernels_v15():
 
     _flash_svd_attention_v15 = flash_svd_attention_v15
     _flashsvd_ffn_v15_fn = flashsvd_ffn_v15
+
+
+def _import_kernels_modernbert():
+    """Import FlashSVD GeGLU v1.5 kernel for ModernBERT FFN."""
+    global _flashsvd_ffn_geglu_v15_fn
+    if _flashsvd_ffn_geglu_v15_fn is not None:
+        return
+
+    kernel_dir = _resolve_kernel_dir()
+    if kernel_dir not in sys.path:
+        sys.path.insert(0, kernel_dir)
+
+    try:
+        from flashsvdgeglu_v15 import flashsvd_ffn_geglu_autotuned
+    except ImportError as e:
+        raise RuntimeError(
+            "Cannot import FlashSVD GeGLU v1.5 kernel for ModernBERT. "
+            "Ensure Triton is installed and a CUDA GPU is available.\n"
+            f"Original error: {e}"
+        ) from e
+
+    _flashsvd_ffn_geglu_v15_fn = flashsvd_ffn_geglu_autotuned
 
 
 # ---------------------------------------------------------------------------
@@ -230,9 +258,8 @@ def enable_flashsvd(model: nn.Module) -> nn.Module:
     encoder_layers = None
     if model_type == "modernbert":
         raise RuntimeError(
-            "enable_flashsvd: ModernBERT requires different Triton kernels "
-            "(flashsvdropeattn + flashsvdgeglu) that are not yet integrated "
-            "in the benchmark pipeline. Use --backend naive for ModernBERT."
+            "enable_flashsvd: ModernBERT is not supported by FlashSVD v1. "
+            "Use --backend flashsvd15 (fused GeGLU kernel) or --backend naive."
         )
     elif hasattr(model, "bert"):
         encoder_layers = model.bert.encoder.layer
@@ -389,6 +416,140 @@ class FlashSVD15Block(nn.Module):
 
 
 # ---------------------------------------------------------------------------
+# FlashModernBertSVDBlock – ModernBERT: fused GeGLU FFN kernel, SDPA attention
+# ---------------------------------------------------------------------------
+class FlashModernBertSVDBlock(nn.Module):
+    """Drop-in replacement for NaiveModernBertSVDBlock.
+
+    Attention: unchanged (per-head einsum projection + PyTorch SDPA + RoPE).
+    FFN: replaced with fused flashsvd_ffn_geglu_autotuned Triton kernel,
+         which avoids materialising the intermediate S buffer.
+
+    Parameters are *shared* (not copied) from the source block.
+    """
+
+    def __init__(self, naive_block):
+        super().__init__()
+        _import_kernels_modernbert()
+
+        # Share all parameters — no copy
+        self.Pq = naive_block.Pq
+        self.Vq = naive_block.Vq
+        self.bq = naive_block.bq
+        self.Pk = naive_block.Pk
+        self.Vk = naive_block.Vk
+        self.bk = naive_block.bk
+        self.Pv = naive_block.Pv
+        self.Vv = naive_block.Vv
+        self.bv = naive_block.bv
+
+        self.Uo = naive_block.Uo
+        self.Vo = naive_block.Vo
+        self.bo_attn = naive_block.bo_attn
+
+        self.U1 = naive_block.U1
+        self.V1 = naive_block.V1
+        self.b1 = naive_block.b1
+        self.U2 = naive_block.U2
+        self.V2 = naive_block.V2
+        self.b2 = naive_block.b2
+
+        self.attn_norm = naive_block.attn_norm
+        self.mlp_norm  = naive_block.mlp_norm
+        self.rotary_emb = naive_block.rotary_emb
+
+        self.num_heads   = naive_block.num_heads
+        self.head_dim    = naive_block.head_dim
+        self.hidden_size = naive_block.hidden_size
+        self.ffn_is_geglu     = naive_block.ffn_is_geglu
+        self.gelu_approximate = naive_block.gelu_approximate
+
+    def forward(self, hidden_states, attention_mask=None, sliding_window_mask=None,
+                position_ids=None, output_attentions=False, **kwargs):
+        from src.encoders.blocks_misc import _apply_rotary
+
+        B, M, D = hidden_states.shape
+        H, dh = self.num_heads, self.head_dim
+        x = hidden_states
+
+        # === Attention (unchanged from NaiveModernBertSVDBlock) ===
+        xn = self.attn_norm(x)
+
+        def project(xn, P, V, b):
+            tmp = torch.einsum("bmd,hdr->bhmr", xn, P)
+            out = torch.einsum("bhmr,hrd->bhmd", tmp, V)
+            if b is not None:
+                out = out + b.view(1, H, 1, dh)
+            return out
+
+        Q = project(xn, self.Pq, self.Vq, self.bq)
+        K = project(xn, self.Pk, self.Vk, self.bk)
+        V = project(xn, self.Pv, self.Vv, self.bv)
+
+        if position_ids is None:
+            position_ids = torch.arange(M, device=x.device).unsqueeze(0).expand(B, M)
+        qf = Q.reshape(B * H, M, dh)
+        kf = K.reshape(B * H, M, dh)
+        posf = position_ids.unsqueeze(1).expand(B, H, M).reshape(B * H, M)
+        cos, sin = self.rotary_emb(qf, position_ids=posf)
+        Q = _apply_rotary(qf, cos, sin).view(B, H, M, dh)
+        K = _apply_rotary(kf, cos, sin).view(B, H, M, dh)
+
+        sdpa_mask = None
+        if sliding_window_mask is not None:
+            sm = sliding_window_mask
+            if sm.dtype.is_floating_point and sm.dtype != Q.dtype:
+                sm = sm.to(Q.dtype)
+            sdpa_mask = sm
+        elif attention_mask is not None:
+            if attention_mask.dim() == 2:
+                sdpa_mask = ~(attention_mask.to(torch.bool))[:, None, None, :]
+            elif attention_mask.dim() == 4:
+                sm = attention_mask
+                if sm.dtype.is_floating_point and sm.dtype != Q.dtype:
+                    sm = sm.to(Q.dtype)
+                sdpa_mask = sm
+
+        attn = F.scaled_dot_product_attention(Q, K, V, attn_mask=sdpa_mask, dropout_p=0.0)
+        attn = attn.transpose(1, 2).reshape(B, M, D)
+        attn_out = (attn @ self.Uo) @ self.Vo
+        if self.bo_attn is not None:
+            attn_out = attn_out + self.bo_attn
+        x = x + attn_out
+
+        # === FFN: fused GeGLU Triton kernel ===
+        xn2 = self.mlp_norm(x)
+        P_ffn = xn2 @ self.U1          # [B, M, R1] — rank-space input
+
+        # GeGLU kernel requires non-None biases; substitute zeros if absent
+        b1 = self.b1 if self.b1 is not None else torch.zeros(
+            self.V1.shape[1], device=x.device, dtype=x.dtype)
+        b2 = self.b2 if self.b2 is not None else torch.zeros(
+            self.V2.shape[1], device=x.device, dtype=x.dtype)
+
+        if self.ffn_is_geglu:
+            y = _flashsvd_ffn_geglu_v15_fn(
+                P_ffn, self.V1, self.U2, self.V2, b1, b2,
+                gelu_approx=self.gelu_approximate,
+            )
+        else:
+            # Non-GeGLU fallback (plain GELU, no split): stay in PyTorch
+            z = P_ffn @ self.V1
+            if self.b1 is not None:
+                z = z + self.b1
+            h = F.gelu(z, approximate=self.gelu_approximate)
+            y = (h @ self.U2) @ self.V2
+            if self.b2 is not None:
+                y = y + self.b2
+
+        x = x + y
+
+        if output_attentions:
+            return (x, None)
+        return (x,)
+
+
+# ---------------------------------------------------------------------------
 # Public API – v1.5
 # ---------------------------------------------------------------------------
 def enable_sdpa(model: nn.Module) -> nn.Module:
@@ -454,13 +615,47 @@ def enable_flashsvd15(model: nn.Module) -> nn.Module:
 
     # Locate encoder layers
     model_type = getattr(model.config, "model_type", "").lower()
-    encoder_layers = None
+
     if model_type == "modernbert":
-        raise RuntimeError(
-            "enable_flashsvd15: ModernBERT requires different Triton kernels "
-            "that are not yet integrated. Use --backend naive for ModernBERT."
-        )
-    elif hasattr(model, "bert"):
+        _import_kernels_modernbert()
+        if hasattr(model, "model") and hasattr(model.model, "layers"):
+            encoder_layers = model.model.layers
+        else:
+            raise RuntimeError(
+                "enable_flashsvd15: cannot find .model.layers on ModernBERT model."
+            )
+
+        patched = 0
+        already_flash = 0
+        for layer in encoder_layers:
+            block = getattr(layer, "block", None)
+            _cls_name = type(block).__name__ if block is not None else ""
+
+            if _cls_name == "FlashModernBertSVDBlock" or isinstance(block, FlashModernBertSVDBlock):
+                already_flash += 1
+                continue
+
+            is_svd_block = (
+                isinstance(block, NaiveModernBertSVDBlock)
+                or (MinimalModernBertSVDBlock and isinstance(block, MinimalModernBertSVDBlock))
+                or _cls_name in ("NaiveModernBertSVDBlock", "MinimalModernBertSVDBlock")
+            )
+            if is_svd_block:
+                layer.block = FlashModernBertSVDBlock(block)
+                patched += 1
+
+        if patched == 0 and already_flash == 0:
+            raise RuntimeError(
+                "enable_flashsvd15: no NaiveModernBertSVDBlock instances found in ModernBERT model."
+            )
+        if already_flash > 0 and patched == 0:
+            print(f"[flashsvd15] ModernBERT already enabled ({already_flash} layers) — no-op.")
+        else:
+            print(f"[flashsvd15] Patched {patched} ModernBERT layers with fused GeGLU kernel.")
+        return model
+
+    encoder_layers = None
+    if hasattr(model, "bert"):
         encoder_layers = model.bert.encoder.layer
     elif hasattr(model, "roberta"):
         encoder_layers = model.roberta.encoder.layer
@@ -487,8 +682,6 @@ def enable_flashsvd15(model: nn.Module) -> nn.Module:
             or _cls_name in ("NaiveSVDBlock", "MinimalSVDBlock", "FlashSVDBlock")
         )
         if is_svd_block:
-            # If already a FlashSVDBlock, unwrap to the underlying naive params
-            # by building FlashSVD15Block from it (it stores all the same tensors)
             flash15_block = FlashSVD15Block(block)
             layer.block = flash15_block
             patched += 1
