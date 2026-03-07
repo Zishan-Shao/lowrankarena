@@ -51,8 +51,10 @@ USE_TASK_MODELS="${USE_TASK_MODELS:-true}"
 TASK_MODEL_PREFIX="${TASK_MODEL_PREFIX:-textattack}"
 LOCAL_PRETRAINED_DIR="${LOCAL_PRETRAINED_DIR:-}"  # Local pre-trained model directory, takes priority over HuggingFace
 
-# Output locations
-RESULT_DIR="${RESULT_DIR:-experiments/glue}"
+# Output locations — namespace by model slug so BERT and ModernBERT don't collide
+_MODEL_SLUG_CAM="${MODEL_ID##*/}"
+_MODEL_SLUG_CAM="${_MODEL_SLUG_CAM,,}"
+RESULT_DIR="${RESULT_DIR:-experiments/glue/${_MODEL_SLUG_CAM}}"
 LOG_DIR="${LOG_DIR:-experiments/logs}"
 mkdir -p "${RESULT_DIR}" "${LOG_DIR}"
 

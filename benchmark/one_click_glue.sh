@@ -89,8 +89,10 @@ LEARNING_RATE="${LEARNING_RATE:-2e-5}"
 SEQ_LEN="${SEQ_LEN:-512}"
 SEED="${SEED:-42}"
 
-# Output configuration
-OUTPUT_DIR="${OUTPUT_DIR:-experiments/glue}"
+# Output configuration — namespace by model slug so BERT and ModernBERT don't collide
+_MODEL_SLUG_OCG="${MODEL_ID##*/}"
+_MODEL_SLUG_OCG="${_MODEL_SLUG_OCG,,}"
+OUTPUT_DIR="${OUTPUT_DIR:-experiments/glue/${_MODEL_SLUG_OCG}}"
 OUT_CSV="${OUT_CSV:-experiments/encoder_runs.csv}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 # Build rank label for log filename:
