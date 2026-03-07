@@ -210,11 +210,10 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
             handles.append(subset[name].register_forward_hook(hook))
         for j in range(inps.shape[0]):
             kwargs_j = {}
-            if attention_masks is not None:
+            if attention_masks is not None and j < attention_masks.shape[0]:
                 kwargs_j['attention_mask'] = attention_masks[j].unsqueeze(0).to(dev)
             if "opt" not in model_name:
-                pos_j = (position_ids[j].unsqueeze(0).to(dev) if position_ids is not None
-                         else torch.arange(inps.shape[1], device=dev).unsqueeze(0))
+                pos_j = torch.arange(inps.shape[1], device=dev).unsqueeze(0)
                 if hasattr(model.model, 'rotary_emb'):
                     kwargs_j['position_embeddings'] = model.model.rotary_emb(inps[j].unsqueeze(0), pos_j)
                 else:
@@ -436,8 +435,7 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         if attention_masks is not None:
             _kw['attention_mask'] = attention_masks
         if "opt" not in model_name:
-            pos = (position_ids.to(dev) if position_ids is not None
-                   else torch.arange(inps.shape[1], device=dev).unsqueeze(0).expand(inps.shape[0], -1))
+            pos = torch.arange(inps.shape[1], device=dev).unsqueeze(0).expand(inps.shape[0], -1)
             if hasattr(model.model, 'rotary_emb'):
                 _kw['position_embeddings'] = model.model.rotary_emb(inps, pos)
             else:
@@ -505,8 +503,7 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         if attention_masks is not None:
             _kw2['attention_mask'] = attention_masks
         if "opt" not in model_name:
-            pos2 = (position_ids.to(dev) if position_ids is not None
-                    else torch.arange(inps.shape[1], device=dev).unsqueeze(0).expand(inps.shape[0], -1))
+            pos2 = torch.arange(inps.shape[1], device=dev).unsqueeze(0).expand(inps.shape[0], -1)
             if hasattr(model.model, 'rotary_emb'):
                 _kw2['position_embeddings'] = model.model.rotary_emb(inps, pos2)
             else:
