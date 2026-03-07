@@ -2405,6 +2405,11 @@ def run_pipeline(args):
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Set accuracy CSV path based on model_id so BERT and ModernBERT don't collide
+    global ACCURACY_CSV_PATH
+    _model_slug = args.model_id.split("/")[-1].lower()
+    ACCURACY_CSV_PATH = f"experiments/results/expA_fine_tune_{_model_slug}.csv"
+
     # Results storage
     all_results = []
     checkpoint_path = None  # Initialize checkpoint path
