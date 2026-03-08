@@ -116,19 +116,7 @@ Wv_v = torch.randn(R, hidden, device=device, dtype=dtype)
 
 x = torch.randn(B, S, hidden, device=device, dtype=dtype)
 
-# ── Fallback path: use reference_packed_fp32 (equivalent to matmul+SDPA) ─────
-# reference_packed_fp32 IS the fp32 ground-truth for both kernel and SDPA.
-# We build PackedFactors from the same weights and use it as fallback reference.
-Pq_fb = F.linear(x, Wv_q).unsqueeze(2).expand(B, S, H, R)   # stride-0
-Pk_fb = F.linear(x, Wv_k).unsqueeze(2).expand(B, S, H, R)
-Pv_fb = F.linear(x, Wv_v).unsqueeze(2).expand(B, S, H, R)
-
-f3_ref = PackedFactors(Pq=Pq_fb, Pk=Pk_fb, Pv=Pv_fb, Vq=Vq_k, Vk=Vk_k, Vv=Vv_k)
-O_fallback = reference_packed_fp32(f3_ref, cos, sin, causal=True,
-                                   window_left=-1, window_right=-1)
-
-# ── Kernel path ───────────────────────────────────────────────────────────────
-# Vq = Wu_q.view(H, Dh, R).permute(0,2,1).contiguous()  — matches svd_llama.py
+# ── Build V factors and P tensors (shared by both fallback and kernel) ────────
 Vq_k = Wu_q.view(H, Dh, R).permute(0, 2, 1).contiguous()   # [H,R,Dh]
 Vk_k = Wu_k.view(H, Dh, R).permute(0, 2, 1).contiguous()
 Vv_k = Wu_v.view(H, Dh, R).permute(0, 2, 1).contiguous()
@@ -136,6 +124,11 @@ Vv_k = Wu_v.view(H, Dh, R).permute(0, 2, 1).contiguous()
 Pq_k = F.linear(x, Wv_q).unsqueeze(2).expand(B, S, H, R)   # stride-0 on H
 Pk_k = F.linear(x, Wv_k).unsqueeze(2).expand(B, S, H, R)
 Pv_k = F.linear(x, Wv_v).unsqueeze(2).expand(B, S, H, R)
+
+# ── Fallback: reference_packed_fp32 is the fp32 ground-truth ─────────────────
+f3_ref = PackedFactors(Pq=Pq_k, Pk=Pk_k, Pv=Pv_k, Vq=Vq_k, Vk=Vk_k, Vv=Vv_k)
+O_fallback = reference_packed_fp32(f3_ref, cos, sin, causal=True,
+                                   window_left=-1, window_right=-1)
 
 f3 = PackedFactors(Pq=Pq_k, Pk=Pk_k, Pv=Pv_k, Vq=Vq_k, Vk=Vk_k, Vv=Vv_k)
 O_kernel = flashsvd_attn_packed(f3, cos, sin, causal=True)   # [B,S,H,Dh]
