@@ -1,19 +1,15 @@
 {
   "schema": "svdllm_eval_v1",
   "script": "eval_general_ppl.py",
-  "timestamp": "2026-03-05T16:01:14",
-  "cmd": "/home/lz299/lowrankarena/eval_results/eval_general_ppl.py --dfsvd_model ./baselines/DF-SVD/huggyllama_llama7b_dfsvd_0.4 --dfsvd_base_model huggyllama/llama-7b --datasets wikitext2,ptb,c4 --device cuda --seqlen 2048 --batch_size 1 --dtype bfloat16 --metrics token --output_json outputs/dfsvd_ppl_llama.json",
+  "timestamp": "2026-03-05T09:35:46",
+  "cmd": "/home/lz299/lowrankarena/eval_results/eval_general_ppl.py --saes_model baselines/SEAS-SVD/robust/jeffwan_llama7b_saes_r0.4 --saes_base_model jeffwan/llama-7b-hf --datasets wikitext2,ptb,c4 --c4_stream --c4_docs 2000 --seqlen 2048 --batch_size 1 --device cuda --dtype bfloat16 --metrics token --output_json outputs/saes_ppl_jeffwan.json",
   "mode": "general_ppl",
   "args": {
     "checkpoint": null,
-    "saes_model": null,
-    "saes_base_model": null,
+    "saes_model": "baselines/SEAS-SVD/robust/jeffwan_llama7b_saes_r0.4",
+    "saes_base_model": "jeffwan/llama-7b-hf",
     "saes_revision": null,
     "saes_cache_dir": null,
-    "dfsvd_model": "./baselines/DF-SVD/huggyllama_llama7b_dfsvd_0.4",
-    "dfsvd_base_model": "huggyllama/llama-7b",
-    "dfsvd_revision": null,
-    "dfsvd_cache_dir": null,
     "dobi_model": null,
     "dobi_revision": null,
     "dobi_cache_dir": null,
@@ -33,31 +29,31 @@
     "ppl_method": "token",
     "lm_eval_add_bos_token": "auto",
     "lm_eval_prefix_token_id": null,
-    "c4_docs": null,
-    "c4_stream": false,
+    "c4_docs": 2000,
+    "c4_stream": true,
     "auto_c4_stream": false,
     "c4_dataset": null,
     "lm_eval_allow_c4_download": false,
-    "output_json": "outputs/dfsvd_ppl_llama.json",
+    "output_json": "outputs/saes_ppl_jeffwan.json",
     "output_dir": null,
     "run_name": null
   },
   "perf": {
     "overall": {
-      "wall_time_sec": 978.1518956078216,
-      "cpu_rss_start_bytes": 510484480,
-      "cpu_rss_end_bytes": 5338755072,
-      "cpu_rss_delta_bytes": 4828270592,
-      "cpu_maxrss_start_bytes": 510484480,
-      "cpu_maxrss_end_bytes": 40114298880,
-      "cpu_maxrss_delta_bytes": 39603814400,
+      "wall_time_sec": 307.34442162979394,
+      "cpu_rss_start_bytes": 510746624,
+      "cpu_rss_end_bytes": 1902944256,
+      "cpu_rss_delta_bytes": 1392197632,
+      "cpu_maxrss_start_bytes": 510746624,
+      "cpu_maxrss_end_bytes": 37001871360,
+      "cpu_maxrss_delta_bytes": 36491124736,
       "gpu_start": {
         "allocated_bytes": 0,
         "reserved_bytes": 0
       },
       "gpu_end": {
-        "allocated_bytes": 8907038208,
-        "reserved_bytes": 10202644480
+        "allocated_bytes": 5870436864,
+        "reserved_bytes": 6620708864
       }
     }
   },
@@ -83,12 +79,12 @@
         "metrics": {
           "token_ppl": {
             "label": "General PPL:token_ppl",
-            "wall_time_sec": 952.8251477181911,
-            "cpu_rss_start_bytes": 5234528256,
-            "cpu_rss_end_bytes": 5338755072,
-            "cpu_rss_delta_bytes": 104226816,
-            "cpu_maxrss_start_bytes": 40114298880,
-            "cpu_maxrss_end_bytes": 40114298880,
+            "wall_time_sec": 290.1663348618895,
+            "cpu_rss_start_bytes": 952303616,
+            "cpu_rss_end_bytes": 1902944256,
+            "cpu_rss_delta_bytes": 950640640,
+            "cpu_maxrss_start_bytes": 37001871360,
+            "cpu_maxrss_end_bytes": 37001871360,
             "cpu_maxrss_delta_bytes": 0,
             "gpu_device": {
               "index": 0,
@@ -96,27 +92,27 @@
               "total_memory_bytes": 84974239744
             },
             "gpu_start": {
-              "allocated_bytes": 8898518528,
-              "reserved_bytes": 9292480512
+              "allocated_bytes": 5861917184,
+              "reserved_bytes": 6058672128
             },
             "gpu_end": {
-              "allocated_bytes": 8907038208,
-              "reserved_bytes": 10202644480
+              "allocated_bytes": 5870436864,
+              "reserved_bytes": 6620708864
             },
             "gpu_peak": {
-              "max_allocated_bytes": 9390577152,
-              "max_reserved_bytes": 10202644480
+              "max_allocated_bytes": 6213661184,
+              "max_reserved_bytes": 6620708864
             }
           }
         },
         "to_device": {
           "label": "General PPL:to_device",
-          "wall_time_sec": 7.390354218892753,
-          "cpu_rss_start_bytes": 10304892928,
-          "cpu_rss_end_bytes": 5234528256,
-          "cpu_rss_delta_bytes": -5070364672,
-          "cpu_maxrss_start_bytes": 40114298880,
-          "cpu_maxrss_end_bytes": 40114298880,
+          "wall_time_sec": 3.0209684688597918,
+          "cpu_rss_start_bytes": 7187742720,
+          "cpu_rss_end_bytes": 952303616,
+          "cpu_rss_delta_bytes": -6235439104,
+          "cpu_maxrss_start_bytes": 37001871360,
+          "cpu_maxrss_end_bytes": 37001871360,
           "cpu_maxrss_delta_bytes": 0,
           "gpu_device": {
             "index": 0,
@@ -128,19 +124,19 @@
             "reserved_bytes": 0
           },
           "gpu_end": {
-            "allocated_bytes": 8898518528,
-            "reserved_bytes": 9292480512
+            "allocated_bytes": 5861917184,
+            "reserved_bytes": 6058672128
           },
           "gpu_peak": {
-            "max_allocated_bytes": 8898518528,
-            "max_reserved_bytes": 9292480512
+            "max_allocated_bytes": 5861917184,
+            "max_reserved_bytes": 6058672128
           }
         }
       },
       "token_ppl": {
-        "wikitext2": 25449.435120675156,
-        "ptb": 21571.695299278414,
-        "c4": 24948.42584195293
+        "wikitext2": 247093.37393278274,
+        "ptb": 231678.5798223509,
+        "c4": 272408.4023144196
       }
     }
   ]

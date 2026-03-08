@@ -8,11 +8,14 @@ import numpy as np
 import torch
 from datasets import load_dataset
 
-"""
-Docs:
-- https://huggingface.co/docs/datasets/loading
-- https://huggingface.co/docs/datasets/process
-- https://huggingface.co/blog/llama2#how-to-prompt-llama-2
+"""Tokenizer-safe data utils.
+
+This module is a drop-in replacement for the original ASVD `datautils.py`.
+It adds a small guard so that if a caller accidentally passes a boolean
+instead of a tokenizer object, we reload the tokenizer from `model_id`
+instead of crashing with:
+
+    TypeError: 'bool' object is not callable
 """
 
 # Added for PTB dataset of new version 4.4.0
@@ -22,6 +25,7 @@ PTB_FILES = {
     "validation": PTB_URL_BASE + "ptb.valid.txt",
     "test": PTB_URL_BASE + "ptb.test.txt",
 }
+
 
 # ----------------------------------------------------------------------
 # Tokenizer safety guard
@@ -38,15 +42,16 @@ def _resolve_hf_token() -> Optional[str]:
     return None
 
 
-
 def _ensure_tokenizer(tokenizer: Any, model_id: Optional[str] = None) -> Any:
     """Return a callable Hugging Face tokenizer.
 
     Some call sites accidentally pass a boolean (e.g., False) instead of a tokenizer.
     This guard prevents: TypeError: 'bool' object is not callable.
 
-    If `tokenizer` is invalid, we reload a tokenizer from `model_id`.
+    If `tokenizer` is invalid, we reload from `model_id`.
     """
+
+    # Happy path: already a callable tokenizer object.
     try:
         if tokenizer is not None and not isinstance(tokenizer, bool) and callable(tokenizer):
             # Ensure pad token exists for LLaMA-like tokenizers.
@@ -57,19 +62,20 @@ def _ensure_tokenizer(tokenizer: Any, model_id: Optional[str] = None) -> Any:
         pass
 
     model_key = str(model_id).strip() if model_id is not None else ""
+
+    # Cache to avoid repeatedly re-loading tokenizers.
     if model_key and model_key in _TOKENIZER_CACHE:
         cached = _TOKENIZER_CACHE.get(model_key)
-    # Guard against corrupted cache entries (e.g., bool False).
-    try:
-        if cached is not None and not isinstance(cached, bool) and callable(cached):
-            return cached
-    except Exception:
-        pass
-    # Drop invalid cache entry and rebuild.
-    try:
-        del _TOKENIZER_CACHE[model_key]
-    except Exception:
-        pass
+        try:
+            if cached is not None and not isinstance(cached, bool) and callable(cached):
+                return cached
+        except Exception:
+            pass
+        # Drop invalid cache entry and rebuild.
+        try:
+            del _TOKENIZER_CACHE[model_key]
+        except Exception:
+            pass
 
     if not model_key:
         raise TypeError(
@@ -114,6 +120,7 @@ def _ensure_tokenizer(tokenizer: Any, model_id: Optional[str] = None) -> Any:
             _TOKENIZER_CACHE[model_key] = tok
     except Exception:
         pass
+
     return tok
 
 
@@ -151,9 +158,11 @@ def sample_train_loaders(name, tokenizer, nsamples=128, seed=0, seqlen=2048, mod
     for _ in range(nsamples):
         i = random.randint(0, len(traindata) - seqlen * 2 - 1)
         j = i + seqlen * 2
-        # Extra safety: re-check callable (protects against accidental reassignment).
         if not callable(tokenizer):
             tokenizer = _ensure_tokenizer(tokenizer, model_id)
+        # just before trainenc = tokenizer(...)
+        print("before tokenize:", __file__, type(tokenizer), callable(tokenizer), repr(tokenizer))
+        assert not isinstance(tokenizer, bool), f"tokenizer turned bool: {tokenizer!r}"
         trainenc = tokenizer(traindata[i:j], return_tensors="pt")
         inp = trainenc.input_ids[:, :seqlen]
         trainloader.append(inp)
@@ -167,7 +176,7 @@ def get_redpajama_train(tokenizer, percent=10, seed=3, batch_size=128, max_lengt
         return tokenizer(example["text"], truncation=True, max_length=max_length)
 
     if percent != 100:
-        split = f"train[:{int(850000*percent/100)}]"
+        split = f"train[:{int(850000 * percent / 100)}]"
     else:
         split = "train"
     dataset = load_dataset("togethercomputer/RedPajama-Data-1T-Sample", split=split)
@@ -222,7 +231,7 @@ def get_calib_data(name, tokenizer, model_id, nsamples, seqlen=2048, seed=3, use
     set_seed(seed)
 
     print(f" get_ptq_calib_data {name}, nsamples={nsamples}, seqlen={seqlen}, {seed}")
-    cache_file = f"cache/{name}_{str(model_id).replace('/','_')}_{nsamples}_{seqlen}_{seed}_bos{use_bos}.pt"
+    cache_file = f"cache/{name}_{str(model_id).replace('/', '_')}_{nsamples}_{seqlen}_{seed}_bos{use_bos}.pt"
     print(f"cache_file={cache_file}")
 
     if not os.path.exists("cache"):

@@ -14,6 +14,181 @@ from typing import List, Optional
 import torch
 from tqdm import tqdm
 
+
+# ----------------------------------------------------------------------------
+# Perf recording helpers (time + CPU/GPU memory)
+# ----------------------------------------------------------------------------
+
+try:
+    import psutil  # type: ignore
+except Exception:
+    psutil = None
+
+
+def _get_cpu_rss_bytes() -> Optional[int]:
+    # Current process RSS in bytes if available (psutil), else None.
+    if psutil is not None:
+        try:
+            return int(psutil.Process(os.getpid()).memory_info().rss)
+        except Exception:
+            return None
+    return None
+
+
+def _get_cpu_maxrss_bytes() -> Optional[int]:
+    # Process max RSS in bytes (resource.ru_maxrss) if available.
+    try:
+        import resource  # Unix-only
+
+        v = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # Linux: KB; macOS: bytes.
+        if sys.platform == "darwin":
+            return int(v)
+        return int(v) * 1024
+    except Exception:
+        return None
+
+
+def _cuda_device_index(device: str) -> Optional[int]:
+    if not (str(device).startswith("cuda") and torch.cuda.is_available()):
+        return None
+    s = str(device)
+    if ":" in s:
+        try:
+            return int(s.split(":", 1)[1])
+        except Exception:
+            pass
+    try:
+        return int(torch.cuda.current_device())
+    except Exception:
+        return 0
+
+
+def _maybe_cuda_sync(device: str) -> None:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return
+    try:
+        torch.cuda.synchronize(idx)
+    except Exception:
+        torch.cuda.synchronize()
+
+
+def _reset_cuda_peaks(device: str) -> None:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return
+    try:
+        torch.cuda.reset_peak_memory_stats(idx)
+    except Exception:
+        torch.cuda.reset_peak_memory_stats()
+
+
+def _cuda_mem_snapshot(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        return {
+            "allocated_bytes": int(torch.cuda.memory_allocated(idx)),
+            "reserved_bytes": int(torch.cuda.memory_reserved(idx)),
+        }
+    except Exception:
+        return None
+
+
+def _cuda_peak_snapshot(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        return {
+            "max_allocated_bytes": int(torch.cuda.max_memory_allocated(idx)),
+            "max_reserved_bytes": int(torch.cuda.max_memory_reserved(idx)),
+        }
+    except Exception:
+        return None
+
+
+def _cuda_device_info(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        prop = torch.cuda.get_device_properties(idx)
+        return {
+            "index": int(idx),
+            "name": str(prop.name),
+            "total_memory_bytes": int(prop.total_memory),
+        }
+    except Exception:
+        try:
+            return {"index": int(idx), "name": str(torch.cuda.get_device_name(idx))}
+        except Exception:
+            return {"index": int(idx)}
+
+
+class PerfRecorder:
+    # Context manager to record wall time + CPU/GPU memory deltas for a code region.
+
+    def __init__(self, device: str, label: str = ""):
+        self.device = device
+        self.label = label
+
+    def __enter__(self):
+        _maybe_cuda_sync(self.device)
+        _reset_cuda_peaks(self.device)
+        self.t0 = time.perf_counter()
+        self.cpu_rss0 = _get_cpu_rss_bytes()
+        self.cpu_maxrss0 = _get_cpu_maxrss_bytes()
+        self.gpu0 = _cuda_mem_snapshot(self.device)
+        self.gpu_info = _cuda_device_info(self.device)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        _maybe_cuda_sync(self.device)
+        self.t1 = time.perf_counter()
+        self.cpu_rss1 = _get_cpu_rss_bytes()
+        self.cpu_maxrss1 = _get_cpu_maxrss_bytes()
+        self.gpu1 = _cuda_mem_snapshot(self.device)
+        self.gpu_peak = _cuda_peak_snapshot(self.device)
+
+    def to_dict(self) -> dict:
+        t0 = getattr(self, "t0", None)
+        t1 = getattr(self, "t1", None)
+        out = {
+            "label": self.label,
+            "wall_time_sec": float((t1 - t0) if (t0 is not None and t1 is not None) else 0.0),
+        }
+
+        # CPU
+        if getattr(self, "cpu_rss0", None) is not None:
+            out["cpu_rss_start_bytes"] = int(self.cpu_rss0)
+        if getattr(self, "cpu_rss1", None) is not None:
+            out["cpu_rss_end_bytes"] = int(self.cpu_rss1)
+        if getattr(self, "cpu_rss0", None) is not None and getattr(self, "cpu_rss1", None) is not None:
+            out["cpu_rss_delta_bytes"] = int(self.cpu_rss1 - self.cpu_rss0)
+
+        if getattr(self, "cpu_maxrss0", None) is not None:
+            out["cpu_maxrss_start_bytes"] = int(self.cpu_maxrss0)
+        if getattr(self, "cpu_maxrss1", None) is not None:
+            out["cpu_maxrss_end_bytes"] = int(self.cpu_maxrss1)
+        if getattr(self, "cpu_maxrss0", None) is not None and getattr(self, "cpu_maxrss1", None) is not None:
+            out["cpu_maxrss_delta_bytes"] = int(self.cpu_maxrss1 - self.cpu_maxrss0)
+
+        # GPU
+        if getattr(self, "gpu_info", None) is not None:
+            out["gpu_device"] = self.gpu_info
+        if getattr(self, "gpu0", None) is not None:
+            out["gpu_start"] = self.gpu0
+        if getattr(self, "gpu1", None) is not None:
+            out["gpu_end"] = self.gpu1
+        if getattr(self, "gpu_peak", None) is not None:
+            out["gpu_peak"] = self.gpu_peak
+
+        return out
+
+
 '''
 1) 默认：token‑level PPL（wikitext2/ptb/c4）
 CUDA_VISIBLE_DEVICES=3 python eval_general_ppl.py \
@@ -520,6 +695,15 @@ def main() -> None:
 
     args = p.parse_args()
 
+
+    # Perf (overall)
+    overall_t0 = time.perf_counter()
+    overall_cpu_rss0 = _get_cpu_rss_bytes()
+    overall_cpu_maxrss0 = _get_cpu_maxrss_bytes()
+    overall_gpu0 = _cuda_mem_snapshot(args.device)
+    perf = {"models": {}, "runs": {}}
+
+
     all_runs = {}
     models_info = []
 
@@ -545,8 +729,14 @@ def main() -> None:
 
 
     def _run_one(model, tokenizer, label: str, datasets_override: Optional[List[str]] = None):
+        perf["runs"].setdefault(label, {"phases": {}})
+
+        _perf_to = PerfRecorder(args.device, label=f"{label}:to_device")
+        _perf_to.__enter__()
         model = _to_device(model, args.device, args.dtype)
         model.eval()
+        _perf_to.__exit__(None, None, None)
+        perf["runs"][label]["phases"]["to_device"] = _perf_to.to_dict()
 
         if args.c4_docs is not None:
             os.environ["SVDLLM_C4_VAL_DOCS"] = str(int(args.c4_docs))
@@ -575,6 +765,8 @@ def main() -> None:
         }
 
         if "token" in metrics:
+            _perf_tok = PerfRecorder(args.device, label=f"{label}:token_ppl")
+            _perf_tok.__enter__()
             if args.ppl_method == "legacy":
                 run_out["token_ppl"] = _legacy_ppl_eval(
                     model,
@@ -599,6 +791,9 @@ def main() -> None:
                     label=label,
                     max_batches=args.max_batches,
                 )
+            _perf_tok.__exit__(None, None, None)
+            perf["runs"][label]["phases"]["token_ppl"] = _perf_tok.to_dict()
+
 
         if any(m in metrics for m in ("word", "byte", "bpb")):
             # Use lm-eval harness to compute word/byte/bpb for the same datasets.
@@ -654,6 +849,8 @@ def main() -> None:
                 run_out["lm_eval_tasks"] = []
                 return run_out
 
+            _perf_lme = PerfRecorder(args.device, label=f"{label}:lm_eval")
+            _perf_lme.__enter__()
             res = evaluator.simple_evaluate(
                 model=lm,
                 tasks=lm_eval_datasets,
@@ -663,6 +860,9 @@ def main() -> None:
                 device=args.device,
                 limit=args.max_batches,
             )
+            _perf_lme.__exit__(None, None, None)
+            perf["runs"][label]["phases"]["lm_eval"] = _perf_lme.to_dict()
+
             if res is None:
                 raise RuntimeError("LM Evaluation Harness returned no results (not rank 0).")
             print("\nLM-Eval metrics (word/byte/bpb):")
@@ -690,11 +890,19 @@ def main() -> None:
 
         print("[Compare] Evaluating our checkpoint...")
         models_info.append({"name": "ours", "source": args.checkpoint})
+        perf["models"].setdefault("ours", {"phases": {}})
+        _perf_load = PerfRecorder(args.device, label="ours:load_model")
+        _perf_load.__enter__()
         model, tokenizer = _load_ours(args.checkpoint)
+        _perf_load.__exit__(None, None, None)
+        perf["models"]["ours"]["phases"]["load_model"] = _perf_load.to_dict()
         _run_with_sets(model, tokenizer, label_prefix=f"{args.label} (ours)")
 
         print("[Compare] Evaluating Dobi checkpoint...")
         remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
+        perf["models"].setdefault("dobi", {"phases": {}})
+        _perf_load = PerfRecorder(args.device, label="dobi:load_model")
+        _perf_load.__enter__()
         model, tokenizer, local_path = _load_dobi_model(
             args.dobi_model,
             hf_token=args.hf_token,
@@ -702,6 +910,8 @@ def main() -> None:
             cache_dir=args.dobi_cache_dir,
             remapping=remap_flag,
         )
+        _perf_load.__exit__(None, None, None)
+        perf["models"]["dobi"]["phases"]["load_model"] = _perf_load.to_dict()
         models_info.append({
             "name": "dobi",
             "source": args.dobi_model,
@@ -714,6 +924,9 @@ def main() -> None:
 
     elif args.dobi_model:
         remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
+        perf["models"].setdefault("dobi", {"phases": {}})
+        _perf_load = PerfRecorder(args.device, label="dobi:load_model")
+        _perf_load.__enter__()
         model, tokenizer, local_path = _load_dobi_model(
             args.dobi_model,
             hf_token=args.hf_token,
@@ -721,6 +934,8 @@ def main() -> None:
             cache_dir=args.dobi_cache_dir,
             remapping=remap_flag,
         )
+        _perf_load.__exit__(None, None, None)
+        perf["models"]["dobi"]["phases"]["load_model"] = _perf_load.to_dict()
         models_info.append({
             "name": "dobi",
             "source": args.dobi_model,
@@ -733,13 +948,37 @@ def main() -> None:
 
     else:
         models_info.append({"name": "ours", "source": args.checkpoint})
+        perf["models"].setdefault("ours", {"phases": {}})
+        _perf_load = PerfRecorder(args.device, label="ours:load_model")
+        _perf_load.__enter__()
         model, tokenizer = _load_ours(args.checkpoint)
+        _perf_load.__exit__(None, None, None)
+        perf["models"]["ours"]["phases"]["load_model"] = _perf_load.to_dict()
         _run_with_sets(model, tokenizer, label_prefix=args.label)
 
     # ------------------------------------------------------------------
     # Save JSON (optional)
     # ------------------------------------------------------------------
+    
     out_json = _auto_output_json(args, "ppl")
+
+    overall_t1 = time.perf_counter()
+    overall_cpu_rss1 = _get_cpu_rss_bytes()
+    overall_cpu_maxrss1 = _get_cpu_maxrss_bytes()
+    overall_gpu1 = _cuda_mem_snapshot(args.device)
+
+    perf["overall"] = {
+        "wall_time_sec": float(overall_t1 - overall_t0),
+        "cpu_rss_start_bytes": int(overall_cpu_rss0) if overall_cpu_rss0 is not None else None,
+        "cpu_rss_end_bytes": int(overall_cpu_rss1) if overall_cpu_rss1 is not None else None,
+        "cpu_rss_delta_bytes": int(overall_cpu_rss1 - overall_cpu_rss0) if (overall_cpu_rss0 is not None and overall_cpu_rss1 is not None) else None,
+        "cpu_maxrss_start_bytes": int(overall_cpu_maxrss0) if overall_cpu_maxrss0 is not None else None,
+        "cpu_maxrss_end_bytes": int(overall_cpu_maxrss1) if overall_cpu_maxrss1 is not None else None,
+        "cpu_maxrss_delta_bytes": int(overall_cpu_maxrss1 - overall_cpu_maxrss0) if (overall_cpu_maxrss0 is not None and overall_cpu_maxrss1 is not None) else None,
+        "gpu_start": overall_gpu0,
+        "gpu_end": overall_gpu1,
+    }
+
     payload = {
         "schema": "svdllm_eval_v1",
         "script": os.path.basename(__file__),
@@ -747,6 +986,7 @@ def main() -> None:
         "cmd": " ".join(sys.argv),
         "mode": "ppl",
         "args": vars(args),
+        "perf": perf,
         "models": models_info,
         "results": all_runs,
     }

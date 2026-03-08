@@ -411,7 +411,7 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
     calib_seqlen = int(calib_loader[0]["input_ids"].shape[-1])
     model.seqlen = calib_seqlen
     inps = torch.zeros(
-        (len(calib_loader), calib.seqlen, model.config.hidden_size),
+        (len(calib_loader), calib_seqlen, model.config.hidden_size),
         dtype=dtype,
         device=buf_device,
         pin_memory=pin,

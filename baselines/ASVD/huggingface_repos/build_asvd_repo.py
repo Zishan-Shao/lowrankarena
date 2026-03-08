@@ -158,7 +158,7 @@ def _ensure_tokenizer(tok: Any, model_id: str, *, hf_token: Optional[str] = None
     except Exception:
         pass
 
-    kwargs: Dict[str, Any] = {"trust_remote_code": True, "use_fast": True}
+    kwargs: Dict[str, Any] = {"trust_remote_code": True, "use_fast": False}
     if hf_token:
         # Transformers has used both 'token' and 'use_auth_token' across versions.
         kwargs["token"] = hf_token
@@ -242,6 +242,9 @@ def _call_get_calib_data(
         pass
 
     # Try keyword-rich call first (most explicit / least error-prone).
+    # first lines of get_calib_data()
+    print("calib entry:", __file__, type(tokenizer), callable(tokenizer), repr(tokenizer))
+    assert not isinstance(tokenizer, bool), f"bad tokenizer at entry: {tokenizer!r}"
     try:
         return get_calib_data(
             dataset,
@@ -323,7 +326,7 @@ def main(args):
             tok = AutoTokenizer.from_pretrained(
                 model_id,
                 trust_remote_code=True,
-                use_fast=True,
+                use_fast=False,
                 token=args.hf_token,
             )
             return _ensure_tokenizer(tok, model_id, hf_token=args.hf_token)
@@ -336,13 +339,15 @@ def main(args):
                 tok = AutoTokenizer.from_pretrained(
                     model_id,
                     trust_remote_code=True,
-                    use_fast=True,
+                    use_fast=False,
                     use_auth_token=args.hf_token,
                 )
                 return _ensure_tokenizer(tok, model_id, hf_token=args.hf_token)
 
             tokenizer = _run_stage(timing, "load_tokenizer", _load_tok_compat)
-
+        # after tokenizer load in build_asvd_repo.py
+        print("build tokenizer:", __file__, type(tokenizer), callable(tokenizer), repr(tokenizer))
+        assert not isinstance(tokenizer, bool), f"bad tokenizer in build: {tokenizer!r}"
         # Load model
         def _load_model():
             try:

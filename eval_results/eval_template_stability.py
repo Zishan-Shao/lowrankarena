@@ -16,9 +16,11 @@ except Exception:
 from tqdm import tqdm
 
 # Ensure repo root on PYTHONPATH
+# Ensure repo root is on PYTHONPATH
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-if _THIS_DIR not in sys.path:
-    sys.path.insert(0, _THIS_DIR)
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 from utils.model_utils import get_model_from_huggingface, get_model_from_local
 

@@ -10,6 +10,177 @@ import re
 import inspect
 
 
+import time
+
+try:
+    import psutil  # type: ignore
+except Exception:
+    psutil = None
+
+
+def _get_cpu_rss_bytes() -> Optional[int]:
+    """Return current process RSS in bytes if available (psutil), else None."""
+    if psutil is not None:
+        try:
+            return int(psutil.Process(os.getpid()).memory_info().rss)
+        except Exception:
+            return None
+    return None
+
+
+def _get_cpu_maxrss_bytes() -> Optional[int]:
+    """Return process max RSS in bytes (resource.ru_maxrss) if available."""
+    try:
+        import resource  # Unix-only
+
+        v = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # Linux: KB; macOS: bytes.
+        if sys.platform == "darwin":
+            return int(v)
+        return int(v) * 1024
+    except Exception:
+        return None
+
+
+def _cuda_device_index(device: str) -> Optional[int]:
+    if not (str(device).startswith("cuda") and torch.cuda.is_available()):
+        return None
+    s = str(device)
+    if ":" in s:
+        try:
+            return int(s.split(":", 1)[1])
+        except Exception:
+            pass
+    try:
+        return int(torch.cuda.current_device())
+    except Exception:
+        return 0
+
+
+def _maybe_cuda_sync(device: str) -> None:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return
+    try:
+        torch.cuda.synchronize(idx)
+    except Exception:
+        torch.cuda.synchronize()
+
+
+def _reset_cuda_peaks(device: str) -> None:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return
+    try:
+        torch.cuda.reset_peak_memory_stats(idx)
+    except Exception:
+        torch.cuda.reset_peak_memory_stats()
+
+
+def _cuda_mem_snapshot(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        return {
+            "allocated_bytes": int(torch.cuda.memory_allocated(idx)),
+            "reserved_bytes": int(torch.cuda.memory_reserved(idx)),
+        }
+    except Exception:
+        return None
+
+
+def _cuda_peak_snapshot(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        return {
+            "max_allocated_bytes": int(torch.cuda.max_memory_allocated(idx)),
+            "max_reserved_bytes": int(torch.cuda.max_memory_reserved(idx)),
+        }
+    except Exception:
+        return None
+
+
+def _cuda_device_info(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        prop = torch.cuda.get_device_properties(idx)
+        return {
+            "index": int(idx),
+            "name": str(prop.name),
+            "total_memory_bytes": int(prop.total_memory),
+        }
+    except Exception:
+        try:
+            return {"index": int(idx), "name": str(torch.cuda.get_device_name(idx))}
+        except Exception:
+            return {"index": int(idx)}
+
+
+class PerfRecorder:
+    """Context manager to record wall time + CPU/GPU memory deltas for a code region."""
+
+    def __init__(self, device: str, label: str = ""):
+        self.device = device
+        self.label = label
+
+    def __enter__(self):
+        _maybe_cuda_sync(self.device)
+        _reset_cuda_peaks(self.device)
+        self.t0 = time.perf_counter()
+        self.cpu_rss0 = _get_cpu_rss_bytes()
+        self.cpu_maxrss0 = _get_cpu_maxrss_bytes()
+        self.gpu0 = _cuda_mem_snapshot(self.device)
+        self.gpu_info = _cuda_device_info(self.device)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        _maybe_cuda_sync(self.device)
+        self.t1 = time.perf_counter()
+        self.cpu_rss1 = _get_cpu_rss_bytes()
+        self.cpu_maxrss1 = _get_cpu_maxrss_bytes()
+        self.gpu1 = _cuda_mem_snapshot(self.device)
+        self.gpu_peak = _cuda_peak_snapshot(self.device)
+
+    def to_dict(self) -> dict:
+        t0 = getattr(self, "t0", None)
+        t1 = getattr(self, "t1", None)
+        out = {
+            "label": self.label,
+            "wall_time_sec": float((t1 - t0) if (t0 is not None and t1 is not None) else 0.0),
+        }
+
+        # CPU
+        if getattr(self, "cpu_rss0", None) is not None:
+            out["cpu_rss_start_bytes"] = int(self.cpu_rss0)
+        if getattr(self, "cpu_rss1", None) is not None:
+            out["cpu_rss_end_bytes"] = int(self.cpu_rss1)
+        if getattr(self, "cpu_rss0", None) is not None and getattr(self, "cpu_rss1", None) is not None:
+            out["cpu_rss_delta_bytes"] = int(self.cpu_rss1 - self.cpu_rss0)
+
+        if getattr(self, "cpu_maxrss0", None) is not None:
+            out["cpu_maxrss_start_bytes"] = int(self.cpu_maxrss0)
+        if getattr(self, "cpu_maxrss1", None) is not None:
+            out["cpu_maxrss_end_bytes"] = int(self.cpu_maxrss1)
+        if getattr(self, "cpu_maxrss0", None) is not None and getattr(self, "cpu_maxrss1", None) is not None:
+            out["cpu_maxrss_delta_bytes"] = int(self.cpu_maxrss1 - self.cpu_maxrss0)
+
+        # GPU
+        if getattr(self, "gpu_info", None) is not None:
+            out["gpu_device"] = self.gpu_info
+        if getattr(self, "gpu0", None) is not None:
+            out["gpu_start"] = self.gpu0
+        if getattr(self, "gpu1", None) is not None:
+            out["gpu_end"] = self.gpu1
+        if getattr(self, "gpu_peak", None) is not None:
+            out["gpu_peak"] = self.gpu_peak
+
+        return out
+
 # Ensure repo root is on PYTHONPATH
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
@@ -372,21 +543,6 @@ def main() -> None:
     p.add_argument("--saes_cache_dir", type=str, default=None)
 
     p.add_argument(
-        "--dfsvd_model",
-        type=str,
-        default=None,
-        help="DF-SVD checkpoint (local dir or HF repo id).",
-    )
-    p.add_argument(
-        "--dfsvd_base_model",
-        type=str,
-        default=None,
-        help="Base HF model id/path to apply DF-SVD onto (required when using DF-SVD).",
-    )
-    p.add_argument("--dfsvd_revision", type=str, default=None)
-    p.add_argument("--dfsvd_cache_dir", type=str, default=None)
-
-    p.add_argument(
         "--dobi_model",
         type=str,
         default=None,
@@ -468,87 +624,98 @@ def main() -> None:
     if args.json_keep_samples:
         args.log_samples = True
 
-    if args.dobi_model:
-        if args.dobi_remapping and args.dobi_unremapping:
-            raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
-    else:
-        if not args.model and not args.checkpoint and not args.saes_model and not args.dfsvd_model:
-            raise ValueError("Please provide --model, --checkpoint, --saes_model, --dfsvd_model or --dobi_model.")
-        if args.checkpoint and not os.path.exists(args.checkpoint):
-            raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
 
-    if args.device.startswith("cuda") and not torch.cuda.is_available():
-        raise RuntimeError("CUDA requested but not available.")
+    overall_t0 = time.perf_counter()
+    overall_cpu_rss0 = _get_cpu_rss_bytes()
+    overall_cpu_maxrss0 = _get_cpu_maxrss_bytes()
+    overall_gpu0 = _cuda_mem_snapshot(args.device)
 
-    if args.dobi_model:
-        remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
-        model, tokenizer, _ = _load_dobi_model(
-            args.dobi_model,
-            hf_token=args.hf_token,
-            revision=args.dobi_revision,
-            cache_dir=args.dobi_cache_dir,
-            remapping=remap_flag,
-        )
-        model_name = args.dobi_model
-    else:
-        if args.dfsvd_model:
-            if not args.dfsvd_base_model:
-                raise ValueError("--dfsvd_model requires --dfsvd_base_model.")
-            model, tokenizer, _ = load_dfsvd_model(
-                args.dfsvd_model,
-                base_model=args.dfsvd_base_model,
+
+    perf = {"phases": {"task_sets": {}}}
+    with PerfRecorder(args.device, label="model_load_and_to_device") as _perf_load:
+        if args.dobi_model:
+            if args.dobi_remapping and args.dobi_unremapping:
+                raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
+        else:
+            if not args.model and not args.checkpoint and not args.saes_model and not args.dfsvd_model:
+                raise ValueError("Please provide --model, --checkpoint, --saes_model, --dfsvd_model or --dobi_model.")
+            if args.checkpoint and not os.path.exists(args.checkpoint):
+                raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
+
+        if args.device.startswith("cuda") and not torch.cuda.is_available():
+            raise RuntimeError("CUDA requested but not available.")
+
+        if args.dobi_model:
+            remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
+            model, tokenizer, _ = _load_dobi_model(
+                args.dobi_model,
                 hf_token=args.hf_token,
-                revision=args.dfsvd_revision,
-                cache_dir=args.dfsvd_cache_dir,
+                revision=args.dobi_revision,
+                cache_dir=args.dobi_cache_dir,
+                remapping=remap_flag,
             )
-            model_name = args.dfsvd_model
-        elif args.saes_model:
-            if not args.saes_base_model:
-                raise ValueError("--saes_model requires --saes_base_model.")
-            model, tokenizer, _ = load_saes_svd_model(
-                args.saes_model,
-                base_model=args.saes_base_model,
-                hf_token=args.hf_token,
-                revision=args.saes_revision,
-                cache_dir=args.saes_cache_dir,
-            )
-            model_name = args.saes_model
-        elif args.model:
-            # Allow --model to be a local SAES-SVD directory too (auto-detect)
-            if os.path.isdir(args.model) and looks_like_saes_svd_checkpoint(args.model):
-                if not args.saes_base_model:
-                    raise ValueError("SAES-SVD checkpoint detected but --saes_base_model is missing.")
-                model, tokenizer, _ = load_saes_svd_model(
-                    args.model,
-                    base_model=args.saes_base_model,
-                    hf_token=args.hf_token,
-                    revision=args.saes_revision,
-                    cache_dir=args.saes_cache_dir,
-                )
-            # Allow --model to be a local DF-SVD directory too (auto-detect)
-            elif os.path.isdir(args.model) and looks_like_dfsvd_checkpoint(args.model):
+            model_name = args.dobi_model
+        else:
+            if args.dfsvd_model:
                 if not args.dfsvd_base_model:
-                    raise ValueError("DF-SVD checkpoint detected but --dfsvd_base_model is missing.")
+                    raise ValueError("--dfsvd_model requires --dfsvd_base_model.")
                 model, tokenizer, _ = load_dfsvd_model(
-                    args.model,
+                    args.dfsvd_model,
                     base_model=args.dfsvd_base_model,
                     hf_token=args.hf_token,
                     revision=args.dfsvd_revision,
                     cache_dir=args.dfsvd_cache_dir,
                 )
+                model_name = args.dfsvd_model
+            elif args.saes_model:
+                if not args.saes_base_model:
+                    raise ValueError("--saes_model requires --saes_base_model.")
+                model, tokenizer, _ = load_saes_svd_model(
+                    args.saes_model,
+                    base_model=args.saes_base_model,
+                    hf_token=args.hf_token,
+                    revision=args.saes_revision,
+                    cache_dir=args.saes_cache_dir,
+                )
+                model_name = args.saes_model
+            elif args.model:
+                # Allow --model to be a local SAES-SVD directory too (auto-detect)
+                if os.path.isdir(args.model) and looks_like_saes_svd_checkpoint(args.model):
+                    if not args.saes_base_model:
+                        raise ValueError("SAES-SVD checkpoint detected but --saes_base_model is missing.")
+                    model, tokenizer, _ = load_saes_svd_model(
+                        args.model,
+                        base_model=args.saes_base_model,
+                        hf_token=args.hf_token,
+                        revision=args.saes_revision,
+                        cache_dir=args.saes_cache_dir,
+                    )
+                # Allow --model to be a local DF-SVD directory too (auto-detect)
+                elif os.path.isdir(args.model) and looks_like_dfsvd_checkpoint(args.model):
+                    if not args.dfsvd_base_model:
+                        raise ValueError("DF-SVD checkpoint detected but --dfsvd_base_model is missing.")
+                    model, tokenizer, _ = load_dfsvd_model(
+                        args.model,
+                        base_model=args.dfsvd_base_model,
+                        hf_token=args.hf_token,
+                        revision=args.dfsvd_revision,
+                        cache_dir=args.dfsvd_cache_dir,
+                    )
+                else:
+                    model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
+                model_name = args.model
             else:
-                model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
-            model_name = args.model
-        else:
-            model, tokenizer = get_model_from_local(args.checkpoint)
-            model_name = args.checkpoint
+                model, tokenizer = get_model_from_local(args.checkpoint)
+                model_name = args.checkpoint
 
-    model = _to_device(model, args.device, args.dtype)
-    model.eval()
-    try:
-        model.config.use_cache = False
-    except Exception:
-        pass
+        model = _to_device(model, args.device, args.dtype)
+        model.eval()
+        try:
+            model.config.use_cache = False
+        except Exception:
+            pass
+
+    perf["phases"]["model_load"] = _perf_load.to_dict()
 
     try:
         from lm_eval import evaluator
@@ -593,17 +760,19 @@ def main() -> None:
             print(f"[LM-Eval] No valid tasks for set '{set_name}', skipping.")
             continue
 
-        res, used = _safe_simple_evaluate(
-            evaluator=evaluator,
-            model=lm,
-            tasks=set_tasks,
-            num_fewshot=args.num_fewshot,
-            batch_size=args.batch_size,
-            max_batch_size=64,
-            device=args.device,
-            limit=args.limit,
-            log_samples=args.log_samples,
-        )
+        with PerfRecorder(args.device, label=f"lm_eval[{set_name}]") as _perf_set:
+            res, used = _safe_simple_evaluate(
+                evaluator=evaluator,
+                model=lm,
+                tasks=set_tasks,
+                num_fewshot=args.num_fewshot,
+                batch_size=args.batch_size,
+                max_batch_size=64,
+                device=args.device,
+                limit=args.limit,
+                log_samples=args.log_samples,
+            )
+        perf["phases"]["task_sets"][set_name] = _perf_set.to_dict()
         if not res or not res.get("results"):
             print(f"[LM-Eval] No results for set '{set_name}' after filtering; skipping.")
             continue
@@ -627,6 +796,23 @@ def main() -> None:
     if args_dict.get("hf_token"):
         args_dict["hf_token"] = "<REDACTED>"
 
+
+    overall_t1 = time.perf_counter()
+    overall_cpu_rss1 = _get_cpu_rss_bytes()
+    overall_cpu_maxrss1 = _get_cpu_maxrss_bytes()
+    overall_gpu1 = _cuda_mem_snapshot(args.device)
+
+    perf["overall"] = {
+        "wall_time_sec": float(overall_t1 - overall_t0),
+        "cpu_rss_start_bytes": int(overall_cpu_rss0) if overall_cpu_rss0 is not None else None,
+        "cpu_rss_end_bytes": int(overall_cpu_rss1) if overall_cpu_rss1 is not None else None,
+        "cpu_rss_delta_bytes": (int(overall_cpu_rss1 - overall_cpu_rss0) if (overall_cpu_rss0 is not None and overall_cpu_rss1 is not None) else None),
+        "cpu_maxrss_start_bytes": int(overall_cpu_maxrss0) if overall_cpu_maxrss0 is not None else None,
+        "cpu_maxrss_end_bytes": int(overall_cpu_maxrss1) if overall_cpu_maxrss1 is not None else None,
+        "cpu_maxrss_delta_bytes": (int(overall_cpu_maxrss1 - overall_cpu_maxrss0) if (overall_cpu_maxrss0 is not None and overall_cpu_maxrss1 is not None) else None),
+        "gpu_start": overall_gpu0,
+        "gpu_end": overall_gpu1,
+    }
     payload = {
         "schema": "svdllm_eval_v1",
         "script": os.path.basename(__file__),
@@ -634,6 +820,7 @@ def main() -> None:
         "cmd": " ".join(sys.argv),
         "mode": "lm_eval",
         "args": args_dict,
+        "perf": perf,
         "model": model_name,
         "tasks_used": tasks_used,
         "results": all_results,

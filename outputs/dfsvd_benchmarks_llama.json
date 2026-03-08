@@ -1,27 +1,18 @@
 {
   "schema": "svdllm_eval_v1",
   "script": "eval_benchmarks.py",
-  "timestamp": "2026-02-26T04:58:22",
-  "cmd": "/home/lz299/lowrankarena/eval_results/eval_benchmarks.py --model ./baselines/DF-SVD/llama7b_dfsvd_0.4 --dfsvd_base_model huggyllama/llama-7b --device cuda --batch_size 8 --dtype bfloat16 --use_lm_eval --lm_eval_tasks arc_easy,arc_challenge,hellaswag,piqa,winogrande,openbookqa --output_json outputs/dfsvd_benchmarks_llama.json",
+  "timestamp": "2026-03-05T15:44:53",
+  "cmd": "/home/lz299/lowrankarena/eval_results/eval_benchmarks.py --model ./baselines/DF-SVD/huggyllama_llama7b_dfsvd_0.4 --dfsvd_base_model huggyllama/llama-7b --device cuda --batch_size 1 --dtype bfloat16 --use_lm_eval --lm_eval_tasks arc_easy,arc_challenge,hellaswag,piqa,winogrande,openbookqa --output_json outputs/dfsvd_benchmarks_llama.json",
   "mode": "lm_eval",
   "args": {
-    "model": "./baselines/DF-SVD/llama7b_dfsvd_0.4",
+    "model": "./baselines/DF-SVD/huggyllama_llama7b_dfsvd_0.4",
     "device": "cuda",
     "hf_token": null,
     "saes_svd": false,
     "saes_base_model": null,
     "saes_revision": null,
     "saes_cache_dir": null,
-    "dfsvd_svd": false,
-    "dfsvd_base_model": "huggyllama/llama-7b",
-    "dfsvd_revision": null,
-    "dfsvd_cache_dir": null,
-    "dobi_svd": false,
-    "dobi_remapping": false,
-    "dobi_unremapping": false,
-    "dobi_revision": null,
-    "dobi_cache_dir": null,
-    "batch_size": 8,
+    "batch_size": 1,
     "limit": null,
     "dtype": "bfloat16",
     "gsm8k_max_new_tokens": 64,
@@ -44,49 +35,129 @@
     "fix_pad_query_mask": false,
     "output_json": "outputs/dfsvd_benchmarks_llama.json",
     "output_dir": null,
-    "run_name": null
+    "run_name": null,
+    "dfsvd_svd": false,
+    "dfsvd_base_model": "huggyllama/llama-7b",
+    "dfsvd_revision": null,
+    "dfsvd_cache_dir": null
   },
-  "model": "./baselines/DF-SVD/llama7b_dfsvd_0.4",
+  "perf": {
+    "phases": {
+      "load_model": {
+        "label": "load_model",
+        "wall_time_sec": 32.99051479995251,
+        "cpu_rss_start_bytes": 749056000,
+        "cpu_rss_end_bytes": 5251776512,
+        "cpu_rss_delta_bytes": 4502720512,
+        "cpu_maxrss_start_bytes": 749056000,
+        "cpu_maxrss_end_bytes": 40250388480,
+        "cpu_maxrss_delta_bytes": 39501332480,
+        "gpu_device": {
+          "index": 0,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_bytes": 84974239744
+        },
+        "gpu_start": {
+          "allocated_bytes": 0,
+          "reserved_bytes": 0
+        },
+        "gpu_end": {
+          "allocated_bytes": 8898518528,
+          "reserved_bytes": 9292480512
+        },
+        "gpu_peak": {
+          "max_allocated_bytes": 8898518528,
+          "max_reserved_bytes": 9292480512
+        }
+      },
+      "lm_eval": {
+        "label": "lm_eval",
+        "wall_time_sec": 7578.2558344285935,
+        "cpu_rss_start_bytes": 5251776512,
+        "cpu_rss_end_bytes": 5309014016,
+        "cpu_rss_delta_bytes": 57237504,
+        "cpu_maxrss_start_bytes": 40250388480,
+        "cpu_maxrss_end_bytes": 40250388480,
+        "cpu_maxrss_delta_bytes": 0,
+        "gpu_device": {
+          "index": 0,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_bytes": 84974239744
+        },
+        "gpu_start": {
+          "allocated_bytes": 8898518528,
+          "reserved_bytes": 9292480512
+        },
+        "gpu_end": {
+          "allocated_bytes": 8907038208,
+          "reserved_bytes": 9680453632
+        },
+        "gpu_peak": {
+          "max_allocated_bytes": 9035335168,
+          "max_reserved_bytes": 9680453632
+        }
+      }
+    },
+    "tasks": {},
+    "overall": {
+      "wall_time_sec": 7611.938725819811,
+      "cpu_rss_start_bytes": 617943040,
+      "cpu_rss_end_bytes": 5309014016,
+      "cpu_rss_delta_bytes": 4691070976,
+      "cpu_maxrss_start_bytes": 617943040,
+      "cpu_maxrss_end_bytes": 40250388480,
+      "cpu_maxrss_delta_bytes": 39632445440,
+      "gpu_start": {
+        "allocated_bytes": 0,
+        "reserved_bytes": 0
+      },
+      "gpu_end": {
+        "allocated_bytes": 8907038208,
+        "reserved_bytes": 9680453632
+      }
+    }
+  },
+  "model": "./baselines/DF-SVD/huggyllama_llama7b_dfsvd_0.4",
   "results": {
     "arc_challenge": {
       "alias": "arc_challenge",
       "acc,none": 0.2354948805460751,
-      "acc_stderr,none": 0.012399451855004746,
-      "acc_norm,none": 0.2832764505119454,
-      "acc_norm_stderr,none": 0.013167478735134576
+      "acc_stderr,none": 0.012399451855004743,
+      "acc_norm,none": 0.28498293515358364,
+      "acc_norm_stderr,none": 0.013191348179838792
     },
     "arc_easy": {
       "alias": "arc_easy",
-      "acc,none": 0.2537878787878788,
-      "acc_stderr,none": 0.008929657065808286,
-      "acc_norm,none": 0.26641414141414144,
-      "acc_norm_stderr,none": 0.009071357971078681
+      "acc,none": 0.25336700336700335,
+      "acc_stderr,none": 0.008924765424529265,
+      "acc_norm,none": 0.26557239057239057,
+      "acc_norm_stderr,none": 0.009062210626971845
     },
     "hellaswag": {
       "alias": "hellaswag",
-      "acc,none": 0.2562238597888867,
-      "acc_stderr,none": 0.004356547185847049,
-      "acc_norm,none": 0.26030671181039633,
-      "acc_norm_stderr,none": 0.004379051357024133
+      "acc,none": 0.2566221868153754,
+      "acc_stderr,none": 0.00435876459640106,
+      "acc_norm,none": 0.2614021111332404,
+      "acc_norm_stderr,none": 0.004385004998923451
     },
     "openbookqa": {
       "alias": "openbookqa",
-      "acc,none": 0.142,
-      "acc_stderr,none": 0.015625630247810298,
-      "acc_norm,none": 0.258,
-      "acc_norm_stderr,none": 0.01958671178521584
+      "acc,none": 0.144,
+      "acc_stderr,none": 0.015716934945725767,
+      "acc_norm,none": 0.254,
+      "acc_norm_stderr,none": 0.019486596801643375
     },
     "piqa": {
       "alias": "piqa",
-      "acc,none": 0.5272034820457019,
-      "acc_stderr,none": 0.01164854526242902,
-      "acc_norm,none": 0.49510337323177367,
-      "acc_norm_stderr,none": 0.011665264730078137
+      "acc,none": 0.5244831338411317,
+      "acc_stderr,none": 0.011651830225709977,
+      "acc_norm,none": 0.49347116430903154,
+      "acc_norm_stderr,none": 0.01166482959521097
     },
     "winogrande": {
       "alias": "winogrande",
-      "acc,none": 0.4925019731649566,
-      "acc_stderr,none": 0.01405090552122858
+      "acc,none": 0.4996053670086819,
+      "acc_stderr,none": 0.014052481306049516
     }
   }
 }

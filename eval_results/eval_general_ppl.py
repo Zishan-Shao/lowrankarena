@@ -13,6 +13,178 @@ from typing import List, Optional
 import torch
 from tqdm import tqdm
 
+import time
+
+try:
+    import psutil  # type: ignore
+except Exception:
+    psutil = None
+
+
+def _get_cpu_rss_bytes() -> Optional[int]:
+    """Return current process RSS in bytes if available (psutil), else None."""
+    if psutil is not None:
+        try:
+            return int(psutil.Process(os.getpid()).memory_info().rss)
+        except Exception:
+            return None
+    return None
+
+
+def _get_cpu_maxrss_bytes() -> Optional[int]:
+    """Return process max RSS in bytes (resource.ru_maxrss) if available."""
+    try:
+        import resource  # Unix-only
+
+        v = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # Linux: KB; macOS: bytes.
+        if sys.platform == "darwin":
+            return int(v)
+        return int(v) * 1024
+    except Exception:
+        return None
+
+
+def _cuda_device_index(device: str) -> Optional[int]:
+    if not (str(device).startswith("cuda") and torch.cuda.is_available()):
+        return None
+    s = str(device)
+    if ":" in s:
+        try:
+            return int(s.split(":", 1)[1])
+        except Exception:
+            pass
+    try:
+        return int(torch.cuda.current_device())
+    except Exception:
+        return 0
+
+
+def _maybe_cuda_sync(device: str) -> None:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return
+    try:
+        torch.cuda.synchronize(idx)
+    except Exception:
+        torch.cuda.synchronize()
+
+
+def _reset_cuda_peaks(device: str) -> None:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return
+    try:
+        torch.cuda.reset_peak_memory_stats(idx)
+    except Exception:
+        torch.cuda.reset_peak_memory_stats()
+
+
+def _cuda_mem_snapshot(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        return {
+            "allocated_bytes": int(torch.cuda.memory_allocated(idx)),
+            "reserved_bytes": int(torch.cuda.memory_reserved(idx)),
+        }
+    except Exception:
+        return None
+
+
+def _cuda_peak_snapshot(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        return {
+            "max_allocated_bytes": int(torch.cuda.max_memory_allocated(idx)),
+            "max_reserved_bytes": int(torch.cuda.max_memory_reserved(idx)),
+        }
+    except Exception:
+        return None
+
+
+def _cuda_device_info(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        prop = torch.cuda.get_device_properties(idx)
+        return {
+            "index": int(idx),
+            "name": str(prop.name),
+            "total_memory_bytes": int(prop.total_memory),
+        }
+    except Exception:
+        try:
+            return {"index": int(idx), "name": str(torch.cuda.get_device_name(idx))}
+        except Exception:
+            return {"index": int(idx)}
+
+
+class PerfRecorder:
+    """Context manager to record wall time + CPU/GPU memory deltas for a code region."""
+
+    def __init__(self, device: str, label: str = ""):
+        self.device = device
+        self.label = label
+
+    def __enter__(self):
+        _maybe_cuda_sync(self.device)
+        _reset_cuda_peaks(self.device)
+        self.t0 = time.perf_counter()
+        self.cpu_rss0 = _get_cpu_rss_bytes()
+        self.cpu_maxrss0 = _get_cpu_maxrss_bytes()
+        self.gpu0 = _cuda_mem_snapshot(self.device)
+        self.gpu_info = _cuda_device_info(self.device)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        _maybe_cuda_sync(self.device)
+        self.t1 = time.perf_counter()
+        self.cpu_rss1 = _get_cpu_rss_bytes()
+        self.cpu_maxrss1 = _get_cpu_maxrss_bytes()
+        self.gpu1 = _cuda_mem_snapshot(self.device)
+        self.gpu_peak = _cuda_peak_snapshot(self.device)
+
+    def to_dict(self) -> dict:
+        t0 = getattr(self, "t0", None)
+        t1 = getattr(self, "t1", None)
+        out = {
+            "label": self.label,
+            "wall_time_sec": float((t1 - t0) if (t0 is not None and t1 is not None) else 0.0),
+        }
+
+        # CPU
+        if getattr(self, "cpu_rss0", None) is not None:
+            out["cpu_rss_start_bytes"] = int(self.cpu_rss0)
+        if getattr(self, "cpu_rss1", None) is not None:
+            out["cpu_rss_end_bytes"] = int(self.cpu_rss1)
+        if getattr(self, "cpu_rss0", None) is not None and getattr(self, "cpu_rss1", None) is not None:
+            out["cpu_rss_delta_bytes"] = int(self.cpu_rss1 - self.cpu_rss0)
+
+        if getattr(self, "cpu_maxrss0", None) is not None:
+            out["cpu_maxrss_start_bytes"] = int(self.cpu_maxrss0)
+        if getattr(self, "cpu_maxrss1", None) is not None:
+            out["cpu_maxrss_end_bytes"] = int(self.cpu_maxrss1)
+        if getattr(self, "cpu_maxrss0", None) is not None and getattr(self, "cpu_maxrss1", None) is not None:
+            out["cpu_maxrss_delta_bytes"] = int(self.cpu_maxrss1 - self.cpu_maxrss0)
+
+        # GPU
+        if getattr(self, "gpu_info", None) is not None:
+            out["gpu_device"] = self.gpu_info
+        if getattr(self, "gpu0", None) is not None:
+            out["gpu_start"] = self.gpu0
+        if getattr(self, "gpu1", None) is not None:
+            out["gpu_end"] = self.gpu1
+        if getattr(self, "gpu_peak", None) is not None:
+            out["gpu_peak"] = self.gpu_peak
+
+        return out
+
+
 
 # ----------------------------------------------------------------------------
 # JSON output helpers (mirrors eval_SVDLLM_benchmark.py)
@@ -553,6 +725,12 @@ def main() -> None:
 
     args = p.parse_args()
 
+    overall_t0 = time.perf_counter()
+    overall_cpu_rss0 = _get_cpu_rss_bytes()
+    overall_cpu_maxrss0 = _get_cpu_maxrss_bytes()
+    overall_gpu0 = _cuda_mem_snapshot(args.device)
+
+
     runs = []  # collected results for JSON output
 
 
@@ -571,19 +749,6 @@ def main() -> None:
                 hf_token=args.hf_token,
                 revision=args.saes_revision,
                 cache_dir=args.saes_cache_dir,
-            )
-            return model, tokenizer
-
-        # 2b) Local DF-SVD dir (contains dfsvd_manifest.json + dfsvd_state.pt)
-        if os.path.isdir(ckpt_or_dir) and looks_like_dfsvd_checkpoint(ckpt_or_dir):
-            if not args.dfsvd_base_model:
-                raise ValueError("DF-SVD checkpoint detected but --dfsvd_base_model is missing.")
-            model, tokenizer, _ = load_dfsvd_model(
-                ckpt_or_dir,
-                base_model=args.dfsvd_base_model,
-                hf_token=args.hf_token,
-                revision=args.dfsvd_revision,
-                cache_dir=args.dfsvd_cache_dir,
             )
             return model, tokenizer
 
@@ -616,8 +781,11 @@ def main() -> None:
         raise RuntimeError("CUDA requested but not available.")
 
     def _run_one(model, tokenizer, label: str, datasets_override: Optional[List[str]] = None):
-        model = _to_device(model, args.device, args.dtype)
-        model.eval()
+        run_perf = {"metrics": {}}
+        with PerfRecorder(args.device, label=f"{label}:to_device") as _perf_td:
+            model = _to_device(model, args.device, args.dtype)
+            model.eval()
+        run_perf["to_device"] = _perf_td.to_dict()
 
         if args.c4_docs is not None:
             os.environ["SVDLLM_C4_VAL_DOCS"] = str(int(args.c4_docs))
@@ -646,33 +814,36 @@ def main() -> None:
             "max_batches": args.max_batches,
             "dtype": args.dtype,
             "device": args.device,
+            "perf": run_perf,
         }
         if "token" in metrics:
-            if args.ppl_method == "legacy":
-                run_res["token_ppl"] = _legacy_ppl_eval(
-                    model,
-                    tokenizer,
-                    datasets=datasets,
-                    model_seq_len=args.seqlen,
-                    batch_size=args.batch_size,
-                    device=args.device,
-                    label=label,
-                    max_batches=args.max_batches,
-                )
-            else:
-                run_res["token_ppl"] = _call_and_capture_dict(
-                    ppl_eval,
-                    want_keys=datasets,
-                    model=model,
-                    tokenizer=tokenizer,
-                    datasets=datasets,
-                    model_seq_len=args.seqlen,
-                    batch_size=args.batch_size,
-                    device=args.device,
-                    label=label,
-                    max_batches=args.max_batches,
-                )
+            with PerfRecorder(args.device, label=f"{label}:token_ppl") as _perf_tok:
+                if args.ppl_method == "legacy":
+                    run_res["token_ppl"] = _legacy_ppl_eval(
+                        model,
+                        tokenizer,
+                        datasets=datasets,
+                        model_seq_len=args.seqlen,
+                        batch_size=args.batch_size,
+                        device=args.device,
+                        label=label,
+                        max_batches=args.max_batches,
+                    )
+                else:
+                    run_res["token_ppl"] = _call_and_capture_dict(
+                        ppl_eval,
+                        want_keys=datasets,
+                        model=model,
+                        tokenizer=tokenizer,
+                        datasets=datasets,
+                        model_seq_len=args.seqlen,
+                        batch_size=args.batch_size,
+                        device=args.device,
+                        label=label,
+                        max_batches=args.max_batches,
+                    )
 
+            run_perf["metrics"]["token_ppl"] = _perf_tok.to_dict()
         if not any(m in metrics for m in ("word", "byte", "bpb")):
             runs.append(run_res)
             return run_res
@@ -725,15 +896,17 @@ def main() -> None:
                 print("[LM-Eval] No datasets left for word/byte/bpb after filtering; skipping.")
                 runs.append(run_res)
                 return run_res
-            res = evaluator.simple_evaluate(
-                model=lm,
-                tasks=lm_eval_datasets,
-                num_fewshot=0,
-                batch_size=args.batch_size,
-                max_batch_size=64,
-                device=args.device,
-                limit=args.max_batches,
-            )
+            with PerfRecorder(args.device, label=f"{label}:lm_eval_metrics") as _perf_lm:
+                res = evaluator.simple_evaluate(
+                    model=lm,
+                    tasks=lm_eval_datasets,
+                    num_fewshot=0,
+                    batch_size=args.batch_size,
+                    max_batch_size=64,
+                    device=args.device,
+                    limit=args.max_batches,
+                )
+            run_perf["metrics"]["lm_eval"] = _perf_lm.to_dict()
             if res is None:
                 raise RuntimeError("LM Evaluation Harness returned no results (not rank 0).")
             print("\nLM-Eval metrics (word/byte/bpb):")
@@ -787,6 +960,27 @@ def main() -> None:
         )
         _run_with_sets(model, tokenizer, label_prefix=f"{args.label} (dobi)")
 
+        overall_t1 = time.perf_counter()
+        overall_cpu_rss1 = _get_cpu_rss_bytes()
+        overall_cpu_maxrss1 = _get_cpu_maxrss_bytes()
+        overall_gpu1 = _cuda_mem_snapshot(args.device)
+
+        perf_overall = {
+            "wall_time_sec": float(overall_t1 - overall_t0),
+            "cpu_rss_start_bytes": int(overall_cpu_rss0) if overall_cpu_rss0 is not None else None,
+            "cpu_rss_end_bytes": int(overall_cpu_rss1) if overall_cpu_rss1 is not None else None,
+            "cpu_rss_delta_bytes": (int(overall_cpu_rss1 - overall_cpu_rss0) if (overall_cpu_rss0 is not None and overall_cpu_rss1 is not None) else None),
+            "cpu_maxrss_start_bytes": int(overall_cpu_maxrss0) if overall_cpu_maxrss0 is not None else None,
+            "cpu_maxrss_end_bytes": int(overall_cpu_maxrss1) if overall_cpu_maxrss1 is not None else None,
+            "cpu_maxrss_delta_bytes": (int(overall_cpu_maxrss1 - overall_cpu_maxrss0) if (overall_cpu_maxrss0 is not None and overall_cpu_maxrss1 is not None) else None),
+            "gpu_start": overall_gpu0,
+            "gpu_end": overall_gpu1,
+        }
+
+        args_dict = dict(vars(args))
+        if args_dict.get("hf_token"):
+            args_dict["hf_token"] = "<REDACTED>"
+
         out_json = _auto_output_json(args, "general_ppl")
         payload = {
             "schema": "svdllm_eval_v1",
@@ -794,7 +988,8 @@ def main() -> None:
             "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
             "cmd": " ".join(sys.argv),
             "mode": "general_ppl_compare",
-            "args": vars(args),
+            "args": args_dict,
+            "perf": {"overall": perf_overall},
             "runs": runs,
         }
         _write_json(out_json, payload)
@@ -832,6 +1027,27 @@ def main() -> None:
         model, tokenizer = _load_ours(args.checkpoint)
         _run_with_sets(model, tokenizer, label_prefix=args.label)
 
+    overall_t1 = time.perf_counter()
+    overall_cpu_rss1 = _get_cpu_rss_bytes()
+    overall_cpu_maxrss1 = _get_cpu_maxrss_bytes()
+    overall_gpu1 = _cuda_mem_snapshot(args.device)
+
+    perf_overall = {
+        "wall_time_sec": float(overall_t1 - overall_t0),
+        "cpu_rss_start_bytes": int(overall_cpu_rss0) if overall_cpu_rss0 is not None else None,
+        "cpu_rss_end_bytes": int(overall_cpu_rss1) if overall_cpu_rss1 is not None else None,
+        "cpu_rss_delta_bytes": (int(overall_cpu_rss1 - overall_cpu_rss0) if (overall_cpu_rss0 is not None and overall_cpu_rss1 is not None) else None),
+        "cpu_maxrss_start_bytes": int(overall_cpu_maxrss0) if overall_cpu_maxrss0 is not None else None,
+        "cpu_maxrss_end_bytes": int(overall_cpu_maxrss1) if overall_cpu_maxrss1 is not None else None,
+        "cpu_maxrss_delta_bytes": (int(overall_cpu_maxrss1 - overall_cpu_maxrss0) if (overall_cpu_maxrss0 is not None and overall_cpu_maxrss1 is not None) else None),
+        "gpu_start": overall_gpu0,
+        "gpu_end": overall_gpu1,
+    }
+
+    args_dict = dict(vars(args))
+    if args_dict.get("hf_token"):
+        args_dict["hf_token"] = "<REDACTED>"
+
     out_json = _auto_output_json(args, "general_ppl")
     payload = {
         "schema": "svdllm_eval_v1",
@@ -839,7 +1055,8 @@ def main() -> None:
         "timestamp": _dt.datetime.now().isoformat(timespec="seconds"),
         "cmd": " ".join(sys.argv),
         "mode": "general_ppl",
-        "args": vars(args),
+        "args": args_dict,
+        "perf": {"overall": perf_overall},
         "runs": runs,
     }
     _write_json(out_json, payload)

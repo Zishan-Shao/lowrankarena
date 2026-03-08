@@ -1,0 +1,159 @@
+{
+  "schema": "svdllm_eval_v1",
+  "script": "eval_benchmarks.py",
+  "timestamp": "2026-03-05T09:30:36",
+  "cmd": "/home/lz299/lowrankarena/eval_results/eval_benchmarks.py --model baselines/SEAS-SVD/robust/jeffwan_llama7b_saes_r0.4 --saes_svd --saes_base_model jeffwan/llama-7b-hf --use_lm_eval --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa --device cuda --batch_size 1 --dtype bfloat16 --lm_eval_num_fewshot 0 --output_json outputs/saes_benchmark_jeffwan.json",
+  "mode": "lm_eval",
+  "args": {
+    "model": "baselines/SEAS-SVD/robust/jeffwan_llama7b_saes_r0.4",
+    "device": "cuda",
+    "hf_token": null,
+    "saes_svd": true,
+    "saes_base_model": "jeffwan/llama-7b-hf",
+    "saes_revision": null,
+    "saes_cache_dir": null,
+    "batch_size": 1,
+    "limit": null,
+    "dtype": "bfloat16",
+    "gsm8k_max_new_tokens": 64,
+    "skip_gsm8k": false,
+    "skip_truthfulqa": false,
+    "use_lm_eval": true,
+    "lm_eval_tasks": "openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa",
+    "lm_eval_num_fewshot": 0,
+    "lm_eval_max_length": 2048,
+    "lm_eval_max_batch_size": 64,
+    "lm_eval_add_bos_token": "auto",
+    "lm_eval_prefix_token_id": null,
+    "lm_eval_include_path": null,
+    "token_ppl": false,
+    "token_ppl_datasets": "wikitext2,ptb,c4",
+    "token_ppl_seqlen": 2048,
+    "token_ppl_batch_size": 4,
+    "token_ppl_max_batches": null,
+    "force_right_padding": false,
+    "fix_pad_query_mask": false,
+    "output_json": "outputs/saes_benchmark_jeffwan.json",
+    "output_dir": null,
+    "run_name": null
+  },
+  "perf": {
+    "phases": {
+      "load_model": {
+        "label": "load_model",
+        "wall_time_sec": 14.236170516349375,
+        "cpu_rss_start_bytes": 749330432,
+        "cpu_rss_end_bytes": 986165248,
+        "cpu_rss_delta_bytes": 236834816,
+        "cpu_maxrss_start_bytes": 749330432,
+        "cpu_maxrss_end_bytes": 37135794176,
+        "cpu_maxrss_delta_bytes": 36386463744,
+        "gpu_device": {
+          "index": 0,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_bytes": 84974239744
+        },
+        "gpu_start": {
+          "allocated_bytes": 0,
+          "reserved_bytes": 0
+        },
+        "gpu_end": {
+          "allocated_bytes": 5861917184,
+          "reserved_bytes": 6058672128
+        },
+        "gpu_peak": {
+          "max_allocated_bytes": 5861917184,
+          "max_reserved_bytes": 6058672128
+        }
+      },
+      "lm_eval": {
+        "label": "lm_eval",
+        "wall_time_sec": 2987.690367587842,
+        "cpu_rss_start_bytes": 986165248,
+        "cpu_rss_end_bytes": 2034778112,
+        "cpu_rss_delta_bytes": 1048612864,
+        "cpu_maxrss_start_bytes": 37135794176,
+        "cpu_maxrss_end_bytes": 37135794176,
+        "cpu_maxrss_delta_bytes": 0,
+        "gpu_device": {
+          "index": 0,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_bytes": 84974239744
+        },
+        "gpu_start": {
+          "allocated_bytes": 5861917184,
+          "reserved_bytes": 6058672128
+        },
+        "gpu_end": {
+          "allocated_bytes": 5870436864,
+          "reserved_bytes": 6129975296
+        },
+        "gpu_peak": {
+          "max_allocated_bytes": 5926955008,
+          "max_reserved_bytes": 6129975296
+        }
+      }
+    },
+    "tasks": {},
+    "overall": {
+      "wall_time_sec": 3002.4616287983954,
+      "cpu_rss_start_bytes": 618258432,
+      "cpu_rss_end_bytes": 2034778112,
+      "cpu_rss_delta_bytes": 1416519680,
+      "cpu_maxrss_start_bytes": 618258432,
+      "cpu_maxrss_end_bytes": 37135794176,
+      "cpu_maxrss_delta_bytes": 36517535744,
+      "gpu_start": {
+        "allocated_bytes": 0,
+        "reserved_bytes": 0
+      },
+      "gpu_end": {
+        "allocated_bytes": 5870436864,
+        "reserved_bytes": 6129975296
+      }
+    }
+  },
+  "model": "baselines/SEAS-SVD/robust/jeffwan_llama7b_saes_r0.4",
+  "results": {
+    "arc_challenge": {
+      "alias": "arc_challenge",
+      "acc,none": 0.2295221843003413,
+      "acc_stderr,none": 0.012288926760890802,
+      "acc_norm,none": 0.2781569965870307,
+      "acc_norm_stderr,none": 0.013094469919538792
+    },
+    "arc_easy": {
+      "alias": "arc_easy",
+      "acc,none": 0.2542087542087542,
+      "acc_stderr,none": 0.00893453768114155,
+      "acc_norm,none": 0.27104377104377103,
+      "acc_norm_stderr,none": 0.0091209197417606
+    },
+    "hellaswag": {
+      "alias": "hellaswag",
+      "acc,none": 0.2538338976299542,
+      "acc_stderr,none": 0.004343142545094227,
+      "acc_norm,none": 0.25851424019119695,
+      "acc_norm_stderr,none": 0.004369232540125885
+    },
+    "openbookqa": {
+      "alias": "openbookqa",
+      "acc,none": 0.142,
+      "acc_stderr,none": 0.015625630247810305,
+      "acc_norm,none": 0.246,
+      "acc_norm_stderr,none": 0.01927981905635257
+    },
+    "piqa": {
+      "alias": "piqa",
+      "acc,none": 0.5266594124047879,
+      "acc_stderr,none": 0.011649229994347384,
+      "acc_norm,none": 0.4961915125136017,
+      "acc_norm_stderr,none": 0.0116654857447468
+    },
+    "winogrande": {
+      "alias": "winogrande",
+      "acc,none": 0.5019731649565904,
+      "acc_stderr,none": 0.014052376259225636
+    }
+  }
+}

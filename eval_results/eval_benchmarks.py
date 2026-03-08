@@ -8,7 +8,7 @@ import os
 import re
 import sys
 from typing import List, Dict, Any, Tuple, Optional
-
+from utils.df_svd_loader import looks_like_dfsvd_checkpoint, load_dfsvd_model
 import torch
 from torch.nn import functional as F
 from datasets import load_dataset
@@ -40,6 +40,178 @@ except Exception:
         load_piqa_local = None
         load_mathqa_local = None
 from tqdm import tqdm
+
+import time
+
+try:
+    import psutil  # type: ignore
+except Exception:
+    psutil = None
+
+
+def _get_cpu_rss_bytes() -> Optional[int]:
+    """Return current process RSS in bytes if available (psutil), else None."""
+    if psutil is not None:
+        try:
+            return int(psutil.Process(os.getpid()).memory_info().rss)
+        except Exception:
+            return None
+    return None
+
+
+def _get_cpu_maxrss_bytes() -> Optional[int]:
+    """Return process max RSS in bytes (resource.ru_maxrss) if available."""
+    try:
+        import resource  # Unix-only
+
+        v = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # Linux: KB; macOS: bytes.
+        if sys.platform == "darwin":
+            return int(v)
+        return int(v) * 1024
+    except Exception:
+        return None
+
+
+def _cuda_device_index(device: str) -> Optional[int]:
+    if not (str(device).startswith("cuda") and torch.cuda.is_available()):
+        return None
+    s = str(device)
+    if ":" in s:
+        try:
+            return int(s.split(":", 1)[1])
+        except Exception:
+            pass
+    try:
+        return int(torch.cuda.current_device())
+    except Exception:
+        return 0
+
+
+def _maybe_cuda_sync(device: str) -> None:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return
+    try:
+        torch.cuda.synchronize(idx)
+    except Exception:
+        torch.cuda.synchronize()
+
+
+def _reset_cuda_peaks(device: str) -> None:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return
+    try:
+        torch.cuda.reset_peak_memory_stats(idx)
+    except Exception:
+        torch.cuda.reset_peak_memory_stats()
+
+
+def _cuda_mem_snapshot(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        return {
+            "allocated_bytes": int(torch.cuda.memory_allocated(idx)),
+            "reserved_bytes": int(torch.cuda.memory_reserved(idx)),
+        }
+    except Exception:
+        return None
+
+
+def _cuda_peak_snapshot(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        return {
+            "max_allocated_bytes": int(torch.cuda.max_memory_allocated(idx)),
+            "max_reserved_bytes": int(torch.cuda.max_memory_reserved(idx)),
+        }
+    except Exception:
+        return None
+
+
+def _cuda_device_info(device: str) -> Optional[dict]:
+    idx = _cuda_device_index(device)
+    if idx is None:
+        return None
+    try:
+        prop = torch.cuda.get_device_properties(idx)
+        return {
+            "index": int(idx),
+            "name": str(prop.name),
+            "total_memory_bytes": int(prop.total_memory),
+        }
+    except Exception:
+        try:
+            return {"index": int(idx), "name": str(torch.cuda.get_device_name(idx))}
+        except Exception:
+            return {"index": int(idx)}
+
+
+class PerfRecorder:
+    """Context manager to record wall time + CPU/GPU memory deltas for a code region."""
+
+    def __init__(self, device: str, label: str = ""):
+        self.device = device
+        self.label = label
+
+    def __enter__(self):
+        _maybe_cuda_sync(self.device)
+        _reset_cuda_peaks(self.device)
+        self.t0 = time.perf_counter()
+        self.cpu_rss0 = _get_cpu_rss_bytes()
+        self.cpu_maxrss0 = _get_cpu_maxrss_bytes()
+        self.gpu0 = _cuda_mem_snapshot(self.device)
+        self.gpu_info = _cuda_device_info(self.device)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        _maybe_cuda_sync(self.device)
+        self.t1 = time.perf_counter()
+        self.cpu_rss1 = _get_cpu_rss_bytes()
+        self.cpu_maxrss1 = _get_cpu_maxrss_bytes()
+        self.gpu1 = _cuda_mem_snapshot(self.device)
+        self.gpu_peak = _cuda_peak_snapshot(self.device)
+
+    def to_dict(self) -> dict:
+        t0 = getattr(self, "t0", None)
+        t1 = getattr(self, "t1", None)
+        out = {
+            "label": self.label,
+            "wall_time_sec": float((t1 - t0) if (t0 is not None and t1 is not None) else 0.0),
+        }
+
+        # CPU
+        if getattr(self, "cpu_rss0", None) is not None:
+            out["cpu_rss_start_bytes"] = int(self.cpu_rss0)
+        if getattr(self, "cpu_rss1", None) is not None:
+            out["cpu_rss_end_bytes"] = int(self.cpu_rss1)
+        if getattr(self, "cpu_rss0", None) is not None and getattr(self, "cpu_rss1", None) is not None:
+            out["cpu_rss_delta_bytes"] = int(self.cpu_rss1 - self.cpu_rss0)
+
+        if getattr(self, "cpu_maxrss0", None) is not None:
+            out["cpu_maxrss_start_bytes"] = int(self.cpu_maxrss0)
+        if getattr(self, "cpu_maxrss1", None) is not None:
+            out["cpu_maxrss_end_bytes"] = int(self.cpu_maxrss1)
+        if getattr(self, "cpu_maxrss0", None) is not None and getattr(self, "cpu_maxrss1", None) is not None:
+            out["cpu_maxrss_delta_bytes"] = int(self.cpu_maxrss1 - self.cpu_maxrss0)
+
+        # GPU
+        if getattr(self, "gpu_info", None) is not None:
+            out["gpu_device"] = self.gpu_info
+        if getattr(self, "gpu0", None) is not None:
+            out["gpu_start"] = self.gpu0
+        if getattr(self, "gpu1", None) is not None:
+            out["gpu_end"] = self.gpu1
+        if getattr(self, "gpu_peak", None) is not None:
+            out["gpu_peak"] = self.gpu_peak
+
+        return out
+
 
 
 # ----------------------------------------------------------------------------
@@ -194,88 +366,7 @@ if _REPO_ROOT not in sys.path:
 
 from utils.model_utils import get_model_from_huggingface, get_model_from_local
 from utils.saes_svd_loader import looks_like_saes_svd_checkpoint, load_saes_svd_model
-from utils.df_svd_loader import looks_like_dfsvd_checkpoint, load_dfsvd_model
 from evaluater import ppl_eval
-
-# ----------------------------------------------------------------------------
-# Dobi-SVD loader (mirrors eval_general_ppl.py)
-# ----------------------------------------------------------------------------
-
-def _looks_like_dobi_svd_model(model_id: str) -> bool:
-    """Heuristic: detect a Dobi-SVD checkpoint to route loading to baselines/Dobi-SVD."""
-    if not model_id:
-        return False
-    s = str(model_id).lower()
-    if "dobisvd" in s or "dobi-svd" in s:
-        return True
-    if os.path.isdir(model_id):
-        for fn in ("remapping_weight.pt", "DobiSVD_Model.pt"):
-            if os.path.exists(os.path.join(model_id, fn)):
-                return True
-    return False
-
-
-def _resolve_dobi_path(
-    model_id: str,
-    hf_token: Optional[str] = None,
-    revision: Optional[str] = None,
-    cache_dir: Optional[str] = None,
-) -> str:
-    """Return local directory for a Dobi-SVD model id (HF repo or local dir)."""
-    if os.path.isdir(model_id):
-        return model_id
-    try:
-        from huggingface_hub import snapshot_download  # type: ignore
-    except Exception as e:
-        raise ImportError(
-            "huggingface_hub is required to load Dobi-SVD HF repos. Please `pip install huggingface_hub`."
-        ) from e
-    return snapshot_download(repo_id=model_id, token=hf_token, revision=revision, cache_dir=cache_dir)
-
-
-def _load_dobi_model(
-    model_id: str,
-    hf_token: Optional[str] = None,
-    revision: Optional[str] = None,
-    cache_dir: Optional[str] = None,
-    remapping: Optional[bool] = None,
-):
-    """Load Dobi-SVD model via the official loader functions.
-
-    remapping:
-      - True  -> load_remapping_model (keeps remapped/packed weights; avoids dequantization)
-      - False -> load_unremapping_model (unremap/dequantize to regular weights)
-      - None  -> auto-detect based on files in the checkpoint dir.
-    """
-    dobi_root = os.path.join(_REPO_ROOT, "baselines", "Dobi-SVD")
-    if dobi_root not in sys.path:
-        sys.path.insert(0, dobi_root)
-    try:
-        from modelutils import load_remapping_model, load_unremapping_model  # type: ignore
-    except Exception as e:
-        raise ImportError(
-            f"Failed to import Dobi-SVD loader from {dobi_root}. "
-            "Make sure baselines/Dobi-SVD is present and its dependencies are installed."
-        ) from e
-
-    local_path = _resolve_dobi_path(model_id, hf_token=hf_token, revision=revision, cache_dir=cache_dir)
-
-    if remapping is None:
-        if os.path.exists(os.path.join(local_path, "remapping_weight.pt")):
-            remapping = True
-        elif os.path.exists(os.path.join(local_path, "DobiSVD_Model.pt")):
-            remapping = False
-        else:
-            raise FileNotFoundError(
-                f"Could not infer Dobi-SVD mode from checkpoint dir: {local_path}. "
-                "Expected remapping_weight.pt (remapping) or DobiSVD_Model.pt (unremapping). "
-                "If this is a standard HF model, do NOT use the Dobi loader."
-            )
-
-    loader = load_remapping_model if remapping else load_unremapping_model
-    model, tokenizer = loader(local_path)
-    return model, tokenizer, local_path, bool(remapping)
-
 
 '''
 A. 纯 lm-eval (最可比)
@@ -942,22 +1033,6 @@ def main():
                     help='Base HF model id/path to apply SAES-SVD onto (required when using SAES-SVD).')
     ap.add_argument('--saes_revision', type=str, default=None)
     ap.add_argument('--saes_cache_dir', type=str, default=None)
-    ap.add_argument('--dfsvd_svd', action='store_true',
-                    help='Treat --model as DF-SVD checkpoint (local dir or HF repo id)')
-    ap.add_argument('--dfsvd_base_model', type=str, default=None,
-                    help='Base HF model id/path to apply DF-SVD onto (required when using DF-SVD).')
-    ap.add_argument('--dfsvd_revision', type=str, default=None)
-    ap.add_argument('--dfsvd_cache_dir', type=str, default=None)
-
-    ap.add_argument('--dobi_svd', action='store_true',
-                    help='Treat --model as a Dobi-SVD checkpoint (HF repo id or local dir) and load via baselines/Dobi-SVD.')
-    ap.add_argument('--dobi_remapping', action='store_true',
-                    help='Force Dobi *remapping* loader (keeps remapped/packed weights; avoids dequantization).')
-    ap.add_argument('--dobi_unremapping', action='store_true',
-                    help='Force Dobi *unremapping* loader (unremap/dequantize to regular weights).')
-    ap.add_argument('--dobi_revision', type=str, default=None)
-    ap.add_argument('--dobi_cache_dir', type=str, default=None)
-
     ap.add_argument('--batch_size', type=int, default=8)
     ap.add_argument('--limit', type=int, default=None, help='Limit examples per task for quick runs')
     ap.add_argument('--dtype', type=str, default=None, help='float16/bfloat16/float32')
@@ -1000,68 +1075,60 @@ def main():
                     help='Directory to write JSON results (auto-named). If unset, no JSON is written unless --output_json is provided.')
     ap.add_argument('--run_name', type=str, default=None,
                     help='Optional run name used when auto-naming JSON under --output_dir.')
-
+    ap.add_argument('--dfsvd_svd', action='store_true', help='Treat --model as DF-SVD checkpoint (local dir or HF repo id)')
+    ap.add_argument('--dfsvd_base_model', type=str, default=None, help='Base HF model id/path to apply DF-SVD onto (required when using DF-SVD).')
+    ap.add_argument('--dfsvd_revision', type=str, default=None)
+    ap.add_argument('--dfsvd_cache_dir', type=str, default=None)
     args = ap.parse_args()
 
-    # Load model
-    if args.dobi_remapping and args.dobi_unremapping:
-        raise ValueError("Only one of --dobi_remapping / --dobi_unremapping can be set.")
-    use_dobi = bool(args.dobi_svd or args.dobi_remapping or args.dobi_unremapping or _looks_like_dobi_svd_model(args.model))
+    overall_t0 = time.perf_counter()
+    overall_cpu_rss0 = _get_cpu_rss_bytes()
+    overall_cpu_maxrss0 = _get_cpu_maxrss_bytes()
+    overall_gpu0 = _cuda_mem_snapshot(args.device)
+    perf: Dict[str, Any] = {"phases": {}, "tasks": {}}
 
-    if use_dobi:
-        remap_flag = True if args.dobi_remapping else (False if args.dobi_unremapping else None)
-        model, tokenizer, _, is_dobi_remapping = _load_dobi_model(
-            args.model,
-            hf_token=args.hf_token,
-            revision=args.dobi_revision,
-            cache_dir=args.dobi_cache_dir,
-            remapping=remap_flag,
-        )
-    elif os.path.exists(args.model) and args.model.endswith('.pt'):
-        model, tokenizer = get_model_from_local(args.model)
-        is_dobi_remapping = False
-    elif (os.path.isdir(args.model) and looks_like_dfsvd_checkpoint(args.model)) or args.dfsvd_svd:
-        if not args.dfsvd_base_model:
-            raise ValueError("DF-SVD requires --dfsvd_base_model.")
-        model, tokenizer, _ = load_dfsvd_model(
-            args.model,
-            base_model=args.dfsvd_base_model,
-            hf_token=args.hf_token,
-            revision=args.dfsvd_revision,
-            cache_dir=args.dfsvd_cache_dir,
-        )
-        is_dobi_remapping = False
-    elif (os.path.isdir(args.model) and looks_like_saes_svd_checkpoint(args.model)) or args.saes_svd:
-        if not args.saes_base_model:
-            raise ValueError("SAES-SVD requires --saes_base_model.")
-        model, tokenizer, _ = load_saes_svd_model(
-            args.model,
-            base_model=args.saes_base_model,
-            hf_token=args.hf_token,
-            revision=args.saes_revision,
-            cache_dir=args.saes_cache_dir,
-        )
-        is_dobi_remapping = False
-    else:
-        model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
-        is_dobi_remapping = False
-    tokenizer = _ensure_tokenizer_compat(model, tokenizer, hf_token=args.hf_token)
-    if args.force_right_padding:
-        _force_right_padding(tokenizer)
-    else:
-        _ensure_pad_token(tokenizer)
-    # NOTE: Dobi remapping checkpoints may store packed/int weights; avoid dtype casting in that case.
-    if 'is_dobi_remapping' in locals() and is_dobi_remapping:
-        model = model.to(args.device).eval()
-    else:
+
+    with PerfRecorder(args.device, label="load_model") as _perf_load:
+        # Load model
+        if os.path.exists(args.model) and args.model.endswith('.pt'):
+            model, tokenizer = get_model_from_local(args.model)
+        elif (os.path.isdir(args.model) and looks_like_dfsvd_checkpoint(args.model)) or args.dfsvd_svd:
+            if not args.dfsvd_base_model:
+                raise ValueError("DF-SVD requires --dfsvd_base_model.")
+            model, tokenizer, _ = load_dfsvd_model(
+                args.model,
+                base_model=args.dfsvd_base_model,
+                hf_token=args.hf_token,
+                revision=args.dfsvd_revision,
+                cache_dir=args.dfsvd_cache_dir,
+            )
+        elif (os.path.isdir(args.model) and looks_like_saes_svd_checkpoint(args.model)) or args.saes_svd:
+            if not args.saes_base_model:
+                raise ValueError("SAES-SVD requires --saes_base_model.")
+            model, tokenizer, _ = load_saes_svd_model(
+                args.model,
+                base_model=args.saes_base_model,
+                hf_token=args.hf_token,
+                revision=args.saes_revision,
+                cache_dir=args.saes_cache_dir,
+            )
+        else:
+            model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
+        tokenizer = _ensure_tokenizer_compat(model, tokenizer, hf_token=args.hf_token)
+        if args.force_right_padding:
+            _force_right_padding(tokenizer)
+        else:
+            _ensure_pad_token(tokenizer)
         model = _to_device(model, args.device, args.dtype)
-    _set_pad_query_fix_flags(model, fix=args.fix_pad_query_mask)
+        _set_pad_query_fix_flags(model, fix=args.fix_pad_query_mask)
 
-    # Disable cache for deterministic eval and lower memory
-    try:
-        model.config.use_cache = False
-    except Exception:
-        pass
+        # Disable cache for deterministic eval and lower memory
+        try:
+            model.config.use_cache = False
+        except Exception:
+            pass
+
+    perf["phases"]["load_model"] = _perf_load.to_dict()
 
     if args.use_lm_eval:
         # Resolve add_bos_token / prefix_token_id for lm-eval
@@ -1082,29 +1149,53 @@ def main():
                 add_bos_token = False
             else:
                 add_bos_token = True
-        lm_eval_res = _run_lm_eval_harness(
-            model,
-            tokenizer,
-            device=args.device,
-            tasks=args.lm_eval_tasks,
-            limit=args.limit,
-            batch_size=args.batch_size,
-            max_batch_size=args.lm_eval_max_batch_size,
-            max_length=args.lm_eval_max_length,
-            num_fewshot=args.lm_eval_num_fewshot,
-            include_path=args.lm_eval_include_path,
-            add_bos_token=add_bos_token,
-            prefix_token_id=prefix_token_id,
-        )
+        with PerfRecorder(args.device, label="lm_eval") as _perf_lm_eval:
+            lm_eval_res = _run_lm_eval_harness(
+                model,
+                tokenizer,
+                device=args.device,
+                tasks=args.lm_eval_tasks,
+                limit=args.limit,
+                batch_size=args.batch_size,
+                max_batch_size=args.lm_eval_max_batch_size,
+                max_length=args.lm_eval_max_length,
+                num_fewshot=args.lm_eval_num_fewshot,
+                include_path=args.lm_eval_include_path,
+                add_bos_token=add_bos_token,
+                prefix_token_id=prefix_token_id,
+            )
+        perf["phases"]["lm_eval"] = _perf_lm_eval.to_dict()
 
         out_json = _auto_output_json(args, 'lm_eval')
+        overall_t1 = time.perf_counter()
+        overall_cpu_rss1 = _get_cpu_rss_bytes()
+        overall_cpu_maxrss1 = _get_cpu_maxrss_bytes()
+        overall_gpu1 = _cuda_mem_snapshot(args.device)
+
+        perf["overall"] = {
+            "wall_time_sec": float(overall_t1 - overall_t0),
+            "cpu_rss_start_bytes": int(overall_cpu_rss0) if overall_cpu_rss0 is not None else None,
+            "cpu_rss_end_bytes": int(overall_cpu_rss1) if overall_cpu_rss1 is not None else None,
+            "cpu_rss_delta_bytes": (int(overall_cpu_rss1 - overall_cpu_rss0) if (overall_cpu_rss0 is not None and overall_cpu_rss1 is not None) else None),
+            "cpu_maxrss_start_bytes": int(overall_cpu_maxrss0) if overall_cpu_maxrss0 is not None else None,
+            "cpu_maxrss_end_bytes": int(overall_cpu_maxrss1) if overall_cpu_maxrss1 is not None else None,
+            "cpu_maxrss_delta_bytes": (int(overall_cpu_maxrss1 - overall_cpu_maxrss0) if (overall_cpu_maxrss0 is not None and overall_cpu_maxrss1 is not None) else None),
+            "gpu_start": overall_gpu0,
+            "gpu_end": overall_gpu1,
+        }
+
+        args_dict = dict(vars(args))
+        if args_dict.get("hf_token"):
+            args_dict["hf_token"] = "<REDACTED>"
+
         payload = {
             'schema': 'svdllm_eval_v1',
             'script': os.path.basename(__file__),
             'timestamp': _dt.datetime.now().isoformat(timespec='seconds'),
             'cmd': ' '.join(sys.argv),
             'mode': 'lm_eval',
-            'args': vars(args),
+            "args": args_dict,
+            "perf": perf,
             'model': args.model,
             'results': lm_eval_res.get('results', lm_eval_res) if isinstance(lm_eval_res, dict) else lm_eval_res,
         }
@@ -1112,27 +1203,51 @@ def main():
         return
     if args.token_ppl:
         ds = [d.strip() for d in args.token_ppl_datasets.split(',') if d.strip()]
-        token_ppl = _call_and_capture_dict(
-            ppl_eval,
-            want_keys=ds,
-            model=model,
-            tokenizer=tokenizer,
-            datasets=ds,
-            model_seq_len=args.token_ppl_seqlen,
-            batch_size=args.token_ppl_batch_size,
-            device=args.device,
-            label='Token PPL',
-            max_batches=args.token_ppl_max_batches,
-        )
+        with PerfRecorder(args.device, label="token_ppl") as _perf_token_ppl:
+            token_ppl = _call_and_capture_dict(
+                ppl_eval,
+                want_keys=ds,
+                model=model,
+                tokenizer=tokenizer,
+                datasets=ds,
+                model_seq_len=args.token_ppl_seqlen,
+                batch_size=args.token_ppl_batch_size,
+                device=args.device,
+                label='Token PPL',
+                max_batches=args.token_ppl_max_batches,
+            )
+        perf["phases"]["token_ppl"] = _perf_token_ppl.to_dict()
 
         out_json = _auto_output_json(args, 'token_ppl')
+        overall_t1 = time.perf_counter()
+        overall_cpu_rss1 = _get_cpu_rss_bytes()
+        overall_cpu_maxrss1 = _get_cpu_maxrss_bytes()
+        overall_gpu1 = _cuda_mem_snapshot(args.device)
+
+        perf["overall"] = {
+            "wall_time_sec": float(overall_t1 - overall_t0),
+            "cpu_rss_start_bytes": int(overall_cpu_rss0) if overall_cpu_rss0 is not None else None,
+            "cpu_rss_end_bytes": int(overall_cpu_rss1) if overall_cpu_rss1 is not None else None,
+            "cpu_rss_delta_bytes": (int(overall_cpu_rss1 - overall_cpu_rss0) if (overall_cpu_rss0 is not None and overall_cpu_rss1 is not None) else None),
+            "cpu_maxrss_start_bytes": int(overall_cpu_maxrss0) if overall_cpu_maxrss0 is not None else None,
+            "cpu_maxrss_end_bytes": int(overall_cpu_maxrss1) if overall_cpu_maxrss1 is not None else None,
+            "cpu_maxrss_delta_bytes": (int(overall_cpu_maxrss1 - overall_cpu_maxrss0) if (overall_cpu_maxrss0 is not None and overall_cpu_maxrss1 is not None) else None),
+            "gpu_start": overall_gpu0,
+            "gpu_end": overall_gpu1,
+        }
+
+        args_dict = dict(vars(args))
+        if args_dict.get("hf_token"):
+            args_dict["hf_token"] = "<REDACTED>"
+
         payload = {
             'schema': 'svdllm_eval_v1',
             'script': os.path.basename(__file__),
             'timestamp': _dt.datetime.now().isoformat(timespec='seconds'),
             'cmd': ' '.join(sys.argv),
             'mode': 'token_ppl',
-            'args': vars(args),
+            "args": args_dict,
+            "perf": perf,
             'model': args.model,
             'results': token_ppl,
         }
@@ -1141,33 +1256,51 @@ def main():
 
     # Evaluate tasks
     results: Dict[str, float] = {}
-    results['Openb.'] = eval_openbookqa(model, tokenizer, args.device, args.batch_size, args.limit)
-    results['ARC_e'] = eval_arc_easy(model, tokenizer, args.device, args.batch_size, args.limit)
-    results['WinoG.'] = eval_winogrande(model, tokenizer, args.device, args.batch_size, args.limit)
-    results['HellaS.'] = eval_hellaswag(model, tokenizer, args.device, args.batch_size, args.limit)
-    results['PIQA'] = eval_piqa(model, tokenizer, args.device, args.batch_size, args.limit)
-    results['MathQA'] = eval_mathqa(model, tokenizer, args.device, args.batch_size, args.limit)
+    with PerfRecorder(args.device, label="Openb.") as _perf_task:
+        results['Openb.'] = eval_openbookqa(model, tokenizer, args.device, args.batch_size, args.limit)
+    perf["tasks"]["Openb."] = _perf_task.to_dict()
+    with PerfRecorder(args.device, label="ARC_e") as _perf_task:
+        results['ARC_e'] = eval_arc_easy(model, tokenizer, args.device, args.batch_size, args.limit)
+    perf["tasks"]["ARC_e"] = _perf_task.to_dict()
+    with PerfRecorder(args.device, label="WinoG.") as _perf_task:
+        results['WinoG.'] = eval_winogrande(model, tokenizer, args.device, args.batch_size, args.limit)
+    perf["tasks"]["WinoG."] = _perf_task.to_dict()
+    with PerfRecorder(args.device, label="HellaS.") as _perf_task:
+        results['HellaS.'] = eval_hellaswag(model, tokenizer, args.device, args.batch_size, args.limit)
+    perf["tasks"]["HellaS."] = _perf_task.to_dict()
+    with PerfRecorder(args.device, label="PIQA") as _perf_task:
+        results['PIQA'] = eval_piqa(model, tokenizer, args.device, args.batch_size, args.limit)
+    perf["tasks"]["PIQA"] = _perf_task.to_dict()
+    with PerfRecorder(args.device, label="MathQA") as _perf_task:
+        results['MathQA'] = eval_mathqa(model, tokenizer, args.device, args.batch_size, args.limit)
+    perf["tasks"]["MathQA"] = _perf_task.to_dict()
     # Average over the six MC tasks
     mc_keys = ['Openb.', 'ARC_e', 'WinoG.', 'HellaS.', 'PIQA', 'MathQA']
     mc_vals = [v for k, v in results.items() if k in mc_keys and isinstance(v, float)]
     results['Average'] = sum(mc_vals) / len(mc_vals) if mc_vals else float('nan')
     # TruthfulQA MC1
     if not args.skip_truthfulqa:
-        results['TruthfulQA'] = eval_truthfulqa_mc1(model, tokenizer, args.device, args.batch_size, args.limit)
+        with PerfRecorder(args.device, label="TruthfulQA") as _perf_task:
+            results['TruthfulQA'] = eval_truthfulqa_mc1(model, tokenizer, args.device, args.batch_size, args.limit)
+        perf["tasks"]["TruthfulQA"] = _perf_task.to_dict()
     else:
         results['TruthfulQA'] = float('nan')
+        perf["tasks"]["TruthfulQA"] = None
     # GSM8K
     if not args.skip_gsm8k:
-        results['GSM8K'] = eval_gsm8k(
-            model,
-            tokenizer,
-            args.device,
-            args.limit,
-            max_new_tokens=args.gsm8k_max_new_tokens,
-            batch_size=max(1, args.batch_size // 2),
-        )
+        with PerfRecorder(args.device, label="GSM8K") as _perf_task:
+            results['GSM8K'] = eval_gsm8k(
+                model,
+                tokenizer,
+                args.device,
+                args.limit,
+                max_new_tokens=args.gsm8k_max_new_tokens,
+                batch_size=max(1, args.batch_size // 2),
+            )
+        perf["tasks"]["GSM8K"] = _perf_task.to_dict()
     else:
         results['GSM8K'] = float('nan')
+        perf["tasks"]["GSM8K"] = None
 
     # Pretty print
     order = ['Openb.', 'ARC_e', 'WinoG.', 'HellaS.', 'PIQA', 'MathQA', 'Average', 'TruthfulQA', 'GSM8K']
@@ -1182,13 +1315,35 @@ def main():
 
     # Save JSON (optional)
     out_json = _auto_output_json(args, 'benchmark')
+    overall_t1 = time.perf_counter()
+    overall_cpu_rss1 = _get_cpu_rss_bytes()
+    overall_cpu_maxrss1 = _get_cpu_maxrss_bytes()
+    overall_gpu1 = _cuda_mem_snapshot(args.device)
+
+    perf["overall"] = {
+        "wall_time_sec": float(overall_t1 - overall_t0),
+        "cpu_rss_start_bytes": int(overall_cpu_rss0) if overall_cpu_rss0 is not None else None,
+        "cpu_rss_end_bytes": int(overall_cpu_rss1) if overall_cpu_rss1 is not None else None,
+        "cpu_rss_delta_bytes": (int(overall_cpu_rss1 - overall_cpu_rss0) if (overall_cpu_rss0 is not None and overall_cpu_rss1 is not None) else None),
+        "cpu_maxrss_start_bytes": int(overall_cpu_maxrss0) if overall_cpu_maxrss0 is not None else None,
+        "cpu_maxrss_end_bytes": int(overall_cpu_maxrss1) if overall_cpu_maxrss1 is not None else None,
+        "cpu_maxrss_delta_bytes": (int(overall_cpu_maxrss1 - overall_cpu_maxrss0) if (overall_cpu_maxrss0 is not None and overall_cpu_maxrss1 is not None) else None),
+        "gpu_start": overall_gpu0,
+        "gpu_end": overall_gpu1,
+    }
+
+    args_dict = dict(vars(args))
+    if args_dict.get("hf_token"):
+        args_dict["hf_token"] = "<REDACTED>"
+
     payload = {
         'schema': 'svdllm_eval_v1',
         'script': os.path.basename(__file__),
         'timestamp': _dt.datetime.now().isoformat(timespec='seconds'),
         'cmd': ' '.join(sys.argv),
         'mode': 'benchmark',
-        'args': vars(args),
+        "args": args_dict,
+        "perf": perf,
         'model': args.model,
         'results': results,
     }
