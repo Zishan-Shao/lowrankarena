@@ -120,7 +120,7 @@ class SVD_LlamaMLP(nn.Module):
             B, L, _ = x.shape
             D = self.up_u_proj.out_features
             P  = self.up_v_proj(x)
-            V1 = torch.cat([self.up_u_proj.weight.t(), self.gate_u_proj.weight.t()], dim=1)
+            V1 = torch.cat([self.gate_u_proj.weight.t(), self.up_u_proj.weight.t()], dim=1)
             U2 = self.down_v_proj.weight.t()
             V2 = self.down_u_proj.weight.t()
             b1 = torch.zeros(2 * D, device=x.device, dtype=x.dtype)
