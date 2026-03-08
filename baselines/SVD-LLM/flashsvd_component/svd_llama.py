@@ -9,7 +9,7 @@ from transformers.activations import ACT2FN
 from transformers.utils import logging
 from transformers import LlamaConfig
 
-from src.kernels.decoder.flashsvdswiglu_v15 import flashsvd_ffn_swiglu
+from src.kernels.decoder.flashsvdswiglu_v2 import flashsvd_ffn_dual_split_token
 from src.kernels.decoder.flashsvdropeattn_v16 import (
     PackedFactors, DecodePackedFactors,
     build_rope_tables,
@@ -115,17 +115,15 @@ class SVD_LlamaMLP(nn.Module):
         self.act_fn = ACT2FN[hidden_act]
 
     def forward(self, x):
-        # Fast path: Triton FlashSVD SwiGLU on CUDA using shared rank-space P
+        # Fast path: Triton FlashSVD SwiGLU on CUDA using dual P (independent gate/up)
         if x.is_cuda:
-            B, L, _ = x.shape
-            D = self.up_u_proj.out_features
-            P  = self.up_v_proj(x)
-            V1 = torch.cat([self.gate_u_proj.weight.t(), self.up_u_proj.weight.t()], dim=1)
-            U2 = self.down_v_proj.weight.t()
-            V2 = self.down_u_proj.weight.t()
-            b1 = torch.zeros(2 * D, device=x.device, dtype=x.dtype)
-            b2 = torch.zeros(V2.shape[1], device=x.device, dtype=x.dtype)
-            return flashsvd_ffn_swiglu(P, V1, U2, V2, b1, b2, use_autotune=True)
+            PGate = self.gate_v_proj(x)           # [B, L, R]
+            PUp   = self.up_v_proj(x)             # [B, L, R]
+            GateU = self.gate_u_proj.weight.t()   # [R, D]
+            UpU   = self.up_u_proj.weight.t()     # [R, D]
+            DownV = self.down_v_proj.weight.t()   # [D, R]
+            DownU = self.down_u_proj.weight.t()   # [R, H]
+            return flashsvd_ffn_dual_split_token(PUp, PGate, GateU, UpU, DownV, DownU)
 
         # Fallback: baseline low-rank SwiGLU
         up = self.up_u_proj(self.up_v_proj(x))

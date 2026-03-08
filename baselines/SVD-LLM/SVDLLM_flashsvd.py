@@ -259,8 +259,6 @@ def whitening(model_name, model, profiling_mat, ratio, dev):
         elif 'opt' in model_name:
             svd_decoder = SVDOPTDecoderLayer(model.config, ratio=ratio)
         #### Replace Attn, MLP ####
-        _mlp_gate_W = None  # saved original gate_proj weight for shared-V fix
-        _mlp_up_v = None    # saved up_proj svd_v for shared-V fix
         for name in subset:
             W = subset[name].weight.data.float().to(dev)
             dtype = W.dtype
@@ -329,26 +327,15 @@ def whitening(model_name, model, profiling_mat, ratio, dev):
                 elif "gate_proj" in name:
                     svd_mlp.gate_u_proj.weight.data = svd_u
                     svd_mlp.gate_v_proj.weight.data = svd_v
-                    _mlp_gate_W = W.clone()  # save for shared-V fix
                 elif "down_proj" in name:
                     svd_mlp.down_u_proj.weight.data = svd_u
                     svd_mlp.down_v_proj.weight.data = svd_v
                 elif "up_proj" in name:
                     svd_mlp.up_u_proj.weight.data = svd_u
                     svd_mlp.up_v_proj.weight.data = svd_v
-                    _mlp_up_v = svd_v.clone()  # save for shared-V fix
                     layer.mlp = svd_mlp
             W = W_scale = scaling_matrix_inv = scaling_diag_matrix = U = S = VT  = truc_s = truc_u = truc_v = sqrtSigma = None
             del  W, W_scale, scaling_matrix_inv, scaling_diag_matrix, U, S, VT, truc_s, truc_u, truc_v, sqrtSigma
-        # Force gate_proj to share up_proj's V factor for FlashSVD MLP kernel compatibility
-        if _mlp_gate_W is not None and _mlp_up_v is not None:
-            V = _mlp_up_v.float().to(dev)          # [R, hidden]
-            VVT = V @ V.t()                         # [R, R]
-            VVT_inv = torch.linalg.inv(VVT + 1e-6 * torch.eye(VVT.shape[0], device=dev))
-            gate_u_new = _mlp_gate_W @ V.t() @ VVT_inv  # [D, R]
-            layer.mlp.gate_u_proj.weight.data = gate_u_new.to(dtype).cpu()
-            layer.mlp.gate_v_proj.weight.data = _mlp_up_v  # same as up_v
-            _mlp_gate_W = _mlp_up_v = None
         del layer
         torch.cuda.empty_cache()
 
