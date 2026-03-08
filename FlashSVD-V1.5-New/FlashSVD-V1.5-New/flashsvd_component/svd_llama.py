@@ -12,8 +12,8 @@ from transformers.activations import ACT2FN
 from transformers.utils import logging
 from transformers import LlamaConfig
 
-from src.kernels.decoder.flashsvdropeattn import FlashSVDRoPEAttention, QKVFactors
-from src.kernels.decoder.flashsvdsilu import (
+from kernels.flashsvdropeattn import FlashSVDRoPEAttention, QKVFactors
+from kernels.flashsvdsilu import (
     flashsvd_ffn_dual_split_token,
     flashsvd_ffn_dual_split_token_v2,
     flashsvd_ffn_dual_split_token_v2_sm80,
@@ -64,10 +64,8 @@ def _get_flashsvd_decode_attn_mods():
         return _DECODE_ATTN_MODS
 
     base = (
-        Path(__file__).resolve().parents[3]
-        / "src"
+        Path(__file__).resolve().parents[1]
         / "kernels"
-        / "decoder"
         / "flashsvd-v1.5"
         / "flashsvdropeattn"
     )
@@ -250,10 +248,8 @@ def _get_dense_token_decode_mod():
     if _DENSE_TOKEN_DECODE_MOD is not None:
         return _DENSE_TOKEN_DECODE_MOD
     path = (
-        Path(__file__).resolve().parents[3]
-        / "src"
+        Path(__file__).resolve().parents[1]
         / "kernels"
-        / "decoder"
         / "flashsvd-v1.5"
         / "flashsvdropeattn_short"
         / "flashsvdropeattn_dense_decode.py"
