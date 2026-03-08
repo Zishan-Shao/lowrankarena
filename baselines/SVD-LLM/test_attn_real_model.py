@@ -108,4 +108,47 @@ for layer_idx in range(min(args.max_layers, len(layers))):
     print(f"           Pq abs_mean={Pq_mean:.3e}  Vq abs_mean={Vq_norm:.3e}  "
           f"O_kernel abs_mean={O_kernel.abs().float().mean():.3e}")
 
+print("\n=== S=2048 test (PPL eval sequence length) on layer 0 ===")
+layer = layers[0]
+attn  = layer.self_attn
+if isinstance(attn, SVD_LlamaAttention):
+    S2   = 2048
+    H2   = attn.num_heads
+    dh2  = attn.head_dim
+    R2   = attn.q_v_proj.out_features
+    hid2 = attn.hidden_size
+    x2   = torch.randn(1, S2, hid2, device=dev,
+                       dtype=next(attn.parameters()).dtype)
+
+    with torch.no_grad():
+        Vq2 = attn._eff_weight(attn.q_u_proj).view(H2,dh2,R2).permute(0,2,1).contiguous()
+        Vk2 = attn._eff_weight(attn.k_u_proj).view(H2,dh2,R2).permute(0,2,1).contiguous()
+        Vv2 = attn._eff_weight(attn.v_u_proj).view(H2,dh2,R2).permute(0,2,1).contiguous()
+
+        Pq2 = attn.q_v_proj(x2).unsqueeze(2).expand(1, S2, H2, R2)
+        Pk2 = attn.k_v_proj(x2).unsqueeze(2).expand(1, S2, H2, R2)
+        Pv2 = attn.v_v_proj(x2).unsqueeze(2).expand(1, S2, H2, R2)
+
+        cos2, sin2 = attn._get_rope_tables(S2, dev, x2.dtype)
+
+        f2k = PackedFactors(Pq=Pq2, Pk=Pk2, Pv=Pv2, Vq=Vq2, Vk=Vk2, Vv=Vv2)
+        O_k2  = flashsvd_attn_packed(f2k, cos2, sin2, causal=True)
+
+        # reference: use fp32 ground truth
+        O_r2  = reference_packed_fp32(f2k, cos2, sin2, causal=True,
+                                      window_left=-1, window_right=-1)
+
+    rf2  = rel_fro(O_k2, O_r2)
+    fin2 = torch.isfinite(O_k2).all().item()
+    ma2  = (O_k2.float() - O_r2.float()).abs().max().item()
+    status2 = "PASS" if (fin2 and rf2 < 1e-1) else "FAIL"
+    print(f"  [{status2}] S=2048 layer 0  finite={fin2}  "
+          f"max_abs={ma2:.3e}  rel_fro={rf2:.3e}")
+    print(f"           O_kernel abs_mean={O_k2.abs().float().mean():.3e}  "
+          f"max={O_k2.abs().float().max():.3e}")
+    # check per-position output scale (first vs last token)
+    print(f"           first-token output norm : {O_k2[0,0].float().norm():.3e}")
+    print(f"           last-token  output norm : {O_k2[0,-1].float().norm():.3e}")
+    print(f"           any nan/inf in output   : {(~torch.isfinite(O_k2)).any().item()}")
+
 print("\nDone.")
