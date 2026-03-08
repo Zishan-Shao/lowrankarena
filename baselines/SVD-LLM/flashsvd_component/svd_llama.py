@@ -116,7 +116,7 @@ class SVD_LlamaMLP(nn.Module):
 
     def forward(self, x):
         # Fast path: Triton FlashSVD SwiGLU on CUDA using shared rank-space P
-        if False:  # DEBUG: bypass FlashSVD kernel
+        if False:  # disabled until kernel verified
             B, L, _ = x.shape
             D = self.up_u_proj.out_features
             P  = self.up_v_proj(x)
@@ -212,7 +212,7 @@ class SVD_LlamaAttention(nn.Module):
         H, dh   = self.num_heads, self.head_dim
         R       = self.q_v_proj.out_features
 
-        use_flashsvd = False  # DEBUG: bypass FlashSVD kernel
+        use_flashsvd = False  # disabled until kernel verified
 
         # V factor matrices [H, R, dh] — shared across prefill and decode
         Vq = self._eff_weight(self.q_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
