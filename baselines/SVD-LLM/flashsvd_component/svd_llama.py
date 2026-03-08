@@ -116,7 +116,7 @@ class SVD_LlamaMLP(nn.Module):
 
     def forward(self, x):
         # Fast path: Triton FlashSVD SwiGLU on CUDA using shared rank-space P
-        if x.is_cuda:
+        if False:  # DEBUG: bypass FlashSVD kernel
             B, L, _ = x.shape
             D = self.up_u_proj.out_features
             P  = self.up_v_proj(x)
