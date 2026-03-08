@@ -173,3 +173,60 @@ O4_ref = reference_packed_fp32(f4, cos_s, sin_s, causal=True, window_left=-1, wi
 check("R=64  kernel vs reference            ", O4_k, O4_ref)
 
 print()
+
+# ─────────────────────────────────────────────────────────────────────────────
+print("=== T5: FLOAT16 (real model dtype) — repeat T3 in fp16 ===")
+# The real model is loaded with model.to(dtype=torch.float16)
+dtype16 = torch.float16
+cos16, sin16 = build_rope_tables(S, Dh, base=10000.0, device=device, dtype=dtype16)
+
+Wu_q16 = Wu_q.to(dtype16)
+Wu_k16 = Wu_k.to(dtype16)
+Wu_v16 = Wu_v.to(dtype16)
+Wv_q16 = Wv_q.to(dtype16)
+Wv_k16 = Wv_k.to(dtype16)
+Wv_v16 = Wv_v.to(dtype16)
+x16    = x.to(dtype16)
+
+Vq_16 = Wu_q16.view(H, Dh, R).permute(0, 2, 1).contiguous()
+Vk_16 = Wu_k16.view(H, Dh, R).permute(0, 2, 1).contiguous()
+Vv_16 = Wu_v16.view(H, Dh, R).permute(0, 2, 1).contiguous()
+Pq_16 = F.linear(x16, Wv_q16).unsqueeze(2).expand(B, S, H, R)
+Pk_16 = F.linear(x16, Wv_k16).unsqueeze(2).expand(B, S, H, R)
+Pv_16 = F.linear(x16, Wv_v16).unsqueeze(2).expand(B, S, H, R)
+
+f5 = PackedFactors(Pq=Pq_16, Pk=Pk_16, Pv=Pv_16, Vq=Vq_16, Vk=Vk_16, Vv=Vv_16)
+O5_k   = flashsvd_attn_packed(f5, cos16, sin16, causal=True)
+O5_ref = reference_packed_fp32(f5, cos16, sin16, causal=True, window_left=-1, window_right=-1)
+check("fp16  kernel vs reference (R=1024)  ", O5_k, O5_ref)
+print(f"  [info ] fp16 kernel  finite={torch.isfinite(O5_k).all().item()}  "
+      f"abs_mean={O5_k.abs().float().mean():.3e}  "
+      f"max={O5_k.abs().float().max():.3e}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+print("\n=== T6: fp16 with UNIT-SCALE weights (simulate trained model) ===")
+# Real SVD weights are small (singular values of LLaMA weights).
+# Scale weights down to mimic trained model norms.
+scale = 1.0 / math.sqrt(R)   # typical weight scale after SVD
+Wu_q_n = (Wu_q16 * scale).contiguous()
+Wu_k_n = (Wu_k16 * scale).contiguous()
+Wu_v_n = (Wu_v16 * scale).contiguous()
+Wv_q_n = (Wv_q16 * scale).contiguous()
+Wv_k_n = (Wv_k16 * scale).contiguous()
+Wv_v_n = (Wv_v16 * scale).contiguous()
+
+Vq_n = Wu_q_n.view(H, Dh, R).permute(0, 2, 1).contiguous()
+Vk_n = Wu_k_n.view(H, Dh, R).permute(0, 2, 1).contiguous()
+Vv_n = Wu_v_n.view(H, Dh, R).permute(0, 2, 1).contiguous()
+Pq_n = F.linear(x16 * scale, Wv_q_n).unsqueeze(2).expand(B, S, H, R)
+Pk_n = F.linear(x16 * scale, Wv_k_n).unsqueeze(2).expand(B, S, H, R)
+Pv_n = F.linear(x16 * scale, Wv_v_n).unsqueeze(2).expand(B, S, H, R)
+
+f6 = PackedFactors(Pq=Pq_n, Pk=Pk_n, Pv=Pv_n, Vq=Vq_n, Vk=Vk_n, Vv=Vv_n)
+O6_k   = flashsvd_attn_packed(f6, cos16, sin16, causal=True)
+O6_ref = reference_packed_fp32(f6, cos16, sin16, causal=True, window_left=-1, window_right=-1)
+check("fp16  kernel vs reference (scaled)  ", O6_k, O6_ref)
+print(f"  [info ] fp16 scaled  finite={torch.isfinite(O6_k).all().item()}  "
+      f"abs_mean={O6_k.abs().float().mean():.3e}  "
+      f"max={O6_k.abs().float().max():.3e}")
+print()
