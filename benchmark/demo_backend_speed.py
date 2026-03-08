@@ -42,7 +42,9 @@ def parse_args():
     p.add_argument("--device", default="cuda")
     p.add_argument("--warmup", type=int, default=20, help="预热步数（不计入计时）")
     p.add_argument("--steps",  type=int, default=100, help="计时步数")
-    p.add_argument("--seq_len", type=int, default=128, help="tokenizer 最大序列长度")
+    p.add_argument("--seq_len",    type=int, default=512, help="tokenizer 最大序列长度（建议 512）")
+    p.add_argument("--batch_size", type=int, default=32,
+                   help="把输入句子复制成 N 份构成 batch（建议 32，GPU 负载才足够）")
     return p.parse_args()
 
 
@@ -71,18 +73,20 @@ def _time_inference(model, inputs, device, warmup, steps):
     return median_ms, pred_idx
 
 
-def _run_backends(text, models, id2label, tokenizer, device, seq_len, warmup, steps):
+def _run_backends(text, models, id2label, tokenizer, device, seq_len, batch_size, warmup, steps):
     """对给定句子跑所有后端，打印进度，返回 results 列表。"""
-    inputs = tokenizer(
+    single = tokenizer(
         text,
         return_tensors="pt",
         max_length=seq_len,
         truncation=True,
         padding="max_length",
     )
-    inputs = {k: v.to(device) for k, v in inputs.items()}
+    # 把单句复制成 batch，让 GPU 有足够负载
+    inputs = {k: v.expand(batch_size, -1).contiguous().to(device)
+              for k, v in single.items()}
 
-    print(f"\n  Running ({warmup} warmup + {steps} measure steps per backend)...\n")
+    print(f"\n  Running (bs={batch_size}, seq={seq_len}, {warmup} warmup + {steps} measure steps)...\n")
     results = []
     for name, m in models:
         print(f"  [{name:<18s}] ", end="", flush=True)
@@ -125,8 +129,8 @@ def main():
     print(f"  FlashSVD 后端速度对比 Demo")
     print(f"{'='*64}")
     print(f"  Checkpoint : {args.checkpoint}")
-    print(f"  dtype={args.dtype}  device={device}  "
-          f"warmup={args.warmup}  steps={args.steps}")
+    print(f"  dtype={args.dtype}  device={device}  bs={args.batch_size}  "
+          f"seq={args.seq_len}  warmup={args.warmup}  steps={args.steps}")
     print(f"{'='*64}\n")
 
     # ── 加载压缩模型（只加载一次）────────────────────────────────────
@@ -176,7 +180,7 @@ def main():
 
         results = _run_backends(
             text, models, id2label, tokenizer, device,
-            args.seq_len, args.warmup, args.steps,
+            args.seq_len, args.batch_size, args.warmup, args.steps,
         )
         _print_table(results, comp_info, args.dtype, args.seq_len)
 
