@@ -78,14 +78,28 @@ def parse_args():
     return p.parse_args()
 
 
-def _time_inference(model, inputs, device, warmup, steps):
-    """Return (median_latency_ms, pred_label_idx). Uses per-step CUDA sync for accuracy."""
+def _make_inputs(text, tokenizer, device, seq_len, batch_size):
+    single = tokenizer(
+        text,
+        return_tensors="pt",
+        max_length=seq_len,
+        truncation=True,
+        padding="max_length",
+    )
+    return {k: v.expand(batch_size, -1).contiguous().to(device)
+            for k, v in single.items()}
+
+
+def _warmup(model, inputs, device, warmup):
     model.eval()
     with torch.no_grad():
         for _ in range(warmup):
             model(**inputs)
-
     torch.cuda.synchronize(device)
+
+
+def _time_inference(model, inputs, device, steps):
+    """Return (median_latency_ms, pred_label_idx). Assumes model is already warmed up."""
     times = []
     with torch.no_grad():
         for _ in range(steps):
@@ -101,34 +115,24 @@ def _time_inference(model, inputs, device, warmup, steps):
     return median_ms, pred_idx
 
 
-def _run_backends(text, models, id2label, tokenizer, device, seq_len, batch_size, warmup, steps):
-    single = tokenizer(
-        text,
-        return_tensors="pt",
-        max_length=seq_len,
-        truncation=True,
-        padding="max_length",
-    )
-    # replicate single sentence into a batch so GPU load is meaningful
-    inputs = {k: v.expand(batch_size, -1).contiguous().to(device)
-              for k, v in single.items()}
+def _run_one(text, name, model, id2label, tokenizer, device, seq_len, batch_size, steps):
+    inputs = _make_inputs(text, tokenizer, device, seq_len, batch_size)
+    print(f"  [{name:<18s}] ", end="", flush=True)
+    try:
+        lat_ms, pred_idx = _time_inference(model, inputs, device, steps)
+        pred_label = id2label.get(pred_idx, str(pred_idx))
+        print(f"latency={lat_ms:7.3f} ms   pred={pred_label}")
+        return (name, lat_ms, pred_label, None)
+    except Exception as e:
+        msg = str(e).split("\n")[0][:55]
+        print(f"FAILED -- {msg}")
+        return (name, None, None, msg)
 
-    print(f"\n  Running (bs={batch_size}, seq={seq_len}, "
-          f"{warmup} warmup + {steps} measure steps)...\n")
-    results = []
-    for name, m in models:
-        print(f"  [{name:<18s}] ", end="", flush=True)
-        try:
-            lat_ms, pred_idx = _time_inference(m, inputs, device, warmup, steps)
-            pred_label = id2label.get(pred_idx, str(pred_idx))
-            print(f"latency={lat_ms:7.3f} ms   pred={pred_label}")
-            results.append((name, lat_ms, pred_label, None))
-        except Exception as e:
-            msg = str(e).split("\n")[0][:55]
-            print(f"FAILED -- {msg}")
-            results.append((name, None, None, msg))
 
-    return results
+def _run_all(text, models, id2label, tokenizer, device, seq_len, batch_size, steps):
+    print(f"\n  Running all backends (bs={batch_size}, seq={seq_len}, {steps} steps)...\n")
+    return [_run_one(text, name, m, id2label, tokenizer, device, seq_len, batch_size, steps)
+            for name, m in models]
 
 
 def _print_table(results, comp_info, dtype, batch_size, seq_len):
@@ -187,25 +191,75 @@ def main():
             msg = str(e).split("\n")[0][:55]
             print(f"skipped -- {msg}")
 
-    print(f"\n{len(models)} backend(s) ready. Type a sentence to run inference.")
+    # Warmup all backends once with a dummy sentence so queries are instant
+    print(f"\nWarming up all backends ({args.warmup} steps)...")
+    dummy_inputs = _make_inputs(
+        "Warmup sentence.", tokenizer, device, args.seq_len, args.batch_size
+    )
+    for name, m in models:
+        print(f"  [{name:<18s}] ", end="", flush=True)
+        _warmup(m, dummy_inputs, device, args.warmup)
+        print("done")
+
+    # Build lookup: short key -> (display name, model)
+    name_map = {}
+    for key, (dname, m) in zip(args.backends, models):
+        name_map[key] = (dname, m)
+
+    valid_keys = list(name_map.keys())
+    backend_hint = "/".join(valid_keys) + "/all"
+
+    print(f"\n{len(models)} backend(s) ready. Warmup complete.")
     print("Enter 'q' or Ctrl-C to quit.\n")
 
+    current_text = None
+
     while True:
+        # --- Step 1: get sentence ---
         try:
-            text = input(">>> ").strip()
+            text = input("sentence >>> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nBye.")
             break
 
-        if text.lower() in ("q", "quit", "exit", ""):
+        if text.lower() in ("q", "quit", "exit"):
+            print("Bye.")
+            break
+        if not text:
+            continue
+
+        current_text = text
+
+        # --- Step 2: choose backend ---
+        try:
+            choice = input(f"backend  [{backend_hint}] >>> ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\nBye.")
+            break
+
+        if choice in ("q", "quit", "exit"):
             print("Bye.")
             break
 
-        results = _run_backends(
-            text, models, id2label, tokenizer, device,
-            args.seq_len, args.batch_size, args.warmup, args.steps,
-        )
-        _print_table(results, comp_info, args.dtype, args.batch_size, args.seq_len)
+        print()
+
+        if choice == "all" or choice == "":
+            results = _run_all(
+                current_text, models, id2label, tokenizer, device,
+                args.seq_len, args.batch_size, args.steps,
+            )
+            _print_table(results, comp_info, args.dtype, args.batch_size, args.seq_len)
+
+        elif choice in name_map:
+            dname, m = name_map[choice]
+            result = _run_one(
+                current_text, dname, m, id2label, tokenizer, device,
+                args.seq_len, args.batch_size, args.steps,
+            )
+            print()
+
+        else:
+            print(f"  Unknown backend '{choice}'. Valid: {backend_hint}\n")
 
 
 if __name__ == "__main__":
