@@ -99,8 +99,9 @@ def _warmup(model, inputs, device, warmup):
 
 
 def _time_inference(model, inputs, device, steps):
-    """Return (median_latency_ms, pred_label_idx). Assumes model is already warmed up."""
+    """Return (median_latency_ms, pred_idx, confidence_pct). Assumes already warmed up."""
     times = []
+    last_logits = None
     with torch.no_grad():
         for _ in range(steps):
             torch.cuda.synchronize(device)
@@ -108,21 +109,32 @@ def _time_inference(model, inputs, device, steps):
             out = model(**inputs)
             torch.cuda.synchronize(device)
             times.append(time.perf_counter() - t0)
+        last_logits = out.logits[0].float()
 
     times.sort()
-    median_ms = times[len(times) // 2] * 1000
-    pred_idx  = out.logits[0].argmax().item()
-    return median_ms, pred_idx
+    median_ms   = times[len(times) // 2] * 1000
+    probs       = torch.softmax(last_logits, dim=-1)
+    pred_idx    = probs.argmax().item()
+    confidence  = probs[pred_idx].item() * 100
+    return median_ms, pred_idx, confidence
+
+
+def _format_pred(pred_idx, confidence, id2label):
+    label = id2label.get(pred_idx, f"class_{pred_idx}")
+    # hide uninformative auto-generated names
+    if label.upper().startswith("LABEL_"):
+        label = f"class_{pred_idx}"
+    return f"{label} ({confidence:.1f}%)"
 
 
 def _run_one(text, name, model, id2label, tokenizer, device, seq_len, batch_size, steps):
     inputs = _make_inputs(text, tokenizer, device, seq_len, batch_size)
     print(f"  [{name:<18s}] ", end="", flush=True)
     try:
-        lat_ms, pred_idx = _time_inference(model, inputs, device, steps)
-        pred_label = id2label.get(pred_idx, str(pred_idx))
-        print(f"latency={lat_ms:7.3f} ms   pred={pred_label}")
-        return (name, lat_ms, pred_label, None)
+        lat_ms, pred_idx, conf = _time_inference(model, inputs, device, steps)
+        pred_str = _format_pred(pred_idx, conf, id2label)
+        print(f"latency={lat_ms:7.3f} ms   pred={pred_str}")
+        return (name, lat_ms, pred_str, None)
     except Exception as e:
         msg = str(e).split("\n")[0][:55]
         print(f"FAILED -- {msg}")
