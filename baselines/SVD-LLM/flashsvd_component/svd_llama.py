@@ -212,7 +212,7 @@ class SVD_LlamaAttention(nn.Module):
         H, dh   = self.num_heads, self.head_dim
         R       = self.q_v_proj.out_features
 
-        use_flashsvd = hidden_states.is_cuda
+        use_flashsvd = False  # DEBUG: bypass FlashSVD kernel
 
         # V factor matrices [H, R, dh] — shared across prefill and decode
         Vq = self._eff_weight(self.q_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
