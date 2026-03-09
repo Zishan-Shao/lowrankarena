@@ -170,8 +170,8 @@ def main() -> int:
                     choices=["abs_mean", "abs_max", "fisher", "fisher_abs_mean"])
     ap.add_argument("--sensitivity_metric", type=str, default="ppl",
                     choices=["ppl", "stable_rank"])
-    ap.add_argument("--use_cache", action="store_true", default=True)
-    ap.add_argument("--use_bos", action="store_true", default=True)
+    ap.add_argument("--use_cache", action="store_true", default=False)
+    ap.add_argument("--use_bos", action="store_true", default=False)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--weight_quant", type=str, default="none")
     ap.add_argument("--ppl_target", type=float, default=-1)
