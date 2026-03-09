@@ -256,7 +256,7 @@ def apply_flashsvd_to_asvd_model(model: nn.Module) -> nn.Module:
         if attn is not None:
             try:
                 new_fwd = _make_attn_forward(attn)
-                attn.forward = types.MethodType(new_fwd, attn)
+                attn.forward = new_fwd
                 # Verify at least that attributes exist before counting
                 _ = attn.num_heads
                 patched_attn += 1
@@ -266,7 +266,7 @@ def apply_flashsvd_to_asvd_model(model: nn.Module) -> nn.Module:
         if mlp is not None:
             try:
                 new_fwd = _make_mlp_forward(mlp)
-                mlp.forward = types.MethodType(new_fwd, mlp)
+                mlp.forward = new_fwd
                 patched_mlp += 1
             except Exception as e:
                 print(f"[flashsvd_wrapper] layer {i} MLP skip: {e}")
