@@ -2643,11 +2643,17 @@ class SVD_LlamaAttention(nn.Module):
             except Exception:
                 # Minimal fallback: SDPA (no attn weights).
                 is_causal = attention_mask is None and getattr(self, "is_causal", True)
+                sdpa_mask = attention_mask
+                if sdpa_mask is not None:
+                    q_len = query_states.shape[2]
+                    kv_len = key_states.shape[2]
+                    if sdpa_mask.shape[-2] != q_len or sdpa_mask.shape[-1] != kv_len:
+                        sdpa_mask = sdpa_mask[..., :q_len, :kv_len]
                 attn_output = F.scaled_dot_product_attention(
                     query_states,
                     key_states,
                     value_states,
-                    attn_mask=attention_mask,
+                    attn_mask=sdpa_mask,
                     dropout_p=0.0,
                     is_causal=is_causal,
                 ).transpose(1, 2)
