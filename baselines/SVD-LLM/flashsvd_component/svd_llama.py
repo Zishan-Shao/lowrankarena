@@ -1857,7 +1857,7 @@ class SVD_LlamaAttention(nn.Module):
                         past_key_value,
                         cache_position=cache_position,
                     )
-                    return attn_output, None, None, None, None
+                    return attn_output, None, None, None
                 if self._can_use_flashsvd_dense_decode_graph(hidden_states, past_key_value):
                     attn_output = self._flashsvd_dense_decode_token_from_hidden(
                         hidden_states,
@@ -1866,7 +1866,7 @@ class SVD_LlamaAttention(nn.Module):
                         cache_bindings=None,
                         advance_cache=True,
                     )
-                    return attn_output, None, None, None, None
+                    return attn_output, None, None, None
 
             # Low-rank KV-cache path: cache rank-space Pk/Pv (pre-RoPE) and use Triton decode kernel when q_len==1.
             LowRankKVCache = _get_lowrank_cache_cls()
@@ -2078,7 +2078,7 @@ class SVD_LlamaAttention(nn.Module):
                         )  # [B, H, 1, Dh]
                         attn_output = attn_out.transpose(1, 2).reshape(bsz, 1, H * Dh).contiguous()
                         attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-                        return attn_output, None, None, None, None
+                        return attn_output, None, None, None
 
                     if use_mha_stream:
                         # Query in head-space: [B, H, 1, Dh]
@@ -2206,7 +2206,7 @@ class SVD_LlamaAttention(nn.Module):
                         else:
                             attn_output = out_bhd.reshape(bsz, 1, H * Dh)
                             attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-                        return attn_output, None, None, None, None
+                        return attn_output, None, None, None
 
                     # Query: [B, H, R] (broadcast across heads if rank-space is shared)
                     Pq_q = Pq_rank[:, 0, :].unsqueeze(1).expand(bsz, H, R)
@@ -2513,7 +2513,7 @@ class SVD_LlamaAttention(nn.Module):
                     else:
                         attn_output = O_bhd.reshape(bsz, 1, H * Dh)
                         attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-                    return attn_output, None, None, None
+                    return attn_output, None, None
 
                 # Prefill (q_len>1): use FlashSVD full-seq kernel and populate low-rank cache.
                 B, M, R = Pq_rank.shape
@@ -2565,7 +2565,7 @@ class SVD_LlamaAttention(nn.Module):
                     ).transpose(1, 2)
                     attn_output = attn_out.reshape(B, M, H * dh).contiguous()
                     attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-                    return attn_output, None, None, None
+                    return attn_output, None, None
 
                 Hk = int(getattr(self, "num_key_value_heads", H) or H)
 
