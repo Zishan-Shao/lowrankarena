@@ -86,10 +86,15 @@ def load_compressed_model(
 
         # Peek at state_dict keys to detect SVD checkpoints saved without compression_info.json
         # (can happen when an older version of the code was used, or if the save was interrupted)
-        state_dict_path_peek = checkpoint_path / "pytorch_model.bin"
+        _st_peek = checkpoint_path / "model.safetensors"
+        _bin_peek = checkpoint_path / "pytorch_model.bin"
         detected_method = "dense"
-        if state_dict_path_peek.exists():
-            sd_peek = torch.load(state_dict_path_peek, map_location="cpu")
+        if _st_peek.exists() or _bin_peek.exists():
+            if _st_peek.exists():
+                from safetensors.torch import load_file as _st_load
+                sd_peek = _st_load(str(_st_peek), device="cpu")
+            else:
+                sd_peek = torch.load(_bin_peek, map_location="cpu")
             if any((".block.Uq" in k or ".block.Pq" in k) for k in sd_peek.keys()):
                 detected_method = "svd"
                 print(f"[info] Detected SVD keys in checkpoint despite missing compression_info.json")
@@ -132,10 +137,16 @@ def load_compressed_model(
             trust_remote_code=True,
         )
 
-        # Load state dict from checkpoint
-        state_dict_path = checkpoint_path / "pytorch_model.bin"
-        if state_dict_path.exists():
-            state_dict = torch.load(state_dict_path, map_location="cpu")
+        # Load state dict from checkpoint (safetensors preferred, .bin fallback)
+        _st_path = checkpoint_path / "model.safetensors"
+        _bin_path = checkpoint_path / "pytorch_model.bin"
+        if _st_path.exists():
+            from safetensors.torch import load_file as _st_load
+            state_dict = _st_load(str(_st_path), device="cpu")
+            model.load_state_dict(state_dict)
+            print(f"[load] Loaded state dict from checkpoint")
+        elif _bin_path.exists():
+            state_dict = torch.load(_bin_path, map_location="cpu")
             model.load_state_dict(state_dict)
             print(f"[load] Loaded state dict from checkpoint")
         else:
