@@ -227,6 +227,7 @@ class ModernBertLayerShim(nn.Module):
         self.block = block
         # transformers >= 4.48 accesses attention_type on each layer during forward
         self.attention_type = getattr(block, "attention_type", attention_type)
+        block.attention_type = self.attention_type  # propagate to block for rotary_emb call
 
     def forward(self, hidden_states, attention_mask=None, sliding_window_mask=None,
                 position_ids=None, output_attentions=False, **kwargs):
@@ -362,7 +363,10 @@ class NaiveModernBertSVDBlock(nn.Module):
         qf = Q.reshape(B * H, M, dh)
         kf = K.reshape(B * H, M, dh)
         posf = position_ids.unsqueeze(1).expand(B, H, M).reshape(B * H, M)
-        cos, sin = self.rotary_emb(qf, position_ids=posf)
+        try:
+            cos, sin = self.rotary_emb(qf, position_ids=posf, layer_type=getattr(self, 'attention_type', 'global'))
+        except TypeError:
+            cos, sin = self.rotary_emb(qf, position_ids=posf)
         Q = _apply_rotary(qf, cos, sin).view(B, H, M, dh)
         K = _apply_rotary(kf, cos, sin).view(B, H, M, dh)
 
