@@ -89,7 +89,7 @@ def _compress_model(args):
     torch.cuda.manual_seed_all(args.seed)
 
     print(f"[ASVD] Loading {args.model_id} ...")
-    tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True, use_fast=False)
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id, device_map="auto", torch_dtype=torch.float16, trust_remote_code=True
     )
