@@ -919,7 +919,7 @@ def compress_model(model, method, rank, budget, scope, loader, device, calib_bat
             blk = NaiveModernBertSVDBlock(
                 layer, model.config, r_attn, r_ff, r_wo, per_head_fn, low_rank_fn,
             )
-            return ModernBertLayerShim(blk).to(device).eval()
+            return ModernBertLayerShim(blk, attention_type=getattr(layer, "attention_type", "global")).to(device).eval()
         else:
             blk = NaiveSVDBlock(layer, r_attn, r_ff, per_head_fn, low_rank_fn, r_wo,
                                 qkv_mode=qkv_mode, attn_mode=attn_mode)

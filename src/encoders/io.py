@@ -352,7 +352,7 @@ def load_compressed_model(
                 blk.bo_attn = nn.Parameter(state_dict[bo_key])
                 loaded_params += 1
 
-            encoder_layers[i] = ModernBertLayerShim(blk)
+            encoder_layers[i] = ModernBertLayerShim(blk, attention_type=getattr(hf_layer, "attention_type", "global"))
 
     else:
         for i in range(num_layers):
