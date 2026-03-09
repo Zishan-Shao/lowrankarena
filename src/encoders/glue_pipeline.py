@@ -2439,8 +2439,8 @@ def run_pipeline(args):
         if args.use_task_models:
             print("[modernbert] Disabling use_task_models — no per-task HuggingFace checkpoints for ModernBERT")
             args.use_task_models = False
-        if args.backend in ('flashsvd', 'flashsvd15'):
-            print(f"[modernbert] Backend '{args.backend}' not supported — forcing naive")
+        if args.backend == 'flashsvd':
+            print(f"[modernbert] Backend 'flashsvd' (v1) not supported — forcing naive")
             args.backend = 'naive'
     # ──────────────────────────────────────────────────────────────────────────
 
