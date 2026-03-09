@@ -862,6 +862,12 @@ def get_task_model_id(task: str, args) -> str:
         if local_path.exists():
             print(f"[model] Using local pretrained checkpoint: {local_path}")
             return str(local_path)
+        # local_dir itself may be a single shared model (e.g. MNLI-fine-tuned base
+        # reused for all NLI tasks: copa/hans/anli).  Detect by presence of config.json.
+        elif (Path(local_dir) / "config.json").exists():
+            print(f"[model] local_pretrained_dir is a single shared model "
+                  f"(no per-task subdir for '{task}') — using directly: {local_dir}")
+            return str(local_dir)
         else:
             print(f"[warn] local_pretrained_dir set but {local_path} not found — falling through")
 
@@ -996,7 +1002,11 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
     # ARS uses model task loss with calib labels; if calib_task has more classes than
     # the task model (e.g. --calib_task mnli on a binary boolq model) label=2 with
     # n_classes=2 triggers a CUDA assert in nll_loss.
-    if args.method == "adasvd" and args.calib_task:
+    # Skip when local_pretrained_dir is set: the actual model may have more labels than
+    # ALL_TASKS says (e.g. hans num_labels=2 but model_id is MNLI checkpoint with 3 labels).
+    # compress.py does the same check against model.config.num_labels (authoritative).
+    if (args.method == "adasvd" and args.calib_task
+            and not getattr(args, 'local_pretrained_dir', None)):
         _task_cfg = ALL_TASKS.get(validation_task, {})
         _task_nl   = _task_cfg.get("num_labels")
         _calib_nl  = _calib_cfg.get("num_labels")
@@ -1188,10 +1198,18 @@ def _evaluate_copa(model, loader, device):
     """
     Two-choice NLI scoring for COPA.
 
-    Entailment class: textattack MNLI class 1 (0=contra, 1=entail, 2=neutral).
+    Entailment class detected from model.config.id2label:
+    - textattack MNLI (generic LABEL_X): defaults to class 1
+    - ModernBERT MNLI (HuggingFace GLUE order): class 0 = entailment
     Returns (results_dict, avg_loss) to match evaluate_task's return signature.
     """
-    ENTAIL_IDX = 1   # textattack MNLI: class 1 = entailment
+    _id2label = getattr(model.config, 'id2label', {})
+    ENTAIL_IDX = 1  # textattack MNLI default
+    for _cid, _cname in _id2label.items():
+        if str(_cname).lower() == "entailment":
+            ENTAIL_IDX = int(_cid)
+            break
+    print(f"[copa] entailment class index = {ENTAIL_IDX}  (id2label={_id2label})")
     correct = total = 0
     model.eval()
     with torch.no_grad():
@@ -1422,12 +1440,18 @@ def evaluate_task(model, val_loader, task, device, original_model_id=None):
             label_remap = torch.tensor([2, 0, 1], dtype=torch.long, device=device)
 
     # HANS: fold MNLI 3-class output → 2-class
-    # textattack MNLI: 0=contradiction, 1=entailment, 2=neutral
-    # HANS target:     0=entailment,    1=non_entailment
+    # Detect entailment class from model.config.id2label:
+    #   textattack MNLI (generic LABEL_X): default class 1
+    #   ModernBERT MNLI (HuggingFace GLUE order): class 0 = entailment
     requires_label_fold = cfg.get("requires_label_fold", False)
+    _id2label = getattr(model.config, 'id2label', {})
+    _entail_cls = 1  # textattack MNLI default
+    for _cid, _cname in _id2label.items():
+        if str(_cname).lower() == "entailment":
+            _entail_cls = int(_cid)
+            break
 
     # ── Sanity logging ───────────────────────────────────────────────────────
-    _id2label = getattr(model.config, 'id2label', {})
     _num_labels = getattr(model.config, 'num_labels', '?')
     print(f"[eval] id2label={_id2label}  num_labels={_num_labels}")
     if label_remap is not None:
@@ -1435,7 +1459,7 @@ def evaluate_task(model, val_loader, task, device, original_model_id=None):
     else:
         print(f"[eval] label_remap=None  (labels already canonical or no canonical defined)")
     if requires_label_fold:
-        print(f"[eval] fold_rule: mnli_3→{task}_2  (pred==1→0=entailment, else→1=non_entailment)")
+        print(f"[eval] fold_rule: mnli_3→{task}_2  (pred=={_entail_cls}→0=entailment, else→1=non_entailment)")
 
     model.eval()
 
@@ -1459,9 +1483,9 @@ def evaluate_task(model, val_loader, task, device, original_model_id=None):
                     preds = label_remap[preds]
 
                 if requires_label_fold:
-                    # pred==1 (entailment) → 0; pred∈{0,2} → 1 (non-entailment)
+                    # pred==_entail_cls → 0 (entailment); others → 1 (non-entailment)
                     preds = torch.where(
-                        preds == 1,
+                        preds == _entail_cls,
                         torch.zeros_like(preds),
                         torch.ones_like(preds)
                     )

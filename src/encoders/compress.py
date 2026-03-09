@@ -413,11 +413,19 @@ def _evaluate_copa(model, loader, device) -> float:
     """
     Two-choice NLI scoring for COPA.
 
-    Entailment class: textattack MNLI class 1 (0=contra, 1=entail, 2=neutral).
+    Entailment class is detected from model.config.id2label:
+    - textattack MNLI (generic LABEL_X): defaults to class 1 (0=contra, 1=entail, 2=neutral)
+    - ModernBERT MNLI (HuggingFace GLUE order): class 0 = entailment
     For each pair of consecutive items in the batch (choice1, choice2),
     compare entailment logits and predict the higher-scoring choice.
     """
-    ENTAIL_IDX = 1   # textattack MNLI: class 1 = entailment
+    _id2label = getattr(model.config, 'id2label', {})
+    ENTAIL_IDX = 1  # textattack MNLI default
+    for _cid, _cname in _id2label.items():
+        if str(_cname).lower() == "entailment":
+            ENTAIL_IDX = int(_cid)
+            break
+    print(f"[copa] entailment class index = {ENTAIL_IDX}  (id2label={_id2label})")
     correct = total = 0
     model.eval()
     for batch in loader:
@@ -1199,8 +1207,18 @@ def evaluate_task(model, loader, task, device):
         print(f"[eval] label_remap={label_remap.tolist()}  (canonical={canon})")
     else:
         print(f"[eval] label_remap=None  (labels already canonical or no canonical defined)")
+    # Detect entailment class for HANS fold and COPA scoring.
+    # textattack MNLI uses generic LABEL_X names → default to class 1 (textattack convention).
+    # Models with named id2label (e.g. ModernBERT fine-tuned on GLUE) → look up "entailment".
+    _id2label_map = getattr(model.config, 'id2label', {})
+    _entail_cls = 1  # textattack MNLI default
+    for _cid, _cname in _id2label_map.items():
+        if str(_cname).lower() == "entailment":
+            _entail_cls = int(_cid)
+            break
+
     if requires_label_fold:
-        print(f"[eval] fold_rule: mnli_3→{task}_2  (pred==1→0=entailment, else→1=non_entailment)")
+        print(f"[eval] fold_rule: mnli_3→{task}_2  (pred=={_entail_cls}→0=entailment, else→1=non_entailment)")
 
     model.eval()
     for batch in loader:
@@ -1215,11 +1233,13 @@ def evaluate_task(model, loader, task, device):
             preds = label_remap[preds]
 
         # HANS: fold MNLI 3-class → 2-class
-        # textattack MNLI: 0=contradiction, 1=entailment, 2=neutral
-        # HANS target:     0=entailment,    1=non_entailment
+        # Entailment class detected from model.config.id2label (_entail_cls).
+        # textattack MNLI: 0=contradiction, 1=entailment, 2=neutral → _entail_cls=1
+        # ModernBERT MNLI (HuggingFace GLUE order): 0=entailment → _entail_cls=0
+        # HANS target: 0=entailment, 1=non_entailment
         if requires_label_fold:
             preds = torch.where(
-                preds == 1,
+                preds == _entail_cls,
                 torch.zeros_like(preds),
                 torch.ones_like(preds)
             )

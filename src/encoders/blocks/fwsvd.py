@@ -84,9 +84,14 @@ def estimate_fisher_weights_bert_with_attention(
     model_dtype = next(model.parameters()).dtype
     use_autocast = model_dtype in (torch.float16, torch.bfloat16)
 
+    _num_labels = getattr(model.config, 'num_labels', None)
     for batch in dataloader:
         # move inputs to device…
         inputs = {k: v.to(device) for k,v in batch.items() if isinstance(v, torch.Tensor)}
+        # Clamp labels to valid range — cross-task calibration (e.g. --calib_task mnli on a
+        # 2-class model) can produce labels >= num_labels → CUDA assert in nll_loss.
+        if _num_labels is not None and 'labels' in inputs:
+            inputs['labels'] = inputs['labels'].clamp(0, _num_labels - 1)
         with torch.autocast('cuda', dtype=model_dtype, enabled=use_autocast):
             outputs = model(**inputs)
             loss    = outputs.loss if hasattr(outputs, 'loss') else outputs[0]
@@ -161,8 +166,12 @@ def estimate_fisher_weights_modernbert(
     model_dtype = next(model.parameters()).dtype
     use_autocast = model_dtype in (torch.float16, torch.bfloat16)
 
+    _num_labels = getattr(model.config, 'num_labels', None)
     for batch in dataloader:
         inputs = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
+        # Clamp labels — cross-task calibration can produce labels >= num_labels
+        if _num_labels is not None and 'labels' in inputs:
+            inputs['labels'] = inputs['labels'].clamp(0, _num_labels - 1)
         with torch.autocast('cuda', dtype=model_dtype, enabled=use_autocast):
             outputs = model(**inputs)
             loss = outputs.loss if hasattr(outputs, 'loss') else outputs[0]
