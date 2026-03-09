@@ -211,7 +211,16 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
         for j in range(inps.shape[0]):
             attn_mask_j = attention_masks[j].unsqueeze(0).to(dev) if attention_masks is not None else None
             if "opt" not in model_name:
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attn_mask_j, position_ids=position_ids[j].unsqueeze(0).to(dev))[0]
+                pos_ids_j = position_ids[j].unsqueeze(0).to(dev)
+                extra_kwargs = {}
+                rotary_emb = getattr(getattr(model, 'model', None), 'rotary_emb', None)
+                if rotary_emb is not None:
+                    try:
+                        position_embeddings = rotary_emb(inps[j].unsqueeze(0).to(dev), pos_ids_j)
+                        extra_kwargs['position_embeddings'] = position_embeddings
+                    except Exception:
+                        pass
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attn_mask_j, position_ids=pos_ids_j, **extra_kwargs)[0]
             else:
                 outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attn_mask_j)[0]
         for h in handles:
