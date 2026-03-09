@@ -4,7 +4,14 @@ from __future__ import annotations
 import argparse
 import gc
 import os
+import sys
 from pathlib import Path
+
+# Add repo root (lowrankarena/) so `src.kernels.decoder.*` is importable.
+_here = os.path.dirname(os.path.abspath(__file__))
+_repo_root = os.path.dirname(os.path.dirname(_here))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
 
 import torch
 
