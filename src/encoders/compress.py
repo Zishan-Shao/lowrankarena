@@ -1777,6 +1777,21 @@ def main():
     # --adasvd_calib_samples, so this loader must cover the full training split.
     adasvd_full_loader = None
     if args.method == "adasvd" and calib_loader is not None:
+        # Guard: ARS uses task loss with calibration labels.  If calib_task has more
+        # classes than the model, labels will be out of range → CUDA assert in nll_loss.
+        # E.g. --calib_task mnli (3-class) + binary model → label=2 with n_classes=2.
+        _calib_nl = TASK_CFG[calib_task].get("num_labels")
+        _model_nl = getattr(model.config, "num_labels", None)
+        _calib_is_reg = TASK_CFG[calib_task].get("is_regression", False)
+        if (_calib_nl is not None and _model_nl is not None
+                and not _calib_is_reg and _calib_nl > _model_nl):
+            raise ValueError(
+                f"[adasvd] Calibration task '{calib_task}' has {_calib_nl} label classes "
+                f"but model only has {_model_nl}. ARS task loss would receive out-of-range "
+                f"labels (e.g. label=2 when n_classes=2) → CUDA assert.\n"
+                f"Fix: remove --calib_task (uses eval task's own data) or pick a calib task "
+                f"with num_labels <= {_model_nl}."
+            )
         adasvd_full_loader = prepare_loader(
             calib_task, tokenizer, args.seq_len, args.batch_size,
             split=args.calib_split,

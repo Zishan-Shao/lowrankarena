@@ -992,6 +992,24 @@ def compress_model(args, task: str = None, model_id_override: str = None) -> Pat
             f"or switch to --method dense or --method svd."
         )
 
+    # Extra check for adasvd: calibration labels must be in range for the task model.
+    # ARS uses model task loss with calib labels; if calib_task has more classes than
+    # the task model (e.g. --calib_task mnli on a binary boolq model) label=2 with
+    # n_classes=2 triggers a CUDA assert in nll_loss.
+    if args.method == "adasvd" and args.calib_task:
+        _task_cfg = ALL_TASKS.get(validation_task, {})
+        _task_nl   = _task_cfg.get("num_labels")
+        _calib_nl  = _calib_cfg.get("num_labels")
+        if (_task_nl is not None and _calib_nl is not None
+                and not _calib_cfg.get("is_regression", False)
+                and _calib_nl > _task_nl):
+            raise ValueError(
+                f"[adasvd] --calib_task='{effective_calib_task}' has {_calib_nl} label classes "
+                f"but task='{validation_task}' model only has {_task_nl} classes.\n"
+                f"ARS task loss would receive out-of-range labels → CUDA assert.\n"
+                f"Fix: remove --calib_task so '{validation_task}' uses its own training data."
+            )
+
     cmd = [
         "python", "src/encoders/compress.py",
         "--model_id", model_id,
