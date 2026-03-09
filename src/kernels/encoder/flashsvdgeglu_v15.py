@@ -18,6 +18,9 @@ import triton
 import triton.language as tl
 
 
+_PRECOMPUTED_FFN_G_CACHE: Dict[tuple, torch.Tensor] = {}
+
+
 # -----------------------------
 # Triton kernels
 # -----------------------------
@@ -244,6 +247,112 @@ def fused_ffn_phase12_geglu_kernel(
     )
 
 
+@triton.jit
+def fused_ffn_phase13_geglu_preg_kernel(
+    P_ptr,
+    V1_ptr,
+    G_ptr,
+    Y_ptr,
+    b1_ptr,
+    b2_ptr,
+    B,
+    L,
+    D,
+    R1,
+    Hdim,
+    sP_b,
+    sP_l,
+    sP_r1,
+    sV1_r1,
+    sV1_d,
+    sG_d,
+    sG_h,
+    sY_b,
+    sY_l,
+    sY_h,
+    sb1,
+    sb2,
+    BL: tl.constexpr,
+    BD: tl.constexpr,
+    BR1: tl.constexpr,
+    BH: tl.constexpr,
+    USE_TANH: tl.constexpr,
+):
+    pid_b = tl.program_id(0)
+    pid_l = tl.program_id(1)
+    pid_h = tl.program_id(2)
+
+    offs_l = pid_l * BL + tl.arange(0, BL)
+    offs_h = pid_h * BH + tl.arange(0, BH)
+    mask_h = offs_h < Hdim
+
+    acc_y = tl.zeros((BL, BH), dtype=tl.float32)
+
+    c0 = 0.7978845608028654
+    c1 = 0.044715
+    inv_sqrt2 = 0.7071067811865476
+
+    for d0 in range(0, D, BD):
+        d = d0 + tl.arange(0, BD)
+        m_d = d < D
+
+        tu_acc = tl.zeros((BL, BD), dtype=tl.float32)
+        tv_acc = tl.zeros((BL, BD), dtype=tl.float32)
+
+        for r1_0 in range(0, R1, BR1):
+            r1 = r1_0 + tl.arange(0, BR1)
+            m_r1 = r1 < R1
+
+            p_blk = tl.load(
+                P_ptr + pid_b * sP_b + offs_l[:, None] * sP_l + r1[None, :] * sP_r1,
+                mask=(offs_l[:, None] < L) & m_r1[None, :],
+                other=0.0,
+            )
+            v1u_blk = tl.load(
+                V1_ptr + r1[:, None] * sV1_r1 + d[None, :] * sV1_d,
+                mask=m_r1[:, None] & m_d[None, :],
+                other=0.0,
+            )
+            v1v_blk = tl.load(
+                V1_ptr + r1[:, None] * sV1_r1 + (d[None, :] + D) * sV1_d,
+                mask=m_r1[:, None] & m_d[None, :],
+                other=0.0,
+            )
+
+            tu_acc += tl.dot(p_blk.to(tl.float32), v1u_blk.to(tl.float32))
+            tv_acc += tl.dot(p_blk.to(tl.float32), v1v_blk.to(tl.float32))
+
+        b1u = tl.load(b1_ptr + d * sb1, mask=m_d, other=0.0).to(tl.float32)
+        b1v = tl.load(b1_ptr + (d + D) * sb1, mask=m_d, other=0.0).to(tl.float32)
+        tu = tu_acc + b1u[None, :]
+        tv = tv_acc + b1v[None, :]
+
+        if USE_TANH:
+            z = c0 * (tu + c1 * tu * tu * tu)
+            z2 = 2.0 * z
+            sig_2z = tl.where(z2 >= 0, 1.0 / (1.0 + tl.exp(-z2)), tl.exp(z2) / (1.0 + tl.exp(z2)))
+            tanh_z = 2.0 * sig_2z - 1.0
+            hu = 0.5 * tu * (1.0 + tanh_z)
+        else:
+            hu = 0.5 * tu * (1.0 + tl.erf(tu * inv_sqrt2))
+
+        h_blk = hu * tv
+        g_blk = tl.load(
+            G_ptr + d[:, None] * sG_d + offs_h[None, :] * sG_h,
+            mask=m_d[:, None] & mask_h[None, :],
+            other=0.0,
+        ).to(tl.float32)
+        acc_y += tl.dot(h_blk, g_blk)
+
+    b2_blk = tl.load(b2_ptr + offs_h * sb2, mask=mask_h, other=0.0).to(tl.float32)
+    mask = (offs_l[:, None] < L) & mask_h[None, :]
+    tl.store(
+        Y_ptr + pid_b * sY_b + offs_l[:, None] * sY_l + offs_h[None, :] * sY_h,
+        acc_y + b2_blk[None, :],
+        mask=mask,
+    )
+
+
 # -----------------------------
 # Config selection
 # -----------------------------
@@ -265,6 +374,51 @@ _FUSED_DEFAULT = {
     "num_warps": 8,
     "num_stages": 2,
 }
+
+
+def _tensor_version(t: torch.Tensor) -> int:
+    try:
+        return int(getattr(t, "_version", -1))
+    except Exception:
+        return -1
+
+
+def _precompute_g_enabled() -> bool:
+    raw = os.getenv("FLASH_SVD_GEGLU_PRECOMPUTE_G", "").strip().lower()
+    if raw in {"0", "false", "off", "no"}:
+        return False
+    if raw in {"1", "true", "on", "yes"}:
+        return True
+    return True
+
+
+def _precompute_g_cache_key(U2: torch.Tensor, V2: torch.Tensor) -> tuple:
+    return (
+        U2.device.type,
+        U2.device.index,
+        str(U2.dtype),
+        int(U2.shape[0]),
+        int(U2.shape[1]),
+        int(V2.shape[1]),
+        int(U2.data_ptr()),
+        int(V2.data_ptr()),
+        _tensor_version(U2),
+        _tensor_version(V2),
+    )
+
+
+def precompute_ffn_g(U2: torch.Tensor, V2: torch.Tensor) -> torch.Tensor:
+    return U2.matmul(V2).contiguous()
+
+
+def _get_precomputed_ffn_g(U2: torch.Tensor, V2: torch.Tensor) -> torch.Tensor:
+    key = _precompute_g_cache_key(U2, V2)
+    cached = _PRECOMPUTED_FFN_G_CACHE.get(key)
+    if cached is not None:
+        return cached
+    G = precompute_ffn_g(U2, V2)
+    _PRECOMPUTED_FFN_G_CACHE[key] = G
+    return G
 
 
 def _pick_two_stage_cfg(B: int, L: int, R2: int) -> Dict[str, int]:
@@ -298,10 +452,14 @@ def _effective_variant(kernel_variant: str, prefer_fused: Optional[bool], P: tor
         "FLASH_SVD_GEGLU_KERNEL_VARIANT",
         os.getenv("FLASHSVD_GEGLU_KERNEL_VARIANT", ""),
     ).strip().lower()
+    if env_variant in {"preg", "preg_fused", "fused_preg", "preg-fused"}:
+        return "preg"
     if env_variant in {"fused", "two_stage", "two-stage"}:
         return "fused" if env_variant == "fused" else "two_stage"
 
     kv = kernel_variant.strip().lower()
+    if kv in {"preg", "preg_fused", "fused_preg", "preg-fused"}:
+        return "preg"
     if kv in {"fused", "two_stage", "two-stage"}:
         return "fused" if kv == "fused" else "two_stage"
 
@@ -312,7 +470,7 @@ def _effective_variant(kernel_variant: str, prefer_fused: Optional[bool], P: tor
     B, L, _ = P.shape
     H = V2.shape[1]
     if P.is_cuda and L >= 128 and H >= 256 and P.dtype in (torch.float16, torch.bfloat16):
-        return "fused"
+        return "preg" if _precompute_g_enabled() else "fused"
     return "two_stage"
 
 
@@ -464,6 +622,70 @@ def flashsvd_ffn_geglu_fused(
     return Y
 
 
+def flashsvd_ffn_geglu_fused_preg(
+    P: torch.Tensor,
+    V1: torch.Tensor,
+    G: torch.Tensor,
+    b1: torch.Tensor,
+    b2: torch.Tensor,
+    *,
+    BL: int = 64,
+    BD: int = 128,
+    BR1: int = 64,
+    BH: int = 128,
+    gelu_approx: str = "tanh",
+    num_warps: int = 8,
+    num_stages: int = 2,
+) -> torch.Tensor:
+    B, L, R1 = P.shape
+    R1_v1, two_d = V1.shape
+    D = two_d // 2
+    D_g, H = G.shape
+
+    assert R1_v1 == R1 and two_d == 2 * D
+    assert D_g == D
+    assert b1.numel() == 2 * D and b2.numel() == H
+
+    Y = torch.empty((B, L, H), device=P.device, dtype=P.dtype)
+    grid = (B, triton.cdiv(L, BL), triton.cdiv(H, BH))
+    use_tanh = 1 if gelu_approx == "tanh" else 0
+
+    fused_ffn_phase13_geglu_preg_kernel[grid](
+        P,
+        V1,
+        G,
+        Y,
+        b1,
+        b2,
+        B,
+        L,
+        D,
+        R1,
+        H,
+        P.stride(0),
+        P.stride(1),
+        P.stride(2),
+        V1.stride(0),
+        V1.stride(1),
+        G.stride(0),
+        G.stride(1),
+        Y.stride(0),
+        Y.stride(1),
+        Y.stride(2),
+        b1.stride(0),
+        b2.stride(0),
+        BL=BL,
+        BD=BD,
+        BR1=BR1,
+        BH=BH,
+        USE_TANH=use_tanh,
+        num_warps=num_warps,
+        num_stages=num_stages,
+    )
+
+    return Y
+
+
 def flashsvd_ffn_geglu_autotuned(
     P: torch.Tensor,
     V1: torch.Tensor,
@@ -476,6 +698,8 @@ def flashsvd_ffn_geglu_autotuned(
     *,
     kernel_variant: str = "auto",
     prefer_fused: Optional[bool] = None,
+    use_precomputed_g: Optional[bool] = None,
+    precomputed_g: Optional[torch.Tensor] = None,
     fused_cfg: Optional[Dict[str, int]] = None,
     two_stage_cfg: Optional[Dict[str, int]] = None,
 ) -> torch.Tensor:
@@ -492,6 +716,27 @@ def flashsvd_ffn_geglu_autotuned(
     _, H = V2.shape
 
     variant = _effective_variant(kernel_variant, prefer_fused, P, V2)
+    want_preg = bool(use_precomputed_g) if use_precomputed_g is not None else (variant == "preg")
+    if want_preg:
+        cfg = _pick_fused_cfg(B=B, L=L, H=H, R1=V1.shape[0], R2=U2.shape[1])
+        if fused_cfg:
+            cfg.update({k: int(v) for k, v in fused_cfg.items()})
+        G = precomputed_g if precomputed_g is not None else _get_precomputed_ffn_g(U2, V2)
+        return flashsvd_ffn_geglu_fused_preg(
+            P,
+            V1,
+            G,
+            b1,
+            b2,
+            BL=cfg["BL"],
+            BD=cfg["BD"],
+            BR1=cfg["BR1"],
+            BH=cfg["BH"],
+            gelu_approx=gelu_approx,
+            num_warps=cfg["num_warps"],
+            num_stages=cfg["num_stages"],
+        )
+
     if variant == "fused":
         cfg = _pick_fused_cfg(B=B, L=L, H=H, R1=V1.shape[0], R2=U2.shape[1])
         if fused_cfg:
@@ -552,9 +797,26 @@ def flashsvd_ffn_geglu_configured(
     *,
     kernel_variant: str = "two_stage",
     BH: int = 128,
+    precomputed_g: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     """Manual, pinned launch. Keeps compatibility with previous API."""
     kv = kernel_variant.strip().lower()
+    if kv in {"preg", "preg_fused", "fused_preg", "preg-fused"}:
+        G = precomputed_g if precomputed_g is not None else _get_precomputed_ffn_g(U2, V2)
+        return flashsvd_ffn_geglu_fused_preg(
+            P,
+            V1,
+            G,
+            b1,
+            b2,
+            BL=BL,
+            BD=BD,
+            BR1=BR1,
+            BH=BH,
+            gelu_approx=gelu_approx,
+            num_warps=num_warps,
+            num_stages=num_stages,
+        )
     if kv in {"fused", "phase12"}:
         return flashsvd_ffn_geglu_fused(
             P,
