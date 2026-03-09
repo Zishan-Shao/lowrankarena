@@ -286,7 +286,8 @@ def load_compressed_model(
             # Metadata
             blk.num_heads = base_model.config.num_attention_heads
             blk.head_dim = base_model.config.hidden_size // blk.num_heads
-            blk.rotary_emb = getattr(hf_layer.attn, "rotary_emb", None) or getattr(hf_layer.attn, "rotary_fn", None)  # shared reference
+            _rope = getattr(hf_layer.attn, "rotary_emb", None)
+            blk.rotary_emb = _rope if isinstance(_rope, nn.Module) else base_model.model.rotary_emb  # shared reference
             blk.gelu_approximate = "none"
 
             # ffn_is_geglu: V1.shape[1] == 2 * U2.shape[0]

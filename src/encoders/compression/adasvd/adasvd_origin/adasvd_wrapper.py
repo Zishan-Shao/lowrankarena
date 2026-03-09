@@ -563,6 +563,8 @@ def compress_adasvd_modernbert(
         block   = NaiveModernBertSVDBlock(
             layer, config, rank_attn, rank_ff, rank_wo, _svd_per_head, _svd_low_rank,
         )
+        if block.rotary_emb is None:
+            block.rotary_emb = model.model.rotary_emb
         shimmed = ModernBertLayerShim(block, attention_type=getattr(layer, "attention_type", "global"))
         encoder_layers[i] = shimmed.to(device).eval()
 

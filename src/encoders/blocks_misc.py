@@ -274,9 +274,12 @@ class NaiveModernBertSVDBlock(nn.Module):
         self.mlp_norm = copy.deepcopy(hf_layer.mlp_norm)
 
         # RoPE (shared reference – not copied)
-        # transformers < 4.48 uses rotary_emb; >= 4.48 renamed to rotary_fn
+        # transformers < 4.48: rotary_emb is an nn.Module on attn
+        # transformers >= 4.48: rotary_fn is apply_rotary_pos_emb (a plain function, not usable here)
+        #   → real ModernBertRotaryEmbedding moved to model.model.rotary_emb; caller must set it after init
         _attn = hf_layer.attn
-        self.rotary_emb = getattr(_attn, "rotary_emb", None) or getattr(_attn, "rotary_fn", None)
+        _rope = getattr(_attn, "rotary_emb", None)
+        self.rotary_emb = _rope if isinstance(_rope, nn.Module) else None
 
         # --- Split fused Wqkv [3D, D] → Q, K, V ---
         W = hf_layer.attn.Wqkv.weight.data          # [3*D, D]
