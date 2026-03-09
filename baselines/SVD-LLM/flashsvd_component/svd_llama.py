@@ -249,15 +249,7 @@ def _get_dense_token_decode_mod():
     global _DENSE_TOKEN_DECODE_MOD
     if _DENSE_TOKEN_DECODE_MOD is not None:
         return _DENSE_TOKEN_DECODE_MOD
-    path = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "kernels"
-        / "decoder"
-        / "flashsvd-v1.5"
-        / "flashsvdropeattn_short"
-        / "flashsvdropeattn_dense_decode.py"
-    )
+    path = Path(__file__).resolve().parent / "flashsvdropeattn_dense_decode.py"
     _DENSE_TOKEN_DECODE_MOD = _load_decode_mod(path, "flashsvdropeattn_dense_decode_component")
     return _DENSE_TOKEN_DECODE_MOD
 
