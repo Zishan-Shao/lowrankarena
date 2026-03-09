@@ -222,9 +222,11 @@ def _apply_rotary(x, cos, sin):
 class ModernBertLayerShim(nn.Module):
     """Wraps an SVD block so it has the same forward signature as a ModernBERT layer."""
 
-    def __init__(self, block: nn.Module):
+    def __init__(self, block: nn.Module, attention_type: str = "global"):
         super().__init__()
         self.block = block
+        # transformers >= 4.48 accesses attention_type on each layer during forward
+        self.attention_type = getattr(block, "attention_type", attention_type)
 
     def forward(self, hidden_states, attention_mask=None, sliding_window_mask=None,
                 position_ids=None, output_attentions=False, **kwargs):
@@ -272,7 +274,9 @@ class NaiveModernBertSVDBlock(nn.Module):
         self.mlp_norm = copy.deepcopy(hf_layer.mlp_norm)
 
         # RoPE (shared reference – not copied)
-        self.rotary_emb = hf_layer.attn.rotary_emb
+        # transformers < 4.48 uses rotary_emb; >= 4.48 renamed to rotary_fn
+        _attn = hf_layer.attn
+        self.rotary_emb = getattr(_attn, "rotary_emb", None) or getattr(_attn, "rotary_fn", None)
 
         # --- Split fused Wqkv [3D, D] → Q, K, V ---
         W = hf_layer.attn.Wqkv.weight.data          # [3*D, D]
