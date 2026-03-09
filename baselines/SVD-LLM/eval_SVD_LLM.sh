@@ -1,21 +1,8 @@
-# run SVD-LLM (whitening + SVD). 40% params
-#mkdir -p checkpoints
-
-# CUDA_VISIBLE_DEVICES=1 \
-# python baselines/SVD-LLM/SVDLLM.py \
-#   --model meta-llama/Llama-2-7b-hf \
-#   --step 1 \
-#   --ratio 0.6 \
-#   --dataset wikitext2 \
-#   --whitening_nsamples 256 \
-#   --model_seq_len 2048 \
-#   --save_path checkpoints \
 
 
 
-
-
-CUDA_VISIBLE_DEVICES=1 python -m baselines.SVD-LLM.eval_SVDLLM_benchmark \
+# llama2-7b
+CUDA_VISIBLE_DEVICES=1 python -m eval_results.eval_benchmark \
   --model checkpoints/meta_llama_Llama_2_7b_hf_whitening_only_0.4.pt \
   --device cuda \
   --batch_size 1 \
@@ -27,7 +14,7 @@ CUDA_VISIBLE_DEVICES=1 python -m baselines.SVD-LLM.eval_SVDLLM_benchmark \
   --output_json outputs/benchmark.json
 
 # eval ppl on wikitext2, ptb, c4
-CUDA_VISIBLE_DEVICES=1 python -m baselines.SVD-LLM.eval_SVDLLM_ppl \
+CUDA_VISIBLE_DEVICES=1 python -m eval_results.eval_general_ppl \
   --checkpoint checkpoints/meta_llama_Llama_2_7b_hf_whitening_only_0.4.pt \
   --datasets wikitext2,ptb,c4 \
   --max_batches 50 \
@@ -38,7 +25,7 @@ CUDA_VISIBLE_DEVICES=1 python -m baselines.SVD-LLM.eval_SVDLLM_ppl \
   --output_json outputs/ppl.json
 
 # eval linguistic tasks
-CUDA_VISIBLE_DEVICES=1 python -m baselines.SVD-LLM.eval_SVDLLM_linguistic \
+CUDA_VISIBLE_DEVICES=1 python -m eval_results.eval_linguistic_tasks \
   --checkpoint checkpoints/meta_llama_Llama_2_7b_hf_whitening_only_0.4.pt \
   --device cuda \
   --batch_size 1 \

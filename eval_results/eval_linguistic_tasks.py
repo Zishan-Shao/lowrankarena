@@ -195,6 +195,270 @@ from utils.saes_svd_loader import looks_like_saes_svd_checkpoint, load_saes_svd_
 from utils.df_svd_loader import looks_like_dfsvd_checkpoint, load_dfsvd_model
 
 
+# ----------------------------------------------------------------------------
+# ASVD HuggingFace loader fallback
+# ----------------------------------------------------------------------------
+
+
+def _asvd_torch_dtype(dtype):
+    if dtype is None:
+        return None
+    dtype_map = {
+        "float16": torch.float16,
+        "fp16": torch.float16,
+        "half": torch.float16,
+        "bfloat16": torch.bfloat16,
+        "bf16": torch.bfloat16,
+        "float32": torch.float32,
+        "fp32": torch.float32,
+        "float": torch.float32,
+    }
+    return dtype_map.get(str(dtype).lower())
+
+
+def _hf_from_pretrained_with_token_retry(cls, *args, hf_token=None, **kwargs):
+    if hf_token is None:
+        return cls.from_pretrained(*args, **kwargs)
+    try:
+        return cls.from_pretrained(*args, token=hf_token, **kwargs)
+    except TypeError:
+        return cls.from_pretrained(*args, use_auth_token=hf_token, **kwargs)
+
+
+def _ensure_asvd_tokenizer_pad(tokenizer, padding_side="left"):
+    if getattr(tokenizer, "pad_token_id", None) is None:
+        if getattr(tokenizer, "eos_token_id", None) is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+    if padding_side is not None:
+        try:
+            tokenizer.padding_side = padding_side
+        except Exception:
+            pass
+
+
+def _resolve_asvd_model_path(model_id_or_path, hf_token=None, revision=None, cache_dir=None):
+    if os.path.isdir(model_id_or_path):
+        return model_id_or_path
+    try:
+        from huggingface_hub import snapshot_download
+    except Exception as e:
+        raise RuntimeError(
+            "huggingface_hub is required to download HuggingFace/ASVD repos. "
+            f"Original error: {e}"
+        )
+    return snapshot_download(
+        repo_id=model_id_or_path,
+        revision=revision,
+        cache_dir=cache_dir,
+        token=hf_token,
+    )
+
+
+def _read_json_file(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _import_module_from_file(module_name, file_path):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Failed to create import spec for {module_name} from {file_path}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = mod
+    spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+    return mod
+
+
+def _find_asvd_module_file(module_name, search_roots):
+    rel = module_name.replace(".", os.sep) + ".py"
+    for root in search_roots:
+        cand = os.path.join(root, rel)
+        if os.path.isfile(cand):
+            return cand
+    base = os.path.basename(rel)
+    for root in search_roots:
+        if not os.path.isdir(root):
+            continue
+        for dirpath, _, filenames in os.walk(root):
+            if base in filenames:
+                return os.path.join(dirpath, base)
+    return None
+
+
+def _asvd_search_roots(local_path):
+    roots = []
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.abspath(os.path.join(this_dir, ".."))
+    for root in (
+        local_path,
+        os.path.dirname(local_path),
+        this_dir,
+        parent_dir,
+        os.path.join(this_dir, "huggingface_repos"),
+        os.path.join(parent_dir, "huggingface_repos"),
+    ):
+        if root and root not in roots:
+            roots.append(root)
+    return roots
+
+
+def _load_asvd_hf_model_and_tokenizer(
+    model_id_or_path,
+    *,
+    tokenizer_id_or_path=None,
+    hf_token=None,
+    revision=None,
+    cache_dir=None,
+    trust_remote_code=True,
+    dtype=None,
+):
+    local_path = _resolve_asvd_model_path(
+        model_id_or_path,
+        hf_token=hf_token,
+        revision=revision,
+        cache_dir=cache_dir,
+    )
+
+    search_roots = _asvd_search_roots(local_path)
+    for root in search_roots:
+        if os.path.isdir(root) and root not in sys.path:
+            sys.path.insert(0, root)
+
+    try:
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+    except Exception as e:
+        raise RuntimeError(f"transformers is required to load ASVD HuggingFace repos: {e}")
+
+    torch_dtype = _asvd_torch_dtype(dtype)
+    tok_src = tokenizer_id_or_path or local_path
+
+    try:
+        tokenizer = _hf_from_pretrained_with_token_retry(
+            AutoTokenizer,
+            tok_src,
+            hf_token=hf_token,
+            revision=revision,
+            cache_dir=cache_dir,
+            trust_remote_code=trust_remote_code,
+            use_fast=True,
+        )
+    except Exception:
+        tokenizer = _hf_from_pretrained_with_token_retry(
+            AutoTokenizer,
+            tok_src,
+            hf_token=hf_token,
+            revision=revision,
+            cache_dir=cache_dir,
+            trust_remote_code=trust_remote_code,
+            use_fast=False,
+        )
+    _ensure_asvd_tokenizer_pad(tokenizer)
+
+    model_kwargs = dict(
+        revision=revision,
+        cache_dir=cache_dir,
+        trust_remote_code=trust_remote_code,
+        low_cpu_mem_usage=True,
+    )
+    if torch_dtype is not None:
+        model_kwargs["torch_dtype"] = torch_dtype
+
+    try:
+        model = _hf_from_pretrained_with_token_retry(
+            AutoModelForCausalLM,
+            local_path,
+            hf_token=hf_token,
+            **model_kwargs,
+        )
+        return model, tokenizer, local_path
+    except Exception as e_auto:
+        print(f"[WARN] Standard transformers loader failed: {type(e_auto).__name__}: {e_auto}")
+        print("[WARN] Trying ASVD auto_map fallback loader...")
+
+    config_json = os.path.join(local_path, "config.json")
+    if not os.path.isfile(config_json):
+        raise FileNotFoundError(f"Could not find config.json under {local_path}")
+    cfg_dict = _read_json_file(config_json)
+    auto_map = cfg_dict.get("auto_map") or {}
+    cfg_entry = auto_map.get("AutoConfig")
+    model_entry = auto_map.get("AutoModelForCausalLM") or auto_map.get("AutoModel")
+    if not cfg_entry or not model_entry:
+        raise RuntimeError(
+            "ASVD fallback loader requires AutoConfig and AutoModelForCausalLM/AutoModel entries in config.json"
+        )
+
+    def _split_entry(entry):
+        if ":" in entry:
+            mod, cls = entry.split(":", 1)
+        else:
+            parts = entry.split(".")
+            if len(parts) < 2:
+                raise ValueError(f"Invalid auto_map entry: {entry}")
+            mod, cls = ".".join(parts[:-1]), parts[-1]
+        return mod, cls
+
+    cfg_mod_name, cfg_cls_name = _split_entry(cfg_entry)
+    model_mod_name, model_cls_name = _split_entry(model_entry)
+
+    cfg_file = _find_asvd_module_file(cfg_mod_name, search_roots)
+    model_file = _find_asvd_module_file(model_mod_name, search_roots)
+    if cfg_file is None or model_file is None:
+        raise FileNotFoundError(
+            "Could not locate ASVD remote-code python files for fallback loader.\n"
+            f"  config module: {cfg_mod_name} -> {cfg_file}\n"
+            f"  model module:  {model_mod_name} -> {model_file}"
+        )
+
+    cfg_mod = _import_module_from_file(cfg_mod_name, cfg_file)
+    model_mod = _import_module_from_file(model_mod_name, model_file)
+    cfg_cls = getattr(cfg_mod, cfg_cls_name)
+    model_cls = getattr(model_mod, model_cls_name)
+
+    config = cfg_cls.from_pretrained(local_path)
+    model_kwargs = dict(config=config, low_cpu_mem_usage=True)
+    if torch_dtype is not None:
+        model_kwargs["torch_dtype"] = torch_dtype
+    model = model_cls.from_pretrained(local_path, **model_kwargs)
+    return model, tokenizer, local_path
+
+
+def _load_hf_or_asvd_model_and_tokenizer(
+    model_id_or_path,
+    *,
+    tokenizer_id_or_path=None,
+    hf_token=None,
+    revision=None,
+    cache_dir=None,
+    trust_remote_code=True,
+    dtype=None,
+):
+    should_try_default_loader = (
+        tokenizer_id_or_path is None
+        and revision is None
+        and cache_dir is None
+    )
+    if should_try_default_loader:
+        try:
+            model, tokenizer = get_model_from_huggingface(model_id_or_path, hf_token=hf_token)
+            return model, tokenizer, None
+        except Exception as e:
+            print(f"[WARN] Default HF loader failed for {model_id_or_path}: {type(e).__name__}: {e}")
+            print("[WARN] Falling back to ASVD-compatible loader...")
+
+    return _load_asvd_hf_model_and_tokenizer(
+        model_id_or_path,
+        tokenizer_id_or_path=tokenizer_id_or_path,
+        hf_token=hf_token,
+        revision=revision,
+        cache_dir=cache_dir,
+        trust_remote_code=trust_remote_code,
+        dtype=dtype,
+    )
+
+
+
 def _parse_tasks(s: str) -> List[str]:
     return [t.strip() for t in (s or "").split(",") if t.strip()]
 
@@ -543,6 +807,16 @@ def main() -> None:
     p.add_argument("--saes_cache_dir", type=str, default=None)
 
     p.add_argument(
+        "--dfsvd_model",
+        type=str,
+        default=None,
+        help="DF-SVD checkpoint (local dir or HF repo id).",
+    )
+    p.add_argument("--dfsvd_base_model", type=str, default=None, help="Base HF model id/path to apply DF-SVD onto (required when using DF-SVD).")
+    p.add_argument("--dfsvd_revision", type=str, default=None)
+    p.add_argument("--dfsvd_cache_dir", type=str, default=None)
+
+    p.add_argument(
         "--dobi_model",
         type=str,
         default=None,
@@ -576,6 +850,12 @@ def main() -> None:
     p.add_argument("--dtype", type=str, default=None)
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--hf_token", type=str, default=None)
+
+    p.add_argument("--tokenizer", type=str, default=None, help="Optional tokenizer id/path for HuggingFace/ASVD model loading.")
+    p.add_argument("--revision", type=str, default=None, help="Optional HF revision for --model when loading from HuggingFace.")
+    p.add_argument("--cache_dir", type=str, default=None, help="Optional HF cache dir for --model when loading from HuggingFace.")
+    p.add_argument("--trust_remote_code", action="store_true", help="Enable transformers trust_remote_code for HuggingFace/ASVD loading.")
+    p.add_argument("--no_trust_remote_code", action="store_true", help="Disable transformers trust_remote_code for HuggingFace/ASVD loading.")
 
     p.add_argument(
         "--output_json",
@@ -620,6 +900,12 @@ def main() -> None:
     )
 
     args = p.parse_args()
+
+    trust_remote_code = True
+    if args.no_trust_remote_code:
+        trust_remote_code = False
+    if args.trust_remote_code:
+        trust_remote_code = True
 
     if args.json_keep_samples:
         args.log_samples = True
@@ -702,7 +988,15 @@ def main() -> None:
                         cache_dir=args.dfsvd_cache_dir,
                     )
                 else:
-                    model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
+                    model, tokenizer, _ = _load_hf_or_asvd_model_and_tokenizer(
+                        args.model,
+                        tokenizer_id_or_path=args.tokenizer,
+                        hf_token=args.hf_token,
+                        revision=args.revision,
+                        cache_dir=args.cache_dir,
+                        trust_remote_code=trust_remote_code,
+                        dtype=args.dtype,
+                    )
                 model_name = args.model
             else:
                 model, tokenizer = get_model_from_local(args.checkpoint)
@@ -730,7 +1024,7 @@ def main() -> None:
         device=args.device,
         batch_size=args.batch_size,
         max_batch_size=64,
-        trust_remote_code=True,
+        trust_remote_code=trust_remote_code,
     )
     try:
         from lm_eval.tasks import TaskManager

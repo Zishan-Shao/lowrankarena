@@ -1,4 +1,4 @@
-# physical GPU 2 becomes cuda:0 inside the process
+# llama-7b
 CUDA_VISIBLE_DEVICES=2 python -u SVDLLM_v2.py \
   --model jeffwan/llama-7b-hf \
   --ratio 0.6 \
@@ -7,7 +7,7 @@ CUDA_VISIBLE_DEVICES=2 python -u SVDLLM_v2.py \
   --device cuda:0 \
   --load_dtype float16 \
   --stats_dtype float32 \
-  --sqrt_dtype float32 --store_act_dtype float16 --sqrt_on_gpu \
+  --sqrt_dtype float32 --store_act_dtype float16 \
   --save_path ./checkpoints/llama2_svdllmv2_red0.6.pt \
   --timing_file svdllmv2_timing.json \
   --tqdm auto

@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.optim import Adam
 import torch.distributions as dist
 from transformers import Trainer
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer
 from transformers import AutoModelForSequenceClassification
 from transformers import DataCollatorForLanguageModeling
 from accelerate import Accelerator
@@ -26,7 +26,23 @@ from modules.module import SVDTransformLayer
 from modules.remapping import DOBI_quantize
 
 
+def load_base_tokenizer(model_id: str, lower_id: str):
+    """Load tokenizer robustly for old HF-converted LLaMA checkpoints like jeffwan/llama-7b-hf."""
+    if "llama" in lower_id.lower():
+        tokenizer = LlamaTokenizer.from_pretrained(model_id, legacy=True)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
 
+    if isinstance(tokenizer, bool):
+        raise TypeError(
+            f"Tokenizer load for {model_id} returned bool={tokenizer}. "
+            "Use the repo's pinned env and do not pass use_fast to LLaMA tokenizer loading."
+        )
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
+    return tokenizer
 
 
 def main(args):
@@ -105,7 +121,7 @@ def main(args):
 
     # load model
     model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=model_load_dtype)
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    tokenizer = load_base_tokenizer(model_id, lower_id)
     model.to(DEV_GPU)
     
     # load json
