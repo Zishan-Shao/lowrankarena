@@ -673,7 +673,7 @@ class MinimalModernBertSVDBlock(nn.Module):
 
         if output_attentions:
             return (x, None)
-        return (x,)
+        return x
 
 
 def test_loading():

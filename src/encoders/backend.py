@@ -551,7 +551,7 @@ class FlashModernBertSVDBlock(nn.Module):
 
         if output_attentions:
             return (x, None)
-        return (x,)
+        return x
 
 
 # ---------------------------------------------------------------------------
