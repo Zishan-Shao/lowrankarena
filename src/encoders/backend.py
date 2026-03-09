@@ -466,6 +466,20 @@ class FlashModernBertSVDBlock(nn.Module):
         self.gelu_approximate = naive_block.gelu_approximate
         self.attention_type   = getattr(naive_block, 'attention_type', 'global')
 
+        # Sliding-window SDPA helper (pure PyTorch, no Triton).
+        # Used for chunked SDPA on ModernBERT local-attention layers.
+        try:
+            from src.kernels.encoder.flashsvdropeattn_v15_encoder import FlashSVDRoPEAttention as _RopeAttn
+            self._rope_attn = _RopeAttn(
+                num_heads=self.num_heads,
+                head_dim=self.head_dim,
+                rotary_emb=self.rotary_emb,
+                enable_sliding_chunk=True,
+                auto_infer_window=True,
+            )
+        except Exception:
+            self._rope_attn = None
+
     def forward(self, hidden_states, attention_mask=None, sliding_window_mask=None,
                 position_ids=None, output_attentions=False, **kwargs):
         from src.encoders.blocks_misc import _apply_rotary
@@ -500,22 +514,37 @@ class FlashModernBertSVDBlock(nn.Module):
         Q = _apply_rotary(qf, cos, sin).view(B, H, M, dh)
         K = _apply_rotary(kf, cos, sin).view(B, H, M, dh)
 
-        sdpa_mask = None
-        if sliding_window_mask is not None:
-            sm = sliding_window_mask
-            if sm.dtype.is_floating_point and sm.dtype != Q.dtype:
-                sm = sm.to(Q.dtype)
-            sdpa_mask = sm
-        elif attention_mask is not None:
-            if attention_mask.dim() == 2:
-                sdpa_mask = ~(attention_mask.to(torch.bool))[:, None, None, :]
-            elif attention_mask.dim() == 4:
-                sm = attention_mask
+        # SDPA with optional sliding-window chunking via rope_attn helper.
+        # For local-attention layers (window_radius < L), chunked SDPA is O(L*W) not O(L²).
+        effective_mask = sliding_window_mask if sliding_window_mask is not None else attention_mask
+        if self._rope_attn is not None:
+            window_radius = self._rope_attn._infer_window_radius_from_mask(sliding_window_mask)
+            if window_radius is not None and window_radius < (M - 1):
+                padding_2d = attention_mask if (attention_mask is not None and attention_mask.dim() == 2) else None
+                attn = self._rope_attn._forward_sliding_chunked_qkv(
+                    Q, K, V, effective_mask, padding_2d, window_radius=window_radius
+                )
+            else:
+                sdpa_mask = self._rope_attn._to_sdpa_mask(effective_mask, dtype=Q.dtype)
+                attn = F.scaled_dot_product_attention(Q, K, V, attn_mask=sdpa_mask, dropout_p=0.0, is_causal=False)
+                if attention_mask is not None and attention_mask.dim() == 2:
+                    attn = attn * attention_mask.to(torch.bool)[:, None, :, None]
+        else:
+            sdpa_mask = None
+            if sliding_window_mask is not None:
+                sm = sliding_window_mask
                 if sm.dtype.is_floating_point and sm.dtype != Q.dtype:
                     sm = sm.to(Q.dtype)
                 sdpa_mask = sm
-
-        attn = F.scaled_dot_product_attention(Q, K, V, attn_mask=sdpa_mask, dropout_p=0.0)
+            elif attention_mask is not None:
+                if attention_mask.dim() == 2:
+                    sdpa_mask = ~(attention_mask.to(torch.bool))[:, None, None, :]
+                elif attention_mask.dim() == 4:
+                    sm = attention_mask
+                    if sm.dtype.is_floating_point and sm.dtype != Q.dtype:
+                        sm = sm.to(Q.dtype)
+                    sdpa_mask = sm
+            attn = F.scaled_dot_product_attention(Q, K, V, attn_mask=sdpa_mask, dropout_p=0.0)
         attn = attn.transpose(1, 2).reshape(B, M, D)
         attn_out = (attn @ self.Uo) @ self.Vo
         if self.bo_attn is not None:
