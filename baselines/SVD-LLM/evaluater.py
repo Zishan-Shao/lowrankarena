@@ -225,8 +225,6 @@ def decode_kvcache_eval(
     - Uses `StaticCache` to avoid dynamic `torch.cat` overhead.
     - Requires transformers>=4.4x Cache API (works with LLaMA in 4.53).
     """
-    from transformers.cache_utils import StaticCache
-
     model.eval()
     if max_cache_len is None:
         extra = int(profile_decode_steps) if profile_decode else 0
@@ -310,6 +308,7 @@ def decode_kvcache_eval(
             dtype=dtype,
         )
     else:
+        from transformers.cache_utils import StaticCache
         cache = StaticCache(
             model.config,
             max_batch_size=int(batch_size),
