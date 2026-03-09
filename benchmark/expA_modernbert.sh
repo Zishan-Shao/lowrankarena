@@ -118,6 +118,7 @@ _COMMON_ENV=(
     ADASVD_STEPS="${ADASVD_STEPS}"
     AUTO_FIGURES="false"
     PERF_CSV="${OUT_CSV}"
+    REUSE_CHECKPOINT="$( [[ "${RECOMPRESS}" == "true" ]] && echo "false" || echo "true" )"
 )
 
 # ── Phase 1: GLUE ─────────────────────────────────────────────────────────────
