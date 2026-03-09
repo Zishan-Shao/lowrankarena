@@ -158,11 +158,14 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
             inps[cache['i']] = inp.cpu()
             cache['i'] += 1
             if cache['attention_mask'] is None:
-                cache['attention_mask'] = kwargs['attention_mask'].cpu()
+                attn_mask = kwargs.get('attention_mask', None)
+                cache['attention_mask'] = attn_mask.cpu() if attn_mask is not None else None
                 if "opt" not in model_name:
                     cache['position_ids'] = kwargs['position_ids'].cpu()
             else:
-                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask'].cpu()), dim=0)
+                attn_mask = kwargs.get('attention_mask', None)
+                if attn_mask is not None:
+                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attn_mask.cpu()), dim=0) if cache['attention_mask'] is not None else attn_mask.cpu()
                 if "opt" not in model_name:
                     cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids'].cpu()), dim=0)
             raise ValueError
@@ -206,10 +209,11 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
             subset[name].scaling_diag_matrix = 0
             handles.append(subset[name].register_forward_hook(hook))
         for j in range(inps.shape[0]):
+            attn_mask_j = attention_masks[j].unsqueeze(0).to(dev) if attention_masks is not None else None
             if "opt" not in model_name:
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_masks[j].unsqueeze(0).to(dev), position_ids=position_ids[j].unsqueeze(0).to(dev))[0]
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attn_mask_j, position_ids=position_ids[j].unsqueeze(0).to(dev))[0]
             else:
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_masks[j].unsqueeze(0).to(dev))[0]
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attn_mask_j)[0]
         for h in handles:
             h.remove()
         layer = layer.cpu()
@@ -370,11 +374,14 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
             inps[cache['i']] = inp
             cache['i'] += 1
             if cache['attention_mask'] is None:
-                cache['attention_mask'] = kwargs['attention_mask']
+                attn_mask = kwargs.get('attention_mask', None)
+                cache['attention_mask'] = attn_mask
                 if "opt" not in model_name:
                     cache['position_ids'] = kwargs['position_ids']
             else:
-                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask']), dim=0)
+                attn_mask = kwargs.get('attention_mask', None)
+                if attn_mask is not None:
+                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attn_mask), dim=0) if cache['attention_mask'] is not None else attn_mask
                 if "opt" not in model_name:
                     cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids']), dim=0)
             raise ValueError
