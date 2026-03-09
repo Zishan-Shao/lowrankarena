@@ -365,7 +365,7 @@ class NaiveModernBertSVDBlock(nn.Module):
         posf = position_ids.unsqueeze(1).expand(B, H, M).reshape(B * H, M)
         try:
             cos, sin = self.rotary_emb(qf, position_ids=posf, layer_type=getattr(self, 'attention_type', 'global'))
-        except TypeError:
+        except (TypeError, KeyError):
             cos, sin = self.rotary_emb(qf, position_ids=posf)
         Q = _apply_rotary(qf, cos, sin).view(B, H, M, dh)
         K = _apply_rotary(kf, cos, sin).view(B, H, M, dh)

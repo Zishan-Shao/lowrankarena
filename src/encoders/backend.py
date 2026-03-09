@@ -464,6 +464,7 @@ class FlashModernBertSVDBlock(nn.Module):
         self.hidden_size = getattr(naive_block, 'hidden_size', naive_block.num_heads * naive_block.head_dim)
         self.ffn_is_geglu     = naive_block.ffn_is_geglu
         self.gelu_approximate = naive_block.gelu_approximate
+        self.attention_type   = getattr(naive_block, 'attention_type', 'global')
 
     def forward(self, hidden_states, attention_mask=None, sliding_window_mask=None,
                 position_ids=None, output_attentions=False, **kwargs):
@@ -494,7 +495,7 @@ class FlashModernBertSVDBlock(nn.Module):
         posf = position_ids.unsqueeze(1).expand(B, H, M).reshape(B * H, M)
         try:
             cos, sin = self.rotary_emb(qf, position_ids=posf, layer_type=getattr(self, 'attention_type', 'global'))
-        except TypeError:
+        except (TypeError, KeyError):
             cos, sin = self.rotary_emb(qf, position_ids=posf)
         Q = _apply_rotary(qf, cos, sin).view(B, H, M, dh)
         K = _apply_rotary(kf, cos, sin).view(B, H, M, dh)
