@@ -175,6 +175,10 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--weight_quant", type=str, default="none")
     ap.add_argument("--ppl_target", type=float, default=-1)
+    ap.add_argument("--compress_kv_cache", action="store_true")
+    ap.add_argument("--kv_cache_ratio_target", type=float, default=-1)
+    ap.add_argument("--sigma_fuse", type=str, default="UV", choices=["U", "V", "UV"])
+    ap.add_argument("--rank_align", type=int, default=1)
 
     # Save compressed model
     ap.add_argument("--save_path", type=str, default=None,
