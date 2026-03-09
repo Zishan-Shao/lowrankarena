@@ -146,9 +146,14 @@ def load_compressed_model(
         return model, tokenizer, comp_info
 
     # For compressed models, rebuild SVD blocks
-    # Load the state dict directly
-    state_dict_path = checkpoint_path / "pytorch_model.bin"
-    state_dict = torch.load(state_dict_path, map_location="cpu")
+    # Load the state dict directly (support both safetensors and legacy .bin)
+    safetensors_path = checkpoint_path / "model.safetensors"
+    bin_path = checkpoint_path / "pytorch_model.bin"
+    if safetensors_path.exists():
+        from safetensors.torch import load_file as safetensors_load
+        state_dict = safetensors_load(str(safetensors_path), device="cpu")
+    else:
+        state_dict = torch.load(bin_path, map_location="cpu")
 
     # Detect architecture from state_dict keys
     if any("roberta" in k for k in state_dict.keys()):
