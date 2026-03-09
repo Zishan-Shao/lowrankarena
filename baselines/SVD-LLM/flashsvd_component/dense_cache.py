@@ -4,11 +4,7 @@ from typing import Any, Optional
 
 import torch
 
-try:
-    from transformers.cache_utils import Cache
-except ModuleNotFoundError:
-    class Cache:  # minimal shim for transformers < 4.36
-        def __init__(self, *args, **kwargs): pass
+from transformers.cache_utils import Cache
 
 
 class FlashSVDDenseKVCache(Cache):
