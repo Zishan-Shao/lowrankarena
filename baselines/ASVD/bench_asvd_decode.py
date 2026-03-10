@@ -44,7 +44,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 sys.path.insert(0, os.path.join(os.path.dirname(_HERE), "SVD-LLM"))
 from evaluater import decode_kvcache_eval
 
-from flashsvd_wrapper import apply_flashsvd_to_asvd_model, remove_flashsvd_from_asvd_model
+from flashsvd_wrapper import apply_flashsvd_to_asvd_model
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -191,30 +191,50 @@ def _force_uniform_qkv(model, target_rank: int = 0) -> int:
     return patched
 
 
-def _bench_one(
-    model,
+def _bench_one_mode(
+    checkpoint_path: str | None,
     *,
-    label: str,
-    prompt_len: int,
-    new_tokens: int,
-    warmup: int,
-    batch_size: int,
-    device: str,
-    flashsvd_dense_cache: bool = False,
-):
-    print(f"\n[{label}]")
-    result = decode_kvcache_eval(
-        model,
-        prompt_len=prompt_len,
-        new_tokens=new_tokens,
-        warmup=warmup,
-        batch_size=batch_size,
-        device=device,
-        lowrank_cache=False,
-        flashsvd_dense_cache=flashsvd_dense_cache,
-        baseline_dense_kvcache=False,
-        profile_decode=False,
-    )
+    mode: str,
+    args,
+) -> dict:
+    """Load model fresh, run one benchmark mode, then release GPU memory.
+
+    Mirrors SVD-LLM's _bench_one_mode: each call gets a clean GPU slate.
+    mode: "baseline" | "flashsvd"
+    """
+    assert mode in ("baseline", "flashsvd")
+
+    # Fresh load from checkpoint
+    model, tokenizer = _load_checkpoint(checkpoint_path)
+    model.eval()
+    model = _cast_model(model, args.dtype)
+    model = model.to(args.device)
+
+    if mode == "flashsvd":
+        if args.force_uniform_qkv:
+            _force_uniform_qkv(model, target_rank=args.target_rank)
+        apply_flashsvd_to_asvd_model(model)
+
+    try:
+        result = decode_kvcache_eval(
+            model,
+            prompt_len=args.prompt_len,
+            new_tokens=args.new_tokens,
+            warmup=args.warmup,
+            batch_size=args.batch_size,
+            device=args.device,
+            lowrank_cache=False,
+            flashsvd_dense_cache=(mode == "flashsvd"),
+            baseline_dense_kvcache=False,
+            profile_decode=False,
+        )
+    finally:
+        del model, tokenizer
+        gc.collect()
+        if torch.cuda.is_available() and "cuda" in str(args.device):
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+
     return result
 
 
@@ -290,52 +310,34 @@ def main() -> int:
         f"warmup={args.warmup} batch={args.batch_size} dtype={args.dtype} device={args.device}"
     )
 
-    # ── Load or compress ──────────────────────────────────────────────────────
+    # ── Compress (if needed) and save to a temp file for reload isolation ──────
     if args.checkpoint is not None:
-        model, tokenizer = _load_checkpoint(args.checkpoint)
+        checkpoint_path = args.checkpoint
     else:
         model, tokenizer = _compress_model(args)
-        if args.save_path is not None:
-            Path(args.save_path).mkdir(parents=True, exist_ok=True)
-            model_name = args.model_id.replace("/", "_").replace("-", "_")
-            save_file = Path(args.save_path) / f"{model_name}_asvd_ratio{args.param_ratio_target}.pt"
-            torch.save({"model": model, "tokenizer": tokenizer}, str(save_file))
-            print(f"[ASVD] Checkpoint saved to {save_file}")
-
-    model.eval()
-    model = _cast_model(model, args.dtype)
-    model = model.to(args.device)
+        Path(args.save_path or ".").mkdir(parents=True, exist_ok=True)
+        model_name = args.model_id.replace("/", "_").replace("-", "_")
+        save_dir = Path(args.save_path) if args.save_path else Path(".")
+        save_dir.mkdir(parents=True, exist_ok=True)
+        checkpoint_path = str(save_dir / f"{model_name}_asvd_ratio{args.param_ratio_target}.pt")
+        torch.save({"model": model, "tokenizer": tokenizer}, checkpoint_path)
+        print(f"[ASVD] Checkpoint saved to {checkpoint_path}")
+        del model, tokenizer
+        gc.collect()
+        if torch.cuda.is_available() and "cuda" in str(args.device):
+            torch.cuda.empty_cache()
 
     results: dict[str, dict] = {}
 
-    # ── Baseline (SVDLinear, no FlashSVD) ─────────────────────────────────────
+    # ── Baseline: fresh model load, run, release ───────────────────────────────
     if not args.skip_baseline:
-        results["baseline"] = _bench_one(
-            model,
-            label="ASVD baseline",
-            prompt_len=args.prompt_len,
-            new_tokens=args.new_tokens,
-            warmup=args.warmup,
-            batch_size=args.batch_size,
-            device=args.device,
-        )
+        print("\n[ASVD baseline]")
+        results["baseline"] = _bench_one_mode(checkpoint_path, mode="baseline", args=args)
 
-    # ── FlashSVD (apply wrapper) ───────────────────────────────────────────────
+    # ── FlashSVD: fresh model load, patch, run, release ───────────────────────
     if not args.skip_flashsvd:
-        if args.force_uniform_qkv:
-            _force_uniform_qkv(model, target_rank=args.target_rank)
-        apply_flashsvd_to_asvd_model(model)
-        results["flashsvd"] = _bench_one(
-            model,
-            label="ASVD+FlashSVD",
-            prompt_len=args.prompt_len,
-            new_tokens=args.new_tokens,
-            warmup=args.warmup,
-            batch_size=args.batch_size,
-            device=args.device,
-            flashsvd_dense_cache=True,
-        )
-        remove_flashsvd_from_asvd_model(model)
+        print("\n[ASVD+FlashSVD]")
+        results["flashsvd"] = _bench_one_mode(checkpoint_path, mode="flashsvd", args=args)
 
     # ── Summary ───────────────────────────────────────────────────────────────
     if "baseline" in results and "flashsvd" in results:
@@ -346,11 +348,6 @@ def main() -> int:
         print(f"ASVD baseline : {float(base['decode_ms_per_token']):.3f} ms/token | {float(base['decode_tok_s']):,.0f} tok/s")
         print(f"ASVD+FlashSVD : {float(flash['decode_ms_per_token']):.3f} ms/token | {float(flash['decode_tok_s']):,.0f} tok/s")
         print(f"FlashSVD speedup vs ASVD: {speedup:.2f}x")
-
-    del model, tokenizer
-    gc.collect()
-    if torch.cuda.is_available() and "cuda" in str(args.device):
-        torch.cuda.empty_cache()
 
     return 0
 
