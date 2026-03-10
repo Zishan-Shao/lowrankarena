@@ -283,6 +283,19 @@ def apply_flashsvd_to_asvd_model(model: nn.Module) -> nn.Module:
                 print(f"[flashsvd_wrapper] layer {i} MLP skip: {e}")
 
     print(f"[flashsvd_wrapper] patched {patched_attn} attention layers, {patched_mlp} MLP layers")
+
+    # ── one-time diagnostics ──────────────────────────────────────────────────
+    try:
+        from modules.flashsvd_llama_attn import _HAS_FA2, _HAS_KERNEL, _DenseKVCache, _is_svd, _rank
+        print(f"[flashsvd_wrapper] _HAS_FA2={_HAS_FA2}  _HAS_KERNEL={_HAS_KERNEL}  _DenseKVCache={_DenseKVCache}")
+        attn0 = layers[0].self_attn
+        q, k, v = attn0.q_proj, attn0.k_proj, attn0.v_proj
+        print(f"[flashsvd_wrapper] layer0: q_is_svd={_is_svd(q)} k_is_svd={_is_svd(k)} v_is_svd={_is_svd(v)}")
+        if _is_svd(q) and _is_svd(k) and _is_svd(v):
+            print(f"[flashsvd_wrapper] layer0 ranks: Rq={_rank(q)} Rk={_rank(k)} Rv={_rank(v)}")
+    except Exception as _e:
+        print(f"[flashsvd_wrapper] diagnostics error: {_e}")
+
     return model
 
 
