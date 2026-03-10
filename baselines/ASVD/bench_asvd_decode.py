@@ -224,7 +224,7 @@ def _bench_one_mode(
             batch_size=args.batch_size,
             device=args.device,
             lowrank_cache=False,
-            flashsvd_dense_cache=(mode == "flashsvd"),
+            flashsvd_dense_cache=True,   # both modes use FlashSVDDenseKVCache + FA2
             baseline_dense_kvcache=False,
             profile_decode=False,
         )
