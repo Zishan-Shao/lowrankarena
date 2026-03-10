@@ -919,6 +919,7 @@ if __name__ == '__main__':
     if args.step == 1:
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
+        model.seqlen = args.model_seq_len
         model = model.eval()
         if args.profiling_mat_path is None:
             cali_white_data = get_calib_train_data(args.dataset, tokenizer, args.whitening_nsamples, seqlen=args.model_seq_len)
@@ -933,6 +934,7 @@ if __name__ == '__main__':
     elif args.step == 2:
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
+        model.seqlen = args.model_seq_len
         dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
         model = model.eval()
         model = model.float()  # need to set to float
