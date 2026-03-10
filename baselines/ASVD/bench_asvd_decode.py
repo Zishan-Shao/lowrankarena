@@ -121,11 +121,15 @@ def _load_checkpoint(path: str):
     return obj["model"], obj["tokenizer"]
 
 
-def _force_uniform_qkv(model) -> int:
-    """For layers where only some of q/k/v are SVDLinear, replace the plain
-    nn.Linear ones with SVDLinear at the same rank as the compressed ones.
-    This is needed for FlashSVD kernel which requires q/k/v to share a rank.
-    Returns the number of layers patched.
+def _force_uniform_qkv(model, target_rank: int = 0) -> int:
+    """Make q/k/v projections all SVDLinear with equal rank.
+
+    - Plain nn.Linear projections are replaced with SVDLinear at target_rank.
+    - SVDLinear projections whose rank != target_rank are re-compressed.
+    - If target_rank=0, uses the minimum rank found among existing SVDLinear
+      projections in the model.
+
+    Returns the number of projections replaced/re-compressed.
     """
     from modules.svd_linear import SVDLinear
 
@@ -135,39 +139,55 @@ def _force_uniform_qkv(model) -> int:
     def _rank(m: SVDLinear) -> int:
         return int(m.BLinear.weight.shape[0])
 
-    patched = 0
+    def _to_linear(m: SVDLinear) -> torch.nn.Linear:
+        """Reconstruct a plain nn.Linear from an SVDLinear (approximate)."""
+        W = m.ALinear.weight @ m.BLinear.weight  # [out, in]
+        lin = torch.nn.Linear(m.BLinear.in_features, m.ALinear.out_features,
+                              bias=m.ALinear.bias is not None)
+        lin.weight = torch.nn.Parameter(W)
+        if m.ALinear.bias is not None:
+            lin.bias = torch.nn.Parameter(m.ALinear.bias.clone())
+        return lin
+
     try:
         layers = model.model.layers
     except AttributeError:
         return 0
 
+    # Auto-detect target rank from minimum existing SVDLinear rank
+    if target_rank == 0:
+        for layer in layers:
+            attn = getattr(layer, 'self_attn', None)
+            if attn is None:
+                continue
+            for proj in [attn.q_proj, attn.k_proj, attn.v_proj]:
+                if _is_svd(proj):
+                    target_rank = min(target_rank or _rank(proj), _rank(proj))
+        if target_rank == 0:
+            print("[force_uniform_qkv] no SVDLinear found, skipping")
+            return 0
+
+    print(f"[force_uniform_qkv] target_rank={target_rank}")
+    patched = 0
     for layer in layers:
         attn = getattr(layer, 'self_attn', None)
         if attn is None:
             continue
-        q, k, v = attn.q_proj, attn.k_proj, attn.v_proj
-        svd_ranks = [_rank(m) for m in [q, k, v] if _is_svd(m)]
-        if not svd_ranks:
-            continue
-        if _is_svd(q) and _is_svd(k) and _is_svd(v):
-            continue  # already uniform
-        target_rank = svd_ranks[0]
-        # Replace any plain nn.Linear with SVDLinear at target_rank
-        for name, proj in [('q_proj', q), ('k_proj', k), ('v_proj', v)]:
-            if not _is_svd(proj):
-                n_params = proj.weight.numel()
-                in_out = proj.in_features + proj.out_features
-                param_ratio = target_rank * in_out / n_params
-                svd = SVDLinear.from_linear(
-                    proj,
-                    param_ratio=param_ratio,
-                    act_aware=False,
-                )
-                setattr(attn, name, svd)
-                patched += 1
+        for name in ['q_proj', 'k_proj', 'v_proj']:
+            proj = getattr(attn, name)
+            # Get base nn.Linear (reconstruct if already SVDLinear)
+            if _is_svd(proj):
+                if _rank(proj) == target_rank:
+                    continue  # already correct rank
+                proj = _to_linear(proj)  # reconstruct for re-compression
+            n_params = proj.weight.numel()
+            in_out = proj.in_features + proj.out_features
+            param_ratio = target_rank * in_out / n_params
+            svd = SVDLinear.from_linear(proj, param_ratio=param_ratio, act_aware=False)
+            setattr(attn, name, svd)
+            patched += 1
 
-    if patched:
-        print(f"[force_uniform_qkv] replaced {patched} q/k/v projections with SVDLinear (rank={target_rank})")
+    print(f"[force_uniform_qkv] replaced/recompressed {patched} projections")
     return patched
 
 
@@ -246,9 +266,9 @@ def main() -> int:
     ap.add_argument("--skip_baseline", action="store_true")
     ap.add_argument("--skip_flashsvd", action="store_true")
     ap.add_argument("--force_uniform_qkv", action="store_true",
-                    help="Before FlashSVD, replace un-compressed q/k/v with SVDLinear "
-                         "at the rank of the already-compressed ones (needed when ASVD "
-                         "leaves q/k as nn.Linear)")
+                    help="Before FlashSVD, make q/k/v all SVDLinear with equal rank")
+    ap.add_argument("--target_rank", type=int, default=0,
+                    help="Target rank for --force_uniform_qkv (0=auto: min existing rank)")
 
     args = ap.parse_args()
 
@@ -294,7 +314,7 @@ def main() -> int:
     # ── FlashSVD (apply wrapper) ───────────────────────────────────────────────
     if not args.skip_flashsvd:
         if args.force_uniform_qkv:
-            _force_uniform_qkv(model)
+            _force_uniform_qkv(model, target_rank=args.target_rank)
         apply_flashsvd_to_asvd_model(model)
         results["flashsvd"] = _bench_one(
             model,
