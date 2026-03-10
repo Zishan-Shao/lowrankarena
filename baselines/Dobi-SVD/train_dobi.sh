@@ -1,6 +1,6 @@
 
 # llama7b with no remapping
-CUDA_VISIBLE_DEVICES=6 python svd_trainer.py \
+CUDA_VISIBLE_DEVICES=4 python svd_trainer.py \
   --model_id jeffwan/llama-7b-hf \
   --target_ratio 0.4 \
   --seq_len 2048 \
