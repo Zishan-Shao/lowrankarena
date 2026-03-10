@@ -269,11 +269,20 @@ def main() -> int:
                     help="Before FlashSVD, make q/k/v all SVDLinear with equal rank")
     ap.add_argument("--target_rank", type=int, default=0,
                     help="Target rank for --force_uniform_qkv (0=auto: min existing rank)")
+    ap.add_argument("--sdp_backend", type=str, default=None,
+                    choices=["flash", "mem_efficient", "math"],
+                    help="Lock PyTorch SDPA backend for both baseline and FlashSVD runs")
 
     args = ap.parse_args()
 
     if args.checkpoint is None and args.model_id is None:
         ap.error("Provide --checkpoint or --model_id")
+
+    if args.sdp_backend is not None:
+        torch.backends.cuda.enable_flash_sdp(args.sdp_backend == "flash")
+        torch.backends.cuda.enable_mem_efficient_sdp(args.sdp_backend == "mem_efficient")
+        torch.backends.cuda.enable_math_sdp(args.sdp_backend == "math")
+        print(f"[sdp] locked backend: {args.sdp_backend}")
 
     print("==== ASVD vs ASVD+FlashSVD Decode Benchmark ====")
     print(
