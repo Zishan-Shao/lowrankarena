@@ -1,73 +1,139 @@
-# llama1
-CUDA_VISIBLE_DEVICES=6 python -m eval_results.eval_benchmarks \
-  --model baselines/SEAS-SVD/robust/jeffwan_llama7b_saes_r0.4 \
+#!/bin/bash
+
+# run from repo root:
+# bash baselines/SEAS-SVD/eval_SAES_SVD.sh
+
+mkdir -p outputs/saes
+
+LM_EVAL_TASKS=openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa,truthfulqa_mc1
+PPL_DATASETS=wikitext2,ptb,c4
+SEQ_LEN=2048
+C4_DOCS=2000
+BATCH_SIZE=1
+DEVICE=cuda
+DTYPE=bfloat16
+LING_DTYPE=bfloat16
+
+GPU_BENCH_7B=0
+GPU_PPL_7B=0
+GPU_LING_7B=0
+
+GPU_BENCH_13B=0
+GPU_PPL_13B=0
+GPU_LING_13B=0
+
+GPU_BENCH_30B=0
+GPU_PPL_30B=0
+GPU_LING_30B=0
+
+SAES_MODEL_7B=baselines/SEAS-SVD/robust/jeffwan_llama-7b-hf_saes40
+SAES_MODEL_13B=baselines/SEAS-SVD/robust/jeffwan_llama-13b-hf_saes40
+SAES_MODEL_30B=baselines/SEAS-SVD/robust/jeffwan_llama-30b-hf_saes40
+
+# jeffwan llama-7b-hf, 40% params
+CUDA_VISIBLE_DEVICES=${GPU_BENCH_7B} python -m eval_results.eval_benchmarks \
+  --model ${SAES_MODEL_7B} \
   --saes_svd \
   --saes_base_model jeffwan/llama-7b-hf \
   --use_lm_eval \
-  --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa \
-  --device cuda \
-  --batch_size 1 \
-  --dtype bfloat16 \
+  --lm_eval_tasks ${LM_EVAL_TASKS} \
   --lm_eval_num_fewshot 0 \
-  --output_json outputs/saes_benchmark_jeffwan.json
-# ppl
+  --device ${DEVICE} \
+  --dtype ${DTYPE} \
+  --batch_size ${BATCH_SIZE} \
+  --output_json outputs/saes/jeffwan_llama-7b-hf_saes40_lm_eval.json
 
-CUDA_VISIBLE_DEVICES=6 python -m eval_results.eval_general_ppl \
-  --saes_model baselines/SEAS-SVD/robust/jeffwan_llama7b_saes_r0.4 \
+CUDA_VISIBLE_DEVICES=${GPU_PPL_7B} python -m eval_results.eval_general_ppl \
+  --saes_model ${SAES_MODEL_7B} \
   --saes_base_model jeffwan/llama-7b-hf \
-  --datasets wikitext2,ptb,c4 \
-  --c4_stream --c4_docs 2000 \
-  --seqlen 2048 \
-  --batch_size 1 \
-  --device cuda \
-  --dtype bfloat16 \
+  --datasets ${PPL_DATASETS} \
+  --c4_stream \
+  --c4_docs ${C4_DOCS} \
+  --seqlen ${SEQ_LEN} \
+  --batch_size ${BATCH_SIZE} \
+  --device ${DEVICE} \
+  --dtype ${DTYPE} \
   --metrics token \
-  --output_json outputs/saes_ppl_jeffwan.json
-# linguistic tasks
-CUDA_VISIBLE_DEVICES=6 python -m eval_results.eval_linguistic_tasks \
-  --saes_model baselines/SEAS-SVD/robust/jeffwan_llama7b_saes_r0.4 \
+  --output_json outputs/saes/jeffwan_llama-7b-hf_saes40_ppl.json
+
+CUDA_VISIBLE_DEVICES=${GPU_LING_7B} python -m eval_results.eval_linguistic_tasks \
+  --saes_model ${SAES_MODEL_7B} \
   --saes_base_model jeffwan/llama-7b-hf \
   --tasks blimp \
   --num_fewshot 0 \
-  --batch_size 1 \
-  --device cuda \
-  --dtype bfloat16 \
-  --output_json outputs/saes_linguistic_jeffwan.json
+  --batch_size ${BATCH_SIZE} \
+  --device ${DEVICE} \
+  --dtype ${LING_DTYPE} \
+  --output_json outputs/saes/jeffwan_llama-7b-hf_saes40_ling.json
 
+# jeffwan llama-13b-hf, 40% params
+CUDA_VISIBLE_DEVICES=${GPU_BENCH_13B} python -m eval_results.eval_benchmarks \
+  --model ${SAES_MODEL_13B} \
+  --saes_svd \
+  --saes_base_model jeffwan/llama-13b-hf \
+  --use_lm_eval \
+  --lm_eval_tasks ${LM_EVAL_TASKS} \
+  --lm_eval_num_fewshot 0 \
+  --device ${DEVICE} \
+  --dtype ${DTYPE} \
+  --batch_size ${BATCH_SIZE} \
+  --output_json outputs/saes/jeffwan_llama-13b-hf_saes40_lm_eval.json
 
-# code to eval SAES-SVD
-# benchmark
-# CUDA_VISIBLE_DEVICES=3 python -m eval_results.eval_benchmarks \
-#   --model baselines/SEAS-SVD/robust/llama2_saes_r0.4 \
-#   --saes_svd \
-#   --saes_base_model meta-llama/Llama-2-7b-hf \
-#   --use_lm_eval \
-#   --lm_eval_tasks openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa \
-#   --device cuda \
-#   --batch_size 1 \
-#   --dtype bfloat16 \
-#   --lm_eval_num_fewshot 0 \
-#   --output_json outputs/saes_benchmark.json
-# # ppl
+CUDA_VISIBLE_DEVICES=${GPU_PPL_13B} python -m eval_results.eval_general_ppl \
+  --saes_model ${SAES_MODEL_13B} \
+  --saes_base_model jeffwan/llama-13b-hf \
+  --datasets ${PPL_DATASETS} \
+  --c4_stream \
+  --c4_docs ${C4_DOCS} \
+  --seqlen ${SEQ_LEN} \
+  --batch_size ${BATCH_SIZE} \
+  --device ${DEVICE} \
+  --dtype ${DTYPE} \
+  --metrics token \
+  --output_json outputs/saes/jeffwan_llama-13b-hf_saes40_ppl.json
 
-# CUDA_VISIBLE_DEVICES=3 python -m eval_results.eval_general_ppl \
-#   --saes_model baselines/SEAS-SVD/robust/llama2_saes_r0.4 \
-#   --saes_base_model meta-llama/Llama-2-7b-hf \
-#   --datasets wikitext2,ptb,c4 \
-#   --c4_stream --c4_docs 2000 \
-#   --seqlen 2048 \
-#   --batch_size 1 \
-#   --device cuda \
-#   --dtype bfloat16 \
-#   --metrics token \
-#   --output_json outputs/saes_ppl.json
-# # linguistic tasks
-# CUDA_VISIBLE_DEVICES=3 python -m eval_results.eval_linguistic_tasks \
-#   --saes_model baselines/SEAS-SVD/robust/llama2_saes_r0.4 \
-#   --saes_base_model meta-llama/Llama-2-7b-hf \
-#   --tasks blimp \
-#   --num_fewshot 0 \
-#   --batch_size 1 \
-#   --device cuda \
-#   --dtype bfloat16 \
-#   --output_json outputs/saes_linguistic.json
+CUDA_VISIBLE_DEVICES=${GPU_LING_13B} python -m eval_results.eval_linguistic_tasks \
+  --saes_model ${SAES_MODEL_13B} \
+  --saes_base_model jeffwan/llama-13b-hf \
+  --tasks blimp \
+  --num_fewshot 0 \
+  --batch_size ${BATCH_SIZE} \
+  --device ${DEVICE} \
+  --dtype ${LING_DTYPE} \
+  --output_json outputs/saes/jeffwan_llama-13b-hf_saes40_ling.json
+
+# jeffwan llama-30b-hf, 40% params
+CUDA_VISIBLE_DEVICES=${GPU_BENCH_30B} python -m eval_results.eval_benchmarks \
+  --model ${SAES_MODEL_30B} \
+  --saes_svd \
+  --saes_base_model jeffwan/llama-30b-hf \
+  --use_lm_eval \
+  --lm_eval_tasks ${LM_EVAL_TASKS} \
+  --lm_eval_num_fewshot 0 \
+  --device ${DEVICE} \
+  --dtype ${DTYPE} \
+  --batch_size ${BATCH_SIZE} \
+  --output_json outputs/saes/jeffwan_llama-30b-hf_saes40_lm_eval.json
+
+CUDA_VISIBLE_DEVICES=${GPU_PPL_30B} python -m eval_results.eval_general_ppl \
+  --saes_model ${SAES_MODEL_30B} \
+  --saes_base_model jeffwan/llama-30b-hf \
+  --datasets ${PPL_DATASETS} \
+  --c4_stream \
+  --c4_docs ${C4_DOCS} \
+  --seqlen ${SEQ_LEN} \
+  --batch_size ${BATCH_SIZE} \
+  --device ${DEVICE} \
+  --dtype ${DTYPE} \
+  --metrics token \
+  --output_json outputs/saes/jeffwan_llama-30b-hf_saes40_ppl.json
+
+CUDA_VISIBLE_DEVICES=${GPU_LING_30B} python -m eval_results.eval_linguistic_tasks \
+  --saes_model ${SAES_MODEL_30B} \
+  --saes_base_model jeffwan/llama-30b-hf \
+  --tasks blimp \
+  --num_fewshot 0 \
+  --batch_size ${BATCH_SIZE} \
+  --device ${DEVICE} \
+  --dtype ${LING_DTYPE} \
+  --output_json outputs/saes/jeffwan_llama-30b-hf_saes40_ling.json

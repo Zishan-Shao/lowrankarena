@@ -11,7 +11,29 @@ from typing import List, Dict, Any, Tuple, Optional
 from utils.df_svd_loader import looks_like_dfsvd_checkpoint, load_dfsvd_model
 import torch
 from torch.nn import functional as F
-from datasets import load_dataset
+
+
+def load_dataset(*args, **kwargs):
+    repo_root_guess = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    removed = []
+    for idx in range(len(sys.path) - 1, -1, -1):
+        raw = sys.path[idx]
+        abs_path = os.path.abspath(raw or os.getcwd())
+        if abs_path == repo_root_guess:
+            removed.append((idx, raw))
+            sys.path.pop(idx)
+    try:
+        from datasets import load_dataset as _hf_load_dataset
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            "Hugging Face `datasets` is required for benchmark evaluation."
+        ) from e
+    finally:
+        for idx, raw in sorted(removed, key=lambda x: x[0]):
+            sys.path.insert(idx, raw)
+    return _hf_load_dataset(*args, **kwargs)
+
+
 try:
     from huggingface_hub import hf_hub_download
 except Exception:
@@ -266,7 +288,7 @@ def _auto_output_json(args, suffix: str):
     os.makedirs(out_dir, exist_ok=True)
     run_name = getattr(args, "run_name", None)
     if not run_name:
-        base = getattr(args, "model", None) or "model"
+        base = getattr(args, "model", None) or getattr(args, "dobi_model", None) or "model"
         run_name = f"{_safe_tag(base)}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
     return os.path.join(out_dir, f"{run_name}_{suffix}.json")
 
@@ -630,6 +652,47 @@ def _load_hf_or_asvd_model_and_tokenizer(
         trust_remote_code=trust_remote_code,
         dtype=dtype,
     )
+
+
+def _resolve_dobi_path(model_id: str, hf_token: Optional[str], revision: Optional[str], cache_dir: Optional[str]) -> str:
+    if os.path.isdir(model_id):
+        return model_id
+    try:
+        from huggingface_hub import snapshot_download
+    except Exception as e:
+        raise RuntimeError(f"huggingface_hub is required to download Dobi checkpoints: {e}")
+    return snapshot_download(repo_id=model_id, revision=revision, cache_dir=cache_dir, token=hf_token)
+
+
+def _load_dobi_model(
+    model_id: str,
+    hf_token: Optional[str],
+    revision: Optional[str],
+    cache_dir: Optional[str],
+    remapping: Optional[bool],
+):
+    dobi_root = os.path.join(_REPO_ROOT, "baselines", "Dobi-SVD")
+    if dobi_root not in sys.path:
+        sys.path.insert(0, dobi_root)
+    try:
+        from modelutils import load_remapping_model, load_unremapping_model
+    except Exception as e:
+        raise RuntimeError(f"Failed to import Dobi-SVD loaders from {dobi_root}: {e}")
+    local_path = _resolve_dobi_path(model_id, hf_token=hf_token, revision=revision, cache_dir=cache_dir)
+    if remapping is None:
+        if os.path.exists(os.path.join(local_path, "remapping_weight.pt")):
+            remapping = True
+        elif os.path.exists(os.path.join(local_path, "DobiSVD_Model.pt")):
+            remapping = False
+        else:
+            raise FileNotFoundError(
+                f"Could not find remapping_weight.pt or DobiSVD_Model.pt under {local_path}"
+            )
+    if remapping:
+        model, tokenizer = load_remapping_model(local_path)
+    else:
+        model, tokenizer = load_unremapping_model(local_path)
+    return model, tokenizer, local_path
 
 
 '''
@@ -1288,7 +1351,7 @@ def eval_gsm8k(model, tokenizer, device: str, limit: Optional[int], max_new_toke
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--model', type=str, required=True, help='HF model id or path to local .pt checkpoint saved by this repo')
+    ap.add_argument('--model', type=str, default=None, help='HF model id or path to local .pt checkpoint saved by this repo')
     ap.add_argument('--device', type=str, default='cuda')
     ap.add_argument('--hf_token', type=str, default=None)
     ap.add_argument('--tokenizer', type=str, default=None, help='Optional tokenizer id/path for HuggingFace/ASVD model loading')
@@ -1348,7 +1411,19 @@ def main():
     ap.add_argument('--dfsvd_base_model', type=str, default=None, help='Base HF model id/path to apply DF-SVD onto (required when using DF-SVD).')
     ap.add_argument('--dfsvd_revision', type=str, default=None)
     ap.add_argument('--dfsvd_cache_dir', type=str, default=None)
+    ap.add_argument('--dobi_model', type=str, default=None,
+                    help='Dobi-SVD checkpoint (HF repo id or local dir). If set, overrides --model for loading.')
+    ap.add_argument('--dobi_revision', type=str, default=None)
+    ap.add_argument('--dobi_cache_dir', type=str, default=None)
+    ap.add_argument('--dobi_remapping', action='store_true', help='Force the Dobi remapping loader.')
+    ap.add_argument('--dobi_unremapping', action='store_true', help='Force the Dobi unremapping loader.')
     args = ap.parse_args()
+
+    if not args.model and not args.dobi_model:
+        ap.error('Please provide --model or --dobi_model.')
+    if args.dobi_remapping and args.dobi_unremapping:
+        ap.error('Please choose at most one of --dobi_remapping / --dobi_unremapping.')
+    model_ref = args.dobi_model or args.model
 
     trust_remote_code = True
     if args.no_trust_remote_code:
@@ -1365,9 +1440,22 @@ def main():
 
     with PerfRecorder(args.device, label="load_model") as _perf_load:
         # Load model
-        if os.path.exists(args.model) and args.model.endswith('.pt'):
+        if args.dobi_model:
+            remapping = None
+            if args.dobi_remapping:
+                remapping = True
+            elif args.dobi_unremapping:
+                remapping = False
+            model, tokenizer, _ = _load_dobi_model(
+                args.dobi_model,
+                hf_token=args.hf_token,
+                revision=args.dobi_revision,
+                cache_dir=args.dobi_cache_dir,
+                remapping=remapping,
+            )
+        elif args.model and os.path.exists(args.model) and args.model.endswith('.pt'):
             model, tokenizer = get_model_from_local(args.model)
-        elif (os.path.isdir(args.model) and looks_like_dfsvd_checkpoint(args.model)) or args.dfsvd_svd:
+        elif args.model and ((os.path.isdir(args.model) and looks_like_dfsvd_checkpoint(args.model)) or args.dfsvd_svd):
             if not args.dfsvd_base_model:
                 raise ValueError("DF-SVD requires --dfsvd_base_model.")
             model, tokenizer, _ = load_dfsvd_model(
@@ -1377,7 +1465,7 @@ def main():
                 revision=args.dfsvd_revision,
                 cache_dir=args.dfsvd_cache_dir,
             )
-        elif (os.path.isdir(args.model) and looks_like_saes_svd_checkpoint(args.model)) or args.saes_svd:
+        elif args.model and ((os.path.isdir(args.model) and looks_like_saes_svd_checkpoint(args.model)) or args.saes_svd):
             if not args.saes_base_model:
                 raise ValueError("SAES-SVD requires --saes_base_model.")
             model, tokenizer, _ = load_saes_svd_model(
@@ -1479,7 +1567,7 @@ def main():
             'mode': 'lm_eval',
             "args": args_dict,
             "perf": perf,
-            'model': args.model,
+            'model': model_ref,
             'results': lm_eval_res.get('results', lm_eval_res) if isinstance(lm_eval_res, dict) else lm_eval_res,
         }
         _write_json(out_json, payload)
@@ -1531,7 +1619,7 @@ def main():
             'mode': 'token_ppl',
             "args": args_dict,
             "perf": perf,
-            'model': args.model,
+            'model': model_ref,
             'results': token_ppl,
         }
         _write_json(out_json, payload)
@@ -1627,7 +1715,7 @@ def main():
         'mode': 'benchmark',
         "args": args_dict,
         "perf": perf,
-        'model': args.model,
+        'model': model_ref,
         'results': results,
     }
     _write_json(out_json, payload)

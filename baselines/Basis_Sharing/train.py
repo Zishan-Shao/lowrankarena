@@ -22,7 +22,7 @@ def train(config):
 
     trainer_config = TrainingArguments(output_dir=config.trained_model_path,
                                        overwrite_output_dir=True,
-                                       evaluation_strategy='epoch',
+                                       eval_strategy='epoch',
                                        per_device_train_batch_size=1,
                                        per_device_eval_batch_size=1,
                                        gradient_accumulation_steps=8,
@@ -30,6 +30,7 @@ def train(config):
                                        logging_steps=1,
                                        learning_rate=2e-6,
                                        save_total_limit=1,
+                                       save_safetensors=False,
                                        seed=42,
                                        data_seed=0,
                                        weight_decay=0.001,

@@ -289,6 +289,9 @@ def main(args):
         if isinstance(module, SVDTransformLayer):
             module.gamma.requires_grad = True
 
+    def unwrap_model(m):
+        return getattr(m, "module", m)
+
     def calculate_compression_loss(model, target_compression_ratio, lambda_reg):
         size_new = torch.tensor(0.)
 
@@ -302,13 +305,15 @@ def main(args):
                 size_ori = module.ori_weight_size
                 size_new = torch.where(size_now < size_ori, size_now, size_ori) + size_new
 
-        compression_ratio = size_new / model.module.ori_weight_size
+        base_model = unwrap_model(model)
+        compression_ratio = size_new / base_model.ori_weight_size
 
         compression_loss = abs(compression_ratio - torch.tensor(target_compression_ratio, device=compression_ratio.device))
         return lambda_reg * compression_loss, compression_ratio
 
     def Wrong_value_loss(model):
-        penalty = torch.tensor(0., device=model.module.device)
+        base_model = unwrap_model(model)
+        penalty = torch.tensor(0., device=base_model.device)
 
         for name, module in model.named_modules():
             if isinstance(module, SVDTransformLayer):
@@ -322,7 +327,9 @@ def main(args):
     eval_perf_path = TA_tarined_model_output_dir / f"eval_perf_rank{local_rank}.jsonl"
 
     class SVDTrainer(Trainer):
-        def compute_loss(self, model, inputs, return_outputs=False):
+        # transformers>=4.46 passes num_items_in_batch into Trainer.compute_loss.
+        # Keep the arg for compatibility even though this custom loss does not use it.
+        def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
             outputs = model(**inputs)
 
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
@@ -337,23 +344,24 @@ def main(args):
 
             cur_lr = self.optimizer.param_groups[0]['lr']
 
-            model.module.epoch_cnt += 1
-            if model.module.epoch_cnt % save_epoch_num == 0:
+            base_model = unwrap_model(model)
+            base_model.epoch_cnt += 1
+            if base_model.epoch_cnt % save_epoch_num == 0:
                 k_dict = {}
-                for name, module in self.model.named_modules():
+                for name, module in unwrap_model(self.model).named_modules():
                     if isinstance(module, SVDTransformLayer):
                         k_dict[name] = module.gamma.detach().item()
                 k_dict['ppl'] = ppl.detach().tolist()
                 k_dict['compression_ratio'] = compression_ratio.detach().tolist()
                 k_dict['lr'] = cur_lr
-                output_json_path = str(TA_tarined_model_output_dir / 'k_dict_{:05d}.json'.format(model.module.epoch_cnt))
+                output_json_path = str(TA_tarined_model_output_dir / 'k_dict_{:05d}.json'.format(base_model.epoch_cnt))
                 with open(output_json_path, 'w') as json_file:
                     json.dump(k_dict, json_file, indent=4)
 
-                BEST_loss = model.module.BEST_loss
+                BEST_loss = base_model.BEST_loss
                 CURR_loss = total_loss.mean().item()
                 if CURR_loss < BEST_loss:
-                    model.module.BEST_loss = torch.tensor(CURR_loss, device=model.module.BEST_loss.device)
+                    base_model.BEST_loss = torch.tensor(CURR_loss, device=base_model.BEST_loss.device)
                     k_dict["PPL_ORIG"] = orig_PPL
                     output_json_path = str(TA_tarined_model_output_dir / 'best_gamma.json')
                     with open(output_json_path, 'w') as json_file:
@@ -396,10 +404,9 @@ def main(args):
     # training
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     from transformers import TrainingArguments
-    training_args = TrainingArguments(
+    training_args_kwargs = dict(
         output_dir=TA_tarined_model_output_dir,
         num_train_epochs=TA_num_train_epochs,
-        evaluation_strategy="epoch",
         per_device_train_batch_size=1,
         per_device_eval_batch_size=1,
         warmup_steps=TA_warmup_steps,
@@ -411,6 +418,11 @@ def main(args):
         save_total_limit=2,
         remove_unused_columns=False,
     )
+    if "eval_strategy" in TrainingArguments.__init__.__code__.co_varnames:
+        training_args_kwargs["eval_strategy"] = "epoch"
+    else:
+        training_args_kwargs["evaluation_strategy"] = "epoch"
+    training_args = TrainingArguments(**training_args_kwargs)
 
     callbacks = []
     if args.profile_train:
@@ -430,6 +442,7 @@ def main(args):
         data_collator=data_collator,
         callbacks=callbacks,
     )
+    trainer.model_accepts_loss_kwargs = False
 
     model, train_dataloader, eval_dataloader = accelerator.prepare(
         model, trainer.get_train_dataloader(), trainer.get_eval_dataloader()
