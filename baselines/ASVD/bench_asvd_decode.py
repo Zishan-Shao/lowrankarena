@@ -130,6 +130,7 @@ def _bench_one(
     warmup: int,
     batch_size: int,
     device: str,
+    flashsvd_dense_cache: bool = False,
 ):
     print(f"\n[{label}]")
     result = decode_kvcache_eval(
@@ -140,7 +141,7 @@ def _bench_one(
         batch_size=batch_size,
         device=device,
         lowrank_cache=False,
-        flashsvd_dense_cache=False,
+        flashsvd_dense_cache=flashsvd_dense_cache,
         baseline_dense_kvcache=False,
         profile_decode=False,
     )
@@ -247,6 +248,7 @@ def main() -> int:
             warmup=args.warmup,
             batch_size=args.batch_size,
             device=args.device,
+            flashsvd_dense_cache=True,
         )
         remove_flashsvd_from_asvd_model(model)
 

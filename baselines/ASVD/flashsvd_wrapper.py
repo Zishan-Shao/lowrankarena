@@ -232,10 +232,21 @@ def _make_attn_forward(attn_module):
     return new_forward
 
 
+# ── Import ASVDFlashLlamaAttention ────────────────────────────────────────────
+try:
+    from modules.flashsvd_llama_attn import ASVDFlashLlamaAttention
+    _HAS_FLASH_ATTN_MODULE = True
+except Exception:
+    _HAS_FLASH_ATTN_MODULE = False
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def apply_flashsvd_to_asvd_model(model: nn.Module) -> nn.Module:
     """Patch an ASVD-compressed LlamaForCausalLM to use FlashSVD kernels.
+
+    Attention: replaced with ASVDFlashLlamaAttention (proper module, not monkey-patch).
+    MLP: forward method patched with flashsvd_ffn_swiglu.
 
     Returns the same model object (modified in-place).
     Layers that don't meet compatibility requirements are left unchanged.
@@ -253,12 +264,12 @@ def apply_flashsvd_to_asvd_model(model: nn.Module) -> nn.Module:
         attn = getattr(layer, 'self_attn', None)
         mlp  = getattr(layer, 'mlp', None)
 
-        if attn is not None:
+        if attn is not None and _HAS_FLASH_ATTN_MODULE:
             try:
-                new_fwd = _make_attn_forward(attn)
-                attn.forward = new_fwd
-                # Verify at least that attributes exist before counting
-                _ = attn.num_heads
+                flash_attn = ASVDFlashLlamaAttention(attn)
+                # Store original for restore
+                layer._orig_self_attn = attn
+                layer.self_attn = flash_attn
                 patched_attn += 1
             except Exception as e:
                 print(f"[flashsvd_wrapper] layer {i} attention skip: {e}")
@@ -276,7 +287,7 @@ def apply_flashsvd_to_asvd_model(model: nn.Module) -> nn.Module:
 
 
 def remove_flashsvd_from_asvd_model(model: nn.Module) -> nn.Module:
-    """Remove FlashSVD patches (restore original forward methods).
+    """Remove FlashSVD patches (restore original modules/forward methods).
 
     Must be called before saving/serializing the model.
     """
@@ -285,11 +296,15 @@ def remove_flashsvd_from_asvd_model(model: nn.Module) -> nn.Module:
     except AttributeError:
         return model
     for layer in layers:
-        for sub in [getattr(layer, 'self_attn', None), getattr(layer, 'mlp', None)]:
-            if sub is not None and hasattr(sub, 'forward'):
-                # Delete instance-level override to restore class method
-                try:
-                    del sub.__dict__['forward']
-                except (KeyError, AttributeError):
-                    pass
+        # Restore original attention module if replaced
+        if hasattr(layer, '_orig_self_attn'):
+            layer.self_attn = layer._orig_self_attn
+            del layer._orig_self_attn
+        # Restore MLP forward (delete instance-level override)
+        mlp = getattr(layer, 'mlp', None)
+        if mlp is not None and 'forward' in mlp.__dict__:
+            try:
+                del mlp.__dict__['forward']
+            except (KeyError, AttributeError):
+                pass
     return model
