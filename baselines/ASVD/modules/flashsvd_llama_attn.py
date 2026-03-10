@@ -87,8 +87,24 @@ class ASVDFlashLlamaAttention(nn.Module):
         self.__dict__.update(orig_attn.__dict__)
         # Store reference for fallback
         self._orig_forward = orig_attn.__class__.forward
+        # Precompute V matrices [H, R, dh] once — avoids 96 contiguous() allocs per token
+        self._Vq = self._Vk = self._Vv = None
+        self._precompute_vmats()
 
     # ── helpers ──────────────────────────────────────────────────────────────
+
+    def _precompute_vmats(self) -> None:
+        q, k, v = self.q_proj, self.k_proj, self.v_proj
+        if not (_is_svd(q) and _is_svd(k) and _is_svd(v)):
+            return
+        if not (_rank(q) == _rank(k) == _rank(v)):
+            return
+        H  = self.num_heads
+        Hk = getattr(self, "num_key_value_heads", H)
+        dh = self.head_dim
+        self._Vq = _vmat(q, H,  dh)
+        self._Vk = _vmat(k, Hk, dh)
+        self._Vv = _vmat(v, Hk, dh)
 
     def _can_use_flashsvd_decode(self, hidden_states: torch.Tensor, past_key_value) -> bool:
         if not _HAS_KERNEL or not _HAS_FA2:
@@ -113,20 +129,15 @@ class ASVDFlashLlamaAttention(nn.Module):
         cache_position: Optional[torch.LongTensor],
     ) -> torch.Tensor:
         B = hidden_states.shape[0]
-        H = self.num_heads
-        Hk = getattr(self, "num_key_value_heads", H)
         dh = self.head_dim
-        R = _rank(self.q_proj)
 
         # Rank-space projections: [B, R]
         Pq = self.q_proj.BLinear(hidden_states).squeeze(1)
         Pk = self.k_proj.BLinear(hidden_states).squeeze(1)
         Pv = self.v_proj.BLinear(hidden_states).squeeze(1)
 
-        # V matrices: [H, R, dh]
-        Vq = _vmat(self.q_proj, H, dh)
-        Vk = _vmat(self.k_proj, Hk, dh)
-        Vv = _vmat(self.v_proj, Hk, dh)
+        # V matrices: precomputed in __init__, no allocation here
+        Vq, Vk, Vv = self._Vq, self._Vk, self._Vv
 
         # Reconstruct Q/K/V for current token: [B, H, dh]
         Q_bhd, K_bhd, V_bhd = reconstruct_qkv_token_shared(Pq, Pk, Pv, Vq, Vk, Vv)
@@ -170,7 +181,7 @@ class ASVDFlashLlamaAttention(nn.Module):
         )
 
         # [B, 1, H*dh] → output projection
-        attn_output = out.reshape(B, 1, H * dh)
+        attn_output = out.reshape(B, 1, self.num_heads * dh)
         attn_output = self.o_proj(attn_output)
         return attn_output
 
