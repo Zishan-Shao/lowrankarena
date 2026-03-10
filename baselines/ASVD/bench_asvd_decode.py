@@ -191,6 +191,57 @@ def _force_uniform_qkv(model, target_rank: int = 0) -> int:
     return patched
 
 
+def _force_uniform_mlp(model, target_rank: int = 0) -> int:
+    """Truncate gate/up projections to equal rank so MLP kernel can fire.
+
+    If target_rank=0, uses the minimum rank found across all gate/up pairs.
+    Truncation keeps the first target_rank singular components (lowest-loss).
+    Returns the number of projections truncated.
+    """
+    import torch.nn as nn
+
+    try:
+        layers = model.model.layers
+    except AttributeError:
+        return 0
+
+    def _r(m):
+        return int(m.BLinear.weight.shape[0])
+
+    # Auto-detect target rank
+    if target_rank == 0:
+        for layer in layers:
+            mlp = getattr(layer, 'mlp', None)
+            if mlp is None:
+                continue
+            if hasattr(mlp, 'gate_proj') and hasattr(mlp, 'up_proj'):
+                target_rank = min(target_rank or _r(mlp.gate_proj),
+                                  _r(mlp.gate_proj), _r(mlp.up_proj))
+        if target_rank == 0:
+            print("[force_uniform_mlp] no SVDLinear found, skipping")
+            return 0
+
+    print(f"[force_uniform_mlp] target_rank={target_rank}")
+    patched = 0
+    for layer in layers:
+        mlp = getattr(layer, 'mlp', None)
+        if mlp is None:
+            continue
+        for name in ['gate_proj', 'up_proj']:
+            proj = getattr(mlp, name, None)
+            if proj is None:
+                continue
+            r = _r(proj)
+            if r == target_rank:
+                continue
+            proj.ALinear.weight = nn.Parameter(proj.ALinear.weight[:, :target_rank].contiguous())
+            proj.BLinear.weight = nn.Parameter(proj.BLinear.weight[:target_rank, :].contiguous())
+            patched += 1
+
+    print(f"[force_uniform_mlp] truncated {patched} projections to rank {target_rank}")
+    return patched
+
+
 def _bench_one_mode(
     checkpoint_path: str | None,
     *,
@@ -213,6 +264,8 @@ def _bench_one_mode(
     if mode == "flashsvd":
         if args.force_uniform_qkv:
             _force_uniform_qkv(model, target_rank=args.target_rank)
+        if args.force_uniform_mlp:
+            _force_uniform_mlp(model, target_rank=args.mlp_target_rank)
         apply_flashsvd_to_asvd_model(model)
 
     try:
@@ -224,7 +277,7 @@ def _bench_one_mode(
             batch_size=args.batch_size,
             device=args.device,
             lowrank_cache=False,
-            flashsvd_dense_cache=True,   # both modes use FlashSVDDenseKVCache + FA2
+            flashsvd_dense_cache=(mode == "flashsvd"),
             baseline_dense_kvcache=False,
             profile_decode=False,
         )
@@ -289,6 +342,10 @@ def main() -> int:
                     help="Before FlashSVD, make q/k/v all SVDLinear with equal rank")
     ap.add_argument("--target_rank", type=int, default=0,
                     help="Target rank for --force_uniform_qkv (0=auto: min existing rank)")
+    ap.add_argument("--force_uniform_mlp", action="store_true",
+                    help="Before FlashSVD, truncate gate/up to equal rank so MLP kernel fires")
+    ap.add_argument("--mlp_target_rank", type=int, default=0,
+                    help="Target rank for --force_uniform_mlp (0=auto: min gate/up rank)")
     ap.add_argument("--sdp_backend", type=str, default=None,
                     choices=["flash", "mem_efficient", "math"],
                     help="Lock PyTorch SDPA backend for both baseline and FlashSVD runs")
