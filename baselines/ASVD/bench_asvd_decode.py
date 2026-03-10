@@ -155,9 +155,12 @@ def _force_uniform_qkv(model) -> int:
         # Replace any plain nn.Linear with SVDLinear at target_rank
         for name, proj in [('q_proj', q), ('k_proj', k), ('v_proj', v)]:
             if not _is_svd(proj):
+                n_params = proj.weight.numel()
+                in_out = proj.in_features + proj.out_features
+                param_ratio = target_rank * in_out / n_params
                 svd = SVDLinear.from_linear(
                     proj,
-                    param_ratio=target_rank / proj.weight.shape[1],
+                    param_ratio=param_ratio,
                     act_aware=False,
                 )
                 setattr(attn, name, svd)
