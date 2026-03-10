@@ -80,40 +80,34 @@ def _make_mlp_forward(mlp_module):
     """Return a patched forward() that uses flashsvd_ffn_swiglu on CUDA."""
     original_forward = mlp_module.forward
 
+    gate_proj = mlp_module.gate_proj
+    up_proj   = mlp_module.up_proj
+    down_proj = mlp_module.down_proj
+
+    # Pre-check kernel compatibility; fall back to original if not met.
+    if not (_is_svd(gate_proj) and _is_svd(up_proj) and _is_svd(down_proj)):
+        return original_forward
+    if _rank(gate_proj) != _rank(up_proj):
+        return original_forward
+
+    # Precompute static weight views/concatenations once (not per forward call).
+    D  = up_proj.ALinear.weight.shape[0]    # intermediate_size
+    V1 = torch.cat([up_proj.ALinear.weight.T, gate_proj.ALinear.weight.T], dim=1).contiguous()
+    U2 = down_proj.BLinear.weight.T.contiguous()
+    V2 = down_proj.ALinear.weight.T.contiguous()
+    b1 = torch.zeros(2 * D, device=V1.device, dtype=V1.dtype)
+    b2_bias = getattr(down_proj.ALinear, 'bias', None)
+    b2 = b2_bias if b2_bias is not None else torch.zeros(V2.shape[1], device=V2.device, dtype=V2.dtype)
+
     def new_forward(x):
         if not x.is_cuda:
             return original_forward(x)
-
-        gate_proj = mlp_module.gate_proj
-        up_proj   = mlp_module.up_proj
-        down_proj = mlp_module.down_proj
-
-        if not (_is_svd(gate_proj) and _is_svd(up_proj) and _is_svd(down_proj)):
+        # Prefill (L > 4): skip kernel to avoid Triton autotune on large L
+        if x.shape[1] > 4:
             return original_forward(x)
-        if _rank(gate_proj) != _rank(up_proj):
-            return original_forward(x)
-
-        R1   = _rank(up_proj)
-        D    = up_proj.ALinear.weight.shape[0]    # intermediate_size
 
         # P = x @ BLinear_up^T  →  [B, L, R1]
         P = up_proj.BLinear(x)
-
-        # V1 = [R1, 2*D]:  cols 0..D-1 = up factors, D..2D-1 = gate factors
-        V1u = up_proj.ALinear.weight.T      # [R1, D]
-        V1v = gate_proj.ALinear.weight.T    # [R1, D]  (gate)
-        V1  = torch.cat([V1u, V1v], dim=1)  # [R1, 2D]
-
-        # Down path
-        R2   = _rank(down_proj)
-        U2   = down_proj.BLinear.weight.T   # [D, R2]  (BLinear: [R2, D])
-        V2   = down_proj.ALinear.weight.T   # [R2, H]  (ALinear: [H, R2])
-
-        B, L = x.shape[0], x.shape[1]
-        b1 = torch.zeros(2 * D, device=x.device, dtype=x.dtype)
-        b2_bias = getattr(down_proj.ALinear, 'bias', None)
-        b2 = b2_bias if b2_bias is not None else torch.zeros(V2.shape[1], device=x.device, dtype=x.dtype)
-
         return flashsvd_ffn_swiglu(P, V1, U2, V2, b1, b2)
 
     return new_forward
