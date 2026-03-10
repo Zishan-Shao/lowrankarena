@@ -114,7 +114,7 @@ def load_compressed_model(
     # This avoids HuggingFace validation errors with local paths
     model_id = comp_info.get('model_id', 'bert-base-uncased')
     print(f"[load] Loading tokenizer from: {model_id}")
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=False)
 
     # If dense model, load from original model_id and then load state dict
     if comp_info['method'] == 'dense':
