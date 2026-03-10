@@ -15,6 +15,7 @@ Kernel input layout:
 """
 from __future__ import annotations
 
+import inspect
 import math
 import os
 import sys
@@ -192,9 +193,8 @@ class ASVDFlashLlamaAttention(nn.Module):
             return attn_output, None, past_key_value
 
         # Fallback: original LlamaAttention forward
-        return self._orig_forward(
-            self,
-            hidden_states,
+        # Filter kwargs to only those accepted by the original (handles older transformers)
+        call_kwargs = dict(
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_value=past_key_value,
@@ -204,3 +204,9 @@ class ASVDFlashLlamaAttention(nn.Module):
             position_embeddings=position_embeddings,
             **kwargs,
         )
+        sig = inspect.signature(self._orig_forward)
+        params = sig.parameters
+        has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
+        if not has_var_kw:
+            call_kwargs = {k: v for k, v in call_kwargs.items() if k in params}
+        return self._orig_forward(self, hidden_states, **call_kwargs)
