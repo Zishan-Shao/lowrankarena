@@ -37,7 +37,7 @@ parse_ppl() {
     python -c "
 import re
 txt = open('$f').read()
-m = re.search(r\"wikitext2'?[^:]*:\\s*([0-9]+\\.?[0-9]*)\", txt)
+m = re.search(r\"'wikitext2':\\s*([0-9]+\\.[0-9]+)\", txt)
 print(m.group(1) if m else 'N/A')
 "
 }
