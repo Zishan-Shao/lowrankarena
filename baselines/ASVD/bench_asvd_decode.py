@@ -205,6 +205,9 @@ def _force_uniform_mlp(model, target_rank: int = 0) -> int:
     except AttributeError:
         return 0
 
+    def _is_svd(m):
+        return hasattr(m, 'BLinear') and hasattr(m, 'ALinear')
+
     def _r(m):
         return int(m.BLinear.weight.shape[0])
 
@@ -214,9 +217,11 @@ def _force_uniform_mlp(model, target_rank: int = 0) -> int:
             mlp = getattr(layer, 'mlp', None)
             if mlp is None:
                 continue
-            if hasattr(mlp, 'gate_proj') and hasattr(mlp, 'up_proj'):
-                target_rank = min(target_rank or _r(mlp.gate_proj),
-                                  _r(mlp.gate_proj), _r(mlp.up_proj))
+            g = getattr(mlp, 'gate_proj', None)
+            u = getattr(mlp, 'up_proj', None)
+            if g is None or u is None or not _is_svd(g) or not _is_svd(u):
+                continue
+            target_rank = min(target_rank or _r(g), _r(g), _r(u))
         if target_rank == 0:
             print("[force_uniform_mlp] no SVDLinear found, skipping")
             return 0
@@ -229,7 +234,7 @@ def _force_uniform_mlp(model, target_rank: int = 0) -> int:
             continue
         for name in ['gate_proj', 'up_proj']:
             proj = getattr(mlp, name, None)
-            if proj is None:
+            if proj is None or not _is_svd(proj):
                 continue
             r = _r(proj)
             if r == target_rank:
