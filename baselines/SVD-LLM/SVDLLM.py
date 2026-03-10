@@ -920,6 +920,13 @@ if __name__ == '__main__':
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
         model.seqlen = args.model_seq_len
+        # Truncate pre-cached causal_mask buffer to actual seqlen to avoid SDPA
+        # size mismatch when max_position_embeddings > model_seq_len (e.g. LLaMA-2: 4096 vs 2048)
+        for _m in model.modules():
+            if hasattr(_m, 'causal_mask') and isinstance(getattr(_m, 'causal_mask'), torch.Tensor):
+                cm = _m.causal_mask
+                if cm.shape[-1] > args.model_seq_len:
+                    _m.causal_mask = cm[..., :args.model_seq_len, :args.model_seq_len]
         model = model.eval()
         if args.profiling_mat_path is None:
             cali_white_data = get_calib_train_data(args.dataset, tokenizer, args.whitening_nsamples, seqlen=args.model_seq_len)
@@ -935,6 +942,11 @@ if __name__ == '__main__':
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
         model.seqlen = args.model_seq_len
+        for _m in model.modules():
+            if hasattr(_m, 'causal_mask') and isinstance(getattr(_m, 'causal_mask'), torch.Tensor):
+                cm = _m.causal_mask
+                if cm.shape[-1] > args.model_seq_len:
+                    _m.causal_mask = cm[..., :args.model_seq_len, :args.model_seq_len]
         dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
         model = model.eval()
         model = model.float()  # need to set to float
