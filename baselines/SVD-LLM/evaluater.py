@@ -28,6 +28,11 @@ try:
         return _orig_from_legacy(cls, past_key_values)
 
     DynamicCache.from_legacy_cache = _patched_from_legacy
+
+    # Patch: some transformers versions call to_legacy_cache() on Cache subclasses
+    # that don't implement it (e.g. FlashSVDDenseKVCache). Return self as pass-through.
+    if not hasattr(Cache, 'to_legacy_cache'):
+        Cache.to_legacy_cache = lambda self: self
 except Exception:
     pass
 
