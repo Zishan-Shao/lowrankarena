@@ -121,6 +121,53 @@ def _load_checkpoint(path: str):
     return obj["model"], obj["tokenizer"]
 
 
+def _force_uniform_qkv(model) -> int:
+    """For layers where only some of q/k/v are SVDLinear, replace the plain
+    nn.Linear ones with SVDLinear at the same rank as the compressed ones.
+    This is needed for FlashSVD kernel which requires q/k/v to share a rank.
+    Returns the number of layers patched.
+    """
+    from modules.svd_linear import SVDLinear
+
+    def _is_svd(m):
+        return isinstance(m, SVDLinear)
+
+    def _rank(m: SVDLinear) -> int:
+        return int(m.BLinear.weight.shape[0])
+
+    patched = 0
+    try:
+        layers = model.model.layers
+    except AttributeError:
+        return 0
+
+    for layer in layers:
+        attn = getattr(layer, 'self_attn', None)
+        if attn is None:
+            continue
+        q, k, v = attn.q_proj, attn.k_proj, attn.v_proj
+        svd_ranks = [_rank(m) for m in [q, k, v] if _is_svd(m)]
+        if not svd_ranks:
+            continue
+        if _is_svd(q) and _is_svd(k) and _is_svd(v):
+            continue  # already uniform
+        target_rank = svd_ranks[0]
+        # Replace any plain nn.Linear with SVDLinear at target_rank
+        for name, proj in [('q_proj', q), ('k_proj', k), ('v_proj', v)]:
+            if not _is_svd(proj):
+                svd = SVDLinear.from_linear(
+                    proj,
+                    param_ratio=target_rank / proj.weight.shape[1],
+                    act_aware=False,
+                )
+                setattr(attn, name, svd)
+                patched += 1
+
+    if patched:
+        print(f"[force_uniform_qkv] replaced {patched} q/k/v projections with SVDLinear (rank={target_rank})")
+    return patched
+
+
 def _bench_one(
     model,
     *,
@@ -195,6 +242,10 @@ def main() -> int:
     ap.add_argument("--batch_size", type=int, default=1)
     ap.add_argument("--skip_baseline", action="store_true")
     ap.add_argument("--skip_flashsvd", action="store_true")
+    ap.add_argument("--force_uniform_qkv", action="store_true",
+                    help="Before FlashSVD, replace un-compressed q/k/v with SVDLinear "
+                         "at the rank of the already-compressed ones (needed when ASVD "
+                         "leaves q/k as nn.Linear)")
 
     args = ap.parse_args()
 
@@ -239,6 +290,8 @@ def main() -> int:
 
     # ── FlashSVD (apply wrapper) ───────────────────────────────────────────────
     if not args.skip_flashsvd:
+        if args.force_uniform_qkv:
+            _force_uniform_qkv(model)
         apply_flashsvd_to_asvd_model(model)
         results["flashsvd"] = _bench_one(
             model,
