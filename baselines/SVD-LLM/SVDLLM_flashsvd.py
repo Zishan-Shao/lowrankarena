@@ -1,13 +1,6 @@
 #coding:utf8
 import os
 import sys
-
-# Add repo root so `from src.kernels.xxx import ...` resolves correctly.
-_here = os.path.dirname(os.path.abspath(__file__))           # baselines/SVD-LLM/
-_repo_root = os.path.dirname(os.path.dirname(_here))         # lowrankarena/
-if _repo_root not in sys.path:
-    sys.path.insert(0, _repo_root)
-
 import argparse
 import torch.jit
 from tqdm import tqdm
@@ -15,7 +8,11 @@ import torch
 import torch.nn as nn
 
 from utils.data_utils import *
-from flashsvd_component.svd_llama import SVD_LlamaAttention, SVD_LlamaMLP
+from flashsvd_component.svd_llama import (
+    SVD_LlamaAttention,
+    SVD_LlamaMLP,
+    enable_flashsvd_llama_layer_tail_cuda_graph,
+)
 from flashsvd_component.svd_mistral import SVD_MistralAttention, SVD_MistralMLP
 from flashsvd_component.svd_opt import SVDOPTDecoderLayer
 from utils.model_utils import *
@@ -24,6 +21,18 @@ from evaluater import *
 current_path = os.path.dirname(os.path.abspath(__file__))
 parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(current_path)
+enable_flashsvd_llama_layer_tail_cuda_graph()
+
+
+def _backend_needs_experimental_ffn(backend: str) -> bool:
+    raw = str(backend).strip().lower()
+    return raw in {
+        "dual_split_cublas",
+        "dual_split_kernel",
+        "dual_split_kernel_v2",
+        "dual_split_kernel_v2_sm80",
+        "dual_split_kernel_v3",
+    }
 
 
 
@@ -158,14 +167,11 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
             inps[cache['i']] = inp.cpu()
             cache['i'] += 1
             if cache['attention_mask'] is None:
-                attn_mask = kwargs.get('attention_mask', None)
-                cache['attention_mask'] = attn_mask.cpu() if attn_mask is not None else None
+                cache['attention_mask'] = kwargs['attention_mask'].cpu()
                 if "opt" not in model_name:
                     cache['position_ids'] = kwargs['position_ids'].cpu()
             else:
-                attn_mask = kwargs.get('attention_mask', None)
-                if attn_mask is not None:
-                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attn_mask.cpu()), dim=0) if cache['attention_mask'] is not None else attn_mask.cpu()
+                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask'].cpu()), dim=0)
                 if "opt" not in model_name:
                     cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids'].cpu()), dim=0)
             raise ValueError
@@ -209,20 +215,10 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
             subset[name].scaling_diag_matrix = 0
             handles.append(subset[name].register_forward_hook(hook))
         for j in range(inps.shape[0]):
-            attn_mask_j = attention_masks[j].unsqueeze(0).to(dev) if attention_masks is not None else None
             if "opt" not in model_name:
-                pos_ids_j = position_ids[j].unsqueeze(0).to(dev)
-                extra_kwargs = {}
-                rotary_emb = getattr(getattr(model, 'model', None), 'rotary_emb', None)
-                if rotary_emb is not None:
-                    try:
-                        position_embeddings = rotary_emb(inps[j].unsqueeze(0).to(dev), pos_ids_j)
-                        extra_kwargs['position_embeddings'] = position_embeddings
-                    except Exception:
-                        pass
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attn_mask_j, position_ids=pos_ids_j, **extra_kwargs)[0]
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_masks[j].unsqueeze(0).to(dev), position_ids=position_ids[j].unsqueeze(0).to(dev))[0]
             else:
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attn_mask_j)[0]
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_masks[j].unsqueeze(0).to(dev))[0]
         for h in handles:
             h.remove()
         layer = layer.cpu()
@@ -336,6 +332,11 @@ def whitening(model_name, model, profiling_mat, ratio, dev):
                 elif "o_proj" in name:
                     svd_attn.o_u_proj.weight.data = svd_u
                     svd_attn.o_v_proj.weight.data = svd_v
+                    # Preserve HF layer index for Cache objects (transformers>=4.4x).
+                    try:
+                        svd_attn.layer_idx = int(getattr(layer.self_attn, "layer_idx", i))
+                    except Exception:
+                        svd_attn.layer_idx = int(i)
                     layer.self_attn =  svd_attn
                 elif "gate_proj" in name:
                     svd_mlp.gate_u_proj.weight.data = svd_u
@@ -383,14 +384,11 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
             inps[cache['i']] = inp
             cache['i'] += 1
             if cache['attention_mask'] is None:
-                attn_mask = kwargs.get('attention_mask', None)
-                cache['attention_mask'] = attn_mask
+                cache['attention_mask'] = kwargs['attention_mask']
                 if "opt" not in model_name:
                     cache['position_ids'] = kwargs['position_ids']
             else:
-                attn_mask = kwargs.get('attention_mask', None)
-                if attn_mask is not None:
-                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attn_mask), dim=0) if cache['attention_mask'] is not None else attn_mask
+                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask']), dim=0)
                 if "opt" not in model_name:
                     cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids']), dim=0)
             raise ValueError
@@ -485,6 +483,11 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
                 elif "o_proj" in name:
                     svd_attn.o_u_proj.weight.data = svd_u
                     svd_attn.o_v_proj.weight.data = svd_v
+                    # Preserve HF layer index for Cache objects (transformers>=4.4x).
+                    try:
+                        svd_attn.layer_idx = int(getattr(layer.self_attn, "layer_idx", i))
+                    except Exception:
+                        svd_attn.layer_idx = int(i)
                     layer.self_attn =  svd_attn
                 elif "gate_proj" in name:
                     svd_mlp.gate_u_proj.weight.data = svd_u
@@ -575,7 +578,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--model', type=str, default='jeffwan/llama-7b-hf', help='LLaMA model to load, pass `jeffwan/llama-7b-hf`')
     parser.add_argument('--model_path', type=str, default=None, help='local compressed model path or whitening information path')
-    parser.add_argument('--ratio', type=float, default=0.2, help='Target compression ratio,(0,1), default=0.2, means only keeping about 20% of the params.')
+    parser.add_argument('--ratio', type=float, default=0.2, help='Target compression ratio,(0,1), default=0.2, means only keeping about 20%% of the params.')
     parser.add_argument('--run_low_resource', action='store_true', help='whether to run whitening in low resource, exp, compress LLaMA-7B below 15G gpu')
     parser.add_argument('--dataset', type=str, default='wikitext2',help='Where to extract calibration data from [wikitext2, ptb, c4]')
     parser.add_argument('--whitening_nsamples', type=int, default=256, help='Number of calibration data samples for whitening.')
@@ -586,15 +589,89 @@ if __name__ == '__main__':
     parser.add_argument('--DEV', type=str, default="cuda", help='device')
     parser.add_argument('--model_seq_len', type=int, default=2048, help='the default sequence length of the LLM')
     parser.add_argument('--eval_batch_size', type=int, default=4, help='inference bactch size')
+    parser.add_argument('--eval_dtype', type=str, default="auto", choices=["auto", "fp16", "bf16", "fp32"], help='dtype for step>=4 evaluation (auto=bf16 if supported else fp16)')
     parser.add_argument('--gen_seq_len', type=int, default=1024, help='generated sequence len for efficiency evaluation')
+    parser.add_argument('--prompt_len', type=int, default=2048, help='prompt length for KV-cache decode benchmark (step=6)')
+    parser.add_argument('--new_tokens', type=int, default=128, help='number of decode steps for KV-cache benchmark (step=6)')
+    parser.add_argument('--decode_warmup', type=int, default=5, help='warmup decode steps for KV-cache benchmark (step=6)')
+    parser.add_argument('--max_cache_len', type=int, default=0, help='override max KV cache length for step=6 (<=0 uses prompt+warmup+new_tokens+1)')
+    parser.add_argument('--lowrank_cache', action='store_true', help='Use LowRankKVCache for step=6 (FlashSVD models only)')
+    parser.add_argument(
+        '--flashsvd_dense_cache',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help='Enable FlashSVD dense-KV decode path for step=6 (low-rank weights + dense KV cache + FA2).',
+    )
+    parser.add_argument('--baseline_lowrank_cache', action='store_true', help='Use LowRankKVCache but compute attention with SDPA (no FlashSVD attention kernels) for step=6')
+    parser.add_argument('--baseline_dense_kvcache', action='store_true', help='Use dense KV cache for step=6, but compute Q/K/V with reference PyTorch low-rank reconstruction before RoPE + FA2.')
+    parser.add_argument('--disable_flash_ffn', action='store_true', help='Disable FlashSVD fused SwiGLU FFN kernel (keep FlashSVD attention)')
+    parser.add_argument('--reference_dense_attn', action='store_true', help='Force full-sequence attention to use explicit low-rank reconstruction + RoPE + SDPA for aligned eval/correctness.')
+    parser.add_argument(
+        '--flashsvd_mlp_cuda_graph',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='Enable CUDA Graph for FlashSVD MLP decode fast path.',
+    )
+    parser.add_argument(
+        '--flashsvd_mlp_graph_scope',
+        type=str,
+        default='mlp',
+        choices=['auto', 'mlp', 'layer_tail'],
+        help='CUDA Graph scope for FlashSVD MLP benchmarking.',
+    )
+    parser.add_argument(
+        '--flashsvd_mlp_graph_alias_output',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help='Allow FlashSVD CUDA Graph MLP path to return the static graph output buffer directly to avoid an extra clone.',
+    )
+    parser.add_argument(
+        '--flashsvd_ffn_backend',
+        type=str,
+        default='auto',
+        choices=['auto', 'dual_split_cublas', 'dual_split_cublas_legacy', 'dual_split_kernel', 'dual_split_kernel_v2', 'dual_split_kernel_v2_sm80', 'dual_split_kernel_v3'],
+        help='FFN backend override for legacy A/B. `auto` stays on the production path.',
+    )
+    parser.add_argument('--mha_stream', action='store_true', help='Enable MHA streamed decode path for LowRankKVCache (REP=1): avoids SDPA peak memory and avoids per-head kernel overhead')
+    parser.add_argument('--profile_decode', action='store_true', help='Profile decode latency breakdown in step=6 (prints per-module CUDA time)')
+    parser.add_argument('--profile_decode_steps', type=int, default=20, help='Number of decode steps to profile (step=6)')
+    parser.add_argument('--profile_attn_decode', action='store_true', help='Fine-grained timing inside FlashSVD lowrank-cache decode attention (proj/cache/rope/kernel/out)')
+    parser.add_argument('--profile_attn_layer', type=int, default=0, help='Which decoder layer index to time for --profile_attn_decode')
+    parser.add_argument('--profile_attn_steps', type=int, default=20, help='How many decode steps to average for --profile_attn_decode')
     parser.add_argument('--step', type=int, default=4, help='the step to run the compression')
     parser.add_argument('--hf_token', type=str, default=None, help='Hugging Face access token (optional)')
     parser.add_argument('--lora', type=str, default=None, help='the lora updated weight path to run the accuracy evaluation')
-    
+
     args = parser.parse_args()
-    args.ratio = 1- args.ratio
+    args.ratio = 1 - args.ratio
+    if bool(args.lowrank_cache):
+        args.flashsvd_dense_cache = False
+    if bool(args.baseline_lowrank_cache):
+        # Baseline mode implies LowRankKVCache storage (but disables FlashSVD attention kernels).
+        args.lowrank_cache = True
+        args.flashsvd_dense_cache = False
+        args.baseline_dense_kvcache = False
+    if bool(args.baseline_dense_kvcache):
+        args.lowrank_cache = False
+        args.flashsvd_dense_cache = False
+    set_env_flag("FLASH_SVD_DISABLE_FFN", bool(args.disable_flash_ffn))
+    set_env_flag("FLASH_SVD_BASELINE_LR_KVCACHE", bool(args.baseline_lowrank_cache))
+    set_env_flag("FLASH_SVD_BASELINE_DENSE_KVCACHE", bool(args.baseline_dense_kvcache))
+    set_env_flag("FLASH_SVD_DECODE_MHA_STREAM", bool(args.mha_stream))
+    set_env_flag("FLASH_SVD_PROFILE_ATTN_DECODE", bool(args.profile_attn_decode))
+    set_env_flag("FLASH_SVD_MLP_CUDA_GRAPH", bool(args.flashsvd_mlp_cuda_graph))
+    set_env_flag("FLASH_SVD_MLP_CUDA_GRAPH_ALIAS_OUTPUT", bool(args.flashsvd_mlp_graph_alias_output))
+    set_env_flag("FLASH_SVD_ENABLE_EXPERIMENTAL_FFN", _backend_needs_experimental_ffn(args.flashsvd_ffn_backend))
+    set_env_flag("FLASH_SVD_REFERENCE_DENSE_ATTN", bool(args.reference_dense_attn))
+    os.environ["FLASH_SVD_FFN_BACKEND"] = str(args.flashsvd_ffn_backend)
+    os.environ["FLASH_SVD_MLP_CUDA_GRAPH_SCOPE"] = str(args.flashsvd_mlp_graph_scope)
+    set_env_flag("FLASH_SVD_ENABLE_DENSE_ATTN_DECODE", bool(args.flashsvd_dense_cache))
+    if bool(args.profile_attn_decode):
+        os.environ["FLASH_SVD_PROFILE_ATTN_LAYER"] = str(int(args.profile_attn_layer))
+        os.environ["FLASH_SVD_PROFILE_ATTN_STEPS"] = str(int(args.profile_attn_steps))
     if args.step == 1:
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
+        model.seqlen = args.model_seq_len
         model = model.eval()
         if args.profiling_mat_path is None:
             cali_white_data = get_calib_train_data(args.dataset, tokenizer, args.whitening_nsamples, seqlen=args.model_seq_len)
@@ -608,6 +685,7 @@ if __name__ == '__main__':
             torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_whitening_only_' + str(args.ratio) + '.pt')   # fp32
     elif args.step == 2:
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
+        model.seqlen = args.model_seq_len
         dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
         model = model.eval()
         model = model.float()  # need to set to float
@@ -623,6 +701,7 @@ if __name__ == '__main__':
             torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_whitening_then_update_' + str(args.ratio) + '.pt')  # fp32
     elif args.step == 3:
         model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
+        model.seqlen = args.model_seq_len
         model = model.eval()
         model = model.float()
         dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
@@ -644,10 +723,40 @@ if __name__ == '__main__':
                 )
                 model = model.merge_and_unload()
                 torch.save({'model': model, 'tokenizer': tokenizer}, args.lora + '/merge.pt')
+        model.seqlen = args.model_seq_len
         model.eval()
+        # For end-to-end speed tests, use low-precision eval by default.
+        if args.eval_dtype == "fp32":
+            model = model.float()
+        elif args.eval_dtype == "fp16":
+            model = model.half()
+        elif args.eval_dtype == "bf16":
+            model = model.to(dtype=torch.bfloat16)
+        else:  # auto
+            # Prefer bf16 when available; fall back to fp16 otherwise.
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                model = model.to(dtype=torch.bfloat16)
+            else:
+                model = model.half()
         model = model.to(args.DEV)
         if args.step == 4:
             label = 'Baseline PPL' if args.model_path == 'original' else 'PPL after pruning'
             ppl_eval(model, tokenizer, datasets=['wikitext2'], model_seq_len=args.model_seq_len, batch_size=args.eval_batch_size, device=args.DEV, label=label)
         elif args.step == 5:
             eff_eval(model, tokenizer, generated_len=args.gen_seq_len, batch_size=args.eval_batch_size, device=args.DEV)
+        elif args.step == 6:
+            max_cache_len = int(args.max_cache_len) if int(args.max_cache_len) > 0 else None
+            decode_kvcache_eval(
+                model,
+                prompt_len=args.prompt_len,
+                new_tokens=args.new_tokens,
+                warmup=args.decode_warmup,
+                max_cache_len=max_cache_len,
+                batch_size=args.eval_batch_size,
+                device=args.DEV,
+                lowrank_cache=bool(args.lowrank_cache),
+                flashsvd_dense_cache=bool(args.flashsvd_dense_cache),
+                baseline_dense_kvcache=bool(args.baseline_dense_kvcache),
+                profile_decode=bool(args.profile_decode),
+                profile_decode_steps=int(args.profile_decode_steps),
+            )

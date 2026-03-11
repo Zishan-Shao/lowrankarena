@@ -1,7 +1,7 @@
-"""
-Local utilities package for FlashSVDTrain.
+"""Utility helpers for SVD-LLM style scripts (FlashSVD-v1.5).
 
-Having an __init__ ensures absolute imports like `utils.model_utils` prefer
-this local package over any third‑party packages named `utils`.
+This package is intentionally lightweight and self-contained so that
+`FlashSVD-v1.5/SVDLLM*.py` scripts can run without depending on the
+original upstream repo layout.
 """
 

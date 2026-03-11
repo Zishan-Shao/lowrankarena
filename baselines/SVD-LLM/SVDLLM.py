@@ -8,7 +8,11 @@ import torch
 import torch.nn as nn
 
 from utils.data_utils import *
-from component.svd_llama import SVD_LlamaAttention, SVD_LlamaMLP
+from component.svd_llama import (
+    SVD_LlamaAttention,
+    SVD_LlamaMLP,
+    enable_flashsvd_llama_layer_tail_cuda_graph,
+)
 from component.svd_mistral import SVD_MistralAttention, SVD_MistralMLP
 from component.svd_opt import SVDOPTDecoderLayer
 from utils.model_utils import *
@@ -17,6 +21,7 @@ from evaluater import *
 current_path = os.path.dirname(os.path.abspath(__file__))
 parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(current_path)
+enable_flashsvd_llama_layer_tail_cuda_graph()
 
 
 def _compat_enabled(key: str, default: bool = False) -> bool:
@@ -221,7 +226,17 @@ def profle_svdllm(name, model, calib_loader, dev):
         
 
 @torch.no_grad()
-def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
+def profle_svdllm_low_resource(
+    model_name,
+    model,
+    calib_loader,
+    dev,
+    *,
+    stats_device: str = "auto",        # auto|cpu|cuda
+    stats_dtype: str = "fp32",         # fp32|fp64
+    store_dtype: str = "fp16",         # fp16|bf16|fp32
+    microbatch: int = 1,
+):
     if "opt" in model_name:
         layers = model.model.decoder.layers
         model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
@@ -232,6 +247,14 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
         model.model.embed_tokens = model.model.embed_tokens.to(dev)
         model.model.norm = model.model.norm.to(dev)
     layers[0] = layers[0].to(dev)
+
+    # Resolve stats device/dtypes
+    stats_device = (stats_device or "auto").lower()
+    stats_dtype = (stats_dtype or "fp32").lower()
+    store_dtype = (store_dtype or "fp16").lower()
+    stats_t = torch.float64 if stats_dtype == "fp64" else torch.float32
+    store_t = {"fp16": torch.float16, "bf16": torch.bfloat16, "fp32": torch.float32}.get(store_dtype, torch.float16)
+    use_gpu_stats = str(dev).startswith("cuda") and stats_device in ("auto", "cuda")
 
     dtype = next(iter(model.parameters())).dtype
     # Use CPU-pinned buffers for activations to avoid large GPU allocations
@@ -287,7 +310,6 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
         model.model.embed_tokens = model.model.embed_tokens.cpu()
         model.model.norm = model.model.norm.cpu()
     torch.cuda.empty_cache()
-    outs = torch.zeros_like(inps, device=buf_device, pin_memory=pin)
     attention_masks = cache['attention_mask']
     if "opt" not in model_name:
         position_ids = cache['position_ids']
@@ -297,68 +319,97 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
         layer = layers[i].to(dev)
         subset = find_layers(layer)        
         compat_whitening = _compat_enabled('whitening', False)
+        cov_cache = {}
         def hook(module, input, output):
-            x = input[0].detach()
-            if x.dim() == 3:
-                x = x.reshape(-1, x.shape[-1])
-            elif x.dim() == 2:
-                pass
+            orig_x = input[0].detach()
+            if orig_x.dim() == 3:
+                orig_x2d = orig_x.reshape(-1, orig_x.shape[-1])
+            elif orig_x.dim() == 2:
+                orig_x2d = orig_x
             else:
-                x = x.view(-1, x.shape[-1])
-            # Accumulate stats on the same device as the stats tensors (GPU by default,
-            # CPU fallback if GPU memory is tight)
-            stats_dev = getattr(module, '_second', None).device if hasattr(module, '_second') else dev
-            x = x.to(dtype=torch.float64, device=stats_dev)
+                orig_x2d = orig_x.view(-1, orig_x.shape[-1])
+
+            # Cache X^T X + sum(X) per unique input tensor in this forward call
+            key = (int(orig_x2d.data_ptr()), int(orig_x2d.shape[0]), int(orig_x2d.shape[1]))
+            cached = cov_cache.get(key, None)
+            if cached is None:
+                if compat_whitening and hasattr(module, "_acc"):
+                    stats_dev = module._acc.device
+                elif hasattr(module, "_second"):
+                    stats_dev = module._second.device
+                else:
+                    stats_dev = dev
+                x = orig_x2d.to(device=stats_dev, dtype=stats_t)
+                xtx = x.t().matmul(x)
+                xsum = x.sum(dim=0)
+                nrow = int(x.shape[0])
+                cov_cache[key] = (xtx, xsum, nrow)
+            else:
+                xtx, xsum, nrow = cached
+
             if compat_whitening:
-                module._acc += x.t().matmul(x)
+                module._acc += xtx
             else:
-                module._second += x.t().matmul(x)
-                module._mean += x.sum(dim=0)
-                module._count += x.shape[0]
-            del x, output
-            torch.cuda.empty_cache()
+                module._second += xtx
+                module._mean += xsum
+                module._count += nrow
+            del output
         handles = []
         for name in subset:
             if isinstance(subset[name], nn.Linear):
                 in_f = subset[name].in_features
-                # Always accumulate whitening statistics on CPU to avoid large GPU second-moment buffers
-                if compat_whitening:
-                    subset[name]._acc = torch.zeros((in_f, in_f), dtype=torch.float64, device='cpu')
-                else:
-                    subset[name]._second = torch.zeros((in_f, in_f), dtype=torch.float64, device='cpu')
-                    subset[name]._mean = torch.zeros((in_f,), dtype=torch.float64, device='cpu')
-                    subset[name]._count = 0
+                # Prefer accumulating whitening statistics on GPU for speed; fall back to CPU on OOM.
+                stats_dev = dev if use_gpu_stats else torch.device("cpu")
+                try:
+                    if compat_whitening:
+                        subset[name]._acc = torch.zeros((in_f, in_f), dtype=stats_t, device=stats_dev)
+                    else:
+                        subset[name]._second = torch.zeros((in_f, in_f), dtype=stats_t, device=stats_dev)
+                        subset[name]._mean = torch.zeros((in_f,), dtype=stats_t, device=stats_dev)
+                        subset[name]._count = 0
+                except RuntimeError as e:
+                    if "out of memory" in str(e).lower() and str(stats_dev).startswith("cuda"):
+                        torch.cuda.empty_cache()
+                        if compat_whitening:
+                            subset[name]._acc = torch.zeros((in_f, in_f), dtype=stats_t, device="cpu")
+                        else:
+                            subset[name]._second = torch.zeros((in_f, in_f), dtype=stats_t, device="cpu")
+                            subset[name]._mean = torch.zeros((in_f,), dtype=stats_t, device="cpu")
+                            subset[name]._count = 0
+                    else:
+                        raise
             handles.append(subset[name].register_forward_hook(hook))
-        for j in range(inps.shape[0]):
-            amj = None if attention_masks is None else attention_masks[j].unsqueeze(0)
+        mb = max(int(microbatch), 1)
+        n = int(inps.shape[0])
+        for j0 in range(0, n, mb):
+            j1 = min(n, j0 + mb)
+            cov_cache.clear()
+
+            amj = None if attention_masks is None else attention_masks[j0:j1]
             if amj is not None and amj.device != dev:
                 amj = amj.to(dev, non_blocking=True)
-            # Move current slice to GPU on the fly
-            xj = inps[j].unsqueeze(0).to(dev, non_blocking=True)
+
+            xj = inps[j0:j1].to(dev, non_blocking=True)
             if "opt" not in model_name:
-                # Newer HF LLaMA requires explicit rotary position embeddings (cos, sin)
-                pidsj = None if cache.get('position_ids', None) is None else position_ids[j].unsqueeze(0).to(dev, non_blocking=True)
+                pidsj = None if cache.get('position_ids', None) is None else position_ids[j0:j1].to(dev, non_blocking=True)
                 pos_emb = None
                 try:
-                    # HF >= 4.57 exposes model.model.rotary_emb(hidden_states, position_ids)
                     if hasattr(model, 'model') and hasattr(model.model, 'rotary_emb'):
-                        pos_emb = model.model.rotary_emb(xj.to(dev), pidsj)
+                        pos_emb = model.model.rotary_emb(xj, pidsj)
                 except Exception:
                     pos_emb = None
                 try:
-                    # Prefer passing position_embeddings when supported
                     yj = layer(xj, attention_mask=amj, position_ids=pidsj, position_embeddings=pos_emb)[0]
                 except TypeError:
-                    # Fallback for older HF that ignores/doesn't accept position_embeddings
                     yj = layer(xj, attention_mask=amj, position_ids=pidsj)[0]
             else:
                 yj = layer(xj, attention_mask=amj)[0]
-            # Move result back to CPU buffer if enabled
-            outs[j] = yj.to(buf_device, non_blocking=True)
+
+            # Overwrite activation buffer in-place to save memory.
+            inps[j0:j1] = yj.to(buf_device, non_blocking=True)
         for h in handles:
             h.remove()
         layer = layer.cpu()
-        torch.cuda.empty_cache()
         for name in subset:
             compat_whitening = _compat_enabled('whitening', False)
             if compat_whitening:
@@ -374,7 +425,7 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
                     scaling = torch.linalg.cholesky(
                         raw_xtx + shift * torch.eye(raw_xtx.shape[0], device=raw_xtx.device, dtype=raw_xtx.dtype)
                     )
-                layer_profile[name] = scaling.cpu()
+                layer_profile[name] = scaling.to(dtype=store_t).cpu()
                 subset[name]._acc = None
             else:
                 if not hasattr(subset[name], "_second"):
@@ -403,21 +454,29 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
                         w = torch.clamp(w, min=eps)
                         cov_spd = (Q * w) @ Q.T
                         scaling = torch.linalg.cholesky(cov_spd)
-                layer_profile[name] = scaling.cpu()
+                layer_profile[name] = scaling.to(dtype=store_t).cpu()
                 # cleanup
                 subset[name]._second = None
                 subset[name]._mean = None
                 subset[name]._count = 0
-            torch.cuda.empty_cache()
         layers[i] = layer.cpu()
         profiling_mat[i] = layer_profile
-        inps = outs
         torch.cuda.empty_cache()
     return profiling_mat
      
  
 @torch.no_grad()
-def whitening(model_name, model, profiling_mat, ratio, dev):
+def whitening(
+    model_name,
+    model,
+    profiling_mat,
+    ratio,
+    dev,
+    *,
+    svd_lowrank: bool = False,
+    svd_oversample: int = 64,
+    svd_niter: int = 2,
+):
     model.eval()
     if 'opt' in model_name:
         layers = model.model.decoder.layers
@@ -444,24 +503,38 @@ def whitening(model_name, model, profiling_mat, ratio, dev):
             # Compute SVD in float32 for stability, cast back to original dtype for storage.
             W = subset[name].weight.data.to(dev, dtype=torch.float32)
             dtype = orig_dtype
-            scaling_diag_matrix = profiling_mat[i][name].to(dev)
+            scaling_diag_matrix = profiling_mat[i][name].to(dev, dtype=torch.float32)
+            # Small diagonal jitter for numerical safety (matches common whitening practice).
             try:
-                scaling_matrix_inv = torch.linalg.inv(scaling_diag_matrix)
-            except Exception as e:
-                print("Warning: scaling_diag_matrix is not full rank!")
-                scaling_diag_matrix += 1e-6 * torch.eye(scaling_diag_matrix.shape[0]).to(dev)
-                scaling_matrix_inv = torch.linalg.inv(scaling_diag_matrix)
-            scaling_diag_matrix = scaling_diag_matrix.float()
-            scaling_matrix_inv = scaling_matrix_inv.float()
-            W_scale = torch.matmul(W, scaling_diag_matrix)
-            U, S, VT = torch.linalg.svd(W_scale, full_matrices=False)
-            # Use a rank proportional to the smaller dimension to respect keep_ratio.
+                W_scale = torch.matmul(W, scaling_diag_matrix)
+            except Exception:
+                eps = 1e-6
+                scaling_diag_matrix = scaling_diag_matrix + eps * torch.eye(
+                    scaling_diag_matrix.shape[0], device=scaling_diag_matrix.device, dtype=scaling_diag_matrix.dtype
+                )
+                W_scale = torch.matmul(W, scaling_diag_matrix)
+            # Official SVD-LLM rank mapping: keep_ratio ~= params_ratio
+            # For W in R^{m x n}, choose k such that k(m+n) ≈ ratio * (m*n).
             max_rank = min(W.shape[0], W.shape[1])
-            num_s_after_trunc = max(1, int(max_rank * ratio))
-            num_s_after_trunc = min(num_s_after_trunc, max_rank)
-            truc_s = S[:num_s_after_trunc]
-            truc_u = U[:, :num_s_after_trunc]
-            truc_v = torch.matmul(VT[:num_s_after_trunc, :], scaling_matrix_inv)
+            num_s_after_trunc = int(W.shape[0] * W.shape[1] * ratio / (W.shape[0] + W.shape[1]))
+            num_s_after_trunc = max(1, min(num_s_after_trunc, max_rank))
+
+            if svd_lowrank and num_s_after_trunc < max_rank:
+                q = min(max_rank, int(num_s_after_trunc) + int(max(svd_oversample, 0)))
+                U_lr, S_lr, V_lr = torch.svd_lowrank(W_scale, q=q, niter=int(max(svd_niter, 0)))
+                truc_u = U_lr[:, :num_s_after_trunc]
+                truc_s = S_lr[:num_s_after_trunc]
+                VT_k = V_lr[:, :num_s_after_trunc].t().contiguous()  # (k, n)
+            else:
+                U_full, S_full, VT_full = torch.linalg.svd(W_scale, full_matrices=False)
+                truc_u = U_full[:, :num_s_after_trunc]
+                truc_s = S_full[:num_s_after_trunc]
+                VT_k = VT_full[:num_s_after_trunc, :].contiguous()
+
+            # Avoid forming inv(L): solve right-triangular system for VT_k @ inv(L)
+            # We want X = VT_k @ inv(L) where L = scaling_diag_matrix (lower-triangular).
+            # Equivalent: (X L)^T = VT_k^T -> L^T X^T = VT_k^T.
+            truc_v = torch.linalg.solve_triangular(scaling_diag_matrix.t(), VT_k.t(), upper=True).t()
             truc_sigma = torch.diag(truc_s)
             #### Replace Attn, MLP ####
             sqrtSigma = torch.sqrt(truc_sigma)
@@ -533,6 +606,11 @@ def whitening(model_name, model, profiling_mat, ratio, dev):
                 elif "o_proj" in name:
                     svd_attn.o_u_proj.weight.data = svd_u
                     svd_attn.o_v_proj.weight.data = svd_v
+                    # Preserve HF layer index for Cache objects (transformers>=4.4x).
+                    try:
+                        svd_attn.layer_idx = int(getattr(layer.self_attn, "layer_idx", i))
+                    except Exception:
+                        svd_attn.layer_idx = int(i)
                     layer.self_attn =  svd_attn
                 elif "gate_proj" in name:
                     svd_mlp.gate_u_proj.weight.data = svd_u
@@ -899,6 +977,14 @@ if __name__ == '__main__':
     parser.add_argument('--step', type=int, default=4, help='the step to run the compression')
     parser.add_argument('--hf_token', type=str, default=None, help='Hugging Face access token (optional)')
     parser.add_argument('--lora', type=str, default=None, help='the lora updated weight path to run the accuracy evaluation')
+    # Speed / memory knobs for step 1/2
+    parser.add_argument('--whitening_stats_device', type=str, default='auto', choices=['auto', 'cpu', 'cuda'], help='Where to accumulate whitening XTX stats (auto=cuda when DEV is cuda)')
+    parser.add_argument('--whitening_stats_dtype', type=str, default='fp32', choices=['fp32', 'fp64'], help='dtype for whitening stats accumulation')
+    parser.add_argument('--whitening_store_dtype', type=str, default='fp16', choices=['fp16', 'bf16', 'fp32'], help='dtype to store Cholesky whitening matrices in profiling_mat (saves RAM/disk)')
+    parser.add_argument('--whitening_microbatch', type=int, default=1, help='microbatch size when iterating cached activations per layer (higher = faster, more GPU memory)')
+    parser.add_argument('--svd_lowrank', action='store_true', help='Use randomized truncated SVD (torch.svd_lowrank) instead of full SVD for speed')
+    parser.add_argument('--svd_oversample', type=int, default=64, help='Oversampling for randomized SVD (only when --svd_lowrank)')
+    parser.add_argument('--svd_niter', type=int, default=2, help='Power iterations for randomized SVD (only when --svd_lowrank)')
     # Official-compat toggles
     parser.add_argument('--svdllm_compat_all', action='store_true', help='Enable all official-compat behaviors (whitening XTX, official ranks, explicit attention math).')
     parser.add_argument('--svdllm_compat_whitening', action='store_true', help='Use original whitening accumulation (raw X^T X without centering).')
@@ -919,40 +1005,65 @@ if __name__ == '__main__':
     if args.step == 1:
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
+        model = model.eval()
         model.seqlen = args.model_seq_len
-        # Truncate pre-cached causal_mask buffer to actual seqlen to avoid SDPA
-        # size mismatch when max_position_embeddings > model_seq_len (e.g. LLaMA-2: 4096 vs 2048)
         for _m in model.modules():
             if hasattr(_m, 'causal_mask') and isinstance(getattr(_m, 'causal_mask'), torch.Tensor):
                 cm = _m.causal_mask
                 if cm.shape[-1] > args.model_seq_len:
                     _m.causal_mask = cm[..., :args.model_seq_len, :args.model_seq_len]
-        model = model.eval()
         if args.profiling_mat_path is None:
             cali_white_data = get_calib_train_data(args.dataset, tokenizer, args.whitening_nsamples, seqlen=args.model_seq_len)
-            profiling_mat = profle_svdllm_low_resource(args.model, model, cali_white_data, args.DEV)
+            profiling_mat = profle_svdllm_low_resource(
+                args.model,
+                model,
+                cali_white_data,
+                args.DEV,
+                stats_device=args.whitening_stats_device,
+                stats_dtype=args.whitening_stats_dtype,
+                store_dtype=args.whitening_store_dtype,
+                microbatch=args.whitening_microbatch,
+            )
             if args.save_path is not None:
                 torch.save(profiling_mat, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_profiling_'+ args.dataset + '_' + str(args.whitening_nsamples)  + '_' + str(args.seed)+ '.pt')
         else:
             profiling_mat = torch.load(args.profiling_mat_path)
-        whitening(args.model, model, profiling_mat, args.ratio, args.DEV)
+        whitening(
+            args.model,
+            model,
+            profiling_mat,
+            args.ratio,
+            args.DEV,
+            svd_lowrank=bool(args.svd_lowrank),
+            svd_oversample=int(args.svd_oversample),
+            svd_niter=int(args.svd_niter),
+        )
         if args.save_path is not None:
             torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_whitening_only_' + str(args.ratio) + '.pt')   # fp32
     elif args.step == 2:
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
+        dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
+        model = model.eval()
         model.seqlen = args.model_seq_len
         for _m in model.modules():
             if hasattr(_m, 'causal_mask') and isinstance(getattr(_m, 'causal_mask'), torch.Tensor):
                 cm = _m.causal_mask
                 if cm.shape[-1] > args.model_seq_len:
                     _m.causal_mask = cm[..., :args.model_seq_len, :args.model_seq_len]
-        dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
-        model = model.eval()
         model = model.float()  # need to set to float
         if args.profiling_mat_path is None:
             cali_white_data = get_calib_train_data(args.dataset, tokenizer, args.whitening_nsamples, seqlen=args.model_seq_len)
-            profiling_mat = profle_svdllm_low_resource(args.model, model, cali_white_data, args.DEV)
+            profiling_mat = profle_svdllm_low_resource(
+                args.model,
+                model,
+                cali_white_data,
+                args.DEV,
+                stats_device=args.whitening_stats_device,
+                stats_dtype=args.whitening_stats_dtype,
+                store_dtype=args.whitening_store_dtype,
+                microbatch=args.whitening_microbatch,
+            )
             if args.save_path is not None:
                 torch.save(profiling_mat, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_profiling_'+ args.dataset + '_' + str(args.whitening_nsamples)  + '_' + str(args.seed)+ '.pt')
         else:
@@ -964,6 +1075,7 @@ if __name__ == '__main__':
         model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
         model = model.eval()
+        model.seqlen = args.model_seq_len
         model = model.float()
         dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
         whitening_local_update(model_name=args.model, model=model, dataloader=dataloader, profiling_mat=None, ratio=args.ratio, dev=args.DEV, direct_update=True)
@@ -984,6 +1096,7 @@ if __name__ == '__main__':
                 )
                 model = model.merge_and_unload()
                 torch.save({'model': model, 'tokenizer': tokenizer}, args.lora + '/merge.pt')
+        model.seqlen = args.model_seq_len
         model.eval()
         # Optional dtype override for evaluation to control GPU memory
         # Default behavior preserved (float32) when no override is set.

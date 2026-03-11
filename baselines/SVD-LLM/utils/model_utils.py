@@ -1,215 +1,272 @@
-#coding:utf8
+from __future__ import annotations
+
 import os
-import sys
+from pathlib import Path
+from typing import Dict, Iterable, Optional, Tuple, Type
+
 import torch
 import torch.nn as nn
 
-current_path = os.path.dirname(os.path.abspath(__file__))
-parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(current_path)
 
-# bandaid fix
-dev = torch.device("cuda")
+def find_layers(
+    module: nn.Module,
+    layers: Tuple[Type[nn.Module], ...] = (nn.Linear,),
+    *,
+    prefix: str = "",
+) -> Dict[str, nn.Module]:
+    """Recursively collect layers of given types.
+
+    The returned keys match `module.named_modules()` names, which is what the
+    SVD-LLM scripts expect (e.g. "self_attn.q_proj", "mlp.gate_proj").
+    """
+    found: Dict[str, nn.Module] = {}
+    for name, child in module.named_modules():
+        if name == "":
+            continue
+        if isinstance(child, layers):
+            found[prefix + name] = child
+    return found
+
+
+def _token_arg(hf_token: Optional[str]):
+    # transformers>=4.35 uses `token=`; older versions use `use_auth_token=`.
+    return {"token": hf_token} if hf_token else {}
+
+
+def _is_tokenizer_like(obj) -> bool:
+    if obj is None or isinstance(obj, bool):
+        return False
+    # HF tokenizers are callable and implement encode/decode.
+    if callable(obj):
+        return True
+    return hasattr(obj, "encode") and hasattr(obj, "decode")
+
+
+def _load_tokenizer(model_id: str, *, hf_token: Optional[str] = None):
+    from transformers import AutoTokenizer
+
+    last_err: Optional[Exception] = None
+    for use_fast in (True, False):
+        try:
+            tok = AutoTokenizer.from_pretrained(
+                model_id,
+                trust_remote_code=True,
+                use_fast=use_fast,
+                **_token_arg(hf_token),
+            )
+        except Exception as e:
+            last_err = e
+            continue
+
+        if not _is_tokenizer_like(tok):
+            # Extremely defensive: we've observed environments where a non-tokenizer
+            # placeholder (e.g. bool) can surface here.
+            continue
+
+        try:
+            if getattr(tok, "pad_token", None) is None:
+                tok.pad_token = tok.eos_token
+        except Exception:
+            pass
+        return tok
+
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError(f"Failed to load a usable tokenizer for: {model_id}")
+
+
+def ensure_transformers_layer_idx(model: nn.Module) -> None:
+    """Ensure decoder self-attention modules have `layer_idx`.
+
+    Transformers>=4.4x Cache implementations (DynamicCache/StaticCache/...) use
+    `layer_idx` to route KV updates. Some pickled checkpoints (e.g. after module
+    replacement) may miss this attribute.
+    """
+    try:
+        # LLaMA / Mistral style
+        layers = getattr(getattr(model, "model", None), "layers", None)
+        if layers is not None:
+            for i, layer in enumerate(layers):
+                attn = getattr(layer, "self_attn", None)
+                if attn is not None:
+                    # Force-correct even if present: some replacement pipelines set all to 0.
+                    setattr(attn, "layer_idx", int(i))
+            return
+        # OPT style
+        dec_layers = getattr(getattr(getattr(model, "model", None), "decoder", None), "layers", None)
+        if dec_layers is not None:
+            for i, layer in enumerate(dec_layers):
+                attn = getattr(layer, "self_attn", None)
+                if attn is not None:
+                    setattr(attn, "layer_idx", int(i))
+    except Exception:
+        # Best-effort only.
+        return
+
+
+def get_model_from_huggingface(
+    model_id: str,
+    *,
+    hf_token: Optional[str] = None,
+    torch_dtype: Optional[torch.dtype] = None,
+):
+    """Load (model, tokenizer) from HuggingFace hub.
+
+    Note: we keep the model on CPU; callers can move/cast as needed.
+    """
+    from transformers import AutoModelForCausalLM
+
+    tok = _load_tokenizer(model_id, hf_token=hf_token)
+
+    # Avoid HF warnings about dtype; let caller cast later if desired.
+    kwargs = dict(trust_remote_code=True, low_cpu_mem_usage=True, **_token_arg(hf_token))
+    if torch_dtype is not None:
+        kwargs["torch_dtype"] = torch_dtype
+
+    model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
+    ensure_transformers_layer_idx(model)
+
+    # Common in quant/ptq pipelines.
+    model.seqlen = int(getattr(model.config, "max_position_embeddings", 2048))
+    return model, tok
+
+
+def get_model_from_local(path: str):
+    """Load (model, tokenizer) from a local torch.save checkpoint.
+
+    Expected format: torch.save({'model': model, 'tokenizer': tokenizer}, path)
+    """
+    p = Path(path)
+    if p.is_dir():
+        from transformers import AutoModelForCausalLM
+
+        tok = _load_tokenizer(str(p), hf_token=None)
+        model = AutoModelForCausalLM.from_pretrained(str(p), trust_remote_code=True, low_cpu_mem_usage=True)
+        ensure_transformers_layer_idx(model)
+        model.seqlen = int(getattr(model.config, "max_position_embeddings", 2048))
+        return model, tok
+
+    obj = _torch_load_local_checkpoint(p)
+    if isinstance(obj, dict) and "model" in obj and "tokenizer" in obj:
+        model = obj["model"]
+        ensure_transformers_layer_idx(model)
+        return model, obj["tokenizer"]
+    if hasattr(obj, "forward"):
+        # A pickled HF model (rare but possible): try to recover tokenizer.
+        model = obj
+        ensure_transformers_layer_idx(model)
+        model_id = getattr(model, "name_or_path", None)
+        if model_id:
+            try:
+                tok = _load_tokenizer(str(model_id), hf_token=None)
+                return model, tok
+            except Exception:
+                pass
+        raise ValueError(
+            f"Loaded a model object from {path} but could not recover a tokenizer. "
+            "Please re-save as {'model': model, 'tokenizer': tok}."
+        )
+    raise ValueError(f"Unrecognized checkpoint format at: {path}")
+
+
+@torch.no_grad()
+def measure_param_bytes(model: nn.Module) -> int:
+    """Sum unique parameter storage bytes (avoids double-count on tied weights)."""
+    seen = set()
+    total = 0
+    for p in model.parameters():
+        if p is None:
+            continue
+        try:
+            st = p.untyped_storage()
+            key = (int(st.data_ptr()), int(st.nbytes()))
+            nbytes = int(st.nbytes())
+        except Exception:
+            st = p.storage()
+            nbytes = int(st.size()) * int(p.element_size())
+            key = (int(st.data_ptr()), int(nbytes))
+        if key in seen:
+            continue
+        seen.add(key)
+        total += nbytes
+    return total
 
 
 def mib(nbytes: int) -> float:
-    return nbytes / (1024 ** 2)
+    return float(nbytes) / (1024.0**2)
 
 
-def measure_param_bytes(model: nn.Module) -> int:
-    return sum(p.numel() * p.element_size() for p in model.parameters())
+def set_env_flag(name: str, value: bool):
+    if value:
+        os.environ[name] = "1"
+    else:
+        # Don't leave stale "0" around; scripts typically check != "0".
+        os.environ.pop(name, None)
 
 
-def get_model_from_huggingface(model_id, hf_token: str = None):
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    # Pick up token from env if not provided
-    if hf_token is None:
-        hf_token = (
-            os.getenv("HF_TOKEN")
-            or os.getenv("HUGGINGFACE_TOKEN")
-            or os.getenv("HUGGINGFACE_HUB_TOKEN")
-        )
-    # Tokenizer: prefer fast; if protobuf/sentencepiece conversion fails, fall back to slow
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _looks_like_flashsvd_checkpoint(path: Path) -> bool:
     try:
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_id, trust_remote_code=True, use_fast=True, token=hf_token
+        root = Path(__file__).resolve().parents[1]  # FlashSVD-v1.5/
+        resolved = path.resolve()
+        if not resolved.is_relative_to(root):
+            return False
+    except Exception:
+        # Best-effort: if we can't resolve, fall back to name heuristics only.
+        pass
+    name = path.name.lower()
+    # Common outputs produced by SVDLLM(.py) / SVDLLM_flashsvd(.py)
+    return any(
+        key in name
+        for key in (
+            "_whitening_only_",
+            "_whitening_then_update_",
+            "_update_only_",
+            "_profiling_",
+            "svdllm",
+            "flashsvd",
+            "merge.pt",
         )
-    except Exception as e:
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_id, trust_remote_code=True, use_fast=False, token=hf_token
-            )
-        except Exception as e2:
-            # Some community LLaMA repos lack tokenizer files; fall back to an open LLaMA tokenizer
-            if "llama" in model_id.lower() or "vicuna" in model_id.lower():
-                try:
-                    tokenizer = AutoTokenizer.from_pretrained(
-                        "openlm-research/open_llama_7b", trust_remote_code=True, use_fast=False, token=hf_token
-                    )
-                    # Ensure pad token exists for batching
-                    if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
-                        tokenizer.pad_token = tokenizer.eos_token
-                except Exception:
-                    raise e2
-            else:
-                raise e2
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        device_map="cpu",
-        torch_dtype=torch.float16,
-        trust_remote_code=True,
-        cache_dir=None,
-        token=hf_token,
     )
-    # Sequence length hint for downstream code
-    model.seqlen = getattr(model.config, 'max_position_embeddings', 2048)
-    return model, tokenizer
 
-def get_model_from_local(model_id):
+
+def _torch_load_local_checkpoint(path: Path):
+    """Load a local torch checkpoint, handling PyTorch>=2.6 weights_only default.
+
+    PyTorch 2.6 changed `torch.load` default `weights_only=True`, which rejects
+    pickled model/tokenizer objects (our SVDLLM scripts save them as a dict).
+    We try a safe load first and fall back to `weights_only=False` only when we
+    can reasonably assume the checkpoint is trusted.
     """
-    Load a locally saved checkpoint produced by this repo.
 
-    Older checkpoints were saved with full Python objects:
-        torch.save({'model': model, 'tokenizer': tokenizer}, path)
-
-    Unpickling those requires the same transformers symbols to exist at load
-    time. Some versions no longer expose transformers.activations.SiLUActivation,
-    which raises an AttributeError while loading.
-
-    To maximize compatibility without forcing a specific transformers version,
-    we provide a lightweight shim for missing activations before torch.load.
-    """
-    # Provide missing activation and wrapper classes if the installed environment lacks them
-    try:
-        import transformers
-        from transformers import activations as _hf_acts
-        if not hasattr(_hf_acts, "SiLUActivation"):
-            class SiLUActivation(torch.nn.Module):
-                def forward(self, x):  # pragma: no cover - simple shim
-                    return torch.nn.functional.silu(x)
-            # Attach to the same module path the pickle expects
-            setattr(_hf_acts, "SiLUActivation", SiLUActivation)
-        # Some checkpoints were saved while wrapper classes lived under __main__
-        # (e.g., when using the medium training scripts directly). Expose shims
-        # on the current __main__ to make unpickling robust.
-        import sys as _sys
-        _main = _sys.modules.get("__main__")
-        if _main is not None:
-            if not hasattr(_main, "WeightLoRAWrapper"):
-                class WeightLoRAWrapper(torch.nn.Module):
-                    def __init__(self, base: torch.nn.Linear, rank: int, alpha: float, freeze_base: bool = True):
-                        super().__init__()
-                        self.base = base
-                        if freeze_base:
-                            for p in self.base.parameters():
-                                p.requires_grad = False
-                        self.rank = max(int(rank), 1)
-                        self.scaling = float(alpha) / float(self.rank)
-                        # Lazily created if missing in older checkpoints
-                        if not hasattr(self, "lora_down") or not isinstance(getattr(self, "lora_down"), torch.nn.Linear):
-                            self.lora_down = torch.nn.Linear(self.base.in_features, self.rank, bias=False,
-                                                             device=self.base.weight.device, dtype=self.base.weight.dtype)
-                            torch.nn.init.normal_(self.lora_down.weight, mean=0.0, std=0.02)
-                        if not hasattr(self, "lora_up") or not isinstance(getattr(self, "lora_up"), torch.nn.Linear):
-                            self.lora_up = torch.nn.Linear(self.rank, self.base.out_features, bias=False,
-                                                           device=self.base.weight.device, dtype=self.base.weight.dtype)
-                            torch.nn.init.normal_(self.lora_up.weight, mean=0.0, std=0.02)
-                    def forward(self, x):
-                        return self.base(x) + self.lora_up(self.lora_down(x)) * self.scaling
-                setattr(_main, "WeightLoRAWrapper", WeightLoRAWrapper)
-            if not hasattr(_main, "ActivationSpaceLoRAWrapper"):
-                class ActivationSpaceLoRAWrapper(torch.nn.Module):
-                    def __init__(self, base: torch.nn.Linear, rank: int, alpha: float, freeze_base: bool = True):
-                        super().__init__()
-                        self.base = base
-                        if freeze_base:
-                            for p in self.base.parameters():
-                                p.requires_grad = False
-                        self.rank = max(int(rank), 1)
-                        self.scaling = float(alpha) / float(self.rank)
-                        if not hasattr(self, "lora_down") or not isinstance(getattr(self, "lora_down"), torch.nn.Linear):
-                            self.lora_down = torch.nn.Linear(self.base.out_features, self.rank, bias=False,
-                                                             device=self.base.weight.device, dtype=self.base.weight.dtype)
-                            torch.nn.init.normal_(self.lora_down.weight, mean=0.0, std=0.02)
-                        if not hasattr(self, "lora_up") or not isinstance(getattr(self, "lora_up"), torch.nn.Linear):
-                            self.lora_up = torch.nn.Linear(self.rank, self.base.out_features, bias=False,
-                                                           device=self.base.weight.device, dtype=self.base.weight.dtype)
-                            torch.nn.init.normal_(self.lora_up.weight, mean=0.0, std=0.02)
-                    def forward(self, x):
-                        z = self.base(x)
-                        return z + self.lora_up(self.lora_down(z)) * self.scaling
-                setattr(_main, "ActivationSpaceLoRAWrapper", ActivationSpaceLoRAWrapper)
-    except Exception:
-        # If transformers import fails for some reason, fall back to default load
-        pass
-
-    pruned_dict = torch.load(model_id, weights_only=False, map_location='cpu')
-    tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
-
-    # Ensure config compatibility across transformers versions
-    try:
-        cfg = model.config
-        # Set defaults for private flags used by properties in recent versions
-        def _ensure(prop, default):
-            try:
-                # Access to trigger AttributeError if backing field missing
-                _ = getattr(cfg, prop)
-            except Exception:
-                try:
-                    setattr(cfg, prop, default)
-                except Exception:
-                    # Fallback to private backing name that properties expect
-                    setattr(cfg, f"_{prop}", default)
-
-        for prop, default in (
-            ("output_attentions", False),
-            ("output_hidden_states", False),
-            ("return_dict", True),
-            ("use_return_dict", True),
-            ("use_cache", False),
-        ):
-            _ensure(prop, default)
-
-        # Provide a reasonable sequence length hint
-        if not hasattr(model, 'seqlen'):
-            try:
-                model.seqlen = getattr(cfg, 'max_position_embeddings', 2048)
-            except Exception:
-                model.seqlen = 2048
-        # LlamaModel in newer Transformers expects a shared rotary embedding module on the model
+    def _load(*, weights_only: Optional[bool]):
+        if weights_only is None:
+            return torch.load(str(path), map_location="cpu")
         try:
-            inner = getattr(model, 'model', None)
-            if inner is not None and not hasattr(inner, 'rotary_emb') and getattr(cfg, 'model_type', '') == 'llama':
-                try:
-                    # Prefer HF's implementation to match version-specific behavior
-                    from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding as HFLlamaRotaryEmbedding
-                    inner.rotary_emb = HFLlamaRotaryEmbedding(config=cfg)
-                except Exception:
-                    # Fallback to local implementation with basic defaults
-                    from component.svd_llama import LlamaRotaryEmbedding as LocalLlamaRotaryEmbedding
-                    head_dim = cfg.hidden_size // cfg.num_attention_heads
-                    max_pos = getattr(cfg, 'max_position_embeddings', 2048)
-                    inner.rotary_emb = LocalLlamaRotaryEmbedding(head_dim, max_position_embeddings=max_pos)
-        except Exception:
-            pass
-    except Exception:
-        pass
-    # Align dtype with the HF loading path which defaults to float16 for speed/memory
+            return torch.load(str(path), map_location="cpu", weights_only=weights_only)
+        except TypeError:
+            # Older PyTorch without weights_only.
+            return torch.load(str(path), map_location="cpu")
+
     try:
-        model = model.to(dtype=torch.float16)
-    except Exception:
-        # If some submodules cannot change dtype (e.g., layernorm buffers), skip silently
-        pass
+        return _load(weights_only=True)
+    except Exception as e:
+        msg = str(e)
+        is_weights_only = "Weights only load failed" in msg or "weights_only" in msg
+        if not is_weights_only:
+            raise
 
-    return model, tokenizer
+        trusted = _env_truthy("FLASH_SVD_TRUST_PICKLE") or _looks_like_flashsvd_checkpoint(path)
+        if not trusted:
+            raise RuntimeError(
+                f"Refusing to load pickled checkpoint with weights_only=False: {path}\n"
+                "PyTorch>=2.6 defaults torch.load(weights_only=True), which can't load "
+                "our pickled {'model': model, 'tokenizer': tok} format.\n"
+                "If you trust this checkpoint, re-run with: FLASH_SVD_TRUST_PICKLE=1"
+            ) from e
 
-def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
-    if type(module) in layers:
-        return {name: module}
-    res = {}
-    for name1, child in module.named_children():
-        res.update(find_layers(
-            child, layers=layers, name=name + '.' + name1 if name != '' else name1
-        ))
-    return res
+        # Trusted fallback: allow pickled model/tokenizer objects.
+        return _load(weights_only=False)

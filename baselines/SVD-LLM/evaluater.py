@@ -14,28 +14,6 @@ except Exception:  # pragma: no cover
 
 from utils.model_utils import measure_param_bytes, mib
 
-# Patch: transformers 4.36-4.39 LlamaModel.forward() checks isinstance(past_key_values, StaticCache)
-# and calls DynamicCache.from_legacy_cache() on anything else, including our Cache subclasses.
-# Fix: make from_legacy_cache() pass through any Cache subclass unchanged.
-try:
-    from transformers.cache_utils import Cache, DynamicCache
-    _orig_from_legacy = DynamicCache.from_legacy_cache.__func__
-
-    @classmethod  # type: ignore[misc]
-    def _patched_from_legacy(cls, past_key_values=None):
-        if past_key_values is not None and isinstance(past_key_values, Cache):
-            return past_key_values
-        return _orig_from_legacy(cls, past_key_values)
-
-    DynamicCache.from_legacy_cache = _patched_from_legacy
-
-    # Patch: some transformers versions call to_legacy_cache() on Cache subclasses
-    # that don't implement it (e.g. FlashSVDDenseKVCache). Return self as pass-through.
-    if not hasattr(Cache, 'to_legacy_cache'):
-        Cache.to_legacy_cache = lambda self: self
-except Exception:
-    pass
-
 
 def _iter_texts(dataset_name: str, split: str) -> Iterable[str]:
     if load_dataset is None:
@@ -309,7 +287,7 @@ def decode_kvcache_eval(
         raise ValueError("flashsvd_dense_cache and baseline_dense_kvcache are mutually exclusive.")
 
     if lowrank_cache:
-        from flashsvd_component.lowrank_cache import LowRankKVCache
+        from flashsvd_component.legacy.lowrank_cache import LowRankKVCache
 
         # NOTE: Some FlashSVD checkpoints use different ranks for Q/K/V and/or
         # vary ranks by layer. Avoid inferring a single global rank here; the

@@ -1,27 +1,34 @@
-import math
+from dataclasses import dataclass
 import os
-import inspect
 from typing import Optional, Tuple
 
 import torch
 import torch.utils.checkpoint
 import torch.nn.functional as F
+import triton
 from torch import nn
 
 from transformers.activations import ACT2FN
 from transformers.utils import logging
 from transformers import LlamaConfig
 
-from src.kernels.decoder.flashsvdropeattn import FlashSVDRoPEAttention, QKVFactors
-from src.kernels.decoder.flashsvdsilu import (
+from backend.attn import (
+    call_flash_attn_with_kvcache,
+    get_default_flashsvd_decode_attn_mod,
+    get_dense_token_decode_mod,
+    get_flash_attn_with_kvcache,
+    get_flashsvd_decode_attn_mods,
+    maybe_kwargs,
+    resolve_decode_variant,
+    select_decode_variant,
+)
+from kernels.flashsvdropeattn import flashsvd_rope_sdpa
+from backend.mlp import (
     flashsvd_ffn_dual_split_token,
     flashsvd_ffn_dual_split_token_v2,
     flashsvd_ffn_dual_split_token_v2_sm80,
     flashsvd_ffn_dual_split_token_v3,
 )
-
-import importlib.util
-from pathlib import Path
 
 
 logger = logging.get_logger(__name__)
@@ -29,7 +36,6 @@ logger = logging.get_logger(__name__)
 _CONFIG_FOR_DOC = "LlamaConfig"
 
 
-_DECODE_ATTN_MODS = None
 _LRKV_MHA_SDPA_WARNED = False
 _LRKV_RANK_MISMATCH_WARNED = False
 _LRKV_MHA_STREAM_AUTO_WARNED = False
@@ -40,122 +46,234 @@ _DENSE_CACHE_CLS_RESOLVED = False
 _EXPERIMENTAL_FFN_WARNED = False
 _DECODE_AUTOTUNE_CACHE = {}
 _DECODE_AUTOTUNE_LOGGED = set()
-_DECODE_VARIANT_CACHE = {}
-_DECODE_VARIANT_LOGGED = set()
 _HF_LLAMA_LAYER_GRAPH_PATCHED = False
 _HF_LLAMA_DECODER_LAYER_FORWARD = None
-_FLASH_ATTN_WITH_KVCACHE = None
-_FLASH_ATTN_WITH_KVCACHE_RESOLVED = False
-_DENSE_TOKEN_DECODE_MOD = None
 
 
-def _load_decode_mod(path: Path, module_name: str):
-    spec = importlib.util.spec_from_file_location(module_name, str(path))
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Failed to load decode attention module spec from: {path}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+@dataclass
+class QKVFactors:
+    Pq: torch.Tensor
+    Pk: torch.Tensor
+    Pv: torch.Tensor
+    Vq: torch.Tensor
+    Vk: torch.Tensor
+    Vv: torch.Tensor
+    bq: Optional[torch.Tensor] = None
+    bk: Optional[torch.Tensor] = None
+    bv: Optional[torch.Tensor] = None
 
 
-def _get_flashsvd_decode_attn_mods():
-    global _DECODE_ATTN_MODS
-    if _DECODE_ATTN_MODS is not None:
-        return _DECODE_ATTN_MODS
+def _build_flashsvd_rope_tables(
+    rotary_emb,
+    *,
+    batch_size: int,
+    seq_len: int,
+    head_dim: int,
+    position_ids: Optional[torch.Tensor],
+    device: torch.device,
+    dtype: torch.dtype,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if position_ids is None:
+        position_ids = torch.arange(seq_len, device=device, dtype=torch.long).unsqueeze(0)
+    if position_ids.dim() == 1:
+        position_ids = position_ids.unsqueeze(0)
+    if position_ids.shape[-1] != seq_len:
+        raise ValueError(f"position_ids last dim {position_ids.shape[-1]} != M {seq_len}")
 
-    base = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "kernels"
-        / "decoder"
-        / "flashsvd-v1.5"
-        / "flashsvdropeattn"
+    shared_batch = position_ids.shape[0] == 1 and batch_size > 1
+    if not shared_batch and position_ids.shape[0] != batch_size:
+        if position_ids.shape[0] == 1:
+            shared_batch = True
+        else:
+            raise ValueError(f"position_ids batch dim {position_ids.shape[0]} != B {batch_size}")
+
+    inv_freq = getattr(rotary_emb, "inv_freq", None)
+    if inv_freq is not None:
+        inv_freq = inv_freq.to(device=device, dtype=torch.float32)
+        pos = position_ids.to(torch.float32)[..., None]
+        angles = pos * inv_freq
+        cos_half = torch.cos(angles)
+        sin_half = torch.sin(angles)
+        cos = torch.cat((cos_half, cos_half), dim=-1).to(dtype)
+        sin = torch.cat((sin_half, sin_half), dim=-1).to(dtype)
+    else:
+        batch_for_rotary = int(position_ids.shape[0])
+        dummy = torch.empty((batch_for_rotary, seq_len, head_dim), device=device, dtype=dtype)
+        try:
+            cos, sin = rotary_emb(dummy, position_ids)
+        except TypeError:
+            cos, sin = rotary_emb(dummy, seq_len=seq_len)
+            if cos.dim() == 4:
+                cos = cos[:, 0, :, :]
+                sin = sin[:, 0, :, :]
+
+    if shared_batch:
+        cos = cos.expand(batch_size, -1, -1)
+        sin = sin.expand(batch_size, -1, -1)
+    return cos, sin
+
+
+def _run_flashsvd_prefill_kernel(
+    *,
+    rotary_emb,
+    qkv_factors: QKVFactors,
+    num_heads: int,
+    head_dim: int,
+    position_ids: torch.Tensor,
+    attention_mask: Optional[torch.Tensor],
+    sliding_window_mask: Optional[torch.Tensor] = None,
+    bm: int = 64,
+    bn: int = 64,
+    bdh: Optional[int] = None,
+    br: int = 64,
+) -> torch.Tensor:
+    Pq, Pk, Pv = qkv_factors.Pq, qkv_factors.Pk, qkv_factors.Pv
+    Vq, Vk, Vv = qkv_factors.Vq, qkv_factors.Vk, qkv_factors.Vv
+    bq, bk, bv = qkv_factors.bq, qkv_factors.bk, qkv_factors.bv
+
+    if Pq.dim() != 4:
+        raise ValueError(f"FlashSVD prefill expects Pq [B,H,M,R], got {tuple(Pq.shape)}")
+
+    B, Hq, M, R = Pq.shape
+    if Hq != num_heads:
+        raise ValueError(f"Pq has {Hq} heads, expected {num_heads}")
+    if Pk.dim() != 4 or Pv.dim() != 4:
+        raise ValueError(f"Expected Pk/Pv [B,Hk,M,R], got {tuple(Pk.shape)}/{tuple(Pv.shape)}")
+
+    Bk, Hk, Mk, Rk = Pk.shape
+    if Bk != B or Mk != M or Rk != R:
+        raise AssertionError("Pk/Pv shape mismatch vs Pq")
+
+    device = Pq.device
+    dtype = Pq.dtype
+    kernel_bdh = head_dim if bdh is None else bdh
+    if kernel_bdh != head_dim:
+        raise AssertionError("Kernel currently expects BDH == dh.")
+
+    cos, sin = _build_flashsvd_rope_tables(
+        rotary_emb,
+        batch_size=B,
+        seq_len=M,
+        head_dim=head_dim,
+        position_ids=position_ids,
+        device=device,
+        dtype=dtype,
     )
-    mods = {}
 
-    path_v15 = base / "flashsvdropeattn_v1.5_decode.py"
-    if path_v15.exists():
-        try:
-            mods["v15"] = _load_decode_mod(path_v15, "flashsvdropeattn_v15_decode")
-        except Exception:
-            pass
+    pad_mask_ptr = None
+    add_mask_ptr = None
+    has_pad = 0
+    has_add = 0
+    if attention_mask is not None:
+        if attention_mask.dim() == 2:
+            pad_mask_ptr = attention_mask
+            has_pad = 1
+        elif attention_mask.dim() == 4:
+            add_mask_ptr = attention_mask
+            has_add = 1
+        else:
+            raise ValueError(f"Unsupported attention_mask shape: {attention_mask.shape}")
+    if sliding_window_mask is not None:
+        add_mask_ptr = sliding_window_mask
+        has_add = 1
 
-    path_v16 = base / "flashsvdropeattn_v1.6_decode_opt.py"
-    if path_v16.exists():
-        try:
-            mods["v16"] = _load_decode_mod(path_v16, "flashsvdropeattn_v16_decode_opt")
-        except Exception:
-            pass
+    output = torch.empty((B, M, num_heads, head_dim), device=device, dtype=dtype)
 
-    if not mods:
-        raise ImportError(f"Failed to load any decode attention module from: {base}")
-    _DECODE_ATTN_MODS = mods
-    return mods
+    sPq_b, sPq_h, sPq_m, sPq_r = Pq.stride()
+    sPk_b, sPk_h, sPk_m, sPk_r = Pk.stride()
+    sPv_b, sPv_h, sPv_m, sPv_r = Pv.stride()
+    sVq_h, sVq_r, sVq_dh = Vq.stride()
+    sVk_h, sVk_r, sVk_dh = Vk.stride()
+    sVv_h, sVv_r, sVv_dh = Vv.stride()
+    sbq_hd = bq.stride(0) if bq is not None else 0
+    sbk_hd = bk.stride(0) if bk is not None else 0
+    sbv_hd = bv.stride(0) if bv is not None else 0
 
+    sCOS_b, sCOS_m, sCOS_dh = cos.stride()
+    sSIN_b, sSIN_m, sSIN_dh = sin.stride()
+    sO_b, sO_m, sO_h, sO_dh = output.stride()
 
-def _get_flashsvd_decode_attn_mod():
-    mods = _get_flashsvd_decode_attn_mods()
-    if "v16" in mods:
-        return mods["v16"]
-    return next(iter(mods.values()))
+    if has_pad:
+        sPM_b, sPM_m = pad_mask_ptr.stride()
+    else:
+        sPM_b = sPM_m = 0
+    if has_add:
+        sAM_b, _, sAM_mq, sAM_mk = add_mask_ptr.stride()
+    else:
+        sAM_b = sAM_mq = sAM_mk = 0
 
-
-def _maybe_kwargs(fn, kwargs):
-    try:
-        params = inspect.signature(fn).parameters
-    except Exception:
-        return kwargs
-    return {k: v for k, v in kwargs.items() if k in params}
-
-
-def _canonical_decode_variant(name: str) -> str:
-    raw = str(name or "").strip().lower().replace("-", "_")
-    if raw in {"", "auto"}:
-        return "auto"
-    if raw in {"v15", "v1.5", "1.5"}:
-        return "v15"
-    if raw in {"v16_v1", "v1", "legacy"}:
-        return "v16_v1"
-    if raw in {"v16_v2", "v16", "v2"}:
-        return "v16_v2"
-    return "auto"
-
-
-def _available_decode_variants(mods) -> list[str]:
-    out: list[str] = []
-    m15 = mods.get("v15", None)
-    if m15 is not None and hasattr(m15, "DecodePackedFactors") and hasattr(m15, "flashsvd_attn_decode_packed"):
-        out.append("v15")
-    m16 = mods.get("v16", None)
-    if m16 is not None and hasattr(m16, "DecodePackedFactors"):
-        if hasattr(m16, "flashsvd_attn_decode_packed_v1"):
-            out.append("v16_v1")
-        if hasattr(m16, "flashsvd_attn_decode_packed"):
-            out.append("v16_v2")
-    return out
-
-
-def _resolve_decode_variant(mods, variant: str):
-    v = _canonical_decode_variant(variant)
-    if v == "v15":
-        mod = mods.get("v15", None)
-        if mod is None:
-            return None, None
-        return mod, getattr(mod, "flashsvd_attn_decode_packed", None)
-    if v == "v16_v1":
-        mod = mods.get("v16", None)
-        if mod is None:
-            return None, None
-        fn = getattr(mod, "flashsvd_attn_decode_packed_v1", None)
-        if fn is None:
-            fn = getattr(mod, "flashsvd_attn_decode_packed", None)
-        return mod, fn
-    if v == "v16_v2":
-        mod = mods.get("v16", None)
-        if mod is None:
-            return None, None
-        return mod, getattr(mod, "flashsvd_attn_decode_packed", None)
-    return None, None
+    grid = (B * num_heads, triton.cdiv(M, bm))
+    flashsvd_rope_sdpa[grid](
+        Pq,
+        Pk,
+        Pv,
+        Vq,
+        Vk,
+        Vv,
+        bq if bq is not None else output,
+        bk if bk is not None else output,
+        bv if bv is not None else output,
+        cos,
+        sin,
+        output,
+        pad_mask_ptr if has_pad else output,
+        add_mask_ptr if has_add else output,
+        B,
+        num_heads,
+        Hk,
+        M,
+        R,
+        head_dim,
+        sPq_b,
+        sPq_h,
+        sPq_m,
+        sPq_r,
+        sPk_b,
+        sPk_h,
+        sPk_m,
+        sPk_r,
+        sPv_b,
+        sPv_h,
+        sPv_m,
+        sPv_r,
+        sVq_h,
+        sVq_r,
+        sVq_dh,
+        sVk_h,
+        sVk_r,
+        sVk_dh,
+        sVv_h,
+        sVv_r,
+        sVv_dh,
+        sbq_hd,
+        sbk_hd,
+        sbv_hd,
+        sCOS_b,
+        sCOS_m,
+        sCOS_dh,
+        sSIN_b,
+        sSIN_m,
+        sSIN_dh,
+        sO_b,
+        sO_m,
+        sO_h,
+        sO_dh,
+        sPM_b,
+        sPM_m,
+        sAM_b,
+        sAM_mq,
+        sAM_mk,
+        BM=bm,
+        BN=bn,
+        BDH=kernel_bdh,
+        BR=br,
+        HAS_PAD=has_pad,
+        HAS_ADD=has_add,
+        CAUSAL=1,
+        num_warps=4,
+        num_stages=2,
+    )
+    return output
 
 
 def _get_lowrank_cache_cls():
@@ -164,7 +282,7 @@ def _get_lowrank_cache_cls():
     if _LOWRANK_CACHE_CLS_RESOLVED:
         return _LOWRANK_CACHE_CLS
     try:
-        from flashsvd_component.lowrank_cache import LowRankKVCache
+        from flashsvd_component.legacy.lowrank_cache import LowRankKVCache
     except Exception:
         LowRankKVCache = None  # type: ignore[assignment]
     _LOWRANK_CACHE_CLS = LowRankKVCache
@@ -186,78 +304,10 @@ def _get_dense_cache_cls():
     return _DENSE_CACHE_CLS
 
 
-def _get_flash_attn_with_kvcache():
-    global _FLASH_ATTN_WITH_KVCACHE
-    global _FLASH_ATTN_WITH_KVCACHE_RESOLVED
-    if _FLASH_ATTN_WITH_KVCACHE_RESOLVED:
-        return _FLASH_ATTN_WITH_KVCACHE
-    fn = None
-    try:
-        from flash_attn import flash_attn_with_kvcache  # type: ignore
-
-        fn = flash_attn_with_kvcache
-    except Exception:
-        try:
-            from flash_attn.flash_attn_interface import flash_attn_with_kvcache  # type: ignore
-
-            fn = flash_attn_with_kvcache
-        except Exception:
-            fn = None
-    _FLASH_ATTN_WITH_KVCACHE = fn
-    _FLASH_ATTN_WITH_KVCACHE_RESOLVED = True
-    return _FLASH_ATTN_WITH_KVCACHE
-
-
-def _call_flash_attn_with_kvcache(
-    flash_attn_with_kvcache,
-    q_bmhd: torch.Tensor,
-    k_cache_bmhd: torch.Tensor,
-    v_cache_bmhd: torch.Tensor,
-    *,
-    k_bmhd: Optional[torch.Tensor] = None,
-    v_bmhd: Optional[torch.Tensor] = None,
-    cache_seqlens: Optional[torch.Tensor] = None,
-    rotary_cos: Optional[torch.Tensor] = None,
-    rotary_sin: Optional[torch.Tensor] = None,
-    causal: bool,
-):
-    sig = inspect.signature(flash_attn_with_kvcache)
-    params = sig.parameters
-    kwargs: dict[str, object] = {}
-    if "k" in params and k_bmhd is not None:
-        kwargs["k"] = k_bmhd
-    if "v" in params and v_bmhd is not None:
-        kwargs["v"] = v_bmhd
-    if "cache_seqlens" in params and cache_seqlens is not None:
-        kwargs["cache_seqlens"] = cache_seqlens
-    if "rotary_cos" in params and rotary_cos is not None:
-        kwargs["rotary_cos"] = rotary_cos
-    if "rotary_sin" in params and rotary_sin is not None:
-        kwargs["rotary_sin"] = rotary_sin
-    if "rotary_interleaved" in params:
-        kwargs["rotary_interleaved"] = False
-    if "causal" in params:
-        kwargs["causal"] = causal
-    if "dropout_p" in params:
-        kwargs["dropout_p"] = 0.0
-    if "window_size" in params:
-        kwargs["window_size"] = (-1, -1)
-    return flash_attn_with_kvcache(q_bmhd, k_cache_bmhd, v_cache_bmhd, **kwargs)
-
-
-def _get_dense_token_decode_mod():
-    global _DENSE_TOKEN_DECODE_MOD
-    if _DENSE_TOKEN_DECODE_MOD is not None:
-        return _DENSE_TOKEN_DECODE_MOD
-    path = Path(__file__).resolve().parent / "flashsvdropeattn_dense_decode.py"
-    _DENSE_TOKEN_DECODE_MOD = _load_decode_mod(path, "flashsvdropeattn_dense_decode_component")
-    return _DENSE_TOKEN_DECODE_MOD
-
-
 def _flashsvd_ffn_backend() -> str:
     raw = str(os.getenv("FLASH_SVD_FFN_BACKEND", "auto")).strip().lower().replace("-", "_")
-    if raw in {"", "auto"}:
-        return "auto"
+    if raw in {"", "auto", "default", "prod", "production"}:
+        return "production"
     if raw in {"dual_split_cublas", "dual_cublas", "exact_cublas", "dual_split_exact"}:
         return "dual_split_cublas"
     if raw in {"dual_split_cublas_legacy", "dual_split_linear", "exact_linear"}:
@@ -272,7 +322,7 @@ def _flashsvd_ffn_backend() -> str:
         return "dual_split_kernel_v3"
     if raw in {"generic", "triton", "flash"}:
         return "dual_split_cublas_legacy"
-    return "auto"
+    return "production"
 
 
 def _flashsvd_experimental_ffn_enabled() -> bool:
@@ -361,7 +411,7 @@ def _flashsvd_llama_decoder_layer_forward(
     hidden_states = _unwrap_hidden_states_arg(hidden_states)
 
     if _HF_LLAMA_DECODER_LAYER_FORWARD is None or not _should_use_flashsvd_layer_tail_cuda_graph(self, hidden_states):
-        call_kwargs = _maybe_kwargs(
+        call_kwargs = maybe_kwargs(
             _HF_LLAMA_DECODER_LAYER_FORWARD,
             {
                 "attention_mask": attention_mask,
@@ -633,22 +683,19 @@ class SVD_LlamaMLP(nn.Module):
         up = self.up_u_proj(p_up)
         return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
 
-    def _flashsvd_versions(self):
-        self._ensure_runtime_state()
-        return (
-            self.up_v_proj.weight._version,
-            self.gate_v_proj.weight._version,
-            self.up_u_proj.weight._version,
-            self.gate_u_proj.weight._version,
-            self.down_v_proj.weight._version,
-            self.down_u_proj.weight._version,
-        )
+    def _forward_exact_mlp(self, x: torch.Tensor) -> torch.Tensor:
+        p_up = self.up_v_proj(x)
+        p_gate = self.gate_v_proj(x)
+        gate = self.gate_u_proj(p_gate)
+        up = self.up_u_proj(p_up)
+        return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
 
-    def _forward_flashsvd_core(
-        self,
-        x: torch.Tensor,
-    ) -> torch.Tensor:
-        backend = _flashsvd_ffn_backend()
+    def _forward_production_mlp(self, x: torch.Tensor) -> torch.Tensor:
+        if self._prefer_token_decode(x):
+            return self._forward_dual_split_cublas_packed(x)
+        return self._forward_exact_mlp(x)
+
+    def _forward_legacy_mlp_backend(self, x: torch.Tensor, backend: str) -> torch.Tensor:
         experimental_ok = _flashsvd_experimental_ffn_enabled()
         use_token_decode = self._prefer_token_decode(x)
         if backend == "dual_split_cublas":
@@ -661,21 +708,12 @@ class SVD_LlamaMLP(nn.Module):
                 if not _EXPERIMENTAL_FFN_WARNED:
                     print(
                         "[FlashSVD] Experimental FFN kernel backend requested but "
-                        "FLASH_SVD_ENABLE_EXPERIMENTAL_FFN=0; falling back to dual_split_cublas_legacy "
-                        "to preserve token-identical decode."
+                        "FLASH_SVD_ENABLE_EXPERIMENTAL_FFN=0; falling back to exact legacy path."
                     )
                     _EXPERIMENTAL_FFN_WARNED = True
                 backend = "dual_split_cublas_legacy"
-        if backend == "auto":
-            backend = "dual_split_cublas_legacy" if use_token_decode else "generic"
-        if backend == "dual_split_cublas":
-            return self._forward_dual_split_cublas_packed(x)
         if backend == "dual_split_cublas_legacy":
-            p_up = self.up_v_proj(x)
-            p_gate = self.gate_v_proj(x)
-            gate = self.gate_u_proj(p_gate)
-            up = self.up_u_proj(p_up)
-            return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
+            return self._forward_exact_mlp(x)
         if backend == "dual_split_kernel":
             if use_token_decode:
                 v_cat = self._get_dual_split_cublas_factors(x.device, x.dtype)
@@ -684,11 +722,7 @@ class SVD_LlamaMLP(nn.Module):
                 p_up, p_gate = p_cat.split((r, r), dim=-1)
                 gate_u, up_u, down_v, down_u, kernel_b2 = self._get_dual_split_kernel_factors(x.device, x.dtype)
                 return flashsvd_ffn_dual_split_token(p_up, p_gate, gate_u, up_u, down_v, down_u, kernel_b2)
-            p_up = self.up_v_proj(x)
-            p_gate = self.gate_v_proj(x)
-            gate = self.gate_u_proj(p_gate)
-            up = self.up_u_proj(p_up)
-            return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
+            return self._forward_exact_mlp(x)
         if backend == "dual_split_kernel_v2":
             if use_token_decode:
                 v_cat = self._get_dual_split_cublas_factors(x.device, x.dtype)
@@ -707,11 +741,7 @@ class SVD_LlamaMLP(nn.Module):
                     kernel_b2,
                     workspace_s2d=workspace_s2d,
                 )
-            p_up = self.up_v_proj(x)
-            p_gate = self.gate_v_proj(x)
-            gate = self.gate_u_proj(p_gate)
-            up = self.up_u_proj(p_up)
-            return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
+            return self._forward_exact_mlp(x)
         if backend == "dual_split_kernel_v2_sm80":
             if use_token_decode:
                 v_cat = self._get_dual_split_cublas_factors(x.device, x.dtype)
@@ -730,11 +760,7 @@ class SVD_LlamaMLP(nn.Module):
                     kernel_b2,
                     workspace_s2d=workspace_s2d,
                 )
-            p_up = self.up_v_proj(x)
-            p_gate = self.gate_v_proj(x)
-            gate = self.gate_u_proj(p_gate)
-            up = self.up_u_proj(p_up)
-            return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
+            return self._forward_exact_mlp(x)
         if backend == "dual_split_kernel_v3":
             if use_token_decode:
                 v_cat = self._get_dual_split_cublas_factors(x.device, x.dtype)
@@ -742,7 +768,11 @@ class SVD_LlamaMLP(nn.Module):
                 r = self.up_v_proj.out_features
                 p_up, p_gate = p_cat.split((r, r), dim=-1)
                 gate_u, up_u, down_v, down_u, kernel_b2 = self._get_dual_split_kernel_factors(x.device, x.dtype)
-                workspace_y = self._get_dual_split_workspace(x.device, int(p_up.shape[0] * p_up.shape[1]), int(self.down_u_proj.out_features))
+                workspace_y = self._get_dual_split_workspace(
+                    x.device,
+                    int(p_up.shape[0] * p_up.shape[1]),
+                    int(self.down_u_proj.out_features),
+                )
                 return flashsvd_ffn_dual_split_token_v3(
                     p_up,
                     p_gate,
@@ -753,22 +783,28 @@ class SVD_LlamaMLP(nn.Module):
                     kernel_b2,
                     workspace_y=workspace_y,
                 )
-            p_up = self.up_v_proj(x)
-            p_gate = self.gate_v_proj(x)
-            gate = self.gate_u_proj(p_gate)
-            up = self.up_u_proj(p_up)
-            return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
-        if backend in {"auto", "generic"}:
-            p_up = self.up_v_proj(x)
-            p_gate = self.gate_v_proj(x)
-            gate = self.gate_u_proj(p_gate)
-            up = self.up_u_proj(p_up)
-            return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
-        p_up = self.up_v_proj(x)
-        p_gate = self.gate_v_proj(x)
-        gate = self.gate_u_proj(p_gate)
-        up = self.up_u_proj(p_up)
-        return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
+            return self._forward_exact_mlp(x)
+        return self._forward_exact_mlp(x)
+
+    def _flashsvd_versions(self):
+        self._ensure_runtime_state()
+        return (
+            self.up_v_proj.weight._version,
+            self.gate_v_proj.weight._version,
+            self.up_u_proj.weight._version,
+            self.gate_u_proj.weight._version,
+            self.down_v_proj.weight._version,
+            self.down_u_proj.weight._version,
+        )
+
+    def _forward_flashsvd_core(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        backend = _flashsvd_ffn_backend()
+        if backend == "production":
+            return self._forward_production_mlp(x)
+        return self._forward_legacy_mlp_backend(x, backend)
 
     def _get_flashsvd_graph(
         self,
@@ -889,7 +925,8 @@ class SVD_LlamaMLP(nn.Module):
 
     def forward(self, x):
         self._ensure_runtime_state()
-        # Fast path: Triton FlashSVD SwiGLU on CUDA using shared rank-space P
+        # Production path: token decode uses the exact packed-input kernel, otherwise
+        # stay on the readable exact low-rank formulation.
         if (
             x.is_cuda
             and os.getenv("SVDLLM_FLASH_FALLBACK", "0") == "0"
@@ -905,10 +942,7 @@ class SVD_LlamaMLP(nn.Module):
 
             return self._forward_flashsvd_core(x)
 
-        # Fallback (CPU or non-CUDA): baseline low-rank SwiGLU
-        up = self.up_u_proj(self.up_v_proj(x))
-        gate = self.gate_u_proj(self.gate_v_proj(x))
-        return self.down_u_proj(self.down_v_proj(self.act_fn(gate) * up))
+        return self._forward_exact_mlp(x)
 
 
 class SVD_LlamaAttention(nn.Module):
@@ -968,13 +1002,6 @@ class SVD_LlamaAttention(nn.Module):
             base=rope_theta,
         )
 
-        # Flash SVD + RoPE attention kernel wrapper
-        self.flash_attn = FlashSVDRoPEAttention(
-            num_heads=self.num_heads,
-            head_dim=self.head_dim,
-            rotary_emb=self.rotary_emb,
-        )
-
         # Decode-kernel cached factors (computed lazily after weights are loaded).
         self._decode_Vq = None
         self._decode_Vk = None
@@ -1025,12 +1052,6 @@ class SVD_LlamaAttention(nn.Module):
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 base=rope_theta,
-            )
-        if not hasattr(self, "flash_attn"):
-            self.flash_attn = FlashSVDRoPEAttention(
-                num_heads=self.num_heads,
-                head_dim=self.head_dim,
-                rotary_emb=self.rotary_emb,
             )
         if not hasattr(self, "_decode_Vq"):
             self._decode_Vq = None
@@ -1141,7 +1162,7 @@ class SVD_LlamaAttention(nn.Module):
         dtype: torch.dtype,
     ):
         self._ensure_runtime_state()
-        dense_decode_mod = _get_dense_token_decode_mod()
+        dense_decode_mod = get_dense_token_decode_mod()
         key = (device.type, device.index, dtype)
         ptrs = (
             int(self.q_v_proj.weight.data_ptr()),
@@ -1186,7 +1207,7 @@ class SVD_LlamaAttention(nn.Module):
 
     def _can_use_flashsvd_dense_decode_graph(self, hidden_states: torch.Tensor, past_key_value) -> bool:
         DenseKVCache = _get_dense_cache_cls()
-        flash_attn_with_kvcache = _get_flash_attn_with_kvcache()
+        flash_attn_with_kvcache = get_flash_attn_with_kvcache()
         return bool(
             past_key_value is not None
             and DenseKVCache is not None
@@ -1236,7 +1257,7 @@ class SVD_LlamaAttention(nn.Module):
     ) -> torch.Tensor:
         q_len = int(q_bmhd.shape[1])
         if cache_bindings is None:
-            flash_attn_with_kvcache = _get_flash_attn_with_kvcache()
+            flash_attn_with_kvcache = get_flash_attn_with_kvcache()
             seqlen_k = int(past_key_value.get_seq_length())
             smax = int(past_key_value.get_max_cache_shape() or max(seqlen_k + q_len, 1))
             k_cache_bmhd, v_cache_bmhd, cache_seqlens = past_key_value.prepare_fa2_step(
@@ -1258,7 +1279,7 @@ class SVD_LlamaAttention(nn.Module):
             rotary_cos = cache_bindings["rotary_cos"]
             rotary_sin = cache_bindings["rotary_sin"]
 
-        out = _call_flash_attn_with_kvcache(
+        out = call_flash_attn_with_kvcache(
             flash_attn_with_kvcache,
             q_bmhd,
             k_cache_bmhd,
@@ -1320,7 +1341,7 @@ class SVD_LlamaAttention(nn.Module):
             {"cache_position": cache_position},
         )
 
-        flash_attn_with_kvcache = _get_flash_attn_with_kvcache()
+        flash_attn_with_kvcache = get_flash_attn_with_kvcache()
         if cache_bindings is not None:
             flash_attn_with_kvcache = cache_bindings.get("flash_attn_with_kvcache", flash_attn_with_kvcache)
         if flash_attn_with_kvcache is None:
@@ -1331,7 +1352,7 @@ class SVD_LlamaAttention(nn.Module):
             batch_size=int(q_bmhd.shape[0]),
             cache_position=None,
         )
-        out = _call_flash_attn_with_kvcache(
+        out = call_flash_attn_with_kvcache(
             flash_attn_with_kvcache,
             q_bmhd,
             k_cache_bmhd,
@@ -1356,7 +1377,7 @@ class SVD_LlamaAttention(nn.Module):
         cache_bindings: Optional[dict[str, torch.Tensor | object]] = None,
         advance_cache: bool,
     ) -> torch.Tensor:
-        dense_decode_mod = _get_dense_token_decode_mod()
+        dense_decode_mod = get_dense_token_decode_mod()
         packed_qkv_rank, vq_flat, vk_flat, vv_flat = self._get_dense_decode_tensors(
             device=hidden_states.device,
             dtype=hidden_states.dtype,
@@ -1437,169 +1458,6 @@ class SVD_LlamaAttention(nn.Module):
         while bn > 16 and (split_k % bn) != 0:
             bn //= 2
         return max(16, bn)
-
-    @staticmethod
-    def _parse_decode_variant_map(raw: str) -> dict[int, str]:
-        table: dict[int, str] = {}
-        text = str(raw or "").strip()
-        if not text:
-            return table
-        for item in text.split(","):
-            tok = item.strip()
-            if not tok or ":" not in tok:
-                continue
-            b_s, v_s = tok.split(":", 1)
-            try:
-                b = int(b_s.strip())
-            except Exception:
-                continue
-            if b <= 0:
-                continue
-            table[b] = _canonical_decode_variant(v_s.strip())
-        return table
-
-    def _select_decode_variant(
-        self,
-        *,
-        mods,
-        hidden_states: torch.Tensor,
-        bsz: int,
-        H: int,
-        Hk: int,
-        R: int,
-        Dh: int,
-        seqlen_k: int,
-        Pq_q: torch.Tensor,
-        Pk: torch.Tensor,
-        Pv: torch.Tensor,
-        Vq: torch.Tensor,
-        Vk: torch.Tensor,
-        Vv: torch.Tensor,
-        rotary_cos: torch.Tensor,
-        rotary_sin: torch.Tensor,
-        call_kwargs: dict[str, object],
-    ) -> str:
-        global _DECODE_VARIANT_CACHE
-        global _DECODE_VARIANT_LOGGED
-
-        available = _available_decode_variants(mods)
-        if not available:
-            return "v16_v2"
-
-        requested = _canonical_decode_variant(os.getenv("FLASH_SVD_DECODE_KERNEL_VARIANT", "auto"))
-        if requested != "auto":
-            if requested in available:
-                return requested
-            warn_key = ("requested_missing", requested, tuple(available))
-            if warn_key not in _DECODE_VARIANT_LOGGED:
-                print(
-                    "[FlashSVD][decode_variant] requested "
-                    f"{requested} not available; fallback to auto (available={','.join(available)})"
-                )
-                _DECODE_VARIANT_LOGGED.add(warn_key)
-            requested = "auto"
-
-        # Optional fixed batch-size policy, e.g.:
-        # FLASH_SVD_DECODE_KERNEL_MAP="1:v16_v1,2:v16_v1,8:v15,16:v16_v1"
-        variant_map = self._parse_decode_variant_map(os.getenv("FLASH_SVD_DECODE_KERNEL_MAP", ""))
-        if requested == "auto" and bsz in variant_map and variant_map[bsz] in available:
-            return variant_map[bsz]
-
-        include_v2 = os.getenv("FLASH_SVD_DECODE_AUTO_INCLUDE_V2", "0") != "0"
-        candidates = [v for v in ("v15", "v16_v1") if v in available]
-        if include_v2 and "v16_v2" in available:
-            candidates.append("v16_v2")
-        if not candidates:
-            candidates = list(available)
-        if len(candidates) == 1:
-            return candidates[0]
-
-        # Heuristic default before any online tuning.
-        # Large-rank REP==1 decode often favors the v1.5 path in end-to-end serving.
-        if int(R) >= 768 and "v15" in candidates:
-            default_variant = "v15"
-        elif "v16_v1" in candidates:
-            default_variant = "v16_v1"
-        else:
-            default_variant = candidates[0]
-
-        # Keep online variant autotune opt-in for serving stability.
-        if os.getenv("FLASH_SVD_DECODE_KERNEL_AUTOTUNE", "0") == "0":
-            return default_variant
-
-        try:
-            tune_warmup = max(1, int(os.getenv("FLASH_SVD_DECODE_KERNEL_AUTOTUNE_WARMUP", "1")))
-        except Exception:
-            tune_warmup = 1
-        try:
-            tune_iters = max(1, int(os.getenv("FLASH_SVD_DECODE_KERNEL_AUTOTUNE_ITERS", "2")))
-        except Exception:
-            tune_iters = 2
-
-        split_key = int(call_kwargs.get("split_k", 0) or 0)
-        bn_key = int(call_kwargs.get("bn", 0) or 0)
-        br_key = int(call_kwargs.get("br", 0) or 0)
-        pad_key = int(bool(call_kwargs.get("pad_to_16", False)))
-        vk_key = int(bool(call_kwargs.get("vk_resident", False)))
-        # Variant preference should be stable across a request; avoid retuning on
-        # every seqlen bucket transition.
-        cache_key = (
-            int(getattr(hidden_states.device, "index", -1) or -1),
-            str(hidden_states.dtype),
-            int(bsz),
-            int(H),
-            int(Hk),
-            int(R),
-            int(Dh),
-            int(split_key),
-            int(bn_key),
-            int(br_key),
-            int(pad_key),
-            int(vk_key),
-        )
-        cached = _DECODE_VARIANT_CACHE.get(cache_key, None)
-        if cached in candidates:
-            return str(cached)
-
-        best_variant = default_variant
-        best_ms = float("inf")
-
-        for variant in candidates:
-            mod_v, fn_v = _resolve_decode_variant(mods, variant)
-            if mod_v is None or fn_v is None:
-                continue
-            try:
-                f_v = mod_v.DecodePackedFactors(Pq=Pq_q, Pk=Pk, Pv=Pv, Vq=Vq, Vk=Vk, Vv=Vv)
-                kw_v = _maybe_kwargs(fn_v, dict(call_kwargs))
-                for _ in range(tune_warmup):
-                    fn_v(f_v, rotary_cos, rotary_sin, **kw_v)
-                torch.cuda.synchronize(hidden_states.device)
-                ev_s = torch.cuda.Event(enable_timing=True)
-                ev_e = torch.cuda.Event(enable_timing=True)
-                ev_s.record()
-                for _ in range(tune_iters):
-                    fn_v(f_v, rotary_cos, rotary_sin, **kw_v)
-                ev_e.record()
-                torch.cuda.synchronize(hidden_states.device)
-                ms = float(ev_s.elapsed_time(ev_e)) / float(tune_iters)
-            except Exception:
-                continue
-            if ms < best_ms:
-                best_ms = ms
-                best_variant = variant
-
-        _DECODE_VARIANT_CACHE[cache_key] = best_variant
-        log_key = ("autotuned", cache_key)
-        if log_key not in _DECODE_VARIANT_LOGGED:
-            extra = f"{best_ms:.3f} ms" if math.isfinite(best_ms) else "n/a"
-            print(
-                "[FlashSVD][decode_variant] "
-                f"B={bsz} H={H} Hk={Hk} R={R} Dh={Dh} "
-                f"selected={best_variant} "
-                f"candidates={','.join(candidates)} ({extra})"
-            )
-            _DECODE_VARIANT_LOGGED.add(log_key)
-        return best_variant
 
     def _autotune_fused_decode_cfg(
         self,
@@ -1847,17 +1705,18 @@ class SVD_LlamaAttention(nn.Module):
         if past_key_value is not None or use_cache:
             DenseKVCache = _get_dense_cache_cls()
             if DenseKVCache is not None and isinstance(past_key_value, DenseKVCache):
+                # Production decode path: dense KV cache + reconstruct-current-token + FA2 KV cache.
                 if (
                     _flashsvd_baseline_dense_kvcache_enabled()
                     and int(q_len) == 1
-                    and _get_flash_attn_with_kvcache() is not None
+                    and get_flash_attn_with_kvcache() is not None
                 ):
                     attn_output = self._baseline_dense_decode_token_from_hidden(
                         hidden_states,
                         past_key_value,
                         cache_position=cache_position,
                     )
-                    return attn_output, None, None
+                    return attn_output, None
                 if self._can_use_flashsvd_dense_decode_graph(hidden_states, past_key_value):
                     attn_output = self._flashsvd_dense_decode_token_from_hidden(
                         hidden_states,
@@ -1866,9 +1725,10 @@ class SVD_LlamaAttention(nn.Module):
                         cache_bindings=None,
                         advance_cache=True,
                     )
-                    return attn_output, None, None
+                    return attn_output, None
 
-            # Low-rank KV-cache path: cache rank-space Pk/Pv (pre-RoPE) and use Triton decode kernel when q_len==1.
+            # Legacy decode path: low-rank KV cache and historical fused decode kernels.
+            # Keep this code for correctness/perf regression, not as the main serving route.
             LowRankKVCache = _get_lowrank_cache_cls()
 
             if LowRankKVCache is not None and isinstance(past_key_value, LowRankKVCache):
@@ -2078,7 +1938,7 @@ class SVD_LlamaAttention(nn.Module):
                         )  # [B, H, 1, Dh]
                         attn_output = attn_out.transpose(1, 2).reshape(bsz, 1, H * Dh).contiguous()
                         attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-                        return attn_output, None, None
+                        return attn_output, None
 
                     if use_mha_stream:
                         # Query in head-space: [B, H, 1, Dh]
@@ -2206,7 +2066,7 @@ class SVD_LlamaAttention(nn.Module):
                         else:
                             attn_output = out_bhd.reshape(bsz, 1, H * Dh)
                             attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-                        return attn_output, None, None
+                        return attn_output, None
 
                     # Query: [B, H, R] (broadcast across heads if rank-space is shared)
                     Pq_q = Pq_rank[:, 0, :].unsqueeze(1).expand(bsz, H, R)
@@ -2234,7 +2094,7 @@ class SVD_LlamaAttention(nn.Module):
                             seqlen=Smax, head_dim=Dh, device=hidden_states.device, dtype=hidden_states.dtype
                         )
 
-                    mods = _get_flashsvd_decode_attn_mods()
+                    mods = get_flashsvd_decode_attn_mods()
 
                     # Persistent workspace/buffers (slice to current num_splits)
                     split_k = max(1, int(split_k_cfg))
@@ -2352,7 +2212,7 @@ class SVD_LlamaAttention(nn.Module):
                         vk_resident=bool(vk_resident),
                     )
 
-                    selected_variant = self._select_decode_variant(
+                    selected_variant = select_decode_variant(
                         mods=mods,
                         hidden_states=hidden_states,
                         bsz=bsz,
@@ -2371,9 +2231,9 @@ class SVD_LlamaAttention(nn.Module):
                         rotary_sin=rotary_sin,
                         call_kwargs=call_kwargs,
                     )
-                    mod, decode_fn = _resolve_decode_variant(mods, selected_variant)
+                    mod, decode_fn = resolve_decode_variant(mods, selected_variant)
                     if mod is None or decode_fn is None:
-                        mod = _get_flashsvd_decode_attn_mod()
+                        mod = get_default_flashsvd_decode_attn_mod()
                         decode_fn = getattr(mod, "flashsvd_attn_decode_packed")
                         selected_variant = "v16_v2"
 
@@ -2431,7 +2291,7 @@ class SVD_LlamaAttention(nn.Module):
                         )
 
                     f = mod.DecodePackedFactors(Pq=Pq_q, Pk=Pk, Pv=Pv, Vq=Vq, Vk=Vk, Vv=Vv)
-                    decode_kwargs = _maybe_kwargs(decode_fn, call_kwargs)
+                    decode_kwargs = maybe_kwargs(decode_fn, call_kwargs)
 
                     def _run_decode_once():
                         return decode_fn(f, rotary_cos, rotary_sin, **decode_kwargs)
@@ -2443,12 +2303,12 @@ class SVD_LlamaAttention(nn.Module):
                             for alt in ("v15", "v16_v1", "v16_v2"):
                                 if alt == selected_variant:
                                     continue
-                                mod_alt, fn_alt = _resolve_decode_variant(mods, alt)
+                                mod_alt, fn_alt = resolve_decode_variant(mods, alt)
                                 if mod_alt is None or fn_alt is None:
                                     continue
                                 try:
                                     f_alt = mod_alt.DecodePackedFactors(Pq=Pq_q, Pk=Pk, Pv=Pv, Vq=Vq, Vk=Vk, Vv=Vv)
-                                    kw_alt = _maybe_kwargs(fn_alt, call_kwargs)
+                                    kw_alt = maybe_kwargs(fn_alt, call_kwargs)
                                     return fn_alt(f_alt, rotary_cos, rotary_sin, **kw_alt)
                                 except Exception:
                                     continue
@@ -2513,7 +2373,7 @@ class SVD_LlamaAttention(nn.Module):
                     else:
                         attn_output = O_bhd.reshape(bsz, 1, H * Dh)
                         attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-                    return attn_output, None, None
+                    return attn_output, None
 
                 # Prefill (q_len>1): use FlashSVD full-seq kernel and populate low-rank cache.
                 B, M, R = Pq_rank.shape
@@ -2565,7 +2425,7 @@ class SVD_LlamaAttention(nn.Module):
                     ).transpose(1, 2)
                     attn_output = attn_out.reshape(B, M, H * dh).contiguous()
                     attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-                    return attn_output, None, None
+                    return attn_output, None
 
                 Hk = int(getattr(self, "num_key_value_heads", H) or H)
 
@@ -2581,15 +2441,18 @@ class SVD_LlamaAttention(nn.Module):
                     position_ids = torch.arange(M, device=hidden_states.device).unsqueeze(0).expand(B, M)
 
                 qkv = QKVFactors(Pq=Pq4, Pk=Pk4, Pv=Pv4, Vq=Vq, Vk=Vk, Vv=Vv, bq=None, bk=None, bv=None)
-                attn_bmhd = self.flash_attn(
-                    qkv,
+                attn_bmhd = _run_flashsvd_prefill_kernel(
+                    rotary_emb=self.rotary_emb,
+                    qkv_factors=qkv,
+                    num_heads=H,
+                    head_dim=dh,
                     attention_mask=attention_mask,
                     position_ids=position_ids,
                 )  # [B, M, H, dh]
 
                 attn_output = attn_bmhd.reshape(B, M, H * dh)
                 attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-                return attn_output, None, None
+                return attn_output, None
 
             # Build dense Q/K/V via low-rank projections (for cache updates we need dense K/V).
             input_shape = hidden_states.shape[:-1]
@@ -2635,17 +2498,11 @@ class SVD_LlamaAttention(nn.Module):
             except Exception:
                 # Minimal fallback: SDPA (no attn weights).
                 is_causal = attention_mask is None and getattr(self, "is_causal", True)
-                sdpa_mask = attention_mask
-                if sdpa_mask is not None:
-                    q_len = query_states.shape[2]
-                    kv_len = key_states.shape[2]
-                    if sdpa_mask.shape[-2] != q_len or sdpa_mask.shape[-1] != kv_len:
-                        sdpa_mask = sdpa_mask[..., :q_len, :kv_len]
                 attn_output = F.scaled_dot_product_attention(
                     query_states,
                     key_states,
                     value_states,
-                    attn_mask=sdpa_mask,
+                    attn_mask=attention_mask,
                     dropout_p=0.0,
                     is_causal=is_causal,
                 ).transpose(1, 2)
@@ -2655,7 +2512,7 @@ class SVD_LlamaAttention(nn.Module):
             attn_output = self.o_u_proj(self.o_v_proj(attn_output))
             if not output_attentions:
                 attn_weights = None
-            return attn_output, attn_weights, None
+            return attn_output, attn_weights
 
         # Build low-rank P factors: [B, M, R] -> expand to [B, H, M, R]
         Pq = self.q_v_proj(hidden_states)  # [B, M, R]
@@ -2764,8 +2621,11 @@ class SVD_LlamaAttention(nn.Module):
                 attn_out_bhmd = attn_out_bhmd.masked_fill(~pad_mask[:, None, :, None].to(torch.bool), 0.0)
             attn_bmhd = attn_out_bhmd.permute(0, 2, 1, 3).contiguous()
         else:
-            attn_bmhd = self.flash_attn(
-                qkv,
+            attn_bmhd = _run_flashsvd_prefill_kernel(
+                rotary_emb=self.rotary_emb,
+                qkv_factors=qkv,
+                num_heads=H,
+                head_dim=dh,
                 attention_mask=add_mask if add_mask is not None else pad_mask,
                 position_ids=position_ids,
             )  # [B, M, H, dh]
@@ -2779,5 +2639,5 @@ class SVD_LlamaAttention(nn.Module):
         attn_output = self.o_u_proj(self.o_v_proj(attn_output))
 
         attn_weights = None
-        return attn_output, attn_weights, None
+        return attn_output, attn_weights
     
