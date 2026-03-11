@@ -294,6 +294,11 @@ def profle_svdllm_low_resource(
                     cache['position_ids'] = torch.cat((cache['position_ids'], pid.to(buf_device, non_blocking=True)), dim=0)
             raise ValueError
     layers[0] = Catcher(layers[0])
+    # Llama3 (transformers>=4.43) has a model-level rotary_emb; move it to dev
+    # so position_ids (on dev) and inv_freq (on cpu) don't mismatch.
+    _rotary_emb = getattr(getattr(model, 'model', None), 'rotary_emb', None)
+    if _rotary_emb is not None:
+        model.model.rotary_emb = _rotary_emb.to(dev)
     for batch in calib_loader:
         try:
             batch = {k: v.to(dev) for k, v in batch.items()}
@@ -302,11 +307,13 @@ def profle_svdllm_low_resource(
             pass
     layers[0] = layers[0].module
     layers[0] = layers[0].cpu()
+    if _rotary_emb is not None:
+        model.model.rotary_emb = model.model.rotary_emb.cpu()
     if "opt" in model_name:
         model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
         model.model.decoder.final_layer_norm = model.model.decoder.final_layer_norm.cpu()
         model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu()
-    else:  
+    else:
         model.model.embed_tokens = model.model.embed_tokens.cpu()
         model.model.norm = model.model.norm.cpu()
     torch.cuda.empty_cache()
