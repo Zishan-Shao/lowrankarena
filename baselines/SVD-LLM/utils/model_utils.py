@@ -133,8 +133,8 @@ def _ensure_inline_rotary_emb(llama_model: nn.Module, config) -> None:
             # [B, S, head_dim//2]
             freqs = torch.einsum("bi,j->bij", position_ids.float(), inv)
             emb = torch.cat([freqs, freqs], dim=-1)          # [B, S, head_dim]
-            cos = emb.cos()[:, None, :, :]                   # [B, 1, S, head_dim]
-            sin = emb.sin()[:, None, :, :]
+            cos = emb.cos()                                  # [B, S, head_dim]
+            sin = emb.sin()
             return cos.to(x.dtype), sin.to(x.dtype)
 
     llama_model.rotary_emb = _InlineRoPE()
