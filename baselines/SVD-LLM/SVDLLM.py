@@ -462,6 +462,9 @@ def profle_svdllm_low_resource(
                         w, Q = torch.linalg.eigh(cov)
                         w = torch.clamp(w, min=eps)
                         cov_spd = (Q * w) @ Q.T
+                        cov_spd = (cov_spd + cov_spd.T) * 0.5  # re-symmetrize after fp reconstruction
+                        eps_final = max(float(w.max().item()) * 1e-6, 1e-7)
+                        cov_spd = cov_spd + eps_final * torch.eye(cov_spd.shape[0], device=cov_spd.device, dtype=cov_spd.dtype)
                         scaling = torch.linalg.cholesky(cov_spd)
                 layer_profile[name] = scaling.to(dtype=store_t).cpu()
                 # cleanup
