@@ -105,27 +105,53 @@ def ensure_transformers_layer_idx(model: nn.Module) -> None:
 
 
 def ensure_model_level_rotary_emb(model: nn.Module) -> None:
-    """Inject model-level rotary_emb for transformers>=4.43 compatibility.
+    """Patch old pickled LlamaForCausalLM for transformers>=4.43/4.48 compatibility.
 
-    Transformers 4.43+ moved rotary_emb from LlamaAttention to LlamaModel.
-    Old pickled checkpoints only have it inside each attention layer.
-    Inject model.model.rotary_emb from the first layer so LlamaModel.forward works.
+    Changes between old pickled models and transformers 4.48:
+      - LlamaModel: rotary_emb moved from each LlamaAttention to LlamaModel level
+      - LlamaRotaryEmbedding: constructor changed (dim,max_pos,base) → (config,); added rope_type
+      - LlamaAttention: added scaling, attention_dropout, is_causal; uses passed position_embeddings
     """
     try:
         llama_model = getattr(model, "model", None)
         if llama_model is None:
             return
-        if hasattr(llama_model, "rotary_emb"):
-            return
-        layers = getattr(llama_model, "layers", None)
-        if not layers:
-            return
-        rotary_emb = getattr(getattr(layers[0], "self_attn", None), "rotary_emb", None)
-        if rotary_emb is not None:
-            llama_model.rotary_emb = rotary_emb
-            print("[compat] Injected model-level rotary_emb from layer[0].self_attn")
-    except Exception:
-        pass
+        config = model.config
+
+        # ── 1. Model-level rotary_emb ───────────────────────────────────────────
+        existing_rope = getattr(llama_model, "rotary_emb", None)
+        if existing_rope is None or not hasattr(existing_rope, "rope_type"):
+            try:
+                from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
+                llama_model.rotary_emb = LlamaRotaryEmbedding(config=config)
+                print("[compat] Created fresh model-level LlamaRotaryEmbedding from config")
+            except Exception as e:
+                print(f"[compat] Could not create LlamaRotaryEmbedding: {e}")
+
+        # ── 2. Per-attention-layer missing attributes ───────────────────────────
+        import math
+        layers = getattr(llama_model, "layers", None) or []
+        patched_attn = 0
+        for layer in layers:
+            attn = getattr(layer, "self_attn", None)
+            if attn is None:
+                continue
+            head_dim = getattr(attn, "head_dim",
+                               getattr(config, "head_dim",
+                                       config.hidden_size // config.num_attention_heads))
+            if not hasattr(attn, "scaling"):
+                attn.scaling = head_dim ** -0.5
+                patched_attn += 1
+            if not hasattr(attn, "attention_dropout"):
+                attn.attention_dropout = getattr(config, "attention_dropout", 0.0)
+            if not hasattr(attn, "is_causal"):
+                attn.is_causal = True
+            if not hasattr(attn, "config"):
+                attn.config = config
+        if patched_attn:
+            print(f"[compat] Patched {patched_attn} LlamaAttention layers with missing 4.48 attributes")
+    except Exception as e:
+        print(f"[compat] ensure_model_level_rotary_emb failed: {e}")
 
 
 def get_model_from_huggingface(
