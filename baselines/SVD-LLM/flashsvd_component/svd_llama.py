@@ -461,7 +461,13 @@ def _flashsvd_llama_decoder_layer_forward(
                 **kwargs,
             },
         )
-        return _HF_LLAMA_DECODER_LAYER_FORWARD(self, hidden_states, **call_kwargs)
+        result = _HF_LLAMA_DECODER_LAYER_FORWARD(self, hidden_states, **call_kwargs)
+        # transformers >=4.43 LlamaDecoderLayer.forward returns a plain Tensor
+        # instead of the old tuple (hidden_states, ...).  SVDLLM.py always does
+        # result[0] to extract the hidden states, so wrap if needed.
+        if isinstance(result, torch.Tensor):
+            return (result,)
+        return result
 
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
