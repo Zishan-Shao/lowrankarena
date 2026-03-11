@@ -81,6 +81,7 @@ def _configure_mode(
     graph_alias_output: bool,
     enable_flash_dense_attn: bool,
     enable_baseline_dense_kvcache: bool,
+    enable_lowrank_cache: bool = False,
 ) -> tuple[bool, bool, bool]:
     mode = str(mode).strip().lower()
     if mode not in {"flashsvd", "svd"}:
@@ -90,7 +91,7 @@ def _configure_mode(
         _set_env("SVDLLM_FLASH_FALLBACK", False)
         _set_env("FLASH_SVD_DISABLE_FFN", False)
         _set_env("FLASH_SVD_BASELINE_LR_KVCACHE", False)
-        _set_env("FLASH_SVD_ENABLE_DENSE_ATTN_DECODE", enable_flash_dense_attn)
+        _set_env("FLASH_SVD_ENABLE_DENSE_ATTN_DECODE", enable_flash_dense_attn and not enable_lowrank_cache)
         _set_env("FLASH_SVD_BASELINE_DENSE_KVCACHE", False)
         _set_env("FLASH_SVD_REFERENCE_DENSE_ATTN", False)
         _set_env("FLASH_SVD_ENABLE_EXPERIMENTAL_FFN", _backend_needs_experimental_ffn(ffn_backend))
@@ -98,6 +99,8 @@ def _configure_mode(
         _set_env("FLASH_SVD_MLP_CUDA_GRAPH_ALIAS_OUTPUT", graph_alias_output)
         os.environ["FLASH_SVD_MLP_CUDA_GRAPH_SCOPE"] = str(mlp_graph_scope)
         os.environ["FLASH_SVD_FFN_BACKEND"] = str(ffn_backend)
+        if enable_lowrank_cache:
+            return True, False, False  # lowrank_cache, no dense cache
         return False, bool(enable_flash_dense_attn), False
 
     _set_env("SVDLLM_FLASH_FALLBACK", True)
@@ -131,6 +134,7 @@ def _bench_one_mode(
     graph_alias_output: bool,
     enable_flash_dense_attn: bool,
     enable_baseline_dense_kvcache: bool,
+    enable_lowrank_cache: bool = False,
 ):
     lowrank_cache, flashsvd_dense_cache, baseline_dense_kvcache = _configure_mode(
         mode,
@@ -140,6 +144,7 @@ def _bench_one_mode(
         graph_alias_output=graph_alias_output,
         enable_flash_dense_attn=enable_flash_dense_attn,
         enable_baseline_dense_kvcache=enable_baseline_dense_kvcache,
+        enable_lowrank_cache=enable_lowrank_cache,
     )
     model, tokenizer = _load_model_and_tokenizer(source, hf_token=hf_token)
     model.eval()
@@ -189,6 +194,8 @@ def main() -> int:
     ap.add_argument("--mlp_cuda_graph", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--mlp_cuda_graph_scope", type=str, default="mlp", choices=["auto", "mlp", "layer_tail"])
     ap.add_argument("--mlp_cuda_graph_alias_output", action=argparse.BooleanOptionalAction, default=False)
+    ap.add_argument("--lowrank_cache", action=argparse.BooleanOptionalAction, default=False,
+                    help="FlashSVD mode: store K/V in rank space (LowRankKVCache) for true decode bandwidth savings.")
     ap.add_argument("--skip_svd", action="store_true")
     ap.add_argument("--skip_flashsvd", action="store_true")
     args = ap.parse_args()
@@ -206,7 +213,8 @@ def main() -> int:
         f"Config: prompt_len={args.prompt_len} new_tokens={args.new_tokens} warmup={args.warmup} "
         f"batch={args.batch_size} dtype={args.dtype} device={args.device} "
         f"ffn_backend={args.flashsvd_ffn_backend} mlp_cuda_graph={int(args.mlp_cuda_graph)} "
-        f"scope={args.mlp_cuda_graph_scope} baseline_dense_kvcache={int(args.baseline_dense_kvcache)}"
+        f"scope={args.mlp_cuda_graph_scope} baseline_dense_kvcache={int(args.baseline_dense_kvcache)} "
+        f"lowrank_cache={int(args.lowrank_cache)}"
     )
 
     results: dict[str, dict[str, float | int | bool]] = {}
@@ -250,6 +258,7 @@ def main() -> int:
             graph_alias_output=args.mlp_cuda_graph_alias_output,
             enable_flash_dense_attn=bool(args.experimental_flash_dense_attn),
             enable_baseline_dense_kvcache=False,
+            enable_lowrank_cache=bool(args.lowrank_cache),
         )
 
     if "svd" in results and "flashsvd" in results:
