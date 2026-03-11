@@ -415,15 +415,37 @@ def _flashsvd_llama_decoder_layer_forward(
     # layers are called directly (e.g. during whitening/calibration) rather than through
     # LlamaModel.forward() which pre-computes position_embeddings.
     if position_embeddings is None and position_ids is not None:
-        # Try attn-level rotary_emb (transformers <4.43), then model-level (4.43+)
+        # Try attn-level rotary_emb (transformers <4.43), then inline (4.43+).
         rotary_fn = getattr(getattr(self, 'self_attn', None), 'rotary_emb', None)
-        if rotary_fn is None:
-            rotary_fn = getattr(self, '_model_rotary_emb', None)
         if rotary_fn is not None:
             try:
                 position_embeddings = rotary_fn(hidden_states, position_ids)
             except Exception:
                 position_embeddings = None
+
+        if position_embeddings is None:
+            # Inline standard LLaMA RoPE — avoids model.model.rotary_emb device/shape issues.
+            # Produces cos/sin [B, S, head_dim] compatible with HF 4.43+ apply_rotary_pos_emb
+            # (which unsqueezes at dim 1) and SVD_LlamaAttention._apply_rope_hf.
+            _cfg = getattr(getattr(self, 'self_attn', None), 'config', None)
+            if _cfg is not None:
+                try:
+                    _hd = int(getattr(_cfg, 'head_dim',
+                                      _cfg.hidden_size // _cfg.num_attention_heads))
+                    _theta = float(getattr(_cfg, 'rope_theta', 10000.0))
+                    _inv_freq = 1.0 / (_theta ** (
+                        torch.arange(0, _hd, 2, dtype=torch.float32,
+                                     device=hidden_states.device) / _hd
+                    ))
+                    _t = position_ids.float()  # [B, S]
+                    _freqs = torch.einsum('bi,j->bij', _t, _inv_freq)  # [B, S, hd//2]
+                    _emb = torch.cat([_freqs, _freqs], dim=-1)         # [B, S, hd]
+                    position_embeddings = (
+                        _emb.cos().to(hidden_states.dtype),
+                        _emb.sin().to(hidden_states.dtype),
+                    )
+                except Exception:
+                    position_embeddings = None
 
     if _HF_LLAMA_DECODER_LAYER_FORWARD is None or not _should_use_flashsvd_layer_tail_cuda_graph(self, hidden_states):
         call_kwargs = maybe_kwargs(
