@@ -282,9 +282,12 @@ def _get_lowrank_cache_cls():
     if _LOWRANK_CACHE_CLS_RESOLVED:
         return _LOWRANK_CACHE_CLS
     try:
-        from flashsvd_component.legacy.lowrank_cache import LowRankKVCache
+        from flashsvd_component.lowrank_cache import LowRankKVCache
     except Exception:
-        LowRankKVCache = None  # type: ignore[assignment]
+        try:
+            from flashsvd_component.legacy.lowrank_cache import LowRankKVCache  # type: ignore[no-redef]
+        except Exception:
+            LowRankKVCache = None  # type: ignore[assignment]
     _LOWRANK_CACHE_CLS = LowRankKVCache
     _LOWRANK_CACHE_CLS_RESOLVED = True
     return _LOWRANK_CACHE_CLS
