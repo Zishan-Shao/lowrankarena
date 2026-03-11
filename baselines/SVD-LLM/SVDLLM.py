@@ -903,13 +903,13 @@ class local_update:
         if direct_update:
             self.U, self.S, self.VT = torch.linalg.svd(W.data, full_matrices=False)
         else: 
+            scaling_diag_matrix = scaling_diag_matrix.float()
             try:
                 scaling_matrix_inv = torch.linalg.inv(scaling_diag_matrix)
             except Exception as e:
                 print("Warning: scaling_diag_matrix is not full rank!")
-                scaling_diag_matrix += 1e-6 * torch.eye(scaling_diag_matrix.shape[0])
+                scaling_diag_matrix += 1e-6 * torch.eye(scaling_diag_matrix.shape[0], device=scaling_diag_matrix.device)
                 scaling_matrix_inv = torch.linalg.inv(scaling_diag_matrix)
-            scaling_diag_matrix = scaling_diag_matrix.float()
             scaling_matrix_inv = scaling_matrix_inv.float()
             W_scale = torch.matmul(W, scaling_diag_matrix)
             self.U, self.S, self.VT = torch.linalg.svd(W_scale, full_matrices=False)  
