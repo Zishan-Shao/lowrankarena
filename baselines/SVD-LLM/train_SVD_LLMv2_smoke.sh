@@ -23,7 +23,7 @@ LOAD_DTYPE=float16
 STATS_DTYPE=float32
 SQRT_DTYPE=float32
 STORE_ACT_DTYPE=float16
-GPU=6
+GPU=0
 
 # smoke build for jeffwan llama-7b-hf, keep ratio ~= 0.4
 CUDA_VISIBLE_DEVICES="${GPU}" python -u baselines/SVD-LLM/SVDLLM_v2.py \
