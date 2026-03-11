@@ -464,7 +464,19 @@ def load_compressed_model(
         if f"{encoder_prefix}." not in k or ".block." not in k
     }
 
-    missing_keys, unexpected_keys = base_model.load_state_dict(remaining_state, strict=False)
+    # Drop keys whose shapes don't match the current model (e.g. classifier head
+    # when num_labels was overridden from the saved checkpoint).
+    model_state = base_model.state_dict()
+    shape_skipped = []
+    filtered_state = {}
+    for k, v in remaining_state.items():
+        if k in model_state and model_state[k].shape != v.shape:
+            shape_skipped.append(k)
+        else:
+            filtered_state[k] = v
+    if shape_skipped:
+        print(f"[load] Skipping {len(shape_skipped)} shape-mismatched keys (num_labels override): {shape_skipped}")
+    missing_keys, unexpected_keys = base_model.load_state_dict(filtered_state, strict=False)
 
     if missing_keys:
         print(f"[warn] Missing keys: {len(missing_keys)}")
