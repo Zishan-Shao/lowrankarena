@@ -104,6 +104,30 @@ def ensure_transformers_layer_idx(model: nn.Module) -> None:
         return
 
 
+def ensure_model_level_rotary_emb(model: nn.Module) -> None:
+    """Inject model-level rotary_emb for transformers>=4.43 compatibility.
+
+    Transformers 4.43+ moved rotary_emb from LlamaAttention to LlamaModel.
+    Old pickled checkpoints only have it inside each attention layer.
+    Inject model.model.rotary_emb from the first layer so LlamaModel.forward works.
+    """
+    try:
+        llama_model = getattr(model, "model", None)
+        if llama_model is None:
+            return
+        if hasattr(llama_model, "rotary_emb"):
+            return
+        layers = getattr(llama_model, "layers", None)
+        if not layers:
+            return
+        rotary_emb = getattr(getattr(layers[0], "self_attn", None), "rotary_emb", None)
+        if rotary_emb is not None:
+            llama_model.rotary_emb = rotary_emb
+            print("[compat] Injected model-level rotary_emb from layer[0].self_attn")
+    except Exception:
+        pass
+
+
 def get_model_from_huggingface(
     model_id: str,
     *,
@@ -150,6 +174,7 @@ def get_model_from_local(path: str):
     if isinstance(obj, dict) and "model" in obj and "tokenizer" in obj:
         model = obj["model"]
         ensure_transformers_layer_idx(model)
+        ensure_model_level_rotary_emb(model)
         tok = obj["tokenizer"]
         # Pickled tokenizers can be incomplete (missing _special_tokens_map etc.)
         # after module-path shims. Validate and reload from model_id if broken.
@@ -166,6 +191,7 @@ def get_model_from_local(path: str):
         # A pickled HF model (rare but possible): try to recover tokenizer.
         model = obj
         ensure_transformers_layer_idx(model)
+        ensure_model_level_rotary_emb(model)
         model_id = getattr(model, "name_or_path", None)
         if model_id:
             try:
