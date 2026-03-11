@@ -1152,7 +1152,11 @@ class SVD_LlamaAttention(nn.Module):
 
         H, dh = int(self.num_heads), int(self.head_dim)
         Hk_attr = int(getattr(self, "num_key_value_heads", H) or H)
-        R = int(self.q_v_proj.out_features)
+        # Use actual weight shapes for ranks to be robust against stale out_features metadata.
+        Rq = int(self.q_u_proj.weight.shape[1])
+        Rk_w = int(self.k_u_proj.weight.shape[1])
+        Rv_w = int(self.v_u_proj.weight.shape[1])
+        R = Rq  # kept for backward compat reference; only used if Rq == Rk_w == Rv_w
 
         # Infer Hk from weight shapes (preferred) to support checkpoints that
         # preserve true GQA (k/v have Hk heads) as well as older MHA-style ones.
@@ -1188,9 +1192,9 @@ class SVD_LlamaAttention(nn.Module):
             str(self.q_u_proj.weight.device),
         )
         if self._decode_ptrs != ptrs or self._decode_Vq is None or self._decode_Vk is None or self._decode_Vv is None:
-            self._decode_Vq = self.q_u_proj.weight.view(H, dh, R).permute(0, 2, 1).contiguous()
-            self._decode_Vk = self.k_u_proj.weight.view(Hk, dh, R).permute(0, 2, 1).contiguous()
-            self._decode_Vv = self.v_u_proj.weight.view(Hk, dh, R).permute(0, 2, 1).contiguous()
+            self._decode_Vq = self.q_u_proj.weight.view(H, dh, Rq).permute(0, 2, 1).contiguous()
+            self._decode_Vk = self.k_u_proj.weight.view(Hk, dh, Rk_w).permute(0, 2, 1).contiguous()
+            self._decode_Vv = self.v_u_proj.weight.view(Hk, dh, Rv_w).permute(0, 2, 1).contiguous()
             self._decode_ptrs = ptrs
         return self._decode_Vq, self._decode_Vk, self._decode_Vv
 
@@ -1269,7 +1273,7 @@ class SVD_LlamaAttention(nn.Module):
             and (not _flashsvd_baseline_dense_kvcache_enabled())
             and flash_attn_with_kvcache is not None
             and int(hidden_states.shape[1]) == 1
-            and int(self.q_v_proj.out_features) == int(self.k_v_proj.out_features) == int(self.v_v_proj.out_features)
+            and int(self.q_u_proj.weight.shape[1]) == int(self.k_u_proj.weight.shape[1]) == int(self.v_u_proj.weight.shape[1])
         )
 
     @staticmethod
@@ -1774,6 +1778,15 @@ class SVD_LlamaAttention(nn.Module):
                         cache_position=cache_position,
                         cache_bindings=None,
                         advance_cache=True,
+                    )
+                    return attn_output, None
+                # GQA fallback: Q and K/V have different ranks (e.g. Llama3.1-8B).
+                # Reconstruct per-head Q/K/V and attend via FA2 using the dense cache.
+                if int(q_len) == 1 and get_flash_attn_with_kvcache() is not None:
+                    attn_output = self._baseline_dense_decode_token_from_hidden(
+                        hidden_states,
+                        past_key_value,
+                        cache_position=cache_position,
                     )
                     return attn_output, None
 
