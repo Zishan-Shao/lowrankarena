@@ -314,6 +314,10 @@ def profle_svdllm_low_resource(
     if "opt" not in model_name:
         position_ids = cache['position_ids']
     profiling_mat = {}
+    # Inject model-level rotary_emb for transformers 4.43+
+    if hasattr(model, 'model') and hasattr(model.model, 'rotary_emb'):
+        for _layer in layers:
+            _layer._model_rotary_emb = model.model.rotary_emb
     for i in tqdm(range(len(layers))):
         layer_profile = {}
         layer = layers[i].to(dev)
@@ -732,6 +736,10 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
     attention_masks = cache['attention_mask']
     if "opt" not in model_name:
         position_ids = cache['position_ids']
+    # Inject model-level rotary_emb for transformers 4.43+ (rotary_emb moved to LlamaModel)
+    if hasattr(model, 'model') and hasattr(model.model, 'rotary_emb'):
+        for _layer in layers:
+            _layer._model_rotary_emb = model.model.rotary_emb
     for i in tqdm(range(len(layers))):
         layer = layers[i].to(dev)
         subset = find_layers(layer)

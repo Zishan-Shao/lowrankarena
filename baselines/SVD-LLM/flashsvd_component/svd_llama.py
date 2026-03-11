@@ -415,12 +415,15 @@ def _flashsvd_llama_decoder_layer_forward(
     # layers are called directly (e.g. during whitening/calibration) rather than through
     # LlamaModel.forward() which pre-computes position_embeddings.
     if position_embeddings is None and position_ids is not None:
-        try:
-            rotary_fn = getattr(getattr(self, 'self_attn', None), 'rotary_emb', None)
-            if rotary_fn is not None:
+        # Try attn-level rotary_emb (transformers <4.43), then model-level (4.43+)
+        rotary_fn = getattr(getattr(self, 'self_attn', None), 'rotary_emb', None)
+        if rotary_fn is None:
+            rotary_fn = getattr(self, '_model_rotary_emb', None)
+        if rotary_fn is not None:
+            try:
                 position_embeddings = rotary_fn(hidden_states, position_ids)
-        except Exception:
-            position_embeddings = None
+            except Exception:
+                position_embeddings = None
 
     if _HF_LLAMA_DECODER_LAYER_FORWARD is None or not _should_use_flashsvd_layer_tail_cuda_graph(self, hidden_states):
         call_kwargs = maybe_kwargs(
