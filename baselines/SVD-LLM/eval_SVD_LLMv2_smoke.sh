@@ -2,11 +2,13 @@
 set -euo pipefail
 
 # run from repo root:
-# bash baselines/SVD-LLM/eval_SVD_LLM_smoke.sh
+# bash baselines/SVD-LLM/eval_SVD_LLMv2_smoke.sh
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
-export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/baselines/SVD-LLM:${PYTHONPATH:-}"
+
+
 
 
 export SVDLLM_TOKENIZER_MODEL="${SVDLLM_TOKENIZER_MODEL:-jeffwan/llama-7b-hf}"
@@ -50,7 +52,7 @@ CUDA_VISIBLE_DEVICES="${GPU}" python eval_results/eval_general_ppl.py \
 
 # smoke linguistic eval
 CUDA_VISIBLE_DEVICES="${GPU}" python eval_results/eval_linguistic_tasks.py \
-  --model "${SMOKE_MODEL}" \
+  --checkpoint "${SMOKE_MODEL}" \
   --tasks blimp \
   --limit 20 \
   --num_fewshot 0 \

@@ -6,10 +6,11 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
-export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/baselines/SVD-LLM:${PYTHONPATH:-}"
 
+SVDLLM_TOKENIZER_MODEL=jeffwan/llama-7b-hf bash baselines/SVD-LLM/eval_SVD_LLMv2_smoke.sh
 
-export SVDLLM_TOKENIZER_MODEL="${SVDLLM_TOKENIZER_MODEL:-jeffwan/llama-7b-hf}"
+#export SVDLLM_TOKENIZER_MODEL="${SVDLLM_TOKENIZER_MODEL:-jeffwan/llama-7b-hf}"
 
 mkdir -p outputs/svdllm/smoke
 
@@ -20,7 +21,7 @@ BATCH_SIZE=1
 DEVICE=cuda
 DTYPE=bfloat16
 LING_DTYPE=bfloat16
-GPU=6
+GPU=0
 
 # smoke lm-eval
 CUDA_VISIBLE_DEVICES="${GPU}" python eval_results/eval_benchmarks.py \

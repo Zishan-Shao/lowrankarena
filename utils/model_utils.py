@@ -11,15 +11,76 @@ sys.path.append(current_path)
 # bandaid fix
 dev = torch.device("cuda")
 
+def _resolve_hf_token(hf_token: str = None):
+    if hf_token is not None:
+        return hf_token
+    return (
+        os.getenv("HF_TOKEN")
+        or os.getenv("HUGGINGFACE_TOKEN")
+        or os.getenv("HUGGINGFACE_HUB_TOKEN")
+    )
+
+def _tokenizer_ok(tokenizer) -> bool:
+    try:
+        if tokenizer is None or isinstance(tokenizer, bool):
+            return False
+        if callable(tokenizer):
+            return True
+        has_min_api = (
+            hasattr(tokenizer, "encode") and hasattr(tokenizer, "decode")
+        ) or (
+            hasattr(tokenizer, "pad_token_id") and hasattr(tokenizer, "eos_token_id")
+        ) or (
+            hasattr(tokenizer, "vocab_size") or hasattr(tokenizer, "get_vocab")
+        )
+        return bool(has_min_api)
+    except Exception:
+        return False
+
+def _load_tokenizer_from_hint(model_hint: str, hf_token: str = None):
+    if not model_hint:
+        return None
+    hf_token = _resolve_hf_token(hf_token)
+    try:
+        from transformers import AutoTokenizer
+        tok = AutoTokenizer.from_pretrained(
+            model_hint, trust_remote_code=True, use_fast=True, token=hf_token
+        )
+        if _tokenizer_ok(tok):
+            return tok
+    except Exception:
+        pass
+    try:
+        from transformers import AutoTokenizer
+        tok = AutoTokenizer.from_pretrained(
+            model_hint, trust_remote_code=True, use_fast=False, token=hf_token
+        )
+        if _tokenizer_ok(tok):
+            return tok
+    except Exception:
+        pass
+    return None
+
+def _checkpoint_path_model_hints(model_path: str):
+    if not model_path:
+        return []
+    lower = str(model_path).lower()
+    hints = []
+    explicit_map = {
+        "jeffwan_llama_7b_hf": "jeffwan/llama-7b-hf",
+        "jeffwan_llama_13b_hf": "jeffwan/llama-13b-hf",
+        "jeffwan_llama_30b_hf": "jeffwan/llama-30b-hf",
+        "openlm_research_open_llama_7b": "openlm-research/open_llama_7b",
+    }
+    for needle, hint in explicit_map.items():
+        if needle in lower and hint not in hints:
+            hints.append(hint)
+    return hints
+
 def get_model_from_huggingface(model_id, hf_token: str = None):
     from transformers import AutoModelForCausalLM, AutoTokenizer
     # Pick up token from env if not provided
-    if hf_token is None:
-        hf_token = (
-            os.getenv("HF_TOKEN")
-            or os.getenv("HUGGINGFACE_TOKEN")
-            or os.getenv("HUGGINGFACE_HUB_TOKEN")
-        )
+    hf_token = _resolve_hf_token(hf_token)
     # Tokenizer: prefer fast; if protobuf/sentencepiece conversion fails, fall back to slow
     try:
         tokenizer = AutoTokenizer.from_pretrained(
@@ -145,8 +206,19 @@ def get_model_from_local(model_id):
         # If transformers import fails for some reason, fall back to default load
         pass
 
-    pruned_dict = torch.load(model_id, weights_only=False, map_location='cpu')
-    tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
+    loaded_obj = torch.load(model_id, weights_only=False, map_location='cpu')
+
+    tokenizer = None
+    model = None
+    if isinstance(loaded_obj, dict) and 'model' in loaded_obj:
+        tokenizer = loaded_obj.get('tokenizer')
+        model = loaded_obj['model']
+    else:
+        # Newer checkpoints may be saved as a bare model object.
+        model = loaded_obj
+
+    if model is None:
+        raise ValueError(f"Unsupported local checkpoint format: {model_id}")
 
     # Ensure config compatibility across transformers versions
     try:
@@ -201,6 +273,38 @@ def get_model_from_local(model_id):
         model = model.to(dtype=torch.float16)
     except Exception:
         # If some submodules cannot change dtype (e.g., layernorm buffers), skip silently
+        pass
+
+    # If tokenizer was not serialized, reconstruct it from explicit env hint first.
+    if not _tokenizer_ok(tokenizer):
+        model_hint = (
+            os.getenv("SVDLLM_TOKENIZER_MODEL")
+            or getattr(model, "name_or_path", None)
+            or getattr(getattr(model, "config", None), "_name_or_path", None)
+            or getattr(getattr(model, "config", None), "name_or_path", None)
+        )
+        hints = [h for h in [model_hint, *_checkpoint_path_model_hints(model_id)] if h]
+        if not hints:
+            raise ValueError(
+                "Checkpoint does not include tokenizer; set SVDLLM_TOKENIZER_MODEL "
+                "to a valid local tokenizer path or base model id."
+            )
+        for hint in hints:
+            tokenizer = _load_tokenizer_from_hint(hint)
+            if _tokenizer_ok(tokenizer):
+                break
+
+    if not _tokenizer_ok(tokenizer):
+        # Final fallback for llama-family checkpoints.
+        tokenizer = _load_tokenizer_from_hint("openlm-research/open_llama_7b")
+    if not _tokenizer_ok(tokenizer):
+        raise TypeError("Tokenizer recovery failed. Set SVDLLM_TOKENIZER_MODEL to a valid tokenizer/base model id.")
+
+    # Ensure pad token exists for batched evals.
+    try:
+        if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+    except Exception:
         pass
 
     return model, tokenizer
