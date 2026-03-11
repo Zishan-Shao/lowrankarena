@@ -462,11 +462,13 @@ def _flashsvd_llama_decoder_layer_forward(
             },
         )
         result = _HF_LLAMA_DECODER_LAYER_FORWARD(self, hidden_states, **call_kwargs)
-        # transformers >=4.43 LlamaDecoderLayer.forward returns a plain Tensor
-        # instead of the old tuple (hidden_states, ...).  SVDLLM.py always does
-        # result[0] to extract the hidden states, so wrap if needed.
-        if isinstance(result, torch.Tensor):
-            return (result,)
+        # Return exactly what the HF LlamaDecoderLayer.forward returns so that
+        # LlamaModel.forward (which calls us) gets the type it expects:
+        # - transformers <4.43: tuple (hidden_states, attn_weights, past_kv)
+        # - transformers 4.43-4.49: tuple (hidden_states,) or plain Tensor
+        # - transformers >=4.50: plain Tensor (LlamaModel.forward no longer does [0])
+        # Callers that need plain hidden_states (e.g. SVDLLM.py calibration loop)
+        # should use _extract_hidden_states() instead of indexing with [0].
         return result
 
     residual = hidden_states

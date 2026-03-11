@@ -399,11 +399,13 @@ def profle_svdllm_low_resource(
                 except Exception:
                     pos_emb = None
                 try:
-                    yj = layer(xj, attention_mask=amj, position_ids=pidsj, position_embeddings=pos_emb)[0]
+                    _out = layer(xj, attention_mask=amj, position_ids=pidsj, position_embeddings=pos_emb)
                 except TypeError:
-                    yj = layer(xj, attention_mask=amj, position_ids=pidsj)[0]
+                    _out = layer(xj, attention_mask=amj, position_ids=pidsj)
+                yj = _out[0] if isinstance(_out, (tuple, list)) else _out
             else:
-                yj = layer(xj, attention_mask=amj)[0]
+                _out = layer(xj, attention_mask=amj)
+                yj = _out[0] if isinstance(_out, (tuple, list)) else _out
 
             # Overwrite activation buffer in-place to save memory.
             inps[j0:j1] = yj.to(buf_device, non_blocking=True)
@@ -761,10 +763,12 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         for name in gpts:
             handles.append(subset[name].register_forward_hook(add_batch(name)))
         if "opt" not in model_name:
-            outs = layer(inps, attention_mask=attention_masks, position_ids=position_ids)[0]
+            _out = layer(inps, attention_mask=attention_masks, position_ids=position_ids)
+            outs = _out[0] if isinstance(_out, (tuple, list)) else _out
         else:
             # attention_masks can be None; OPT layer will handle internal causal mask
-            outs = layer(inps, attention_mask=attention_masks)[0]
+            _out = layer(inps, attention_mask=attention_masks)
+            outs = _out[0] if isinstance(_out, (tuple, list)) else _out
         for h in handles:
             h.remove()
         for name in gpts:
