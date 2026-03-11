@@ -96,25 +96,30 @@ except: print('N/A')
     echo "  → CSV: $MODEL_TAG,$method,$keep ppl=$ppl base=${base_ms}ms flash=${flash_ms}ms speedup=${speedup}x"
 }
 
-# ── init CSV ──────────────────────────────────────────────────────────────────
-echo "model,method,keep_ratio,wikitext2_ppl,baseline_ms,flashsvd_ms,speedup" > "$CSV"
+# ── init CSV (保留已有 baseline 行，追加后续结果) ─────────────────────────────
+if [ ! -f "$CSV" ]; then
+    echo "model,method,keep_ratio,wikitext2_ppl,baseline_ms,flashsvd_ms,speedup" > "$CSV"
+    eval_and_log "original" "baseline" "1.0"
+else
+    echo "=== CSV already exists, skipping baseline eval ==="
+fi
 
-# ── baseline PPL ──────────────────────────────────────────────────────────────
-eval_and_log "original" "baseline" "1.0"
-
-# ── Step 1: V1 — first ratio also computes & saves profiling_mat ───────────────
-echo "=== Compress V1 ratio=0.2 (保存率=0.8) + profiling_mat ==="
-python SVDLLM.py --model "$MODEL" --step 1 --ratio 0.2 \
-    --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN $TOKEN_ARG \
-    2>&1 | tee logs/${MODEL_TAG}_v1_0.8.log
-
-for RATIO in 0.3 0.4 0.5 0.6; do
-    KEEP=$(keep_csv $RATIO)
-    echo "=== Compress V1 ratio=$RATIO (保存率=$KEEP) ==="
-    python SVDLLM.py --model "$MODEL" --step 1 --ratio $RATIO \
-        --profiling_mat_path "$PROF_MAT" \
-        --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN $TOKEN_ARG \
-        2>&1 | tee logs/${MODEL_TAG}_v1_${KEEP}.log
+# ── Step 1: V1 (skip if checkpoints already exist) ────────────────────────────
+for RATIO in 0.2 0.3 0.4 0.5 0.6; do
+    KEEP_FILE=$(keep_file $RATIO)
+    CKPT="$SAVE_DIR/${MODEL_PREFIX}_whitening_only_${KEEP_FILE}.pt"
+    if [ -f "$CKPT" ]; then
+        echo "=== V1 checkpoint exists, skipping: $CKPT ==="
+    else
+        KEEP=$(keep_csv $RATIO)
+        echo "=== Compress V1 ratio=$RATIO (保存率=$KEEP) ==="
+        PROF_ARG=""
+        [ -f "$PROF_MAT" ] && PROF_ARG="--profiling_mat_path $PROF_MAT"
+        python SVDLLM.py --model "$MODEL" --step 1 --ratio $RATIO \
+            $PROF_ARG \
+            --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN $TOKEN_ARG \
+            2>&1 | tee logs/${MODEL_TAG}_v1_${KEEP}.log
+    fi
 done
 
 # ── Step 2: V2 ────────────────────────────────────────────────────────────────
