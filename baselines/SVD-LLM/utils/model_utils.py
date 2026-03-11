@@ -233,6 +233,49 @@ def _looks_like_flashsvd_checkpoint(path: Path) -> bool:
     )
 
 
+def _inject_pickle_shims():
+    """Inject sys.modules shims for transformers modules that moved between versions.
+
+    Checkpoints pickled with older transformers reference full module paths
+    (e.g. transformers.models.llama.tokenization_llama_fast).  If those paths
+    no longer exist in the installed version, unpickling raises ModuleNotFoundError.
+    We redirect each old path to wherever the class now lives.
+    """
+    import sys
+    import types
+
+    _SHIM_MAP = {
+        # transformers >=4.44 removed the per-model tokenizer_fast sub-modules;
+        # classes moved to transformers.models.llama (re-exported from the package).
+        "transformers.models.llama.tokenization_llama_fast": (
+            "transformers.models.llama",
+            ["LlamaTokenizerFast"],
+        ),
+        "transformers.models.llama.tokenization_llama": (
+            "transformers.models.llama",
+            ["LlamaTokenizer"],
+        ),
+        "transformers.models.mistral.tokenization_mistral_fast": (
+            "transformers.models.mistral",
+            ["MistralTokenizerFast"],
+        ),
+    }
+
+    for old_path, (new_mod_path, attrs) in _SHIM_MAP.items():
+        if old_path in sys.modules:
+            continue
+        try:
+            new_mod = __import__(new_mod_path, fromlist=attrs)
+        except ImportError:
+            continue
+        shim = types.ModuleType(old_path)
+        for attr in attrs:
+            obj = getattr(new_mod, attr, None)
+            if obj is not None:
+                setattr(shim, attr, obj)
+        sys.modules[old_path] = shim
+
+
 def _torch_load_local_checkpoint(path: Path):
     """Load a local torch checkpoint, handling PyTorch>=2.6 weights_only default.
 
@@ -269,4 +312,7 @@ def _torch_load_local_checkpoint(path: Path):
             ) from e
 
         # Trusted fallback: allow pickled model/tokenizer objects.
+        # Older checkpoints were pickled with transformers modules that may have moved
+        # in newer versions.  Inject sys.modules shims so unpickling still works.
+        _inject_pickle_shims()
         return _load(weights_only=False)

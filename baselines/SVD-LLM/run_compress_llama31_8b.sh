@@ -122,14 +122,20 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     fi
 done
 
-# ── Step 2: V2 ────────────────────────────────────────────────────────────────
+# ── Step 2: V2 (skip if checkpoint already exists) ───────────────────────────
 for RATIO in 0.2 0.3 0.4 0.5 0.6; do
-    KEEP=$(keep_csv $RATIO)
-    echo "=== Compress V2 ratio=$RATIO (保存率=$KEEP) ==="
-    python SVDLLM.py --model "$MODEL" --step 2 --ratio $RATIO \
-        --profiling_mat_path "$PROF_MAT" \
-        --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN $TOKEN_ARG \
-        2>&1 | tee logs/${MODEL_TAG}_v2_${KEEP}.log
+    KEEP_FILE=$(keep_file $RATIO)
+    CKPT="$SAVE_DIR/${MODEL_PREFIX}_whitening_then_update_${KEEP_FILE}.pt"
+    if [ -f "$CKPT" ]; then
+        echo "=== V2 checkpoint exists, skipping: $CKPT ==="
+    else
+        KEEP=$(keep_csv $RATIO)
+        echo "=== Compress V2 ratio=$RATIO (保存率=$KEEP) ==="
+        python SVDLLM.py --model "$MODEL" --step 2 --ratio $RATIO \
+            --profiling_mat_path "$PROF_MAT" \
+            --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN $TOKEN_ARG \
+            2>&1 | tee logs/${MODEL_TAG}_v2_${KEEP}.log
+    fi
 done
 
 # ── Eval all checkpoints (PPL + decode speed) ─────────────────────────────────
