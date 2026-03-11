@@ -148,6 +148,32 @@ def _perf_record_stage(timing: dict, name: str, fn, *args, **kwargs):
     return out
 
 
+def _perf_best_effort_torch_save(timing: dict, stage_name: str, obj, path: str, required: bool = False) -> bool:
+    """Try to torch.save and optionally continue on failure.
+
+    This is mainly used for large optional artifacts like profiling matrices.
+    If saving fails (for example due to ENOSPC), remove the partial file,
+    record a warning in timing, and continue unless required=True.
+    """
+    try:
+        _perf_record_stage(timing, stage_name, torch.save, obj, path)
+        return True
+    except Exception as e:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+        msg = f"{type(e).__name__}: {e}"
+        print(f"[Warn] Failed to save optional artifact {path}: {msg}")
+        timing.setdefault("warnings", []).append(
+            {"stage": str(stage_name), "path": str(path), "error": msg}
+        )
+        if required:
+            raise
+        return False
+
+
 
 def _safe_cholesky_spd(mat: torch.Tensor, base_eps: float = 1e-6, max_tries: int = 10) -> torch.Tensor:
     """
@@ -1079,6 +1105,7 @@ if __name__ == '__main__':
     # Instrumentation outputs
     parser.add_argument('--timing_dir', type=str, default=None, help='Directory to write timing json (defaults to --save_path if set, else ./output).')
     parser.add_argument('--timing_file', type=str, default='svdllm_timing.json', help='Filename for timing json written under --timing_dir.')
+    parser.add_argument('--skip_profiling_save', action='store_true', help='Do not save the large profiling_mat artifact; still saves the final checkpoint.')
 
     args = parser.parse_args()
 
@@ -1135,13 +1162,13 @@ if __name__ == '__main__':
                 profiling_mat = _perf_record_stage(
                     timing, "profile_whitening_matrix", profle_svdllm_low_resource, args.model, model, cali_white_data, args.DEV
                 )
-                if args.save_path is not None:
+                if args.save_path is not None and not args.skip_profiling_save:
                     prof_path = (
                         args.save_path + "/" + args.model.replace("/", "_").replace("-", "_")
                         + '_profiling_' + args.dataset + '_' + str(args.whitening_nsamples) + '_' + str(args.seed) + '.pt'
                     )
-                    _perf_record_stage(timing, "save_profiling_mat", torch.save, profiling_mat, prof_path)
-                    timing["paths"]["profiling_mat"] = prof_path
+                    if _perf_best_effort_torch_save(timing, "save_profiling_mat", profiling_mat, prof_path, required=False):
+                        timing["paths"]["profiling_mat"] = prof_path
             else:
                 profiling_mat = _perf_record_stage(timing, "load_profiling_mat", torch.load, args.profiling_mat_path)
                 timing["paths"]["profiling_mat"] = args.profiling_mat_path
@@ -1153,7 +1180,7 @@ if __name__ == '__main__':
                 ckpt_path = (
                     args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_whitening_only_' + str(args.ratio) + '.pt'
                 )
-                _perf_record_stage(timing, "save_checkpoint", torch.save, {'model': model, 'tokenizer': tokenizer}, ckpt_path)
+                _perf_record_stage(timing, "save_checkpoint", torch.save, {'model': model, 'tokenizer': tokenizer, 'base_model': args.model, 'tokenizer_model': args.model}, ckpt_path)
                 timing["paths"]["checkpoint"] = ckpt_path
 
         elif args.step == 2:
@@ -1189,13 +1216,13 @@ if __name__ == '__main__':
                 profiling_mat = _perf_record_stage(
                     timing, "profile_whitening_matrix", profle_svdllm_low_resource, args.model, model, cali_white_data, args.DEV
                 )
-                if args.save_path is not None:
+                if args.save_path is not None and not args.skip_profiling_save:
                     prof_path = (
                         args.save_path + "/" + args.model.replace("/", "_").replace("-", "_")
                         + '_profiling_' + args.dataset + '_' + str(args.whitening_nsamples) + '_' + str(args.seed) + '.pt'
                     )
-                    _perf_record_stage(timing, "save_profiling_mat", torch.save, profiling_mat, prof_path)
-                    timing["paths"]["profiling_mat"] = prof_path
+                    if _perf_best_effort_torch_save(timing, "save_profiling_mat", profiling_mat, prof_path, required=False):
+                        timing["paths"]["profiling_mat"] = prof_path
             else:
                 profiling_mat = _perf_record_stage(timing, "load_profiling_mat", torch.load, args.profiling_mat_path)
                 timing["paths"]["profiling_mat"] = args.profiling_mat_path
@@ -1209,7 +1236,7 @@ if __name__ == '__main__':
                 ckpt_path = (
                     args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_whitening_then_update_' + str(args.ratio) + '.pt'
                 )
-                _perf_record_stage(timing, "save_checkpoint", torch.save, {'model': model, 'tokenizer': tokenizer}, ckpt_path)
+                _perf_record_stage(timing, "save_checkpoint", torch.save, {'model': model, 'tokenizer': tokenizer, 'base_model': args.model, 'tokenizer_model': args.model}, ckpt_path)
                 timing["paths"]["checkpoint"] = ckpt_path
 
         elif args.step == 3:
@@ -1249,7 +1276,7 @@ if __name__ == '__main__':
                 ckpt_path = (
                     args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_update_only_' + str(args.ratio) + '.pt'
                 )
-                _perf_record_stage(timing, "save_checkpoint", torch.save, {'model': model, 'tokenizer': tokenizer}, ckpt_path)
+                _perf_record_stage(timing, "save_checkpoint", torch.save, {'model': model, 'tokenizer': tokenizer, 'base_model': args.model, 'tokenizer_model': args.model}, ckpt_path)
                 timing["paths"]["checkpoint"] = ckpt_path
 
         elif args.step >= 4:
@@ -1272,7 +1299,7 @@ if __name__ == '__main__':
                         torch_dtype=torch.float16,
                     )
                     model = _perf_record_stage(timing, "merge_lora", model.merge_and_unload)
-                    _perf_record_stage(timing, "save_lora_merged", torch.save, {'model': model, 'tokenizer': tokenizer}, args.lora + '/merge.pt')
+                    _perf_record_stage(timing, "save_lora_merged", torch.save, {'model': model, 'tokenizer': tokenizer, 'base_model': args.model, 'tokenizer_model': args.model}, args.lora + '/merge.pt')
                     timing["paths"]["lora_merged"] = args.lora + '/merge.pt'
 
             model.eval()

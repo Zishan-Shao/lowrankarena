@@ -26,7 +26,7 @@ CUDA_VISIBLE_DEVICES=${GPU} python -m eval_results.eval_benchmarks \
   --output_json outputs/asvd/smoke/jeffwan_llama-7b-hf_asvd40_smoke_lm_eval.json
 
 # smoke ppl
-CUDA_VISIBLE_DEVICES=${GPU} python -m baselines.ASVD.eval_ASVD_ppl_with_json \
+CUDA_VISIBLE_DEVICES=${GPU} python -m eval_results.eval_general_ppl \
   --checkpoint ${SMOKE_MODEL} \
   --datasets wikitext2 \
   --max_batches 2 \
@@ -37,7 +37,7 @@ CUDA_VISIBLE_DEVICES=${GPU} python -m baselines.ASVD.eval_ASVD_ppl_with_json \
   --output_json outputs/asvd/smoke/jeffwan_llama-7b-hf_asvd40_smoke_ppl.json
 
 # smoke linguistic eval
-CUDA_VISIBLE_DEVICES=${GPU} python -m baselines.ASVD.eval_ASVD_linguistic_tasks_with_json \
+CUDA_VISIBLE_DEVICES=${GPU} python -m eval_results.eval_linguistic_tasks \
   --model ${SMOKE_MODEL} \
   --trust_remote_code \
   --tasks blimp \

@@ -2,14 +2,14 @@
 set -euo pipefail
 
 # run from repo root:
-# bash baselines/SVD-LLM/eval_SVD_LLM.sh
+# bash baselines/SVD-LLM/eval_SVD_LLMv2.sh
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 
 export PYTHONPATH="${REPO_ROOT}/baselines/SVD-LLM:${PYTHONPATH:-}"
 
-mkdir -p outputs/svdllm
+mkdir -p outputs/svdllmv2
 
 LM_EVAL_TASKS=openbookqa,arc_easy,arc_challenge,winogrande,hellaswag,piqa,mathqa,truthfulqa_mc1
 PPL_DATASETS=wikitext2,ptb,c4
@@ -32,9 +32,9 @@ GPU_BENCH_30B=0
 GPU_PPL_30B=0
 GPU_LING_30B=0
 
-SVDLLM_MODEL_7B=baselines/SVD-LLM/checkpoints/jeffwan_llama_7b_hf_whitening_only_0.4.pt
-SVDLLM_MODEL_13B=baselines/SVD-LLM/checkpoints/jeffwan_llama_13b_hf_whitening_only_0.4.pt
-SVDLLM_MODEL_30B=baselines/SVD-LLM/checkpoints/jeffwan_llama_30b_hf_whitening_only_0.4.pt
+SVDLLMV2_MODEL_7B=baselines/SVD-LLM/checkpoints/jeffwan_llama_7b_hf_svdllmv2_keep0.4.pt
+SVDLLMV2_MODEL_13B=baselines/SVD-LLM/checkpoints/jeffwan_llama_13b_hf_svdllmv2_keep0.4.pt
+SVDLLMV2_MODEL_30B=baselines/SVD-LLM/checkpoints/jeffwan_llama_30b_hf_svdllmv2_keep0.4.pt
 
 run_eval() {
   local gpu_bench="$1"
@@ -57,7 +57,7 @@ run_eval() {
     --lm_eval_max_length "${SEQ_LEN}" \
     --force_right_padding \
     --fix_pad_query_mask \
-    --output_json "outputs/svdllm/${output_tag}_lm_eval.json"
+    --output_json "outputs/svdllmv2/${output_tag}_lm_eval.json"
 
   CUDA_VISIBLE_DEVICES="${gpu_ppl}" python baselines/SVD-LLM/eval_SVDLLM_ppl.py \
     --checkpoint "${checkpoint}" \
@@ -68,7 +68,7 @@ run_eval() {
     --batch_size "${BATCH_SIZE}" \
     --device "${DEVICE}" \
     --dtype "${DTYPE}" \
-    --output_json "outputs/svdllm/${output_tag}_ppl.json"
+    --output_json "outputs/svdllmv2/${output_tag}_ppl.json"
 
   CUDA_VISIBLE_DEVICES="${gpu_ling}" python baselines/SVD-LLM/eval_SVDLLM_linguistic.py \
     --checkpoint "${checkpoint}" \
@@ -77,20 +77,20 @@ run_eval() {
     --batch_size "${BATCH_SIZE}" \
     --device "${DEVICE}" \
     --dtype "${LING_DTYPE}" \
-    --output_json "outputs/svdllm/${output_tag}_ling.json"
+    --output_json "outputs/svdllmv2/${output_tag}_ling.json"
 }
 
 # jeffwan llama-7b-hf, keep ratio ~= 0.4
 run_eval \
   "${GPU_BENCH_7B}" "${GPU_PPL_7B}" "${GPU_LING_7B}" \
-  "${SVDLLM_MODEL_7B}" jeffwan/llama-7b-hf jeffwan_llama-7b-hf_svdllm40
+  "${SVDLLMV2_MODEL_7B}" jeffwan/llama-7b-hf jeffwan_llama-7b-hf_svdllmv240
 
 # jeffwan llama-13b-hf, keep ratio ~= 0.4
 run_eval \
   "${GPU_BENCH_13B}" "${GPU_PPL_13B}" "${GPU_LING_13B}" \
-  "${SVDLLM_MODEL_13B}" jeffwan/llama-13b-hf jeffwan_llama-13b-hf_svdllm40
+  "${SVDLLMV2_MODEL_13B}" jeffwan/llama-13b-hf jeffwan_llama-13b-hf_svdllmv240
 
 # jeffwan llama-30b-hf, keep ratio ~= 0.4
 run_eval \
   "${GPU_BENCH_30B}" "${GPU_PPL_30B}" "${GPU_LING_30B}" \
-  "${SVDLLM_MODEL_30B}" jeffwan/llama-30b-hf jeffwan_llama-30b-hf_svdllm40
+  "${SVDLLMV2_MODEL_30B}" jeffwan/llama-30b-hf jeffwan_llama-30b-hf_svdllmv240

@@ -395,6 +395,59 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
+
+
+def _looks_like_svdllm_checkpoint(path: Optional[str]) -> bool:
+    if not path:
+        return False
+    p = str(path)
+    lower = p.lower()
+    base = os.path.basename(lower)
+    return (
+        "svd-llm" in lower
+        or "svdllm" in lower
+        or "whitening_only" in base
+        or "_update_" in base
+        or "_profiling_" in base
+    )
+
+
+def _load_svdllm_model_utils():
+    svdllm_root = os.path.join(_REPO_ROOT, "baselines", "SVD-LLM")
+    mod_path = os.path.join(svdllm_root, "utils", "model_utils.py")
+    if not os.path.exists(mod_path):
+        raise FileNotFoundError(f"SVD-LLM model_utils not found: {mod_path}")
+    if svdllm_root not in sys.path:
+        sys.path.insert(0, svdllm_root)
+    module_name = "_svdllm_model_utils_local"
+    mod = sys.modules.get(module_name)
+    if mod is not None:
+        return mod
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(module_name, mod_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Failed to load SVD-LLM model_utils from {mod_path}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _load_svdllm_checkpoint(ckpt_or_dir: str, hf_token: Optional[str] = None):
+    return _load_svdllm_model_utils().get_model_from_local(ckpt_or_dir, hf_token=hf_token)
+
+
+def _tokenizer_usable(tokenizer) -> bool:
+    if tokenizer is None or isinstance(tokenizer, bool):
+        return False
+    if callable(tokenizer):
+        return True
+    return (
+        hasattr(tokenizer, "encode") and hasattr(tokenizer, "decode")
+    ) or (
+        hasattr(tokenizer, "pad_token_id") and hasattr(tokenizer, "eos_token_id")
+    )
+
 from utils.model_utils import get_model_from_local, get_model_from_huggingface
 from utils.saes_svd_loader import looks_like_saes_svd_checkpoint, load_saes_svd_model
 from utils.df_svd_loader import looks_like_dfsvd_checkpoint, load_dfsvd_model
@@ -1046,7 +1099,16 @@ def main() -> None:
     def _load_ours(ckpt_or_dir: str):
         # 1) Repo checkpoint (.pt) saved by this repo
         if ckpt_or_dir.endswith(".pt") and os.path.isfile(ckpt_or_dir):
-            return get_model_from_local(ckpt_or_dir)
+            if _looks_like_svdllm_checkpoint(ckpt_or_dir):
+                try:
+                    return _load_svdllm_checkpoint(ckpt_or_dir, hf_token=args.hf_token)
+                except Exception as e:
+                    print(f"[Warn] SVD-LLM checkpoint loader failed for {ckpt_or_dir}; falling back to generic loader: {e}")
+            model, tokenizer = get_model_from_local(ckpt_or_dir)
+            if _looks_like_svdllm_checkpoint(ckpt_or_dir) and not _tokenizer_usable(tokenizer):
+                print("[Warn] Generic loader returned a non-usable tokenizer; retrying with SVD-LLM loader.")
+                model, tokenizer = _load_svdllm_checkpoint(ckpt_or_dir, hf_token=args.hf_token)
+            return model, tokenizer
 
         # 2) Local SAES-SVD dir (contains saes_manifest.json + saes_state.pt)
         if os.path.isdir(ckpt_or_dir) and looks_like_saes_svd_checkpoint(ckpt_or_dir):
