@@ -104,6 +104,43 @@ def ensure_transformers_layer_idx(model: nn.Module) -> None:
         return
 
 
+def _ensure_inline_rotary_emb(llama_model: nn.Module, config) -> None:
+    """Attach a minimal rotary-embedding module when the HF class cannot be instantiated.
+
+    Returns (cos, sin) tensors of shape [B, 1, S, head_dim] to match the
+    position_embeddings contract used by transformers>=4.43 LlamaAttention.
+    """
+    head_dim = getattr(config, "head_dim",
+                       config.hidden_size // config.num_attention_heads)
+    rope_theta = float(getattr(config, "rope_theta", 10000.0))
+    max_pos = int(getattr(config, "max_position_embeddings", 4096))
+
+    class _InlineRoPE(nn.Module):
+        def __init__(self):
+            super().__init__()
+            inv = 1.0 / (rope_theta ** (
+                torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim
+            ))
+            self.register_buffer("inv_freq", inv, persistent=False)
+            self.rope_type = "default"  # sentinel so compat check passes
+
+        def forward(self, x, position_ids=None, seq_len=None):
+            device = x.device
+            if position_ids is None:
+                s = x.shape[1] if x.dim() >= 2 else (seq_len or max_pos)
+                position_ids = torch.arange(s, device=device).unsqueeze(0)
+            inv = self.inv_freq.to(device=device, dtype=torch.float32)
+            # [B, S, head_dim//2]
+            freqs = torch.einsum("bi,j->bij", position_ids.float(), inv)
+            emb = torch.cat([freqs, freqs], dim=-1)          # [B, S, head_dim]
+            cos = emb.cos()[:, None, :, :]                   # [B, 1, S, head_dim]
+            sin = emb.sin()[:, None, :, :]
+            return cos.to(x.dtype), sin.to(x.dtype)
+
+    llama_model.rotary_emb = _InlineRoPE()
+    print("[compat] Attached inline RoPE fallback to LlamaModel")
+
+
 def ensure_model_level_rotary_emb(model: nn.Module) -> None:
     """Patch old pickled LlamaForCausalLM for transformers>=4.43/4.48 compatibility.
 
@@ -123,10 +160,30 @@ def ensure_model_level_rotary_emb(model: nn.Module) -> None:
         if existing_rope is None or not hasattr(existing_rope, "rope_type"):
             try:
                 from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
+                # transformers>=4.50: LlamaRotaryEmbedding reads config.rope_parameters
+                # which is not present on old pickled configs.  Pre-populate it via
+                # ROPE_INIT_FUNCTIONS so the constructor succeeds.
+                if not hasattr(config, "rope_parameters"):
+                    try:
+                        from transformers.models.llama.modeling_llama import ROPE_INIT_FUNCTIONS
+                        rope_type = "default"
+                        if hasattr(config, "rope_scaling") and config.rope_scaling:
+                            rope_type = (
+                                config.rope_scaling.get("rope_type")
+                                or config.rope_scaling.get("type")
+                                or "default"
+                            )
+                        inv_freq, attn_factor = ROPE_INIT_FUNCTIONS[rope_type](config, device=None)
+                        config.rope_parameters = (inv_freq, attn_factor)
+                    except Exception:
+                        pass
                 llama_model.rotary_emb = LlamaRotaryEmbedding(config=config)
                 print("[compat] Created fresh model-level LlamaRotaryEmbedding from config")
             except Exception as e:
                 print(f"[compat] Could not create LlamaRotaryEmbedding: {e}")
+                # Last-resort: inline implementation that produces (cos, sin) matching the
+                # shape expected by LlamaAttention.forward in transformers 4.43+.
+                _ensure_inline_rotary_emb(llama_model, config)
 
         # ── 2. Per-attention-layer missing attributes ───────────────────────────
         import math
