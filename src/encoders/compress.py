@@ -606,7 +606,21 @@ def _data_aware_low_rank(W: torch.Tensor, rank: int, cov_in: torch.Tensor):
     Wf, Cf = W.float(), cov_in.float()
     S = _safe_cholesky(Cf)
     A = Wf.t().contiguous() @ S
-    U, s, Vh = torch.linalg.svd(A, full_matrices=False)
+    try:
+        U, s, Vh = torch.linalg.svd(A, full_matrices=False)
+    except torch._C._LinAlgError:
+        # Ill-conditioned matrix: fall back to Jacobi driver (slower but more stable)
+        try:
+            U, s, Vh = torch.linalg.svd(A, full_matrices=False, driver="gesvd")
+        except (torch._C._LinAlgError, Exception):
+            # Last resort: add small ridge to A^T A before SVD
+            ridge = 1e-4 * float(A.norm()) + 1e-8
+            AtA = A.t() @ A + ridge * torch.eye(A.shape[1], dtype=A.dtype, device=A.device)
+            s2, Vh2 = torch.linalg.eigh(AtA)
+            s2 = torch.clamp(s2, min=0)
+            s = torch.sqrt(s2.flip(0))
+            Vh = Vh2.t().flip(0)
+            U = A @ Vh.t() / (s.unsqueeze(0) + 1e-12)
     V = Vh.t()
     k = min(rank, s.numel())
     X = torch.linalg.solve_triangular(S.t(), V[:, :k], upper=True)
