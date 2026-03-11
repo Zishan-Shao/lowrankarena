@@ -45,6 +45,46 @@ def load_base_tokenizer(model_id: str, lower_id: str):
     return tokenizer
 
 
+
+
+
+def _write_dobi_sidecar(output_dir: Path, model, tokenizer, *, model_id: str, remapping: bool, target_compression_ratio: float):
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir_str = str(output_dir)
+
+    try:
+        model.config._name_or_path = output_dir_str
+    except Exception:
+        pass
+    try:
+        model.name_or_path = output_dir_str
+    except Exception:
+        pass
+
+    try:
+        model.config.save_pretrained(output_dir_str)
+    except Exception as e:
+        print(f"[Warn] Failed to save config into {output_dir_str}: {e}")
+
+    try:
+        tokenizer.save_pretrained(output_dir_str)
+    except Exception as e:
+        print(f"[Warn] Failed to save tokenizer into {output_dir_str}: {e}")
+
+    meta = {
+        "base_model_id": model_id,
+        "tokenizer_hint": output_dir_str,
+        "remapping": bool(remapping),
+        "target_compression_ratio": float(target_compression_ratio),
+    }
+    try:
+        with open(output_dir / "dobi_metadata.json", "w") as f:
+            json.dump(meta, f, indent=2)
+    except Exception as e:
+        print(f"[Warn] Failed to write dobi_metadata.json into {output_dir_str}: {e}")
+
+
 def main(args):
     # setting random seed of numpy and torch
     SEED = args.seed
@@ -264,6 +304,7 @@ def main(args):
                 del module
             
         
+        _write_dobi_sidecar(output_dir, model, tokenizer, model_id=model_id, remapping=False, target_compression_ratio=target_compression_ratio)
         torch.save({'model': model, 'tokenizer': tokenizer}, output_save_path)
         
     if args.remapping:
@@ -295,8 +336,7 @@ def main(args):
                 pass
             else:
                 new_sd[k] = v
-        model.config.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir) 
+        _write_dobi_sidecar(output_dir, model, tokenizer, model_id=model_id, remapping=True, target_compression_ratio=target_compression_ratio)
         torch.save(new_sd, f"{output_dir}/pytorch_model.bin")
         
     print("done")

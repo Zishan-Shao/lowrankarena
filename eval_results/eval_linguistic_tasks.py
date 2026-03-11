@@ -186,59 +186,6 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
-
-
-def _looks_like_svdllm_checkpoint(path: Optional[str]) -> bool:
-    if not path:
-        return False
-    p = str(path)
-    lower = p.lower()
-    base = os.path.basename(lower)
-    return (
-        "svd-llm" in lower
-        or "svdllm" in lower
-        or "whitening_only" in base
-        or "_update_" in base
-        or "_profiling_" in base
-    )
-
-
-def _load_svdllm_model_utils():
-    svdllm_root = os.path.join(_REPO_ROOT, "baselines", "SVD-LLM")
-    mod_path = os.path.join(svdllm_root, "utils", "model_utils.py")
-    if not os.path.exists(mod_path):
-        raise FileNotFoundError(f"SVD-LLM model_utils not found: {mod_path}")
-    if svdllm_root not in sys.path:
-        sys.path.insert(0, svdllm_root)
-    module_name = "_svdllm_model_utils_local"
-    mod = sys.modules.get(module_name)
-    if mod is not None:
-        return mod
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(module_name, mod_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Failed to load SVD-LLM model_utils from {mod_path}")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def _load_svdllm_checkpoint(ckpt_or_dir: str, hf_token: Optional[str] = None):
-    return _load_svdllm_model_utils().get_model_from_local(ckpt_or_dir, hf_token=hf_token)
-
-
-def _tokenizer_usable(tokenizer) -> bool:
-    if tokenizer is None or isinstance(tokenizer, bool):
-        return False
-    if callable(tokenizer):
-        return True
-    return (
-        hasattr(tokenizer, "encode") and hasattr(tokenizer, "decode")
-    ) or (
-        hasattr(tokenizer, "pad_token_id") and hasattr(tokenizer, "eos_token_id")
-    )
-
 _LM_EVAL_ROOT = os.path.join(_REPO_ROOT, "lm-evaluation-harness")
 if os.path.isdir(_LM_EVAL_ROOT) and _LM_EVAL_ROOT not in sys.path:
     sys.path.insert(0, _LM_EVAL_ROOT)
@@ -613,6 +560,41 @@ def _to_device(model: torch.nn.Module, device: str, dtype: Optional[str]) -> tor
     return model.to(device)
 
 
+
+
+
+def _normalize_tokenizer_hint(tokenizer_hint: Optional[str]) -> Optional[str]:
+    if tokenizer_hint is None:
+        return None
+    try:
+        hint = str(tokenizer_hint).strip()
+    except Exception:
+        return None
+    if not hint:
+        return None
+    if os.path.isfile(hint):
+        hint = os.path.dirname(hint)
+    return hint
+
+
+def _resolve_hflm_tokenizer_arg(model, tokenizer, tokenizer_override: Optional[str] = None):
+    override = _normalize_tokenizer_hint(os.getenv("SVDLLM_TOKENIZER_MODEL", "").strip()) or _normalize_tokenizer_hint(tokenizer_override)
+    if override:
+        return override
+
+    try:
+        import transformers
+        if isinstance(tokenizer, (transformers.PreTrainedTokenizer, transformers.PreTrainedTokenizerFast)):
+            return tokenizer
+    except Exception:
+        pass
+
+    try:
+        hint = _normalize_tokenizer_hint(getattr(getattr(model, "config", None), "_name_or_path", None) or getattr(model, "name_or_path", None))
+    except Exception:
+        hint = None
+    return hint
+
 def _resolve_dobi_path(model_id: str, hf_token: Optional[str], revision: Optional[str], cache_dir: Optional[str]) -> str:
     if os.path.isdir(model_id):
         return model_id
@@ -651,6 +633,14 @@ def _load_dobi_model(
         model, tokenizer = load_remapping_model(local_path)
     else:
         model, tokenizer = load_unremapping_model(local_path)
+    try:
+        model.config._name_or_path = local_path
+    except Exception:
+        pass
+    try:
+        model.name_or_path = local_path
+    except Exception:
+        pass
     return model, tokenizer, local_path
 
 
@@ -1052,17 +1042,7 @@ def main() -> None:
                     )
                 model_name = args.model
             else:
-                if _looks_like_svdllm_checkpoint(args.checkpoint):
-                    try:
-                        model, tokenizer = _load_svdllm_checkpoint(args.checkpoint, hf_token=args.hf_token)
-                    except Exception as e:
-                        print(f"[Warn] SVD-LLM checkpoint loader failed for {args.checkpoint}; falling back to generic loader: {e}")
-                        model, tokenizer = get_model_from_local(args.checkpoint)
-                        if not _tokenizer_usable(tokenizer):
-                            print("[Warn] Generic loader returned a non-usable tokenizer; retrying with SVD-LLM loader.")
-                            model, tokenizer = _load_svdllm_checkpoint(args.checkpoint, hf_token=args.hf_token)
-                else:
-                    model, tokenizer = get_model_from_local(args.checkpoint)
+                model, tokenizer = get_model_from_local(args.checkpoint)
                 model_name = args.checkpoint
 
         model = _to_device(model, args.device, args.dtype)
@@ -1081,9 +1061,10 @@ def main() -> None:
         raise RuntimeError(f"lm-eval harness is required: {e}")
 
     tasks = _parse_tasks(args.tasks)
+    lm_tokenizer = _resolve_hflm_tokenizer_arg(model, tokenizer, tokenizer_override=args.tokenizer)
     lm = HFLM(
         pretrained=model,
-        tokenizer=tokenizer,
+        tokenizer=lm_tokenizer,
         device=args.device,
         batch_size=args.batch_size,
         max_batch_size=64,

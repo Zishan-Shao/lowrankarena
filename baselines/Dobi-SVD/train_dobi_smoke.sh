@@ -1,10 +1,11 @@
 #!/bin/bash
+set -euo pipefail
 
 # run from repo root:
 # bash baselines/Dobi-SVD/train_dobi_smoke.sh
 #
-# smoke version for jeffwan llama-7b-hf, 40% params.
-# this uses a separate output root so it does not overwrite the full run.
+# Smoke version for jeffwan llama-7b-hf, 40% params.
+# This trains the UNREMAPPING variant.
 
 RESULTS_DIR=baselines/Dobi-SVD/results_smoke
 TARGET_RATIO=0.4
@@ -14,7 +15,7 @@ TRAINING_DATASET=wikitext2
 N_TRAIN_EPOCHS=1
 N_TRAIN_SAMPLES=8
 N_EVAL_SAMPLES=8
-GPU=5
+GPU=0
 
 CUDA_VISIBLE_DEVICES=${GPU} python baselines/Dobi-SVD/svd_trainer.py \
   --model_id jeffwan/llama-7b-hf \
@@ -26,10 +27,11 @@ CUDA_VISIBLE_DEVICES=${GPU} python baselines/Dobi-SVD/svd_trainer.py \
   --n_train_samples ${N_TRAIN_SAMPLES} \
   --n_eval_samples ${N_EVAL_SAMPLES} \
   --path_head_folder baselines/Dobi-SVD \
-  --path_head_folder_output ${RESULTS_DIR} \
-  --remapping
+  --path_head_folder_output ${RESULTS_DIR}
 
-TRAINING_RESULT_PATH=$(basename "$(ls -td ${RESULTS_DIR}/training_output/llama-7b-hf/Diff-Remapping-0.4_${TRAINING_DATASET}_${SEQ_LEN}_* | head -n 1)")
+TRAINING_RESULT_PATH=$(basename "$(ls -td ${RESULTS_DIR}/training_output/llama-7b-hf/Diff-Noremapping-${TARGET_RATIO}_${TRAINING_DATASET}_${SEQ_LEN}_* | head -n 1)")
+
+
 CUDA_VISIBLE_DEVICES=${GPU} python baselines/Dobi-SVD/weight_updater.py \
   --model_id jeffwan/llama-7b-hf \
   --training_result_path ${TRAINING_RESULT_PATH} \
@@ -38,5 +40,4 @@ CUDA_VISIBLE_DEVICES=${GPU} python baselines/Dobi-SVD/weight_updater.py \
   --n_eval_samples ${N_EVAL_SAMPLES} \
   --training_dataset ${TRAINING_DATASET} \
   --path_head_folder baselines/Dobi-SVD \
-  --path_head_folder_output ${RESULTS_DIR} \
-  --remapping
+  --path_head_folder_output ${RESULTS_DIR}

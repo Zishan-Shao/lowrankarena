@@ -11,7 +11,7 @@ DEVICE=cuda
 DTYPE=bfloat16
 LING_DTYPE=fp16
 BATCH_SIZE=1
-GPU=5
+GPU=2
 
 # smoke lm-eval
 CUDA_VISIBLE_DEVICES=${GPU} python -m eval_results.eval_benchmarks \

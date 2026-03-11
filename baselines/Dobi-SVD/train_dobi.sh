@@ -1,10 +1,11 @@
 #!/bin/bash
+set -euo pipefail
 
 # run from repo root:
 # bash baselines/Dobi-SVD/train_dobi.sh
 #
-# these commands use the remapping version.
-# if you want the non-remapping version, remove --remapping and update the folder names.
+# This trains the UNREMAPPING variant.
+# It intentionally does NOT pass --remapping.
 
 RESULTS_DIR=baselines/Dobi-SVD/results
 TARGET_RATIO=0.4
@@ -19,7 +20,7 @@ GPU_7B=0
 GPU_13B=0
 GPU_30B=0
 
-# jeffwan llama-7b-hf, 40% params
+# 7B
 CUDA_VISIBLE_DEVICES=${GPU_7B} python baselines/Dobi-SVD/svd_trainer.py \
   --model_id jeffwan/llama-7b-hf \
   --target_ratio ${TARGET_RATIO} \
@@ -30,10 +31,14 @@ CUDA_VISIBLE_DEVICES=${GPU_7B} python baselines/Dobi-SVD/svd_trainer.py \
   --n_train_samples ${N_TRAIN_SAMPLES} \
   --n_eval_samples ${N_EVAL_SAMPLES} \
   --path_head_folder baselines/Dobi-SVD \
-  --path_head_folder_output ${RESULTS_DIR} \
-  --remapping
+  --path_head_folder_output ${RESULTS_DIR}
 
-TRAINING_RESULT_PATH_7B=$(basename "$(ls -td ${RESULTS_DIR}/training_output/llama-7b-hf/Diff-Remapping-0.4_${TRAINING_DATASET}_${SEQ_LEN}_* | head -n 1)")
+TRAINING_RESULT_PATH_7B=$(basename "$(ls -td ${RESULTS_DIR}/training_output/llama-7b-hf/Diff-Noremapping-${TARGET_RATIO}_${TRAINING_DATASET}_${SEQ_LEN}_* | head -n 1)")
+if [[ -z "${TRAINING_RESULT_PATH_7B}" ]]; then
+  echo "[ERROR] Could not find the latest 7B Diff-Noremapping run under ${RESULTS_DIR}/training_output/llama-7b-hf" >&2
+  exit 1
+fi
+
 CUDA_VISIBLE_DEVICES=${GPU_7B} python baselines/Dobi-SVD/weight_updater.py \
   --model_id jeffwan/llama-7b-hf \
   --training_result_path ${TRAINING_RESULT_PATH_7B} \
@@ -42,10 +47,9 @@ CUDA_VISIBLE_DEVICES=${GPU_7B} python baselines/Dobi-SVD/weight_updater.py \
   --n_eval_samples ${N_EVAL_SAMPLES} \
   --training_dataset ${TRAINING_DATASET} \
   --path_head_folder baselines/Dobi-SVD \
-  --path_head_folder_output ${RESULTS_DIR} \
-  --remapping
+  --path_head_folder_output ${RESULTS_DIR}
 
-# jeffwan llama-13b-hf, 40% params
+# 13B
 CUDA_VISIBLE_DEVICES=${GPU_13B} python baselines/Dobi-SVD/svd_trainer.py \
   --model_id jeffwan/llama-13b-hf \
   --target_ratio ${TARGET_RATIO} \
@@ -56,10 +60,14 @@ CUDA_VISIBLE_DEVICES=${GPU_13B} python baselines/Dobi-SVD/svd_trainer.py \
   --n_train_samples ${N_TRAIN_SAMPLES} \
   --n_eval_samples ${N_EVAL_SAMPLES} \
   --path_head_folder baselines/Dobi-SVD \
-  --path_head_folder_output ${RESULTS_DIR} \
-  --remapping
+  --path_head_folder_output ${RESULTS_DIR}
 
-TRAINING_RESULT_PATH_13B=$(basename "$(ls -td ${RESULTS_DIR}/training_output/llama-13b-hf/Diff-Remapping-0.4_${TRAINING_DATASET}_${SEQ_LEN}_* | head -n 1)")
+TRAINING_RESULT_PATH_13B=$(basename "$(ls -td ${RESULTS_DIR}/training_output/llama-13b-hf/Diff-Noremapping-${TARGET_RATIO}_${TRAINING_DATASET}_${SEQ_LEN}_* | head -n 1)")
+if [[ -z "${TRAINING_RESULT_PATH_13B}" ]]; then
+  echo "[ERROR] Could not find the latest 13B Diff-Noremapping run under ${RESULTS_DIR}/training_output/llama-13b-hf" >&2
+  exit 1
+fi
+
 CUDA_VISIBLE_DEVICES=${GPU_13B} python baselines/Dobi-SVD/weight_updater.py \
   --model_id jeffwan/llama-13b-hf \
   --training_result_path ${TRAINING_RESULT_PATH_13B} \
@@ -68,10 +76,9 @@ CUDA_VISIBLE_DEVICES=${GPU_13B} python baselines/Dobi-SVD/weight_updater.py \
   --n_eval_samples ${N_EVAL_SAMPLES} \
   --training_dataset ${TRAINING_DATASET} \
   --path_head_folder baselines/Dobi-SVD \
-  --path_head_folder_output ${RESULTS_DIR} \
-  --remapping
+  --path_head_folder_output ${RESULTS_DIR}
 
-# jeffwan llama-30b-hf, 40% params
+# 30B
 CUDA_VISIBLE_DEVICES=${GPU_30B} python baselines/Dobi-SVD/svd_trainer.py \
   --model_id jeffwan/llama-30b-hf \
   --target_ratio ${TARGET_RATIO} \
@@ -82,10 +89,14 @@ CUDA_VISIBLE_DEVICES=${GPU_30B} python baselines/Dobi-SVD/svd_trainer.py \
   --n_train_samples ${N_TRAIN_SAMPLES} \
   --n_eval_samples ${N_EVAL_SAMPLES} \
   --path_head_folder baselines/Dobi-SVD \
-  --path_head_folder_output ${RESULTS_DIR} \
-  --remapping
+  --path_head_folder_output ${RESULTS_DIR}
 
-TRAINING_RESULT_PATH_30B=$(basename "$(ls -td ${RESULTS_DIR}/training_output/llama-30b-hf/Diff-Remapping-0.4_${TRAINING_DATASET}_${SEQ_LEN}_* | head -n 1)")
+TRAINING_RESULT_PATH_30B=$(basename "$(ls -td ${RESULTS_DIR}/training_output/llama-30b-hf/Diff-Noremapping-${TARGET_RATIO}_${TRAINING_DATASET}_${SEQ_LEN}_* | head -n 1)")
+if [[ -z "${TRAINING_RESULT_PATH_30B}" ]]; then
+  echo "[ERROR] Could not find the latest 30B Diff-Noremapping run under ${RESULTS_DIR}/training_output/llama-30b-hf" >&2
+  exit 1
+fi
+
 CUDA_VISIBLE_DEVICES=${GPU_30B} python baselines/Dobi-SVD/weight_updater.py \
   --model_id jeffwan/llama-30b-hf \
   --training_result_path ${TRAINING_RESULT_PATH_30B} \
@@ -94,5 +105,4 @@ CUDA_VISIBLE_DEVICES=${GPU_30B} python baselines/Dobi-SVD/weight_updater.py \
   --n_eval_samples ${N_EVAL_SAMPLES} \
   --training_dataset ${TRAINING_DATASET} \
   --path_head_folder baselines/Dobi-SVD \
-  --path_head_folder_output ${RESULTS_DIR} \
-  --remapping
+  --path_head_folder_output ${RESULTS_DIR}

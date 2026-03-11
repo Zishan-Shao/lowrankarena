@@ -386,59 +386,6 @@ _REPO_ROOT = os.path.dirname(_THIS_DIR)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-
-def _looks_like_svdllm_checkpoint(path: Optional[str]) -> bool:
-    if not path:
-        return False
-    p = str(path)
-    lower = p.lower()
-    base = os.path.basename(lower)
-    return (
-        "svd-llm" in lower
-        or "svdllm" in lower
-        or "whitening_only" in base
-        or "_update_" in base
-        or "_profiling_" in base
-    )
-
-
-def _load_svdllm_model_utils():
-    svdllm_root = os.path.join(_REPO_ROOT, "baselines", "SVD-LLM")
-    mod_path = os.path.join(svdllm_root, "utils", "model_utils.py")
-    if not os.path.exists(mod_path):
-        raise FileNotFoundError(f"SVD-LLM model_utils not found: {mod_path}")
-    if svdllm_root not in sys.path:
-        sys.path.insert(0, svdllm_root)
-    module_name = "_svdllm_model_utils_local"
-    mod = sys.modules.get(module_name)
-    if mod is not None:
-        return mod
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(module_name, mod_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Failed to load SVD-LLM model_utils from {mod_path}")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def _load_svdllm_checkpoint(ckpt_or_dir: str, hf_token: Optional[str] = None):
-    return _load_svdllm_model_utils().get_model_from_local(ckpt_or_dir, hf_token=hf_token)
-
-
-def _tokenizer_usable(tokenizer) -> bool:
-    if tokenizer is None or isinstance(tokenizer, bool):
-        return False
-    if callable(tokenizer):
-        return True
-    return (
-        hasattr(tokenizer, "encode") and hasattr(tokenizer, "decode")
-    ) or (
-        hasattr(tokenizer, "pad_token_id") and hasattr(tokenizer, "eos_token_id")
-    )
-
-
 from utils.model_utils import get_model_from_huggingface, get_model_from_local
 from utils.saes_svd_loader import looks_like_saes_svd_checkpoint, load_saes_svd_model
 from evaluater import ppl_eval
@@ -745,6 +692,14 @@ def _load_dobi_model(
         model, tokenizer = load_remapping_model(local_path)
     else:
         model, tokenizer = load_unremapping_model(local_path)
+    try:
+        model.config._name_or_path = local_path
+    except Exception:
+        pass
+    try:
+        model.name_or_path = local_path
+    except Exception:
+        pass
     return model, tokenizer, local_path
 
 
@@ -807,6 +762,20 @@ def _ensure_pad_token(tokenizer):
         pass
 
 
+def _normalize_tokenizer_hint(model_hint: Optional[str]) -> Optional[str]:
+    if model_hint is None:
+        return None
+    try:
+        hint = str(model_hint).strip()
+    except Exception:
+        return None
+    if not hint:
+        return None
+    if os.path.isfile(hint):
+        hint = os.path.dirname(hint)
+    return hint
+
+
 def _tokenizer_ok(tokenizer) -> bool:
     try:
         return tokenizer is not None and not isinstance(tokenizer, bool) and callable(tokenizer)
@@ -815,6 +784,9 @@ def _tokenizer_ok(tokenizer) -> bool:
 
 
 def _load_tokenizer_from_hint(model_hint: str, hf_token: Optional[str] = None):
+    model_hint = _normalize_tokenizer_hint(model_hint)
+    if not model_hint:
+        return None
     try:
         from transformers import AutoTokenizer
         tok = AutoTokenizer.from_pretrained(
@@ -837,7 +809,10 @@ def _load_tokenizer_from_hint(model_hint: str, hf_token: Optional[str] = None):
         from transformers import LlamaTokenizerFast, LlamaTokenizer
         for cls in (LlamaTokenizerFast, LlamaTokenizer):
             try:
-                tok = cls.from_pretrained(model_hint, token=hf_token)
+                kwargs = {"token": hf_token}
+                if cls.__name__ == "LlamaTokenizer":
+                    kwargs["legacy"] = True
+                tok = cls.from_pretrained(model_hint, **kwargs)
                 if _tokenizer_ok(tok):
                     return tok
             except Exception:
@@ -847,11 +822,12 @@ def _load_tokenizer_from_hint(model_hint: str, hf_token: Optional[str] = None):
     return None
 
 
-def _ensure_tokenizer_compat(model, tokenizer, hf_token: Optional[str] = None):
-    override = os.getenv("SVDLLM_TOKENIZER_MODEL", "").strip()
+def _ensure_tokenizer_compat(model, tokenizer, hf_token: Optional[str] = None, tokenizer_hint: Optional[str] = None):
+    override = _normalize_tokenizer_hint(os.getenv("SVDLLM_TOKENIZER_MODEL", "").strip())
+    tokenizer_hint = _normalize_tokenizer_hint(tokenizer_hint)
     model_hint = None
     try:
-        model_hint = getattr(getattr(model, "config", None), "_name_or_path", None)
+        model_hint = _normalize_tokenizer_hint(getattr(getattr(model, "config", None), "_name_or_path", None))
     except Exception:
         model_hint = None
     # Prefer explicit override
@@ -861,7 +837,7 @@ def _ensure_tokenizer_compat(model, tokenizer, hf_token: Optional[str] = None):
             tokenizer = tok
     # Repair invalid tokenizer
     if not _tokenizer_ok(tokenizer):
-        hint = override or model_hint
+        hint = override or tokenizer_hint or model_hint
         if hint:
             tok = _load_tokenizer_from_hint(hint, hf_token=hf_token)
             if tok is not None:
@@ -882,7 +858,7 @@ def _ensure_tokenizer_compat(model, tokenizer, hf_token: Optional[str] = None):
         tok_vocab = None
     if model_vocab and tok_vocab and model_vocab != tok_vocab:
         print(f"[Warn] Tokenizer vocab {tok_vocab} != model vocab {model_vocab}; reloading tokenizer.")
-        hint = override or model_hint
+        hint = override or tokenizer_hint or model_hint
         if hint:
             tok = _load_tokenizer_from_hint(hint, hf_token=hf_token)
             if tok is not None:
@@ -1507,17 +1483,7 @@ def main():
                 remapping=remapping,
             )
         elif args.model and os.path.exists(args.model) and args.model.endswith('.pt'):
-            if _looks_like_svdllm_checkpoint(args.model):
-                try:
-                    model, tokenizer = _load_svdllm_checkpoint(args.model, hf_token=args.hf_token)
-                except Exception as e:
-                    print(f"[Warn] SVD-LLM checkpoint loader failed for {args.model}; falling back to generic loader: {e}")
-                    model, tokenizer = get_model_from_local(args.model)
-                    if not _tokenizer_usable(tokenizer):
-                        print("[Warn] Generic loader returned a non-usable tokenizer; retrying with SVD-LLM loader.")
-                        model, tokenizer = _load_svdllm_checkpoint(args.model, hf_token=args.hf_token)
-            else:
-                model, tokenizer = get_model_from_local(args.model)
+            model, tokenizer = get_model_from_local(args.model)
         elif args.model and ((os.path.isdir(args.model) and looks_like_dfsvd_checkpoint(args.model)) or args.dfsvd_svd):
             if not args.dfsvd_base_model:
                 raise ValueError("DF-SVD requires --dfsvd_base_model.")
@@ -1548,7 +1514,7 @@ def main():
                 trust_remote_code=trust_remote_code,
                 dtype=args.dtype,
             )
-        tokenizer = _ensure_tokenizer_compat(model, tokenizer, hf_token=args.hf_token)
+        tokenizer = _ensure_tokenizer_compat(model, tokenizer, hf_token=args.hf_token, tokenizer_hint=args.tokenizer)
         if args.force_right_padding:
             _force_right_padding(tokenizer)
         else:
