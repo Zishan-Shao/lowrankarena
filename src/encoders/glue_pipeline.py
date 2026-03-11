@@ -1834,6 +1834,7 @@ def evaluate_compressed_model(checkpoint_path: Path, task: str, args) -> Dict:
         str(checkpoint_path),
         device=device,
         dtype=_dtype,
+        num_labels=cfg.get("num_labels"),
     )
 
     # Prepare data
@@ -2090,6 +2091,7 @@ def finetune_on_task(checkpoint_path: Path, task: str, args) -> Dict:
         str(checkpoint_path),
         device=device,
         dtype=_dtype,
+        num_labels=cfg.get("num_labels"),
     )
 
     # Prepare data

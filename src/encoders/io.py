@@ -48,6 +48,7 @@ def load_compressed_model(
     checkpoint_path: str,
     device: str = "cuda",
     dtype: torch.dtype = torch.float32,
+    num_labels: int | None = None,
 ) -> Tuple[nn.Module, AutoTokenizer, dict]:
     """
     Load a compressed SVD model from disk.
@@ -203,6 +204,13 @@ def load_compressed_model(
     for key, value in config_dict.items():
         if key not in ['_name_or_path', 'transformers_version']:
             setattr(config, key, value)
+
+    # Override num_labels if requested (e.g. evaluating a binary checkpoint on a 3-class task)
+    if num_labels is not None and config.num_labels != num_labels:
+        print(f"[load] Overriding num_labels: {config.num_labels} → {num_labels}")
+        config.num_labels = num_labels
+        config.id2label = {i: f"LABEL_{i}" for i in range(num_labels)}
+        config.label2id = {v: k for k, v in config.id2label.items()}
 
     # Create a fresh base model (this will have standard layers)
     print(f"[load] Creating base model from: {model_id}")
