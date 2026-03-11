@@ -287,7 +287,7 @@ def decode_kvcache_eval(
         raise ValueError("flashsvd_dense_cache and baseline_dense_kvcache are mutually exclusive.")
 
     if lowrank_cache:
-        from flashsvd_component.legacy.lowrank_cache import LowRankKVCache
+        from flashsvd_component.lowrank_cache import LowRankKVCache
 
         # NOTE: Some FlashSVD checkpoints use different ranks for Q/K/V and/or
         # vary ranks by layer. Avoid inferring a single global rank here; the
