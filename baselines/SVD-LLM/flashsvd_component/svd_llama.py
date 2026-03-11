@@ -2670,9 +2670,7 @@ class SVD_LlamaAttention(nn.Module):
             ).transpose(1, 2)
             attn_output = attn_out.reshape(B, M, H * dh).contiguous()
             attn_output = self.o_u_proj(self.o_v_proj(attn_output))
-            if not output_attentions:
-                attn_weights = None
-            return attn_output, attn_weights
+            return attn_output, None  # GQA fallback doesn't compute attention weights
 
         R = Rq
 
