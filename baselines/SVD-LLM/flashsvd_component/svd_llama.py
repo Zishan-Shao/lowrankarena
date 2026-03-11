@@ -2634,14 +2634,53 @@ class SVD_LlamaAttention(nn.Module):
         Pk = self.k_v_proj(hidden_states)  # [B, M, R]
         Pv = self.v_v_proj(hidden_states)  # [B, M, R]
 
-        B, M, R = Pq.shape
+        B, M, Rq = Pq.shape
+        Rk = int(Pk.shape[-1])
         H, dh = self.num_heads, self.head_dim
+        Hk = int(getattr(self, 'num_key_value_heads', H) or H)
+
+        # GQA with different Q vs KV ranks (e.g. Llama3.1-8B): fall back to explicit
+        # Q/K/V reconstruction + SDPA. The FlashSVD kernel requires Rq == Rk.
+        if Rq != Rk:
+            input_shape = hidden_states.shape[:-1]
+            query_states = self.q_u_proj(Pq).view(*input_shape, H, dh).transpose(1, 2)
+            key_states = self.k_u_proj(Pk).view(*input_shape, Hk, dh).transpose(1, 2)
+            value_states = self.v_u_proj(Pv).view(*input_shape, Hk, dh).transpose(1, 2)
+            if position_embeddings is not None:
+                cos, sin = position_embeddings
+                query_states, key_states = self._apply_rope_hf(query_states, key_states, cos, sin)
+            else:
+                if position_ids is None:
+                    position_ids = torch.arange(M, device=hidden_states.device).unsqueeze(0).expand(B, M)
+                cos, sin = self.rotary_emb(query_states, seq_len=int(position_ids.max().item()) + 1)
+                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+            if Hk != H:
+                rep = H // Hk
+                key_states = key_states.repeat_interleave(rep, dim=1)
+                value_states = value_states.repeat_interleave(rep, dim=1)
+            sdpa_mask = None
+            is_causal_flag = attention_mask is None and getattr(self, 'is_causal', True)
+            if attention_mask is not None:
+                if attention_mask.dim() == 4:
+                    sdpa_mask = attention_mask
+                    is_causal_flag = False
+            attn_out = F.scaled_dot_product_attention(
+                query_states, key_states, value_states,
+                attn_mask=sdpa_mask, dropout_p=0.0, is_causal=is_causal_flag,
+            ).transpose(1, 2)
+            attn_output = attn_out.reshape(B, M, H * dh).contiguous()
+            attn_output = self.o_u_proj(self.o_v_proj(attn_output))
+            if not output_attentions:
+                attn_weights = None
+            return attn_output, attn_weights
+
+        R = Rq
 
         # Expand along heads (rank factors are shared across heads)
         # Expand across heads as views (zero stride on H) to avoid materialization
         Pq = Pq.unsqueeze(1).expand(B, H, M, R)
-        Pk = Pk.unsqueeze(1).expand(B, H, M, R)
-        Pv = Pv.unsqueeze(1).expand(B, H, M, R)
+        Pk = Pk.unsqueeze(1).expand(B, Hk, M, R)
+        Pv = Pv.unsqueeze(1).expand(B, Hk, M, R)
 
         # Build V factors from effective projection weights: [H, R, dh]
         # Include LoRA delta if adapters are active by reading lora_A/lora_B
@@ -2657,8 +2696,8 @@ class SVD_LlamaAttention(nn.Module):
             return W
 
         Vq = _eff_weight(self.q_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
-        Vk = _eff_weight(self.k_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
-        Vv = _eff_weight(self.v_u_proj).view(H, dh, R).permute(0, 2, 1).contiguous()
+        Vk = _eff_weight(self.k_u_proj).view(Hk, dh, R).permute(0, 2, 1).contiguous()
+        Vv = _eff_weight(self.v_u_proj).view(Hk, dh, R).permute(0, 2, 1).contiguous()
 
         # No biases in low-rank projections by default
         bq = bk = bv = None
