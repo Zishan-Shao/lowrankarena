@@ -225,6 +225,17 @@ def _hf_from_pretrained_with_token_retry(cls, *args, hf_token=None, **kwargs):
         return cls.from_pretrained(*args, use_auth_token=hf_token, **kwargs)
 
 
+def _is_hf_tokenizer_obj(obj) -> bool:
+    if obj is None or isinstance(obj, bool):
+        return False
+    try:
+        import transformers
+
+        return isinstance(obj, (transformers.PreTrainedTokenizer, transformers.PreTrainedTokenizerFast))
+    except Exception:
+        return False
+
+
 def _ensure_asvd_tokenizer_pad(tokenizer, padding_side="left"):
     if getattr(tokenizer, "pad_token_id", None) is None:
         if getattr(tokenizer, "eos_token_id", None) is not None:
@@ -334,18 +345,9 @@ def _load_asvd_hf_model_and_tokenizer(
     torch_dtype = _asvd_torch_dtype(dtype)
     tok_src = tokenizer_id_or_path or local_path
 
+    tokenizer = None
     try:
-        tokenizer = _hf_from_pretrained_with_token_retry(
-            AutoTokenizer,
-            tok_src,
-            hf_token=hf_token,
-            revision=revision,
-            cache_dir=cache_dir,
-            trust_remote_code=trust_remote_code,
-            use_fast=True,
-        )
-    except Exception:
-        tokenizer = _hf_from_pretrained_with_token_retry(
+        tok_fast = _hf_from_pretrained_with_token_retry(
             AutoTokenizer,
             tok_src,
             hf_token=hf_token,
@@ -354,6 +356,23 @@ def _load_asvd_hf_model_and_tokenizer(
             trust_remote_code=trust_remote_code,
             use_fast=False,
         )
+        if _is_hf_tokenizer_obj(tok_fast):
+            tokenizer = tok_fast
+    except Exception:
+        pass
+    if tokenizer is None:
+        tok_slow = _hf_from_pretrained_with_token_retry(
+            AutoTokenizer,
+            tok_src,
+            hf_token=hf_token,
+            revision=revision,
+            cache_dir=cache_dir,
+            trust_remote_code=trust_remote_code,
+            use_fast=False,
+        )
+        if not _is_hf_tokenizer_obj(tok_slow):
+            raise TypeError(f"Failed to materialize tokenizer from {tok_src}. Got type={type(tok_slow)}")
+        tokenizer = tok_slow
     _ensure_asvd_tokenizer_pad(tokenizer)
 
     model_kwargs = dict(
@@ -594,6 +613,60 @@ def _resolve_hflm_tokenizer_arg(model, tokenizer, tokenizer_override: Optional[s
     except Exception:
         hint = None
     return hint
+
+
+def _materialize_hflm_tokenizer(model, tokenizer, tokenizer_override: Optional[str] = None, hf_token: Optional[str] = None):
+    resolved = _resolve_hflm_tokenizer_arg(model, tokenizer, tokenizer_override=tokenizer_override)
+
+    if _is_hf_tokenizer_obj(resolved):
+        return resolved
+
+    # Local checkpoints sometimes carry malformed tokenizer payloads (e.g., bool).
+    # Force materialization from an explicit id/path when needed.
+    if isinstance(resolved, str):
+        from transformers import AutoTokenizer
+
+        tok = None
+        try:
+            tok_fast = _hf_from_pretrained_with_token_retry(
+                AutoTokenizer,
+                resolved,
+                hf_token=hf_token,
+                trust_remote_code=True,
+                use_fast=False,
+            )
+            if _is_hf_tokenizer_obj(tok_fast):
+                tok = tok_fast
+        except Exception:
+            pass
+        if tok is None:
+            tok_slow = _hf_from_pretrained_with_token_retry(
+                AutoTokenizer,
+                resolved,
+                hf_token=hf_token,
+                trust_remote_code=True,
+                use_fast=False,
+            )
+            if not _is_hf_tokenizer_obj(tok_slow):
+                raise TypeError(f"Failed to load tokenizer from {resolved}. Got type={type(tok_slow)}")
+            tok = tok_slow
+        _ensure_asvd_tokenizer_pad(tok, padding_side=None)
+        return tok
+
+    if isinstance(tokenizer, bool):
+        raise TypeError(
+            "Invalid tokenizer payload (bool) from checkpoint and no valid tokenizer hint resolved. "
+            "Set SVDLLM_TOKENIZER_MODEL or --tokenizer to a valid HF tokenizer id/path."
+        )
+
+    if _is_hf_tokenizer_obj(tokenizer):
+        return tokenizer
+    if tokenizer is not None:
+        raise TypeError(
+            f"Unsupported tokenizer payload type from checkpoint: {type(tokenizer)}. "
+            "Set SVDLLM_TOKENIZER_MODEL or --tokenizer to a valid HF tokenizer id/path."
+        )
+    return resolved
 
 def _resolve_dobi_path(model_id: str, hf_token: Optional[str], revision: Optional[str], cache_dir: Optional[str]) -> str:
     if os.path.isdir(model_id):
@@ -1061,7 +1134,30 @@ def main() -> None:
         raise RuntimeError(f"lm-eval harness is required: {e}")
 
     tasks = _parse_tasks(args.tasks)
-    lm_tokenizer = _resolve_hflm_tokenizer_arg(model, tokenizer, tokenizer_override=args.tokenizer)
+    lm_tokenizer = _materialize_hflm_tokenizer(
+        model,
+        tokenizer,
+        tokenizer_override=args.tokenizer,
+        hf_token=args.hf_token,
+    )
+    if isinstance(lm_tokenizer, bool) or lm_tokenizer is None:
+        fallback_hint = (
+            _normalize_tokenizer_hint(os.getenv("SVDLLM_TOKENIZER_MODEL", "").strip())
+            or _normalize_tokenizer_hint(args.tokenizer)
+            or _normalize_tokenizer_hint(getattr(getattr(model, "config", None), "_name_or_path", None))
+            or "openlm-research/open_llama_7b"
+        )
+        lm_tokenizer = _materialize_hflm_tokenizer(
+            model,
+            None,
+            tokenizer_override=fallback_hint,
+            hf_token=args.hf_token,
+        )
+    if isinstance(lm_tokenizer, bool):
+        raise TypeError(
+            "Resolved tokenizer is boolean; set SVDLLM_TOKENIZER_MODEL (or --tokenizer) "
+            "to a valid tokenizer id/path."
+        )
     lm = HFLM(
         pretrained=model,
         tokenizer=lm_tokenizer,

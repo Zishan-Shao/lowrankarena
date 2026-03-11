@@ -53,6 +53,7 @@ CUDA_VISIBLE_DEVICES="${GPU}" python eval_results/eval_general_ppl.py \
 # smoke linguistic eval
 CUDA_VISIBLE_DEVICES="${GPU}" python eval_results/eval_linguistic_tasks.py \
   --checkpoint "${SMOKE_MODEL}" \
+  --tokenizer "${SVDLLM_TOKENIZER_MODEL}" \
   --tasks blimp \
   --limit 20 \
   --num_fewshot 0 \

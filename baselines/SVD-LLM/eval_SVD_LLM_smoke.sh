@@ -8,9 +8,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/baselines/SVD-LLM:${PYTHONPATH:-}"
 
-SVDLLM_TOKENIZER_MODEL=jeffwan/llama-7b-hf bash baselines/SVD-LLM/eval_SVD_LLMv2_smoke.sh
 
-#export SVDLLM_TOKENIZER_MODEL="${SVDLLM_TOKENIZER_MODEL:-jeffwan/llama-7b-hf}"
+export SVDLLM_TOKENIZER_MODEL="${SVDLLM_TOKENIZER_MODEL:-jeffwan/llama-7b-hf}"
 
 mkdir -p outputs/svdllm/smoke
 
@@ -52,6 +51,7 @@ CUDA_VISIBLE_DEVICES="${GPU}" python eval_results/eval_general_ppl.py \
 # smoke linguistic eval
 CUDA_VISIBLE_DEVICES="${GPU}" python eval_results/eval_linguistic_tasks.py \
   --checkpoint "${SMOKE_MODEL}" \
+  --tokenizer "${SVDLLM_TOKENIZER_MODEL}" \
   --tasks blimp \
   --limit 20 \
   --num_fewshot 0 \
