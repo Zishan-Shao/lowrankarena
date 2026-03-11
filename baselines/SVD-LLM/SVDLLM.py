@@ -761,16 +761,7 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         for name in gpts:
             handles.append(subset[name].register_forward_hook(add_batch(name)))
         if "opt" not in model_name:
-            pos_emb = None
-            try:
-                if hasattr(model, 'model') and hasattr(model.model, 'rotary_emb'):
-                    pos_emb = model.model.rotary_emb(inps, position_ids)
-            except Exception:
-                pos_emb = None
-            try:
-                outs = layer(inps, attention_mask=attention_masks, position_ids=position_ids, position_embeddings=pos_emb)[0]
-            except TypeError:
-                outs = layer(inps, attention_mask=attention_masks, position_ids=position_ids)[0]
+            outs = layer(inps, attention_mask=attention_masks, position_ids=position_ids)[0]
         else:
             # attention_masks can be None; OPT layer will handle internal causal mask
             outs = layer(inps, attention_mask=attention_masks)[0]
@@ -864,16 +855,7 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         layer_for_fwd = svd_decoder if "opt" in model_name else layer
         layer_for_fwd = layer_for_fwd.to(dev)
         if "opt" not in model_name:
-            pos_emb = None
-            try:
-                if hasattr(model, 'model') and hasattr(model.model, 'rotary_emb'):
-                    pos_emb = model.model.rotary_emb(inps, position_ids)
-            except Exception:
-                pos_emb = None
-            try:
-                outs = layer_for_fwd(inps, attention_mask=attention_masks, position_ids=position_ids, position_embeddings=pos_emb)[0]
-            except TypeError:
-                outs = layer_for_fwd(inps, attention_mask=attention_masks, position_ids=position_ids)[0]
+            outs = layer_for_fwd(inps, attention_mask=attention_masks, position_ids=position_ids)[0]
         else:
             outs = layer_for_fwd(inps, attention_mask=attention_masks)[0]
         layers[i] = layer_for_fwd.cpu()

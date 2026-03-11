@@ -410,6 +410,18 @@ def _flashsvd_llama_decoder_layer_forward(
     global _HF_LLAMA_DECODER_LAYER_FORWARD
     hidden_states = _unwrap_hidden_states_arg(hidden_states)
 
+    # Compute position_embeddings if not provided, using the attention module's own
+    # rotary_emb (preferred) or a model-level rotary_emb. This is needed when decoder
+    # layers are called directly (e.g. during whitening/calibration) rather than through
+    # LlamaModel.forward() which pre-computes position_embeddings.
+    if position_embeddings is None and position_ids is not None:
+        try:
+            rotary_fn = getattr(getattr(self, 'self_attn', None), 'rotary_emb', None)
+            if rotary_fn is not None:
+                position_embeddings = rotary_fn(hidden_states, position_ids)
+        except Exception:
+            position_embeddings = None
+
     if _HF_LLAMA_DECODER_LAYER_FORWARD is None or not _should_use_flashsvd_layer_tail_cuda_graph(self, hidden_states):
         call_kwargs = maybe_kwargs(
             _HF_LLAMA_DECODER_LAYER_FORWARD,
