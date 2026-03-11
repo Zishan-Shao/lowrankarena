@@ -725,6 +725,9 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
                     cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids'].to(dev)), dim=0)
             raise ValueError
     layers[0] = Catcher(layers[0])
+    _rotary_emb_lu = getattr(getattr(model, 'model', None), 'rotary_emb', None)
+    if _rotary_emb_lu is not None:
+        model.model.rotary_emb = _rotary_emb_lu.to(dev)
     for batch in dataloader:
         try:
             model(batch[0].to(dev))
@@ -732,6 +735,8 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
             pass
     layers[0] = layers[0].module
     layers[0] = layers[0].cpu()
+    if _rotary_emb_lu is not None:
+        model.model.rotary_emb = model.model.rotary_emb.cpu()
     if "opt" in model_name:
         model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
         model.model.decoder.final_layer_norm = model.model.decoder.final_layer_norm.cpu()
