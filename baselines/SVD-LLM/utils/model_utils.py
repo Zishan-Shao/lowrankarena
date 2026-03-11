@@ -150,7 +150,18 @@ def get_model_from_local(path: str):
     if isinstance(obj, dict) and "model" in obj and "tokenizer" in obj:
         model = obj["model"]
         ensure_transformers_layer_idx(model)
-        return model, obj["tokenizer"]
+        tok = obj["tokenizer"]
+        # Pickled tokenizers can be incomplete (missing _special_tokens_map etc.)
+        # after module-path shims. Validate and reload from model_id if broken.
+        if not _is_tokenizer_like(tok) or not hasattr(tok, "_special_tokens_map"):
+            model_id = getattr(getattr(model, "config", None), "_name_or_path", None)
+            if model_id:
+                try:
+                    tok = _load_tokenizer(str(model_id), hf_token=None)
+                    print(f"[warn] Pickled tokenizer was broken; reloaded from: {model_id}")
+                except Exception as e:
+                    print(f"[warn] Could not reload tokenizer from {model_id}: {e}")
+        return model, tok
     if hasattr(obj, "forward"):
         # A pickled HF model (rare but possible): try to recover tokenizer.
         model = obj
