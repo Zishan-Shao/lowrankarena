@@ -71,7 +71,7 @@ eval_and_log() {
         python bench_flashsvd_vs_svd_decode.py \
             --checkpoint "$ckpt" \
             --dtype bf16 --prompt_len 512 --new_tokens 128 --warmup 5 \
-            --lowrank_cache \
+            --experimental_flash_dense_attn \
             2>&1 | tee "$bench_out"
         base_ms=$(parse_ms "$bench_out" "SVD")
         flash_ms=$(parse_ms "$bench_out" "FlashSVD")

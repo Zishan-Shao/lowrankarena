@@ -39,6 +39,8 @@ _CONFIG_FOR_DOC = "LlamaConfig"
 _LRKV_MHA_SDPA_WARNED = False
 _LRKV_RANK_MISMATCH_WARNED = False
 _LRKV_MHA_STREAM_AUTO_WARNED = False
+_LRKV_R_NOT_POW2_WARNED = False
+_LRKV_R_PAD_FULL_RANK_WARNED = False
 _LOWRANK_CACHE_CLS = None
 _LOWRANK_CACHE_CLS_RESOLVED = False
 _DENSE_CACHE_CLS = None
@@ -1905,6 +1907,9 @@ class SVD_LlamaAttention(nn.Module):
                         )
                         _LRKV_RANK_MISMATCH_WARNED = True
 
+                # Note: Triton kernels require power-of-2 R; non-power-of-2 R is handled by
+                # zero-padding Pk/Pv/Vq/Vk/Vv at the kernel call site (see below).
+
                 if do_prof and not getattr(self, "_attn_decode_prof_done", False):  # type: ignore[attr-defined]
                     ev_cache_s = torch.cuda.Event(enable_timing=True)
                     ev_cache_e = torch.cuda.Event(enable_timing=True)
@@ -2122,10 +2127,72 @@ class SVD_LlamaAttention(nn.Module):
                     # KV caches: [B, Smax, Hk, R] with 0-stride head dim to avoid materialization
                     Pk_cache = past_key_value.key_cache[layer_idx][:bsz, :Smax]  # [B, Smax, R]
                     Pv_cache = past_key_value.value_cache[layer_idx][:bsz, :Smax]
-                    Pk = Pk_cache.unsqueeze(2).expand(bsz, Smax, Hk, R)
-                    Pv = Pv_cache.unsqueeze(2).expand(bsz, Smax, Hk, R)
 
                     Vq, Vk, Vv = self._get_decode_factors()
+
+                    # Triton kernels require R to be a power of 2. Zero-pad if needed.
+                    # Padding with zeros is mathematically equivalent: extra rows/cols of Vk/Vv
+                    # are zero so they contribute nothing to the output.
+                    # However, if R_pad >= H*Dh (full head-space rank), padding is pointless
+                    # (we'd be doing the same work as full-rank dense attention). In that case
+                    # fall back to the SDPA baseline path instead.
+                    _R_pad = 1
+                    while _R_pad < R:
+                        _R_pad <<= 1
+                    _full_rank = H * Dh
+                    if _R_pad >= _full_rank and not force_flashsvd_kernel:
+                        # R is so close to full rank that padding removes all benefit.
+                        # Re-use the SDPA baseline path below by jumping out of this block.
+                        global _LRKV_R_PAD_FULL_RANK_WARNED
+                        if not _LRKV_R_PAD_FULL_RANK_WARNED and not baseline_lr_kvcache:
+                            print(
+                                f"[FlashSVD] LowRankKVCache: R={R_for_kernel} pads to {_R_pad} >= H*Dh={_full_rank} "
+                                "(full rank); FlashSVD kernel has no advantage. "
+                                "Falling back to SDPA baseline. Set FLASH_SVD_FORCE_ATTENTION_KERNEL=1 to override."
+                            )
+                            _LRKV_R_PAD_FULL_RANK_WARNED = True
+                        use_flashsvd_kernel = False
+                    elif _R_pad != R:
+                        _pad = _R_pad - R
+                        Pq_q = F.pad(Pq_q, (0, _pad))                    # [B, H, R_pad]
+                        Pk_cache = F.pad(Pk_cache, (0, _pad))             # [B, Smax, R_pad]
+                        Pv_cache = F.pad(Pv_cache, (0, _pad))             # [B, Smax, R_pad]
+                        Vq = F.pad(Vq, (0, 0, 0, _pad))                  # [H, R_pad, Dh]
+                        Vk = F.pad(Vk, (0, 0, 0, _pad))
+                        Vv = F.pad(Vv, (0, 0, 0, _pad))
+                        R = _R_pad
+
+                    if not use_flashsvd_kernel:
+                        # R padded to full rank: no kernel benefit, use SDPA baseline.
+                        input_shape = hidden_states.shape[:-1]
+                        hidden_shape = (*input_shape, -1, self.head_dim)
+                        query_states = self.q_u_proj(Pq_rank).view(hidden_shape).transpose(1, 2)
+                        Pk_valid = past_key_value.key_cache[layer_idx][:bsz, :seqlen_k]
+                        Pv_valid = past_key_value.value_cache[layer_idx][:bsz, :seqlen_k]
+                        key_states = self.k_u_proj(Pk_valid).view(bsz, seqlen_k, Hk, Dh).transpose(1, 2)
+                        value_states = self.v_u_proj(Pv_valid).view(bsz, seqlen_k, Hk, Dh).transpose(1, 2)
+                        rotary_cos, rotary_sin = past_key_value.get_rope_tables(
+                            seqlen=Smax, head_dim=Dh, device=hidden_states.device, dtype=hidden_states.dtype
+                        )
+                        pos_q = max(0, seqlen_k - 1)
+                        cos_q = rotary_cos[pos_q].view(1, 1, 1, Dh // 2)
+                        sin_q = rotary_sin[pos_q].view(1, 1, 1, Dh // 2)
+                        query_states = self._apply_rope_tables(query_states, cos_q, sin_q)
+                        cos_k = rotary_cos[:seqlen_k].view(1, 1, seqlen_k, Dh // 2)
+                        sin_k = rotary_sin[:seqlen_k].view(1, 1, seqlen_k, Dh // 2)
+                        key_states = self._apply_rope_tables(key_states, cos_k, sin_k)
+                        if Hk != H:
+                            key_states = key_states.repeat_interleave(int(H // max(1, Hk)), dim=1)
+                            value_states = value_states.repeat_interleave(int(H // max(1, Hk)), dim=1)
+                        attn_out = F.scaled_dot_product_attention(
+                            query_states, key_states, value_states, attn_mask=None, dropout_p=0.0, is_causal=False
+                        )
+                        attn_output = attn_out.transpose(1, 2).reshape(bsz, 1, H * Dh).contiguous()
+                        attn_output = self.o_u_proj(self.o_v_proj(attn_output))
+                        return attn_output, None
+
+                    Pk = Pk_cache.unsqueeze(2).expand(bsz, Smax, Hk, R)
+                    Pv = Pv_cache.unsqueeze(2).expand(bsz, Smax, Hk, R)
 
                     # RoPE tables: [Smax, Dh/2]
                     if do_prof and not getattr(self, "_attn_decode_prof_done", False):  # type: ignore[attr-defined]
