@@ -488,6 +488,7 @@ def whitening(
     svd_lowrank: bool = False,
     svd_oversample: int = 64,
     svd_niter: int = 2,
+    basis_sharing: bool = False,
 ):
     model.eval()
     if 'opt' in model_name:
@@ -510,48 +511,112 @@ def whitening(
         elif 'opt' in model_name:
             svd_decoder = SVDOPTDecoderLayer(model.config, ratio=ratio)
         #### Replace Attn, MLP ####
+
+        # ── Basis-sharing setup (GQA models only, e.g. Llama-3.1-8B) ──────────
+        # When enabled, Q/K/V share the same input-projection basis (V matrix).
+        # K and V skip independent SVD; their U is found by projecting W onto Q's basis.
+        # This forces equal ranks so the FlashSVD packed-decode kernel can be used.
+        _bs_R_shared = None          # uniform rank R for Q/K/V
+        _bs_VT_Q_r = None            # top-R rows of Q's whitened SVD: shape [R, D_in]
+        _bs_shared_svd_v = None      # shared unwhitened V: VT_Q @ scaling_inv, shape [R, D_in]
+
+        if basis_sharing and "opt" not in model_name:
+            try:
+                sa = layer.self_attn
+                D_Q  = int(sa.q_proj.weight.shape[0])
+                D_K  = int(sa.k_proj.weight.shape[0])
+                D_V  = int(sa.v_proj.weight.shape[0])
+                D_in = int(sa.q_proj.weight.shape[1])
+                # Only beneficial when K/V are smaller than Q (GQA)
+                if D_K != D_Q:
+                    R_Q = max(1, int(D_Q * D_in * ratio / (D_Q + D_in)))
+                    R_K = max(1, int(D_K * D_in * ratio / (D_K + D_in)))
+                    R_V = max(1, int(D_V * D_in * ratio / (D_V + D_in)))
+                    total_params = R_Q * (D_Q + D_in) + R_K * (D_K + D_in) + R_V * (D_V + D_in)
+                    denom = D_Q + D_K + D_V + D_in
+                    _bs_R_shared = max(1, min(int(total_params // denom), D_in, D_Q))
+                    print(f"  [basis_sharing] layer {i}: R_Q={R_Q} R_K={R_K} R_V={R_V} → R_shared={_bs_R_shared}")
+            except Exception as e:
+                print(f"  [basis_sharing] layer {i}: skipping (no GQA or error: {e})")
+                _bs_R_shared = None
+        # ───────────────────────────────────────────────────────────────────────
+
         for name in subset:
             orig_dtype = subset[name].weight.dtype
             # Compute SVD in float32 for stability, cast back to original dtype for storage.
             W = subset[name].weight.data.to(dev, dtype=torch.float32)
             dtype = orig_dtype
             scaling_diag_matrix = profiling_mat[i][name].to(dev, dtype=torch.float32)
-            # Small diagonal jitter for numerical safety (matches common whitening practice).
-            try:
-                W_scale = torch.matmul(W, scaling_diag_matrix)
-            except Exception:
-                eps = 1e-6
-                scaling_diag_matrix = scaling_diag_matrix + eps * torch.eye(
-                    scaling_diag_matrix.shape[0], device=scaling_diag_matrix.device, dtype=scaling_diag_matrix.dtype
-                )
-                W_scale = torch.matmul(W, scaling_diag_matrix)
-            # Official SVD-LLM rank mapping: keep_ratio ~= params_ratio
-            # For W in R^{m x n}, choose k such that k(m+n) ≈ ratio * (m*n).
-            max_rank = min(W.shape[0], W.shape[1])
-            num_s_after_trunc = int(W.shape[0] * W.shape[1] * ratio / (W.shape[0] + W.shape[1]))
-            num_s_after_trunc = max(1, min(num_s_after_trunc, max_rank))
 
-            if svd_lowrank and num_s_after_trunc < max_rank:
-                q = min(max_rank, int(num_s_after_trunc) + int(max(svd_oversample, 0)))
-                U_lr, S_lr, V_lr = torch.svd_lowrank(W_scale, q=q, niter=int(max(svd_niter, 0)))
-                truc_u = U_lr[:, :num_s_after_trunc]
-                truc_s = S_lr[:num_s_after_trunc]
-                VT_k = V_lr[:, :num_s_after_trunc].t().contiguous()  # (k, n)
-            else:
-                U_full, S_full, VT_full = torch.linalg.svd(W_scale, full_matrices=False)
-                truc_u = U_full[:, :num_s_after_trunc]
-                truc_s = S_full[:num_s_after_trunc]
-                VT_k = VT_full[:num_s_after_trunc, :].contiguous()
+            # ── Basis-sharing fast path for K/V: skip SVD, project onto Q's basis ──
+            _used_shared_basis = False
+            if (basis_sharing and _bs_R_shared is not None and _bs_VT_Q_r is not None
+                    and ("k_proj" in name or "v_proj" in name)
+                    and name in ("self_attn.k_proj", "self_attn.v_proj")):
+                try:
+                    W_scale_kv = torch.matmul(W, scaling_diag_matrix)
+                    # U = W_scale @ VT_Q.T  (LSQ solution since VT_Q rows are orthonormal)
+                    U_kv = torch.matmul(W_scale_kv, _bs_VT_Q_r.t())   # [D_K/D_V, R]
+                    svd_u = U_kv.cpu().to(dtype)
+                    svd_v = _bs_shared_svd_v                           # shared V (ref)
+                    _used_shared_basis = True
+                    # null out temporaries before cleanup line
+                    W_scale_kv = U_kv = None
+                except Exception as e:
+                    print(f"  [basis_sharing] {name} projection failed ({e}), falling back to SVD")
+            # ─────────────────────────────────────────────────────────────────────
 
-            # Avoid forming inv(L): solve right-triangular system for VT_k @ inv(L)
-            # We want X = VT_k @ inv(L) where L = scaling_diag_matrix (lower-triangular).
-            # Equivalent: (X L)^T = VT_k^T -> L^T X^T = VT_k^T.
-            truc_v = torch.linalg.solve_triangular(scaling_diag_matrix.t(), VT_k.t(), upper=True).t()
-            truc_sigma = torch.diag(truc_s)
-            #### Replace Attn, MLP ####
-            sqrtSigma = torch.sqrt(truc_sigma)
-            svd_u = torch.matmul(truc_u, sqrtSigma).cpu().to(dtype)
-            svd_v = torch.matmul(sqrtSigma, truc_v).cpu().to(dtype)
+            if not _used_shared_basis:
+                # Small diagonal jitter for numerical safety (matches common whitening practice).
+                try:
+                    W_scale = torch.matmul(W, scaling_diag_matrix)
+                except Exception:
+                    eps = 1e-6
+                    scaling_diag_matrix = scaling_diag_matrix + eps * torch.eye(
+                        scaling_diag_matrix.shape[0], device=scaling_diag_matrix.device, dtype=scaling_diag_matrix.dtype
+                    )
+                    W_scale = torch.matmul(W, scaling_diag_matrix)
+                # Official SVD-LLM rank mapping: keep_ratio ~= params_ratio
+                # For W in R^{m x n}, choose k such that k(m+n) ≈ ratio * (m*n).
+                max_rank = min(W.shape[0], W.shape[1])
+                if basis_sharing and _bs_R_shared is not None and name == "self_attn.q_proj":
+                    num_s_after_trunc = max(1, min(_bs_R_shared, max_rank))
+                else:
+                    num_s_after_trunc = int(W.shape[0] * W.shape[1] * ratio / (W.shape[0] + W.shape[1]))
+                    num_s_after_trunc = max(1, min(num_s_after_trunc, max_rank))
+
+                if svd_lowrank and num_s_after_trunc < max_rank:
+                    q = min(max_rank, int(num_s_after_trunc) + int(max(svd_oversample, 0)))
+                    U_lr, S_lr, V_lr = torch.svd_lowrank(W_scale, q=q, niter=int(max(svd_niter, 0)))
+                    truc_u = U_lr[:, :num_s_after_trunc]
+                    truc_s = S_lr[:num_s_after_trunc]
+                    VT_k = V_lr[:, :num_s_after_trunc].t().contiguous()  # (k, n)
+                else:
+                    U_full, S_full, VT_full = torch.linalg.svd(W_scale, full_matrices=False)
+                    truc_u = U_full[:, :num_s_after_trunc]
+                    truc_s = S_full[:num_s_after_trunc]
+                    VT_k = VT_full[:num_s_after_trunc, :].contiguous()
+
+                # Avoid forming inv(L): solve right-triangular system for VT_k @ inv(L)
+                # We want X = VT_k @ inv(L) where L = scaling_diag_matrix (lower-triangular).
+                # Equivalent: (X L)^T = VT_k^T -> L^T X^T = VT_k^T.
+                truc_v = torch.linalg.solve_triangular(scaling_diag_matrix.t(), VT_k.t(), upper=True).t()
+                truc_sigma = torch.diag(truc_s)
+
+                if basis_sharing and _bs_R_shared is not None and name == "self_attn.q_proj":
+                    # Absorb ALL of S into U so that V = VT_Q @ scaling_inv (unscaled).
+                    # This allows K/V to reuse V directly without a sqrt(S) mismatch.
+                    sqrtSigma = torch.sqrt(truc_sigma)   # kept for cleanup only
+                    svd_u = torch.matmul(truc_u, truc_sigma).cpu().to(dtype)   # U @ S (full S)
+                    svd_v = truc_v.cpu().to(dtype)                             # VT @ scaling_inv
+                    # Save basis for K/V sharing
+                    _bs_VT_Q_r = VT_k.clone()           # [R, D_in], orthonormal rows in whitened space
+                    _bs_shared_svd_v = svd_v             # [R, D_in], shared V reference
+                else:
+                    #### Replace Attn, MLP ####
+                    sqrtSigma = torch.sqrt(truc_sigma)
+                    svd_u = torch.matmul(truc_u, sqrtSigma).cpu().to(dtype)
+                    svd_v = torch.matmul(sqrtSigma, truc_v).cpu().to(dtype)
             if 'opt' in model_name:
                 if "q_proj" in name:
                     svd_decoder.self_attn.q_u_proj.weight.data = svd_u
@@ -1009,7 +1074,9 @@ if __name__ == '__main__':
     parser.add_argument('--svdllm_compat_whitening', action='store_true', help='Use original whitening accumulation (raw X^T X without centering).')
     parser.add_argument('--svdllm_compat_ranks', action='store_true', help='Use original SVD rank formulas for attention/MLP modules.')
     parser.add_argument('--svdllm_compat_attention', action='store_true', help='Force explicit attention (matmul+softmax) and 3-value return like HF.')
-    
+    # Basis sharing (step 5): force Q/K/V to share input-projection basis for FlashSVD GQA decode
+    parser.add_argument('--basis_sharing', action='store_true', help='Enable basis sharing for Q/K/V (GQA models). Step 5 uses whitening + shared basis.')
+
     args = parser.parse_args()
     # Apply compat flags via environment for downstream modules
     if args.svdllm_compat_all:
@@ -1059,6 +1126,47 @@ if __name__ == '__main__':
         )
         if args.save_path is not None:
             torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_whitening_only_' + str(args.ratio) + '.pt')   # fp32
+    elif args.step == 5:
+        # Step 5: whitening + basis sharing (Q/K/V share same input-projection V).
+        # Enables FlashSVD packed decode for GQA models (e.g. Llama-3.1-8B).
+        model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
+        tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
+        model = model.eval()
+        model.seqlen = args.model_seq_len
+        for _m in model.modules():
+            if hasattr(_m, 'causal_mask') and isinstance(getattr(_m, 'causal_mask'), torch.Tensor):
+                cm = _m.causal_mask
+                if cm.shape[-1] > args.model_seq_len:
+                    _m.causal_mask = cm[..., :args.model_seq_len, :args.model_seq_len]
+        if args.profiling_mat_path is None:
+            cali_white_data = get_calib_train_data(args.dataset, tokenizer, args.whitening_nsamples, seqlen=args.model_seq_len)
+            profiling_mat = profle_svdllm_low_resource(
+                args.model,
+                model,
+                cali_white_data,
+                args.DEV,
+                stats_device=args.whitening_stats_device,
+                stats_dtype=args.whitening_stats_dtype,
+                store_dtype=args.whitening_store_dtype,
+                microbatch=args.whitening_microbatch,
+            )
+            if args.save_path is not None:
+                torch.save(profiling_mat, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") + '_profiling_'+ args.dataset + '_' + str(args.whitening_nsamples)  + '_' + str(args.seed)+ '.pt')
+        else:
+            profiling_mat = torch.load(args.profiling_mat_path)
+        whitening(
+            args.model,
+            model,
+            profiling_mat,
+            args.ratio,
+            args.DEV,
+            svd_lowrank=bool(args.svd_lowrank),
+            svd_oversample=int(args.svd_oversample),
+            svd_niter=int(args.svd_niter),
+            basis_sharing=True,
+        )
+        if args.save_path is not None:
+            torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_basis_sharing_' + str(args.ratio) + '.pt')
     elif args.step == 2:
         model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)

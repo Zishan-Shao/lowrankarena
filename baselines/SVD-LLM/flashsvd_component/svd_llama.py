@@ -124,10 +124,10 @@ def _run_flashsvd_prefill_kernel(
     position_ids: torch.Tensor,
     attention_mask: Optional[torch.Tensor],
     sliding_window_mask: Optional[torch.Tensor] = None,
-    bm: int = 64,
-    bn: int = 64,
+    bm: int = 32,
+    bn: int = 32,
     bdh: Optional[int] = None,
-    br: int = 64,
+    br: int = 32,
 ) -> torch.Tensor:
     Pq, Pk, Pv = qkv_factors.Pq, qkv_factors.Pk, qkv_factors.Pv
     Vq, Vk, Vv = qkv_factors.Vq, qkv_factors.Vk, qkv_factors.Vv
