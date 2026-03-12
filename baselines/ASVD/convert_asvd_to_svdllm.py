@@ -51,13 +51,18 @@ from transformers import AutoTokenizer
 # ---------------------------------------------------------------------------
 
 def _is_svd(m: nn.Module) -> bool:
-    return type(m).__name__ == "SVDLinear"
+    return type(m).__name__ in ("SVDLinear", "SVDTransformLayer")
 
 
 def _rank_of(m: nn.Module) -> int:
-    """Return the compression rank of an SVDLinear, or full-rank for nn.Linear."""
-    if _is_svd(m):
+    """Return the compression rank, or full-rank for nn.Linear."""
+    t = type(m).__name__
+    if t == "SVDLinear":
+        # ASVD: BLinear.weight [rank, in]
         return int(m.BLinear.weight.shape[0])
+    if t == "SVDTransformLayer":
+        # DobiSVD: ALinear.weight [rank, in]
+        return int(m.ALinear.weight.shape[0])
     # plain nn.Linear — not compressed
     return min(m.in_features, m.out_features)
 
@@ -80,7 +85,18 @@ def _truncate(weight: torch.Tensor, new_rank: int, dim: int) -> torch.Tensor:
 
 
 def _get_uv(svd_linear: nn.Module) -> tuple[torch.Tensor, torch.Tensor]:
-    """Return (u_weight [out, R], v_weight [R, in]) from an SVDLinear."""
+    """Return (u_weight [out, R], v_weight [R, in]) from an SVDLinear or SVDTransformLayer.
+
+    ASVD SVDLinear layout:
+        ALinear.weight [out, R]  → U
+        BLinear.weight [R,   in] → V
+
+    DobiSVD SVDTransformLayer layout (names are swapped relative to ASVD):
+        ALinear.weight [R,   in] → V
+        BLinear.weight [out, R]  → U
+    """
+    if type(svd_linear).__name__ == "SVDTransformLayer":
+        return svd_linear.BLinear.weight.data, svd_linear.ALinear.weight.data
     return svd_linear.ALinear.weight.data, svd_linear.BLinear.weight.data
 
 

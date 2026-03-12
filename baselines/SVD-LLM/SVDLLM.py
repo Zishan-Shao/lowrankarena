@@ -512,10 +512,12 @@ def whitening(
             svd_decoder = SVDOPTDecoderLayer(model.config, ratio=ratio)
         #### Replace Attn, MLP ####
 
-        # ── Basis-sharing setup (GQA models only, e.g. Llama-3.1-8B) ──────────
+        # ── Basis-sharing setup (all models, e.g. Llama-2-7B, Llama-3.1-8B) ────
         # When enabled, Q/K/V share the same input-projection basis (V matrix).
         # K and V skip independent SVD; their U is found by projecting W onto Q's basis.
         # This forces equal ranks so the FlashSVD packed-decode kernel can be used.
+        # For GQA (D_K < D_Q): R_shared < R_Q, enabling fast GQA decode.
+        # For MHA (D_K == D_Q): R_shared > R_Q (shared V amortised over 3 projs).
         _bs_R_shared = None          # uniform rank R for Q/K/V
         _bs_VT_Q_r = None            # top-R rows of Q's whitened SVD: shape [R, D_in]
         _bs_shared_svd_v = None      # shared unwhitened V: VT_Q @ scaling_inv, shape [R, D_in]
@@ -527,17 +529,15 @@ def whitening(
                 D_K  = int(sa.k_proj.weight.shape[0])
                 D_V  = int(sa.v_proj.weight.shape[0])
                 D_in = int(sa.q_proj.weight.shape[1])
-                # Only beneficial when K/V are smaller than Q (GQA)
-                if D_K != D_Q:
-                    R_Q = max(1, int(D_Q * D_in * ratio / (D_Q + D_in)))
-                    R_K = max(1, int(D_K * D_in * ratio / (D_K + D_in)))
-                    R_V = max(1, int(D_V * D_in * ratio / (D_V + D_in)))
-                    total_params = R_Q * (D_Q + D_in) + R_K * (D_K + D_in) + R_V * (D_V + D_in)
-                    denom = D_Q + D_K + D_V + D_in
-                    _bs_R_shared = max(1, min(int(total_params // denom), D_in, D_Q))
-                    print(f"  [basis_sharing] layer {i}: R_Q={R_Q} R_K={R_K} R_V={R_V} → R_shared={_bs_R_shared}")
+                R_Q = max(1, int(D_Q * D_in * ratio / (D_Q + D_in)))
+                R_K = max(1, int(D_K * D_in * ratio / (D_K + D_in)))
+                R_V = max(1, int(D_V * D_in * ratio / (D_V + D_in)))
+                total_params = R_Q * (D_Q + D_in) + R_K * (D_K + D_in) + R_V * (D_V + D_in)
+                denom = D_Q + D_K + D_V + D_in
+                _bs_R_shared = max(1, min(int(total_params // denom), D_in, D_Q))
+                print(f"  [basis_sharing] layer {i}: D_Q={D_Q} D_K={D_K} D_V={D_V} R_Q={R_Q} R_K={R_K} R_V={R_V} → R_shared={_bs_R_shared}")
             except Exception as e:
-                print(f"  [basis_sharing] layer {i}: skipping (no GQA or error: {e})")
+                print(f"  [basis_sharing] layer {i}: skipping (error: {e})")
                 _bs_R_shared = None
         # ───────────────────────────────────────────────────────────────────────
 

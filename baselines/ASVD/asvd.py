@@ -57,6 +57,12 @@ def main(args):
             elif args.weight_quant == "awq_int4":
                 model = awq_quant_sequential(model, tokenizer, 4)
 
+    # save compressed model checkpoint if requested
+    if args.save_path and not args.raw_model:
+        os.makedirs(os.path.dirname(args.save_path) if os.path.dirname(args.save_path) else ".", exist_ok=True)
+        torch.save({"model": model, "tokenizer": tokenizer}, args.save_path)
+        print(f"[asvd] Compressed model saved to {args.save_path}")
+
     # evaluate
     result = evaluate_model(
         model,
@@ -197,6 +203,12 @@ if __name__ == "__main__":
         "--use_bos",
         action="store_true",
         help="use bos token in calibration",
+    )
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        default=None,
+        help="if set, save compressed model as {'model': model, 'tokenizer': tokenizer} to this .pt path",
     )
     args = parser.parse_args()
 
