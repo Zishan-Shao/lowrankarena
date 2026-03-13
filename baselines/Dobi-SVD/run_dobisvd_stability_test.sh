@@ -29,7 +29,7 @@ else:
 check_gamma() {
     local ratio="$1"
     python -c "
-import json, glob, math
+import os, json, glob, math
 dirs = glob.glob('results/training_output/${LOWER_ID}/Diff-Noremapping-${ratio}_*')
 dirs = [d for d in dirs if os.path.exists(d+'/best_gamma.json')]
 if not dirs:
