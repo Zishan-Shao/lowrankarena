@@ -98,7 +98,8 @@ def main(args):
     scheduler_min_lr =args.scheduler_min_lr
 
    # load model
-    model_load_dtype = torch.float16
+    _dtype_map = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}
+    model_load_dtype = _dtype_map.get(args.model_dtype, torch.float16)
     computeSVD_dtype = torch.float32
     
     model_id = args.model_id
@@ -271,6 +272,14 @@ def main(args):
                         json.dump(k_dict, json_file, indent=4)
             return (total_loss, outputs) if return_outputs else total_loss
         
+        def training_step(self, model, inputs, **kwargs):
+            loss = super().training_step(model, inputs, **kwargs)
+            # Replace NaN gradients with 0 so optimizer state stays finite
+            for p in model.parameters():
+                if p.grad is not None and not torch.isfinite(p.grad).all():
+                    p.grad = torch.zeros_like(p.grad)
+            return loss
+
         def create_scheduler(self, num_training_steps, optimizer):
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=scheduler_step_size, eta_min=scheduler_min_lr)
             self.lr_scheduler=scheduler
@@ -306,6 +315,7 @@ def main(args):
         "save_steps": 1000,
         "save_total_limit": 2,
         "remove_unused_columns": False,
+        "max_grad_norm": args.max_grad_norm,
         # "deepspeed": deepspeed_config,
     }
     # Handle transformers version differences
@@ -588,9 +598,24 @@ if __name__ == "__main__":
         help="tuning parameters for model performance and size in training loss",
     )
 
- 
-    
- 
+    parser.add_argument(
+        "--model_dtype",
+        type=str,
+        default="float16",
+        choices=["float16", "bfloat16", "float32"],
+        help="model load dtype",
+    )
+
+    parser.add_argument(
+        "--max_grad_norm",
+        type=float,
+        default=1.0,
+        help="max gradient norm for clipping",
+    )
+
+
+
+
     args = parser.parse_args()
 
     main(args)
