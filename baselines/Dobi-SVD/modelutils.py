@@ -4,9 +4,9 @@ import torch.nn as nn
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
 
-from modules.remapping import DOBI_dequantize
 from modules.module import *
 def load_remapping_model(updated_model_path):
+    from modules.remapping import DOBI_dequantize
     logging.getLogger("transformers").setLevel(logging.ERROR)
         
     model_id = updated_model_path
