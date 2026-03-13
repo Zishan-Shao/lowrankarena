@@ -272,8 +272,8 @@ def main(args):
                         json.dump(k_dict, json_file, indent=4)
             return (total_loss, outputs) if return_outputs else total_loss
         
-        def training_step(self, model, inputs, **kwargs):
-            loss = super().training_step(model, inputs, **kwargs)
+        def training_step(self, model, inputs, num_items_in_batch=None, **kwargs):
+            loss = super().training_step(model, inputs, num_items_in_batch, **kwargs)
             # Replace NaN gradients with 0 so optimizer state stays finite
             for p in model.parameters():
                 if p.grad is not None and not torch.isfinite(p.grad).all():
