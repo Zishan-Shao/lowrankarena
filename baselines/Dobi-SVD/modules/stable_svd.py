@@ -104,11 +104,12 @@ class stable_lowrank_SVD(torch.autograd.Function):
 
 class SVDTransformLayer(nn.Module):
     def __init__(self, gamma = None, SEQ_LEN = None, beta = None,
-                 input_size = None, output_size = None, 
-                 weight_size = None, weight = None, 
+                 input_size = None, output_size = None,
+                 weight_size = None, weight = None,
                  bias = None, name = None, device = None):
         super(SVDTransformLayer, self).__init__()
         self.gamma = nn.Parameter(torch.tensor(gamma, dtype=computeSVD_dtype)).to(device) # gamma is trainable
+        self.target_dtype = weight.dtype  # match original weight dtype (float16/bfloat16/float32)
         if bias is None:
             self.ori = nn.Linear(input_size, output_size, bias=False).to(device)
         else:
@@ -149,7 +150,7 @@ class SVDTransformLayer(nn.Module):
         S_transformed = (S) * (Trunc)
         S_diag = torch.diag_embed(S_transformed)
         x_transformed = torch.matmul(torch.matmul(U, S_diag), V.T)   #U @ S_diag @ V.T
-        real_x= x_transformed.to(model_load_dtype)
+        real_x= x_transformed.to(self.target_dtype)
         
         if squeeze_need == 1:
             real_x = real_x.unsqueeze(0)
