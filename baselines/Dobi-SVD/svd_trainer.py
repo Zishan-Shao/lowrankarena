@@ -156,7 +156,7 @@ def main(args):
                 parent = dict(model.named_modules())[parent_name]
             else:
                 parent = model
-            RANK_RATIO = int(min(module.in_features, module.out_features)/SEQ_LEN)
+            RANK_RATIO = max(1, int(min(module.in_features, module.out_features)/SEQ_LEN))
             
             if remapping:
                 gamma_init = (1/RANK_RATIO)*target_compression_ratio*min(module.in_features, module.out_features)
