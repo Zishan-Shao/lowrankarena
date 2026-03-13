@@ -22,8 +22,7 @@ import logging
 
 from utils.datautils import prepare_train_loaders
 from modules.module import *
-from modules.remapping import DOBI_dequantize
-from modelutils import load_remapping_model, load_unremapping_model
+from modelutils import load_unremapping_model
 
 def evaluate_perplexity(model, dataset, limit):
     """
@@ -107,6 +106,7 @@ def main(args):
         model, tokenizer = load_unremapping_model(args.updated_model_path)
         
     if args.remapping:
+        from modelutils import load_remapping_model
         model, tokenizer = load_remapping_model(args.updated_model_path)
 
     # Put compressed model on the GPU.
