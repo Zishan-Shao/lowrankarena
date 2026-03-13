@@ -59,6 +59,8 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
             --training_dataset wikitext2 \
             --n_train_epochs 20 \
             --n_train_samples 256 \
+            --model_dtype bfloat16 \
+            --max_grad_norm 1.0 \
             2>&1 | tee "logs/${MODEL_TAG}_dobi_train_${KEEP}.log"
         TRAIN_DIR=$(find_training_dir "$RATIO")
     fi

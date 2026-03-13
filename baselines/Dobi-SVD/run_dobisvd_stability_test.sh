@@ -34,7 +34,7 @@ dirs = glob.glob('results/training_output/${LOWER_ID}/Diff-Noremapping-${ratio}_
 dirs = [d for d in dirs if os.path.exists(d+'/best_gamma.json')]
 if not dirs:
     print('NO_GAMMA'); exit()
-d = json.load(open(sorted(dirs, key=lambda x: os.path.getmtime(x))[-1]))
+d = json.load(open(sorted(dirs, key=lambda x: os.path.getmtime(x))[-1]+'/best_gamma.json'))
 vals = [v for k,v in d.items() if isinstance(v,(int,float)) and k not in ('ppl','compression_ratio','lr','PPL_ORIG')]
 nan_count = sum(1 for v in vals if math.isnan(v))
 finite_vals = [v for v in vals if not math.isnan(v)]

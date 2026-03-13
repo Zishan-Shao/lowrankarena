@@ -15,8 +15,8 @@ def prepare_train_loaders(tokenizer, DATASET_NAME, data_cache_dir, dataset_cache
     SEED = args.seed
     
     if LOAD and not args.RECREATE:
-        traindata = torch.load(traindata_cache_file)
-        valdata = torch.load(valdata_cache_file)
+        traindata = torch.load(traindata_cache_file, weights_only=False)
+        valdata = torch.load(valdata_cache_file, weights_only=False)
     else:
         if DATASET_NAME == 'c4':
             traindata = load_dataset("json", 
@@ -46,8 +46,8 @@ def prepare_train_loaders(tokenizer, DATASET_NAME, data_cache_dir, dataset_cache
     LOAD = tokenized_traindata_cache_file.exists() and tokenized_valdata_cache_file.exists()
     
     if LOAD and not args.RECREATE:
-        tokenized_traindata = torch.load(tokenized_traindata_cache_file)
-        tokenized_valdata = torch.load(tokenized_valdata_cache_file)
+        tokenized_traindata = torch.load(tokenized_traindata_cache_file, weights_only=False)
+        tokenized_valdata = torch.load(tokenized_valdata_cache_file, weights_only=False)
     else:
         # traindata
         tokenized_traindata = []
