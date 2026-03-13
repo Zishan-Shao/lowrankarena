@@ -37,7 +37,9 @@ else:
 }
 
 # ── Compress ──────────────────────────────────────────────────────────────────
-for RATIO in 0.2 0.3 0.4 0.5 0.6; do
+# Allow passing ratios as arguments, e.g.: bash run_dobisvd_llama31_8b.sh 0.2 0.4
+RATIOS="${@:-0.2 0.3 0.4 0.5 0.6}"
+for RATIO in $RATIOS; do
     KEEP=$(python -c "print(round(1 - $RATIO, 1))")
     DOBI_PT="results/compressed_model/${LOWER_ID}/DobiSVD_Noremapping-${LOWER_ID}-${RATIO}/DobiSVD_Model.pt"
 
@@ -80,7 +82,7 @@ done
 
 echo ""
 echo "=== All done ==="
-for RATIO in 0.2 0.3 0.4 0.5 0.6; do
+for RATIO in $RATIOS; do
     DOBI_PT="results/compressed_model/${LOWER_ID}/DobiSVD_Noremapping-${LOWER_ID}-${RATIO}/DobiSVD_Model.pt"
     [ -f "$DOBI_PT" ] && echo "  ✓ $DOBI_PT" || echo "  ✗ MISSING: $DOBI_PT"
 done
