@@ -197,6 +197,9 @@ def main(args):
     
     
    # SVDTrainer
+    def _unwrap(m):
+        return getattr(m, 'module', m)
+
     def calculate_compression_loss(model, target_compression_ratio, lambda_reg):
         size_new = torch.tensor(0.)
         
@@ -210,13 +213,13 @@ def main(args):
                 size_ori = module.ori_weight_size
                 size_new = torch.where(size_now < size_ori, size_now, size_ori) + size_new
                 
-        compression_ratio = size_new / model.module.ori_weight_size
+        compression_ratio = size_new / _unwrap(model).ori_weight_size
         
         compression_loss = abs(compression_ratio - torch.tensor(target_compression_ratio,device=compression_ratio.device))
         return lambda_reg * compression_loss, compression_ratio
     
     def Wrong_value_loss(model):
-        penalty = torch.tensor(0.,device=model.module.device)
+        penalty = torch.tensor(0.,device=_unwrap(model).device)
         
         for name, module in model.named_modules():
             if isinstance(module, SVDTransformLayer):
@@ -244,8 +247,8 @@ def main(args):
             
             cur_lr = self.optimizer.param_groups[0]['lr']
     
-            model.module.epoch_cnt += 1
-            if model.module.epoch_cnt % save_epoch_num == 0:
+            _unwrap(model).epoch_cnt += 1
+            if _unwrap(model).epoch_cnt % save_epoch_num == 0:
                 k_dict = {}
                 for name, module in self.model.named_modules():
                     if isinstance(module, SVDTransformLayer):
@@ -253,15 +256,15 @@ def main(args):
                 k_dict['ppl']=ppl.detach().tolist()
                 k_dict['compression_ratio']=compression_ratio.detach().tolist()
                 k_dict['lr']=cur_lr
-                output_json_path = str(TA_tarined_model_output_dir/'k_dict_{:05d}.json'.format(model.module.epoch_cnt))
+                output_json_path = str(TA_tarined_model_output_dir/'k_dict_{:05d}.json'.format(_unwrap(model).epoch_cnt))
                 with open(output_json_path, 'w') as json_file:
                     json.dump(k_dict, json_file, indent=4)
     
                 
-                BEST_loss = model.module.BEST_loss
+                BEST_loss = _unwrap(model).BEST_loss
                 CURR_loss = total_loss.mean().item()
                 if CURR_loss < BEST_loss:
-                    model.module.BEST_loss = torch.tensor(CURR_loss, device = model.module.BEST_loss.device)
+                    _unwrap(model).BEST_loss = torch.tensor(CURR_loss, device = _unwrap(model).BEST_loss.device)
                     k_dict["PPL_ORIG"] = orig_PPL
                     output_json_path = str(TA_tarined_model_output_dir/'best_gamma.json')
                     with open(output_json_path, 'w') as json_file:
