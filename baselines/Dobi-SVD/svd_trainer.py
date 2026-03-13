@@ -232,16 +232,16 @@ def main(args):
     class SVDTrainer(Trainer):
         def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
             outputs = model(**inputs)
-    
+
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
             neg_log_likelihood = loss
             ppl = torch.exp(neg_log_likelihood)
             loss = ppl
 
-            
+
             reg_loss, compression_ratio = calculate_compression_loss(model, target_compression_ratio, lambda_reg)
             value_loss = Wrong_value_loss(model)
-    
+
             # print(value_loss)
             total_loss = loss + reg_loss+value_loss
             
