@@ -175,7 +175,7 @@ def main(args):
             m,n =module.weight.shape
             
             cut = min(module.in_features, module.out_features)/SEQ_LEN
-            module.Ngamma = int(cut)
+            module.Ngamma = max(1, int(cut))
             if cut>1:
                 real_gamma = min(m,n, max(1,cut*math.ceil(gamma)))
             else:
