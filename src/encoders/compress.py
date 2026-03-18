@@ -1408,7 +1408,7 @@ def _count_model_params(model):
     return sum(p.numel() for p in model.parameters())
 
 
-def _calculate_param_ratio(model, method, original_total_params, rank=None, budget=None, scope="qkv+ffn", arch="bert"):  # scope: qkv+ffn or qkv+wo+ffn
+def _calculate_param_ratio(model, method, original_total_params, rank=None, budget=None, scope="qkv+ffn", arch="bert", load_model_dir=None):  # scope: qkv+ffn or qkv+wo+ffn
     """
     Calculate compression ratio using ACTUAL parameter counts from the model.
     Returns a tuple: (ratio, original_params, compressed_params, total_original, total_compressed)
@@ -1436,8 +1436,14 @@ def _calculate_param_ratio(model, method, original_total_params, rank=None, budg
         return 1.0, total_model_params, total_model_params, total_model_params, total_model_params
 
     if method == "adasvd":
-        # AdaSVD saves budget report with achieved_ratio
-        budget_report_path = "experiments/ars_out/budget_report.json"
+        # AdaSVD saves budget report with achieved_ratio.
+        # Prefer checkpoint-local copy (paired with this model) over the shared
+        # ars_out/ path which gets overwritten by later runs on different models.
+        _ckpt_report = os.path.join(load_model_dir, "budget_report.json") if load_model_dir else None
+        if _ckpt_report and os.path.exists(_ckpt_report):
+            budget_report_path = _ckpt_report
+        else:
+            budget_report_path = "experiments/ars_out/budget_report.json"
         if os.path.exists(budget_report_path):
             import json
             with open(budget_report_path) as f:
@@ -1993,6 +1999,16 @@ def main():
         with open(save_path / "compression_info.json", "w") as f:
             json.dump(info, f, indent=2)
 
+        # Copy adasvd budget_report.json into checkpoint dir so it stays
+        # paired with this checkpoint (the shared ars_out/ path gets overwritten
+        # by later runs on different models/tasks).
+        if args.method == "adasvd":
+            import shutil as _shutil
+            _ars_report = Path("experiments/ars_out/budget_report.json")
+            if _ars_report.exists():
+                _shutil.copy2(_ars_report, save_path / "budget_report.json")
+                print(f"[save] budget_report.json copied to checkpoint dir")
+
         print(f"[save] Model saved successfully")
         print(f"[save] Accuracy before fine-tuning: {metric_value:.4f}")
 
@@ -2087,7 +2103,8 @@ def main():
 
     # 7) Calculate and display parameter compression ratio
     param_ratio, original_params, compressed_params, total_original, total_compressed = _calculate_param_ratio(
-        model, args.method, original_total_params, args.rank, args.budget, args.scope, arch
+        model, args.method, original_total_params, args.rank, args.budget, args.scope, arch,
+        load_model_dir=getattr(args, 'load_model_dir', None),
     )
     total_ratio = total_compressed / total_original if total_original > 0 else 1.0
 
