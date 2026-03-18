@@ -24,7 +24,7 @@ def main():
     args = parser.parse_args()
 
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_name = args.model.split("/")[-1]
+    model_name = args.model.split("/")[-1].lower()
 
     print(f"Loading model: {args.model}")
     hf_kwargs = {"torch_dtype": torch.float16, "trust_remote_code": True}
