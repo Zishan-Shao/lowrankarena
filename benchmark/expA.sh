@@ -153,7 +153,7 @@ if [[ "${_PHASES}" == *" superglue "* ]]; then
 
     TASKS="${TASKS_SUPERGLUE}" \
     METHODS="${METHODS}" \
-    BACKENDS="naive" \
+    BACKENDS="${BACKENDS:-naive}" \
     RECOMPRESS="${RECOMPRESS}" \
     REUSE="${REUSE:-false}" \
     MODEL_BASE_DIR="${MODEL_BASE_DIR}" \
