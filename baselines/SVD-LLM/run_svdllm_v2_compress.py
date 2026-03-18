@@ -38,6 +38,11 @@ def main():
 
     print(f"Loading profiling_mat: {args.profiling_mat_path}")
     profiling_mat = torch.load(args.profiling_mat_path, weights_only=False)
+    # whitening_hetero doesn't cast to float32 internally; linalg.inv requires it
+    profiling_mat = {
+        i: {k: v.float() for k, v in layer.items()}
+        for i, layer in profiling_mat.items()
+    }
 
     print(f"Compressing with whitening_hetero (ratio={args.ratio}) ...")
     model = whitening_hetero(
