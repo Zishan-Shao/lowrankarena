@@ -45,7 +45,7 @@ def main():
     }
 
     print(f"Compressing with whitening_hetero (ratio={args.ratio}) ...")
-    model = whitening_hetero(
+    whitening_hetero(
         model_name=model_name,
         model=model,
         profiling_mat=profiling_mat,
