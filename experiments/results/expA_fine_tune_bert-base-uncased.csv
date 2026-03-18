@@ -1,0 +1,17 @@
+timestamp,model_id,task,dataset_split,seq_len,batch_size,dtype,method,qkv_mode,rank,budget,backend,stage,seed,metric_name,metric_value,notes
+2026-03-18T15:40:58,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,matthews_correlation,0.533877,stage=no_finetune
+2026-03-18T15:41:57,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,accuracy,0.924312,stage=no_finetune
+2026-03-18T15:42:29,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,f1,0.910035,stage=no_finetune
+2026-03-18T15:51:24,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,f1,0.878463,stage=no_finetune
+2026-03-18T15:57:53,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,accuracy,0.846154,stage=no_finetune
+2026-03-18T16:00:54,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,accuracy,0.915614,stage=no_finetune
+2026-03-18T16:01:27,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,accuracy,0.725632,stage=no_finetune
+2026-03-18T16:02:05,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,pearson,0.880531,stage=no_finetune
+2026-03-18T16:02:28,textattack/bert-base-uncased-CoLA,cola,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,matthews_correlation,0.533877,stage=no_finetune
+2026-03-18T16:02:37,textattack/bert-base-uncased-SST-2,sst2,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,accuracy,0.924312,stage=no_finetune
+2026-03-18T16:02:46,textattack/bert-base-uncased-MRPC,mrpc,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,f1,0.910035,stage=no_finetune
+2026-03-18T16:04:08,textattack/bert-base-uncased-QQP,qqp,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,f1,0.878463,stage=no_finetune
+2026-03-18T16:04:33,textattack/bert-base-uncased-MNLI,mnli,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,accuracy,0.846154,stage=no_finetune
+2026-03-18T16:04:49,textattack/bert-base-uncased-QNLI,qnli,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,accuracy,0.915614,stage=no_finetune
+2026-03-18T16:04:56,textattack/bert-base-uncased-RTE,rte,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,accuracy,0.725632,stage=no_finetune
+2026-03-18T16:05:06,textattack/bert-base-uncased-STS-B,stsb,validation,512,32,bf16,dense,per_head,,,naive,compress_eval,42,pearson,0.880531,stage=no_finetune

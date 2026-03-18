@@ -81,3 +81,10 @@ flashsvd-v2/
 # Large binary / document files
 *.zip
 *.pdf
+baselines/Dobi-SVD/results/training_output/
+baselines/SVD-LLM/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
+baselines/SVD-LLM/flash_attn-2.8.3+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
+baselines/SVD-LLM/flash_attn-2.8.3+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl.1
+baselines/SVD-LLM/flash_attn-2.8.3+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl.2
+baselines/SVD-LLM/flash_attn-2.8.3+cu12torch2.6cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
+baselines/SVD-LLM/flash_attn-2.8.3+cu12torch2.6cxx11abiTRUE-cp310-cp310-linux_x86_64.whl.1

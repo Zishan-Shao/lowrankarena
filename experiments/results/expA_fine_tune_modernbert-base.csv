@@ -1,421 +1,523 @@
 timestamp,model_id,task,dataset_split,seq_len,batch_size,dtype,method,qkv_mode,rank,budget,backend,stage,seed,metric_name,metric_value,notes
-2026-03-08T22:02:31,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune
-2026-03-08T22:02:31,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune sdpa_path=flash
-2026-03-08T22:02:31,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.022995,stage=no_finetune
-2026-03-08T22:02:53,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.491972,stage=no_finetune
-2026-03-08T22:02:53,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.491972,stage=no_finetune sdpa_path=flash
-2026-03-08T22:02:53,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.488532,stage=no_finetune
-2026-03-08T22:03:12,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.254438,stage=no_finetune
-2026-03-08T22:03:12,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.254438,stage=no_finetune sdpa_path=flash
-2026-03-08T22:03:12,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.259587,stage=no_finetune
-2026-03-08T22:17:15,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune
-2026-03-08T22:17:15,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune sdpa_path=flash
-2026-03-08T22:17:15,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.022995,stage=no_finetune
-2026-03-08T22:18:02,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.491972,stage=no_finetune
-2026-03-08T22:18:02,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.491972,stage=no_finetune sdpa_path=flash
-2026-03-08T22:18:02,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.488532,stage=no_finetune
-2026-03-08T22:18:40,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.254438,stage=no_finetune
-2026-03-08T22:18:40,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.254438,stage=no_finetune sdpa_path=flash
-2026-03-08T22:18:40,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.259587,stage=no_finetune
-2026-03-08T22:27:39,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.447578,stage=no_finetune
-2026-03-08T22:27:39,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.447578,stage=no_finetune sdpa_path=flash
-2026-03-08T22:27:39,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.446738,stage=no_finetune
-2026-03-08T22:31:45,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.322466,stage=no_finetune
-2026-03-08T22:31:45,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.322466,stage=no_finetune sdpa_path=flash
-2026-03-08T22:31:45,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.322975,stage=no_finetune
-2026-03-08T22:33:51,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.494600,stage=no_finetune
-2026-03-08T22:33:51,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.494600,stage=no_finetune sdpa_path=flash
-2026-03-08T22:33:51,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.494600,stage=no_finetune
-2026-03-08T22:34:34,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.480144,stage=no_finetune
-2026-03-08T22:34:34,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.480144,stage=no_finetune sdpa_path=flash
-2026-03-08T22:34:34,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.480144,stage=no_finetune
-2026-03-08T22:35:25,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,pearson,-0.010772,stage=no_finetune
-2026-03-08T22:35:25,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,pearson,-0.010772,stage=no_finetune sdpa_path=flash
-2026-03-08T22:35:25,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,pearson,-0.010031,stage=no_finetune
-2026-03-08T22:36:39,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,matthews_correlation,0.026539,stage=no_finetune
-2026-03-08T22:36:39,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.026539,stage=no_finetune sdpa_path=flash
-2026-03-08T22:36:39,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.033907,stage=no_finetune
-2026-03-08T22:37:50,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.504587,stage=no_finetune
-2026-03-08T22:37:50,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.504587,stage=no_finetune sdpa_path=flash
-2026-03-08T22:37:50,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.503440,stage=no_finetune
-2026-03-08T22:38:43,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.028269,stage=no_finetune
-2026-03-08T22:38:43,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,f1,0.028269,stage=no_finetune sdpa_path=flash
-2026-03-08T22:38:43,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.021277,stage=no_finetune
-2026-03-08T22:47:44,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.490633,stage=no_finetune
-2026-03-08T22:47:44,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,f1,0.490633,stage=no_finetune sdpa_path=flash
-2026-03-08T22:47:44,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.490207,stage=no_finetune
-2026-03-08T22:51:50,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.336526,stage=no_finetune
-2026-03-08T22:51:50,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.336526,stage=no_finetune sdpa_path=flash
-2026-03-08T22:51:50,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.334896,stage=no_finetune
-2026-03-08T22:53:58,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.502105,stage=no_finetune
-2026-03-08T22:53:58,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.502105,stage=no_finetune sdpa_path=flash
-2026-03-08T22:53:58,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.502837,stage=no_finetune
-2026-03-08T22:54:49,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.530686,stage=no_finetune
-2026-03-08T22:54:49,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.530686,stage=no_finetune sdpa_path=flash
-2026-03-08T22:54:49,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-08T22:55:49,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,pearson,-0.052508,stage=no_finetune
-2026-03-08T22:55:49,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,pearson,-0.052508,stage=no_finetune sdpa_path=flash
-2026-03-08T22:55:49,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,pearson,-0.050893,stage=no_finetune
-2026-03-08T22:56:55,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,matthews_correlation,0.029292,stage=no_finetune
-2026-03-08T22:56:55,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.029292,stage=no_finetune sdpa_path=flash
-2026-03-08T22:56:55,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.029292,stage=no_finetune
-2026-03-08T22:57:45,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.752294,stage=no_finetune
-2026-03-08T22:57:45,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.752294,stage=no_finetune sdpa_path=flash
-2026-03-08T22:57:45,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.753440,stage=no_finetune
-2026-03-08T22:58:30,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.754919,stage=no_finetune
-2026-03-08T22:58:30,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,f1,0.754919,stage=no_finetune sdpa_path=flash
-2026-03-08T22:58:30,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.745946,stage=no_finetune
-2026-03-08T23:06:03,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.570833,stage=no_finetune
-2026-03-08T23:06:03,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,f1,0.570833,stage=no_finetune sdpa_path=flash
-2026-03-08T23:06:03,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.570667,stage=no_finetune
-2026-03-08T23:08:26,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.406521,stage=no_finetune
-2026-03-08T23:08:26,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.406521,stage=no_finetune sdpa_path=flash
-2026-03-08T23:08:26,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.406419,stage=no_finetune
-2026-03-08T23:10:02,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.495149,stage=no_finetune
-2026-03-08T23:10:02,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.495149,stage=no_finetune sdpa_path=flash
-2026-03-08T23:10:02,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.494966,stage=no_finetune
-2026-03-08T23:10:47,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-08T23:10:47,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
-2026-03-08T23:10:47,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-08T23:11:40,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,pearson,0.378104,stage=no_finetune
-2026-03-08T23:11:40,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,pearson,0.378104,stage=no_finetune sdpa_path=flash
-2026-03-08T23:11:40,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,pearson,0.377380,stage=no_finetune
-2026-03-08T23:17:33,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,matthews_correlation,-0.029230,stage=no_finetune
-2026-03-08T23:17:33,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,matthews_correlation,-0.029230,stage=no_finetune sdpa_path=flash
-2026-03-08T23:17:33,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,matthews_correlation,-0.023761,stage=no_finetune
-2026-03-08T23:22:51,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.573394,stage=no_finetune
-2026-03-08T23:22:51,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.573394,stage=no_finetune sdpa_path=flash
-2026-03-08T23:22:51,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.572248,stage=no_finetune
-2026-03-08T23:28:16,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.159744,stage=no_finetune
-2026-03-08T23:28:16,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,f1,0.159744,stage=no_finetune sdpa_path=flash
-2026-03-08T23:28:16,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.154341,stage=no_finetune
-2026-03-08T23:45:16,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.569125,stage=no_finetune
-2026-03-08T23:45:16,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,f1,0.569125,stage=no_finetune sdpa_path=flash
-2026-03-08T23:45:16,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.568522,stage=no_finetune
-2026-03-08T23:53:26,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.398268,stage=no_finetune
-2026-03-08T23:53:26,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.398268,stage=no_finetune sdpa_path=flash
-2026-03-08T23:53:26,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.399083,stage=no_finetune
-2026-03-09T00:00:09,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.580999,stage=no_finetune
-2026-03-09T00:00:09,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.580999,stage=no_finetune sdpa_path=flash
-2026-03-09T00:00:09,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.579718,stage=no_finetune
-2026-03-09T00:05:34,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.472924,stage=no_finetune
-2026-03-09T00:05:34,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.472924,stage=no_finetune sdpa_path=flash
-2026-03-09T00:05:34,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.472924,stage=no_finetune
-2026-03-09T00:11:20,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.273090,stage=no_finetune
-2026-03-09T00:11:20,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,pearson,0.273090,stage=no_finetune sdpa_path=flash
-2026-03-09T00:11:20,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,pearson,0.274193,stage=no_finetune
-2026-03-09T00:12:26,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune
-2026-03-09T00:12:26,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune sdpa_path=flash
-2026-03-09T00:12:26,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.022995,stage=no_finetune
-2026-03-09T00:13:15,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.491972,stage=no_finetune
-2026-03-09T00:13:15,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.491972,stage=no_finetune sdpa_path=flash
-2026-03-09T00:13:15,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.488532,stage=no_finetune
-2026-03-09T00:13:57,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.254438,stage=no_finetune
-2026-03-09T00:13:57,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.254438,stage=no_finetune sdpa_path=flash
-2026-03-09T00:13:57,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.259587,stage=no_finetune
-2026-03-09T00:21:23,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.447578,stage=no_finetune
-2026-03-09T00:21:23,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.447578,stage=no_finetune sdpa_path=flash
-2026-03-09T00:21:23,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.446738,stage=no_finetune
-2026-03-09T00:23:40,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.322466,stage=no_finetune
-2026-03-09T00:23:40,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.322466,stage=no_finetune sdpa_path=flash
-2026-03-09T00:23:40,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.322975,stage=no_finetune
-2026-03-09T00:25:15,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.494600,stage=no_finetune
-2026-03-09T00:25:15,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.494600,stage=no_finetune sdpa_path=flash
-2026-03-09T00:25:15,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.494600,stage=no_finetune
-2026-03-09T00:25:58,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.480144,stage=no_finetune
-2026-03-09T00:25:58,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.480144,stage=no_finetune sdpa_path=flash
-2026-03-09T00:25:58,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.480144,stage=no_finetune
-2026-03-09T00:26:47,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,pearson,-0.010772,stage=no_finetune
-2026-03-09T00:26:47,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,pearson,-0.010772,stage=no_finetune sdpa_path=flash
-2026-03-09T00:26:47,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,pearson,-0.010031,stage=no_finetune
-2026-03-09T00:27:57,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,matthews_correlation,0.026539,stage=no_finetune
-2026-03-09T00:27:57,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.026539,stage=no_finetune sdpa_path=flash
-2026-03-09T00:27:57,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.033907,stage=no_finetune
-2026-03-09T00:28:51,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.504587,stage=no_finetune
-2026-03-09T00:28:51,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.504587,stage=no_finetune sdpa_path=flash
-2026-03-09T00:28:51,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.503440,stage=no_finetune
-2026-03-09T00:29:39,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.028269,stage=no_finetune
-2026-03-09T00:29:39,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,f1,0.028269,stage=no_finetune sdpa_path=flash
-2026-03-09T00:29:39,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.021277,stage=no_finetune
-2026-03-09T00:37:14,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.490633,stage=no_finetune
-2026-03-09T00:37:14,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,f1,0.490633,stage=no_finetune sdpa_path=flash
-2026-03-09T00:37:14,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.490207,stage=no_finetune
-2026-03-09T00:39:38,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.336526,stage=no_finetune
-2026-03-09T00:39:38,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.336526,stage=no_finetune sdpa_path=flash
-2026-03-09T00:39:38,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.334896,stage=no_finetune
-2026-03-09T00:41:17,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.502105,stage=no_finetune
-2026-03-09T00:41:17,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.502105,stage=no_finetune sdpa_path=flash
-2026-03-09T00:41:17,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.502837,stage=no_finetune
-2026-03-09T00:42:06,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.530686,stage=no_finetune
-2026-03-09T00:42:06,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.530686,stage=no_finetune sdpa_path=flash
-2026-03-09T00:42:06,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T00:43:03,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,pearson,-0.052508,stage=no_finetune
-2026-03-09T00:43:03,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,pearson,-0.052508,stage=no_finetune sdpa_path=flash
-2026-03-09T00:43:03,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,pearson,-0.050893,stage=no_finetune
-2026-03-09T00:44:09,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,matthews_correlation,0.029292,stage=no_finetune
-2026-03-09T00:44:09,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.029292,stage=no_finetune sdpa_path=flash
-2026-03-09T00:44:09,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.029292,stage=no_finetune
-2026-03-09T00:44:56,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.752294,stage=no_finetune
-2026-03-09T00:44:56,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.752294,stage=no_finetune sdpa_path=flash
-2026-03-09T00:44:56,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.753440,stage=no_finetune
-2026-03-09T00:45:39,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.754919,stage=no_finetune
-2026-03-09T00:45:39,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,f1,0.754919,stage=no_finetune sdpa_path=flash
-2026-03-09T00:45:39,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.745946,stage=no_finetune
-2026-03-09T00:53:09,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.570833,stage=no_finetune
-2026-03-09T00:53:09,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,f1,0.570833,stage=no_finetune sdpa_path=flash
-2026-03-09T00:53:09,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.570667,stage=no_finetune
-2026-03-09T00:55:30,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.406521,stage=no_finetune
-2026-03-09T00:55:30,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.406521,stage=no_finetune sdpa_path=flash
-2026-03-09T00:55:30,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.406419,stage=no_finetune
-2026-03-09T00:57:07,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.495149,stage=no_finetune
-2026-03-09T00:57:07,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.495149,stage=no_finetune sdpa_path=flash
-2026-03-09T00:57:07,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.494966,stage=no_finetune
-2026-03-09T00:57:49,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T00:57:49,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
-2026-03-09T00:57:49,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T00:58:39,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,pearson,0.378104,stage=no_finetune
-2026-03-09T00:58:39,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,pearson,0.378104,stage=no_finetune sdpa_path=flash
-2026-03-09T00:58:39,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,pearson,0.377380,stage=no_finetune
-2026-03-09T01:04:13,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,matthews_correlation,-0.029230,stage=no_finetune
-2026-03-09T01:04:13,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,matthews_correlation,-0.029230,stage=no_finetune sdpa_path=flash
-2026-03-09T01:04:13,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,matthews_correlation,-0.023761,stage=no_finetune
-2026-03-09T01:09:27,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.573394,stage=no_finetune
-2026-03-09T01:09:27,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.573394,stage=no_finetune sdpa_path=flash
-2026-03-09T01:09:27,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.572248,stage=no_finetune
-2026-03-09T01:14:51,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.159744,stage=no_finetune
-2026-03-09T01:14:51,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,f1,0.159744,stage=no_finetune sdpa_path=flash
-2026-03-09T01:14:51,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.154341,stage=no_finetune
-2026-03-09T01:31:50,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.569125,stage=no_finetune
-2026-03-09T01:31:50,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,f1,0.569125,stage=no_finetune sdpa_path=flash
-2026-03-09T01:31:50,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.568522,stage=no_finetune
-2026-03-09T01:39:42,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.398268,stage=no_finetune
-2026-03-09T01:39:42,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.398268,stage=no_finetune sdpa_path=flash
-2026-03-09T01:39:42,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.399083,stage=no_finetune
-2026-03-09T01:46:34,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.580999,stage=no_finetune
-2026-03-09T01:46:34,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.580999,stage=no_finetune sdpa_path=flash
-2026-03-09T01:46:34,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.579718,stage=no_finetune
-2026-03-09T01:56:14,compressed_models/modernbert/svd/boolq/svd_ra26_rf138_rw112_per_head_naive,boolq,validation,512,32,bf16,svd,per_head,ra26_rf138_rw112,,naive,compress_finetune,42,accuracy,0.653517,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T01:56:14,compressed_models/modernbert/svd/boolq/svd_ra26_rf138_rw112_per_head_naive,boolq,validation,512,32,bf16,svd,per_head,ra26_rf138_rw112,,flashsvd15,compress_finetune,42,accuracy,0.652599,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:02:15,compressed_models/modernbert/fwsvd/boolq/fwsvd_ra26_rf138_rw112_per_head_naive,boolq,validation,512,32,bf16,fwsvd,per_head,ra26_rf138_rw112,,naive,compress_finetune,42,accuracy,0.679817,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:02:15,compressed_models/modernbert/fwsvd/boolq/fwsvd_ra26_rf138_rw112_per_head_naive,boolq,validation,512,32,bf16,fwsvd,per_head,ra26_rf138_rw112,,flashsvd15,compress_finetune,42,accuracy,0.675535,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:08:42,compressed_models/modernbert/drone/boolq/drone_ra26_rf138_rw112_per_head_naive,boolq,validation,512,32,bf16,drone,per_head,ra26_rf138_rw112,,naive,compress_finetune,42,accuracy,0.672783,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:08:42,compressed_models/modernbert/drone/boolq/drone_ra26_rf138_rw112_per_head_naive,boolq,validation,512,32,bf16,drone,per_head,ra26_rf138_rw112,,flashsvd15,compress_finetune,42,accuracy,0.675535,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:15:51,compressed_models/modernbert/adasvd/boolq/adasvd_b0.527_per_head_naive,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_finetune,42,accuracy,0.688379,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:15:51,compressed_models/modernbert/adasvd/boolq/adasvd_b0.527_per_head_naive,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_finetune,42,accuracy,0.688991,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:17:19,compressed_models/modernbert/adasvd/rte_sg/adasvd_b0.527_per_head_naive,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_finetune,42,accuracy,0.574007,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:17:19,compressed_models/modernbert/adasvd/rte_sg/adasvd_b0.527_per_head_naive,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_finetune,42,accuracy,0.559567,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:20:09,compressed_models/modernbert/adasvd/wic/adasvd_b0.527_per_head_naive,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_finetune,42,accuracy,0.673981,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T02:20:09,compressed_models/modernbert/adasvd/wic/adasvd_b0.527_per_head_naive,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_finetune,42,accuracy,0.658307,post_compress_finetune epochs=3 lr=2e-05
-2026-03-09T10:08:27,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
-2026-03-09T10:08:27,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
-2026-03-09T10:08:27,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.606116,stage=no_finetune
-2026-03-09T10:08:45,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T10:08:45,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
-2026-03-09T10:08:45,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.469314,stage=no_finetune
-2026-03-09T10:09:05,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T10:09:05,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
-2026-03-09T10:09:05,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T10:09:21,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T10:09:21,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
-2026-03-09T10:09:21,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T10:13:31,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
-2026-03-09T10:13:31,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
-2026-03-09T10:13:31,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.606116,stage=no_finetune
-2026-03-09T10:13:48,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T10:13:48,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
-2026-03-09T10:13:48,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.469314,stage=no_finetune
-2026-03-09T10:14:09,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T10:14:09,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
-2026-03-09T10:14:09,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T10:14:25,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T10:14:25,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
-2026-03-09T10:14:25,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T10:15:17,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.618960,stage=no_finetune
-2026-03-09T10:15:17,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.618960,stage=no_finetune sdpa_path=flash
-2026-03-09T10:15:17,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.620183,stage=no_finetune
-2026-03-09T10:15:35,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T10:15:35,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
-2026-03-09T10:15:35,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T10:15:55,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.498433,stage=no_finetune
-2026-03-09T10:15:55,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.498433,stage=no_finetune sdpa_path=flash
-2026-03-09T10:15:55,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T10:16:11,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T10:16:11,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
-2026-03-09T10:16:11,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.375000,stage=no_finetune
-2026-03-09T10:17:05,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.621713,stage=no_finetune
-2026-03-09T10:17:05,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.621713,stage=no_finetune sdpa_path=flash
-2026-03-09T10:17:05,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.621713,stage=no_finetune
-2026-03-09T10:17:23,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T10:17:23,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
-2026-03-09T10:17:23,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T10:17:57,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.464286,stage=no_finetune
-2026-03-09T10:17:57,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.464286,stage=no_finetune sdpa_path=flash
-2026-03-09T10:17:57,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.464286,stage=no_finetune
-2026-03-09T10:18:59,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.583486,stage=no_finetune
-2026-03-09T10:18:59,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.583486,stage=no_finetune sdpa_path=flash
-2026-03-09T10:18:59,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.585015,stage=no_finetune
-2026-03-09T10:19:21,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T10:19:21,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
-2026-03-09T10:19:21,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.516245,stage=no_finetune
-2026-03-09T10:19:47,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.521944,stage=no_finetune
-2026-03-09T10:19:47,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.521944,stage=no_finetune sdpa_path=flash
-2026-03-09T10:19:47,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.521944,stage=no_finetune
-2026-03-09T10:20:06,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.660714,stage=no_finetune
-2026-03-09T10:20:06,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.660714,stage=no_finetune sdpa_path=flash
-2026-03-09T10:20:06,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.642857,stage=no_finetune
-2026-03-09T10:21:09,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.530000,stage=no_finetune
-2026-03-09T10:21:09,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.530000,stage=no_finetune sdpa_path=flash
-2026-03-09T10:21:09,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.510000,stage=no_finetune
-2026-03-09T10:24:39,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.515067,stage=no_finetune
-2026-03-09T10:24:39,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.515067,stage=no_finetune sdpa_path=flash
-2026-03-09T10:24:39,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.515567,stage=no_finetune
-2026-03-09T10:27:13,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.480000,stage=no_finetune
-2026-03-09T10:27:13,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.480000,stage=no_finetune sdpa_path=flash
-2026-03-09T10:27:13,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.520000,stage=no_finetune
-2026-03-09T10:30:41,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.509933,stage=no_finetune
-2026-03-09T10:30:41,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.509933,stage=no_finetune sdpa_path=flash
-2026-03-09T10:30:41,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.509367,stage=no_finetune
-2026-03-09T11:55:59,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
-2026-03-09T11:55:59,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
-2026-03-09T11:55:59,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.606116,stage=no_finetune
-2026-03-09T11:56:18,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T11:56:18,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
-2026-03-09T11:56:18,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.469314,stage=no_finetune
-2026-03-09T11:56:39,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T11:56:39,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
-2026-03-09T11:56:39,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T11:56:55,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T11:56:55,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
-2026-03-09T11:56:55,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T11:57:49,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.618960,stage=no_finetune
-2026-03-09T11:57:49,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.618960,stage=no_finetune sdpa_path=flash
-2026-03-09T11:57:49,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.620183,stage=no_finetune
-2026-03-09T11:58:07,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T11:58:07,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
-2026-03-09T11:58:07,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T11:58:28,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.498433,stage=no_finetune
-2026-03-09T11:58:28,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.498433,stage=no_finetune sdpa_path=flash
-2026-03-09T11:58:28,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T11:58:44,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T11:58:44,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
-2026-03-09T11:58:44,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.375000,stage=no_finetune
-2026-03-09T11:59:38,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.621713,stage=no_finetune
-2026-03-09T11:59:38,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.621713,stage=no_finetune sdpa_path=flash
-2026-03-09T11:59:38,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.621713,stage=no_finetune
-2026-03-09T11:59:57,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T11:59:57,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
-2026-03-09T11:59:57,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T12:00:32,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.464286,stage=no_finetune
-2026-03-09T12:00:32,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.464286,stage=no_finetune sdpa_path=flash
-2026-03-09T12:00:32,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.464286,stage=no_finetune
-2026-03-09T12:01:33,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.583486,stage=no_finetune
-2026-03-09T12:01:33,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.583486,stage=no_finetune sdpa_path=flash
-2026-03-09T12:01:33,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.585015,stage=no_finetune
-2026-03-09T12:01:56,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T12:01:56,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
-2026-03-09T12:01:56,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.516245,stage=no_finetune
-2026-03-09T12:02:22,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.521944,stage=no_finetune
-2026-03-09T12:02:22,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.521944,stage=no_finetune sdpa_path=flash
-2026-03-09T12:02:22,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.521944,stage=no_finetune
-2026-03-09T12:02:41,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.660714,stage=no_finetune
-2026-03-09T12:02:41,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.660714,stage=no_finetune sdpa_path=flash
-2026-03-09T12:02:41,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.642857,stage=no_finetune
-2026-03-09T12:03:44,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.530000,stage=no_finetune
-2026-03-09T12:03:44,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.530000,stage=no_finetune sdpa_path=flash
-2026-03-09T12:03:44,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.510000,stage=no_finetune
-2026-03-09T12:07:14,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.515067,stage=no_finetune
-2026-03-09T12:07:14,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.515067,stage=no_finetune sdpa_path=flash
-2026-03-09T12:07:14,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.515567,stage=no_finetune
-2026-03-09T12:09:45,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.480000,stage=no_finetune
-2026-03-09T12:09:45,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.480000,stage=no_finetune sdpa_path=flash
-2026-03-09T12:09:45,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.520000,stage=no_finetune
-2026-03-09T12:13:15,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.509933,stage=no_finetune
-2026-03-09T12:13:15,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.509933,stage=no_finetune sdpa_path=flash
-2026-03-09T12:13:15,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.509367,stage=no_finetune
-2026-03-09T14:16:29,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
-2026-03-09T14:16:29,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
-2026-03-09T14:16:29,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.606116,stage=no_finetune
-2026-03-09T14:16:47,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T14:16:47,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
-2026-03-09T14:16:47,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.469314,stage=no_finetune
-2026-03-09T14:17:07,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T14:17:07,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
-2026-03-09T14:17:07,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T14:17:23,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T14:17:23,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
-2026-03-09T14:17:23,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T14:18:16,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.618960,stage=no_finetune
-2026-03-09T14:18:16,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.618960,stage=no_finetune sdpa_path=flash
-2026-03-09T14:18:16,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.620183,stage=no_finetune
-2026-03-09T14:18:34,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T14:18:34,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
-2026-03-09T14:18:34,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.465704,stage=no_finetune
-2026-03-09T14:18:54,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.498433,stage=no_finetune
-2026-03-09T14:18:54,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.498433,stage=no_finetune sdpa_path=flash
-2026-03-09T14:18:54,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
-2026-03-09T14:19:09,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
-2026-03-09T14:19:09,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
-2026-03-09T14:19:09,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.375000,stage=no_finetune
-2026-03-09T14:20:02,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.621713,stage=no_finetune
-2026-03-09T14:20:02,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.621713,stage=no_finetune sdpa_path=flash
-2026-03-09T14:20:02,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.621713,stage=no_finetune
-2026-03-09T14:20:20,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T14:20:20,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
-2026-03-09T14:20:20,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T14:20:57,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.464286,stage=no_finetune
-2026-03-09T14:20:57,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.464286,stage=no_finetune sdpa_path=flash
-2026-03-09T14:20:57,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.464286,stage=no_finetune
-2026-03-09T14:21:56,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.583486,stage=no_finetune
-2026-03-09T14:21:56,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.583486,stage=no_finetune sdpa_path=flash
-2026-03-09T14:21:56,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.585015,stage=no_finetune
-2026-03-09T14:22:18,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
-2026-03-09T14:22:18,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
-2026-03-09T14:22:18,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.516245,stage=no_finetune
-2026-03-09T14:22:43,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.521944,stage=no_finetune
-2026-03-09T14:22:43,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.521944,stage=no_finetune sdpa_path=flash
-2026-03-09T14:22:43,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.521944,stage=no_finetune
-2026-03-09T14:23:02,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.660714,stage=no_finetune
-2026-03-09T14:23:02,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.660714,stage=no_finetune sdpa_path=flash
-2026-03-09T14:23:02,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.642857,stage=no_finetune
-2026-03-09T14:24:07,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.530000,stage=no_finetune
-2026-03-09T14:24:07,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.530000,stage=no_finetune sdpa_path=flash
-2026-03-09T14:24:07,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.510000,stage=no_finetune
-2026-03-09T14:27:37,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.515067,stage=no_finetune
-2026-03-09T14:27:37,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.515067,stage=no_finetune sdpa_path=flash
-2026-03-09T14:27:37,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.515567,stage=no_finetune
-2026-03-09T14:28:56,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.490000,stage=no_finetune
-2026-03-09T14:28:56,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.490000,stage=no_finetune sdpa_path=flash
-2026-03-09T14:28:56,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.480000,stage=no_finetune
-2026-03-09T14:35:02,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.472867,stage=no_finetune
-2026-03-09T14:35:02,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.472867,stage=no_finetune sdpa_path=flash
-2026-03-09T14:35:02,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.474933,stage=no_finetune
-2026-03-09T14:35:59,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.348000,stage=no_finetune
-2026-03-09T14:35:59,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.348000,stage=no_finetune sdpa_path=flash
-2026-03-09T14:35:59,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.343000,stage=no_finetune
-2026-03-09T14:36:54,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.358000,stage=no_finetune
-2026-03-09T14:36:54,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.358000,stage=no_finetune sdpa_path=flash
-2026-03-09T14:36:54,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.354000,stage=no_finetune
-2026-03-09T14:37:53,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.341667,stage=no_finetune
-2026-03-09T14:37:53,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.341667,stage=no_finetune sdpa_path=flash
-2026-03-09T14:37:53,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.342500,stage=no_finetune
-2026-03-09T14:38:36,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.480000,stage=no_finetune
-2026-03-09T14:38:36,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.480000,stage=no_finetune sdpa_path=flash
-2026-03-09T14:38:36,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.520000,stage=no_finetune
-2026-03-09T14:42:05,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.509933,stage=no_finetune
-2026-03-09T14:42:05,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.509933,stage=no_finetune sdpa_path=flash
-2026-03-09T14:42:05,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.509367,stage=no_finetune
-2026-03-09T14:47:41,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.560000,stage=no_finetune
-2026-03-09T14:47:41,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.560000,stage=no_finetune sdpa_path=flash
-2026-03-09T14:47:41,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.530000,stage=no_finetune
-2026-03-09T15:01:41,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.512000,stage=no_finetune
-2026-03-09T15:01:41,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.512000,stage=no_finetune sdpa_path=flash
-2026-03-09T15:01:41,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.511067,stage=no_finetune
-2026-03-09T15:07:12,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.325000,stage=no_finetune
-2026-03-09T15:07:12,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.325000,stage=no_finetune sdpa_path=flash
-2026-03-09T15:07:12,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.327000,stage=no_finetune
-2026-03-09T15:12:31,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.331000,stage=no_finetune
-2026-03-09T15:12:31,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.331000,stage=no_finetune sdpa_path=flash
-2026-03-09T15:12:31,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.332000,stage=no_finetune
-2026-03-09T15:18:05,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.335833,stage=no_finetune
-2026-03-09T15:18:05,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.335833,stage=no_finetune sdpa_path=flash
-2026-03-09T15:18:05,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.335833,stage=no_finetune
+2026-03-10T23:24:35,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune
+2026-03-10T23:24:35,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune sdpa_path=flash
+2026-03-10T23:24:35,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.022995,stage=no_finetune
+2026-03-10T23:25:03,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.491972,stage=no_finetune
+2026-03-10T23:25:03,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.491972,stage=no_finetune sdpa_path=flash
+2026-03-10T23:25:03,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.493119,stage=no_finetune
+2026-03-10T23:25:29,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.254438,stage=no_finetune
+2026-03-10T23:25:29,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.254438,stage=no_finetune sdpa_path=flash
+2026-03-10T23:25:29,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.264706,stage=no_finetune
+2026-03-10T23:29:12,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune
+2026-03-10T23:29:12,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.012320,stage=no_finetune sdpa_path=flash
+2026-03-10T23:29:12,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.022995,stage=no_finetune
+2026-03-10T23:29:40,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.491972,stage=no_finetune
+2026-03-10T23:29:40,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.491972,stage=no_finetune sdpa_path=flash
+2026-03-10T23:29:40,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.491972,stage=no_finetune
+2026-03-10T23:30:05,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.254438,stage=no_finetune
+2026-03-10T23:30:05,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.254438,stage=no_finetune sdpa_path=flash
+2026-03-10T23:30:05,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.254438,stage=no_finetune
+2026-03-10T23:36:17,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,f1,0.447578,stage=no_finetune
+2026-03-10T23:36:17,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,f1,0.447578,stage=no_finetune sdpa_path=flash
+2026-03-10T23:36:17,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,f1,0.445806,stage=no_finetune
+2026-03-10T23:38:05,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.322466,stage=no_finetune
+2026-03-10T23:38:05,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.322466,stage=no_finetune sdpa_path=flash
+2026-03-10T23:38:05,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.320734,stage=no_finetune
+2026-03-10T23:39:14,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.494600,stage=no_finetune
+2026-03-10T23:39:14,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.494600,stage=no_finetune sdpa_path=flash
+2026-03-10T23:39:14,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.494600,stage=no_finetune
+2026-03-10T23:39:37,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.480144,stage=no_finetune
+2026-03-10T23:39:37,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.480144,stage=no_finetune sdpa_path=flash
+2026-03-10T23:39:37,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.480144,stage=no_finetune
+2026-03-10T23:40:12,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,pearson,-0.010772,stage=no_finetune
+2026-03-10T23:40:12,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,pearson,-0.010772,stage=no_finetune sdpa_path=flash
+2026-03-10T23:40:12,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,pearson,-0.009639,stage=no_finetune
+2026-03-10T23:40:58,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,matthews_correlation,0.082055,stage=no_finetune
+2026-03-10T23:40:58,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.082055,stage=no_finetune sdpa_path=flash
+2026-03-10T23:40:58,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.075040,stage=no_finetune
+2026-03-10T23:41:26,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.505734,stage=no_finetune
+2026-03-10T23:41:26,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.505734,stage=no_finetune sdpa_path=flash
+2026-03-10T23:41:26,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.502294,stage=no_finetune
+2026-03-10T23:41:52,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.160256,stage=no_finetune
+2026-03-10T23:41:52,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,f1,0.160256,stage=no_finetune sdpa_path=flash
+2026-03-10T23:41:52,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.166667,stage=no_finetune
+2026-03-10T23:47:57,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,f1,0.489582,stage=no_finetune
+2026-03-10T23:47:57,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,f1,0.489582,stage=no_finetune sdpa_path=flash
+2026-03-10T23:47:57,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,f1,0.489034,stage=no_finetune
+2026-03-10T23:49:41,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.338665,stage=no_finetune
+2026-03-10T23:49:41,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.338665,stage=no_finetune sdpa_path=flash
+2026-03-10T23:49:41,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.339379,stage=no_finetune
+2026-03-10T23:50:48,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.516017,stage=no_finetune
+2026-03-10T23:50:48,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.516017,stage=no_finetune sdpa_path=flash
+2026-03-10T23:50:48,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.516383,stage=no_finetune
+2026-03-10T23:51:10,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.530686,stage=no_finetune
+2026-03-10T23:51:10,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.530686,stage=no_finetune sdpa_path=flash
+2026-03-10T23:51:10,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.530686,stage=no_finetune
+2026-03-10T23:51:44,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,pearson,-0.056276,stage=no_finetune
+2026-03-10T23:51:44,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,pearson,-0.056276,stage=no_finetune sdpa_path=flash
+2026-03-10T23:51:44,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,pearson,-0.020083,stage=no_finetune
+2026-03-10T23:52:28,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,matthews_correlation,0.029292,stage=no_finetune
+2026-03-10T23:52:28,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,matthews_correlation,0.029292,stage=no_finetune sdpa_path=flash
+2026-03-10T23:52:28,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,matthews_correlation,0.029292,stage=no_finetune
+2026-03-10T23:52:56,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.746560,stage=no_finetune
+2026-03-10T23:52:56,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.746560,stage=no_finetune sdpa_path=flash
+2026-03-10T23:52:56,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.744266,stage=no_finetune
+2026-03-10T23:53:20,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.744102,stage=no_finetune
+2026-03-10T23:53:20,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,f1,0.744102,stage=no_finetune sdpa_path=flash
+2026-03-10T23:53:20,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.731261,stage=no_finetune
+2026-03-10T23:59:25,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,f1,0.571089,stage=no_finetune
+2026-03-10T23:59:25,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,f1,0.571089,stage=no_finetune sdpa_path=flash
+2026-03-10T23:59:25,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,f1,0.571559,stage=no_finetune
+2026-03-11T00:01:11,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.408355,stage=no_finetune
+2026-03-11T00:01:11,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.408355,stage=no_finetune sdpa_path=flash
+2026-03-11T00:01:11,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.408864,stage=no_finetune
+2026-03-11T00:02:20,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.495149,stage=no_finetune
+2026-03-11T00:02:20,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.495149,stage=no_finetune sdpa_path=flash
+2026-03-11T00:02:20,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.494966,stage=no_finetune
+2026-03-11T00:02:44,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T00:02:44,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T00:02:44,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T00:03:20,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,pearson,0.382235,stage=no_finetune
+2026-03-11T00:03:20,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,pearson,0.382235,stage=no_finetune sdpa_path=flash
+2026-03-11T00:03:20,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,pearson,0.381880,stage=no_finetune
+2026-03-11T00:04:18,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,matthews_correlation,-0.041127,stage=no_finetune
+2026-03-11T00:04:18,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,matthews_correlation,-0.041127,stage=no_finetune sdpa_path=flash
+2026-03-11T00:04:18,compressed_models/modernbert/dense/cola/pretrained_base,cola,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,matthews_correlation,-0.047735,stage=no_finetune
+2026-03-11T00:04:55,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.571101,stage=no_finetune
+2026-03-11T00:04:55,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.571101,stage=no_finetune sdpa_path=flash
+2026-03-11T00:04:55,compressed_models/modernbert/dense/sst2/pretrained_base,sst2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.571101,stage=no_finetune
+2026-03-11T00:05:29,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.007143,stage=no_finetune
+2026-03-11T00:05:29,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,f1,0.007143,stage=no_finetune sdpa_path=flash
+2026-03-11T00:05:29,compressed_models/modernbert/dense/mrpc/pretrained_base,mrpc,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.007143,stage=no_finetune
+2026-03-11T00:13:58,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,f1,0.570826,stage=no_finetune
+2026-03-11T00:13:58,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,f1,0.570826,stage=no_finetune sdpa_path=flash
+2026-03-11T00:13:58,compressed_models/modernbert/dense/qqp/pretrained_base,qqp,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,f1,0.572016,stage=no_finetune
+2026-03-11T00:16:25,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.403668,stage=no_finetune
+2026-03-11T00:16:25,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.403668,stage=no_finetune sdpa_path=flash
+2026-03-11T00:16:25,compressed_models/modernbert/dense/mnli/pretrained_base,mnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.403057,stage=no_finetune
+2026-03-11T00:18:02,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.547684,stage=no_finetune
+2026-03-11T00:18:02,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.547684,stage=no_finetune sdpa_path=flash
+2026-03-11T00:18:02,compressed_models/modernbert/dense/qnli/pretrained_base,qnli,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.546403,stage=no_finetune
+2026-03-11T00:18:33,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-11T00:18:33,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.472924,stage=no_finetune sdpa_path=flash
+2026-03-11T00:18:33,compressed_models/modernbert/dense/rte/pretrained_base,rte,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-11T00:19:24,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,pearson,0.343664,stage=no_finetune
+2026-03-11T00:19:24,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,pearson,0.343664,stage=no_finetune sdpa_path=flash
+2026-03-11T00:19:24,compressed_models/modernbert/dense/stsb/pretrained_base,stsb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,pearson,0.346050,stage=no_finetune
+2026-03-11T00:20:51,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
+2026-03-11T00:20:51,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
+2026-03-11T00:20:51,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.607951,stage=no_finetune
+2026-03-11T00:21:15,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T00:21:15,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T00:21:15,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-11T00:21:44,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T00:21:44,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
+2026-03-11T00:21:44,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T00:22:04,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T00:22:04,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T00:22:04,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T00:23:10,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.618960,stage=no_finetune
+2026-03-11T00:23:10,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.618960,stage=no_finetune sdpa_path=flash
+2026-03-11T00:23:10,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.619572,stage=no_finetune
+2026-03-11T00:23:33,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T00:23:33,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T00:23:33,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T00:24:00,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.498433,stage=no_finetune
+2026-03-11T00:24:00,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.498433,stage=no_finetune sdpa_path=flash
+2026-03-11T00:24:00,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.495298,stage=no_finetune
+2026-03-11T00:24:20,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T00:24:20,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T00:24:20,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.392857,stage=no_finetune
+2026-03-11T00:25:24,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T00:25:24,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.621713,stage=no_finetune sdpa_path=flash
+2026-03-11T00:25:24,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T00:25:47,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T00:25:47,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T00:25:47,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T00:26:29,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.464286,stage=no_finetune
+2026-03-11T00:26:29,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.464286,stage=no_finetune sdpa_path=flash
+2026-03-11T00:26:29,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.464286,stage=no_finetune
+2026-03-11T00:27:47,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.583486,stage=no_finetune
+2026-03-11T00:27:47,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.583486,stage=no_finetune sdpa_path=flash
+2026-03-11T00:27:47,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.584709,stage=no_finetune
+2026-03-11T00:28:17,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T00:28:17,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T00:28:17,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T00:28:53,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T00:28:53,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.521944,stage=no_finetune sdpa_path=flash
+2026-03-11T00:28:53,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T00:29:19,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.660714,stage=no_finetune
+2026-03-11T00:29:19,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.660714,stage=no_finetune sdpa_path=flash
+2026-03-11T00:29:19,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.660714,stage=no_finetune
+2026-03-11T00:30:25,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.530000,stage=no_finetune
+2026-03-11T00:30:25,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.530000,stage=no_finetune sdpa_path=flash
+2026-03-11T00:30:25,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.480000,stage=no_finetune
+2026-03-11T00:35:12,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.515067,stage=no_finetune
+2026-03-11T00:35:12,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.515067,stage=no_finetune sdpa_path=flash
+2026-03-11T00:35:12,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.515400,stage=no_finetune
+2026-03-11T00:36:07,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.490000,stage=no_finetune
+2026-03-11T00:36:07,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.490000,stage=no_finetune sdpa_path=flash
+2026-03-11T00:36:07,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.490000,stage=no_finetune
+2026-03-11T00:40:56,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.472867,stage=no_finetune
+2026-03-11T00:40:56,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.472867,stage=no_finetune sdpa_path=flash
+2026-03-11T00:40:56,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472567,stage=no_finetune
+2026-03-11T00:41:27,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.348000,stage=no_finetune
+2026-03-11T00:41:27,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.348000,stage=no_finetune sdpa_path=flash
+2026-03-11T00:41:27,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.345000,stage=no_finetune
+2026-03-11T00:41:57,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.358000,stage=no_finetune
+2026-03-11T00:41:57,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.358000,stage=no_finetune sdpa_path=flash
+2026-03-11T00:41:57,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.354000,stage=no_finetune
+2026-03-11T00:42:29,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.341667,stage=no_finetune
+2026-03-11T00:42:29,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.341667,stage=no_finetune sdpa_path=flash
+2026-03-11T00:42:29,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.344167,stage=no_finetune
+2026-03-11T00:43:20,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.480000,stage=no_finetune
+2026-03-11T00:43:20,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.480000,stage=no_finetune sdpa_path=flash
+2026-03-11T00:43:20,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.500000,stage=no_finetune
+2026-03-11T00:48:08,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.509933,stage=no_finetune
+2026-03-11T00:48:08,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.509933,stage=no_finetune sdpa_path=flash
+2026-03-11T00:48:08,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.510467,stage=no_finetune
+2026-03-11T00:49:14,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.560000,stage=no_finetune
+2026-03-11T00:49:14,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.560000,stage=no_finetune sdpa_path=flash
+2026-03-11T00:49:14,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.530000,stage=no_finetune
+2026-03-11T00:55:47,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.512000,stage=no_finetune
+2026-03-11T00:55:47,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.512000,stage=no_finetune sdpa_path=flash
+2026-03-11T00:55:47,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.510767,stage=no_finetune
+2026-03-11T00:56:29,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.325000,stage=no_finetune
+2026-03-11T00:56:29,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.325000,stage=no_finetune sdpa_path=flash
+2026-03-11T00:56:29,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.327000,stage=no_finetune
+2026-03-11T00:57:09,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.331000,stage=no_finetune
+2026-03-11T00:57:09,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.331000,stage=no_finetune sdpa_path=flash
+2026-03-11T00:57:09,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.332000,stage=no_finetune
+2026-03-11T00:57:53,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.335833,stage=no_finetune
+2026-03-11T00:57:53,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.335833,stage=no_finetune sdpa_path=flash
+2026-03-11T00:57:53,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.339167,stage=no_finetune
+2026-03-11T01:05:19,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
+2026-03-11T01:05:19,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
+2026-03-11T01:05:19,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.607951,stage=no_finetune
+2026-03-11T01:05:42,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T01:05:42,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T01:05:42,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-11T01:06:10,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T01:06:10,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
+2026-03-11T01:06:10,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T01:06:30,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T01:06:30,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T01:06:30,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T01:07:34,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.618960,stage=no_finetune
+2026-03-11T01:07:34,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.618960,stage=no_finetune sdpa_path=flash
+2026-03-11T01:07:34,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.619572,stage=no_finetune
+2026-03-11T01:07:58,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T01:07:58,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T01:07:58,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T01:08:25,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.498433,stage=no_finetune
+2026-03-11T01:08:25,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.498433,stage=no_finetune sdpa_path=flash
+2026-03-11T01:08:25,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.495298,stage=no_finetune
+2026-03-11T01:08:46,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T01:08:46,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T01:08:46,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.392857,stage=no_finetune
+2026-03-11T01:09:51,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T01:09:51,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.621713,stage=no_finetune sdpa_path=flash
+2026-03-11T01:09:51,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T01:10:15,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T01:10:15,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T01:10:15,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T01:10:52,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.464286,stage=no_finetune
+2026-03-11T01:10:52,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.464286,stage=no_finetune sdpa_path=flash
+2026-03-11T01:10:52,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T01:12:10,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.583486,stage=no_finetune
+2026-03-11T01:12:10,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.583486,stage=no_finetune sdpa_path=flash
+2026-03-11T01:12:10,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.584709,stage=no_finetune
+2026-03-11T01:12:40,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T01:12:40,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T01:12:40,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T01:13:16,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T01:13:16,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.521944,stage=no_finetune sdpa_path=flash
+2026-03-11T01:13:16,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T01:13:42,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.660714,stage=no_finetune
+2026-03-11T01:13:42,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.660714,stage=no_finetune sdpa_path=flash
+2026-03-11T01:13:42,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.660714,stage=no_finetune
+2026-03-11T01:14:48,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.530000,stage=no_finetune
+2026-03-11T01:14:48,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.530000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:14:48,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.480000,stage=no_finetune
+2026-03-11T01:19:34,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.515067,stage=no_finetune
+2026-03-11T01:19:34,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.515067,stage=no_finetune sdpa_path=flash
+2026-03-11T01:19:34,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.515400,stage=no_finetune
+2026-03-11T01:20:27,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.490000,stage=no_finetune
+2026-03-11T01:20:27,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.490000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:20:27,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.490000,stage=no_finetune
+2026-03-11T01:25:13,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.472867,stage=no_finetune
+2026-03-11T01:25:13,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.472867,stage=no_finetune sdpa_path=flash
+2026-03-11T01:25:13,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472567,stage=no_finetune
+2026-03-11T01:25:44,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.348000,stage=no_finetune
+2026-03-11T01:25:44,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.348000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:25:44,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.345000,stage=no_finetune
+2026-03-11T01:26:13,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.358000,stage=no_finetune
+2026-03-11T01:26:13,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.358000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:26:13,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.354000,stage=no_finetune
+2026-03-11T01:26:45,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.341667,stage=no_finetune
+2026-03-11T01:26:45,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.341667,stage=no_finetune sdpa_path=flash
+2026-03-11T01:26:45,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.344167,stage=no_finetune
+2026-03-11T01:27:37,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.480000,stage=no_finetune
+2026-03-11T01:27:37,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.480000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:27:37,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.500000,stage=no_finetune
+2026-03-11T01:32:24,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.509933,stage=no_finetune
+2026-03-11T01:32:24,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.509933,stage=no_finetune sdpa_path=flash
+2026-03-11T01:32:24,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.510467,stage=no_finetune
+2026-03-11T01:33:28,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.560000,stage=no_finetune
+2026-03-11T01:33:28,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.560000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:33:28,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.530000,stage=no_finetune
+2026-03-11T01:40:01,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.512000,stage=no_finetune
+2026-03-11T01:40:01,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.512000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:40:01,compressed_models/modernbert/dense/mnli/pretrained_base,hans,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.510767,stage=no_finetune
+2026-03-11T01:40:42,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.325000,stage=no_finetune
+2026-03-11T01:40:42,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.325000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:40:42,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.327000,stage=no_finetune
+2026-03-11T01:41:21,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.331000,stage=no_finetune
+2026-03-11T01:41:21,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.331000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:41:21,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.332000,stage=no_finetune
+2026-03-11T01:42:03,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.335833,stage=no_finetune
+2026-03-11T01:42:03,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.335833,stage=no_finetune sdpa_path=flash
+2026-03-11T01:42:03,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.339167,stage=no_finetune
+2026-03-11T01:43:41,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
+2026-03-11T01:43:41,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
+2026-03-11T01:43:41,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.607951,stage=no_finetune
+2026-03-11T01:44:04,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T01:44:04,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T01:44:04,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-11T01:44:31,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T01:44:31,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
+2026-03-11T01:44:31,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T01:44:51,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T01:44:51,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T01:44:51,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T01:45:55,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.618960,stage=no_finetune
+2026-03-11T01:45:55,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.618960,stage=no_finetune sdpa_path=flash
+2026-03-11T01:45:55,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.619572,stage=no_finetune
+2026-03-11T01:46:19,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T01:46:19,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T01:46:19,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T01:46:45,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.498433,stage=no_finetune
+2026-03-11T01:46:45,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.498433,stage=no_finetune sdpa_path=flash
+2026-03-11T01:46:45,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.506270,stage=no_finetune
+2026-03-11T01:47:05,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T01:47:05,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T01:47:05,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.392857,stage=no_finetune
+2026-03-11T01:48:08,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T01:48:08,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.621713,stage=no_finetune sdpa_path=flash
+2026-03-11T01:48:08,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T01:48:31,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T01:48:31,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T01:48:31,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T01:49:09,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.464286,stage=no_finetune
+2026-03-11T01:49:09,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.464286,stage=no_finetune sdpa_path=flash
+2026-03-11T01:49:09,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.464286,stage=no_finetune
+2026-03-11T01:50:28,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.583486,stage=no_finetune
+2026-03-11T01:50:28,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.583486,stage=no_finetune sdpa_path=flash
+2026-03-11T01:50:28,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.584709,stage=no_finetune
+2026-03-11T01:50:58,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T01:50:58,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T01:50:58,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T01:51:35,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T01:51:35,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.521944,stage=no_finetune sdpa_path=flash
+2026-03-11T01:51:35,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T01:52:01,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.660714,stage=no_finetune
+2026-03-11T01:52:01,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.660714,stage=no_finetune sdpa_path=flash
+2026-03-11T01:52:01,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.660714,stage=no_finetune
+2026-03-11T01:57:15,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.515067,stage=no_finetune
+2026-03-11T01:57:15,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.515067,stage=no_finetune sdpa_path=flash
+2026-03-11T01:57:15,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.515400,stage=no_finetune
+2026-03-11T01:58:10,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.490000,stage=no_finetune
+2026-03-11T01:58:10,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.490000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:58:10,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.490000,stage=no_finetune
+2026-03-11T01:58:41,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.348000,stage=no_finetune
+2026-03-11T01:58:41,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.348000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:58:41,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.345000,stage=no_finetune
+2026-03-11T01:59:11,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.358000,stage=no_finetune
+2026-03-11T01:59:11,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.358000,stage=no_finetune sdpa_path=flash
+2026-03-11T01:59:11,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.354000,stage=no_finetune
+2026-03-11T01:59:43,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.341667,stage=no_finetune
+2026-03-11T01:59:43,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.341667,stage=no_finetune sdpa_path=flash
+2026-03-11T01:59:43,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.344167,stage=no_finetune
+2026-03-11T02:01:32,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
+2026-03-11T02:01:32,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
+2026-03-11T02:01:32,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.607951,stage=no_finetune
+2026-03-11T02:01:56,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T02:01:56,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T02:01:56,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-11T02:02:24,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T02:02:24,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
+2026-03-11T02:02:24,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T02:02:44,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:02:44,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T02:02:44,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:03:48,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.618960,stage=no_finetune
+2026-03-11T02:03:48,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.618960,stage=no_finetune sdpa_path=flash
+2026-03-11T02:03:48,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.619572,stage=no_finetune
+2026-03-11T02:04:12,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T02:04:12,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T02:04:12,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T02:04:38,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.498433,stage=no_finetune
+2026-03-11T02:04:38,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.498433,stage=no_finetune sdpa_path=flash
+2026-03-11T02:04:38,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.506270,stage=no_finetune
+2026-03-11T02:04:58,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:04:58,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T02:04:58,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.392857,stage=no_finetune
+2026-03-11T02:06:06,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T02:06:06,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.621713,stage=no_finetune sdpa_path=flash
+2026-03-11T02:06:06,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T02:06:29,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:06:29,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T02:06:29,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:07:07,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.464286,stage=no_finetune
+2026-03-11T02:07:07,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.464286,stage=no_finetune sdpa_path=flash
+2026-03-11T02:07:07,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:08:27,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.583486,stage=no_finetune
+2026-03-11T02:08:27,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.583486,stage=no_finetune sdpa_path=flash
+2026-03-11T02:08:27,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.584709,stage=no_finetune
+2026-03-11T02:08:58,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:08:58,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T02:08:58,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:09:34,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T02:09:34,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.521944,stage=no_finetune sdpa_path=flash
+2026-03-11T02:09:34,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T02:13:26,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
+2026-03-11T02:13:26,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
+2026-03-11T02:13:26,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.607951,stage=no_finetune
+2026-03-11T02:13:50,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T02:13:50,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T02:13:50,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-11T02:14:16,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T02:14:16,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
+2026-03-11T02:14:16,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T02:14:36,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:14:36,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T02:14:36,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:15:38,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.618960,stage=no_finetune
+2026-03-11T02:15:38,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.618960,stage=no_finetune sdpa_path=flash
+2026-03-11T02:15:38,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.619572,stage=no_finetune
+2026-03-11T02:16:01,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T02:16:01,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T02:16:01,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T02:16:27,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.498433,stage=no_finetune
+2026-03-11T02:16:27,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.498433,stage=no_finetune sdpa_path=flash
+2026-03-11T02:16:27,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.495298,stage=no_finetune
+2026-03-11T02:16:46,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:16:46,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T02:16:46,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.392857,stage=no_finetune
+2026-03-11T02:17:51,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T02:17:51,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.621713,stage=no_finetune sdpa_path=flash
+2026-03-11T02:17:51,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T02:18:15,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:18:15,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T02:18:15,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:18:52,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.464286,stage=no_finetune
+2026-03-11T02:18:52,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.464286,stage=no_finetune sdpa_path=flash
+2026-03-11T02:18:52,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.464286,stage=no_finetune
+2026-03-11T02:20:12,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.583486,stage=no_finetune
+2026-03-11T02:20:12,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.583486,stage=no_finetune sdpa_path=flash
+2026-03-11T02:20:12,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.584709,stage=no_finetune
+2026-03-11T02:20:42,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:20:42,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T02:20:42,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:21:18,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T02:21:18,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.521944,stage=no_finetune sdpa_path=flash
+2026-03-11T02:21:18,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T02:27:11,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.607645,stage=no_finetune
+2026-03-11T02:27:11,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.607645,stage=no_finetune sdpa_path=flash
+2026-03-11T02:27:11,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.607951,stage=no_finetune
+2026-03-11T02:27:35,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T02:27:35,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T02:27:35,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.472924,stage=no_finetune
+2026-03-11T02:28:02,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T02:28:02,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.501567,stage=no_finetune sdpa_path=flash
+2026-03-11T02:28:02,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.501567,stage=no_finetune
+2026-03-11T02:28:22,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:28:22,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T02:28:22,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:29:27,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.618960,stage=no_finetune
+2026-03-11T02:29:27,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.618960,stage=no_finetune sdpa_path=flash
+2026-03-11T02:29:27,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.619572,stage=no_finetune
+2026-03-11T02:29:50,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T02:29:50,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.465704,stage=no_finetune sdpa_path=flash
+2026-03-11T02:29:50,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.465704,stage=no_finetune
+2026-03-11T02:30:18,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.498433,stage=no_finetune
+2026-03-11T02:30:18,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.498433,stage=no_finetune sdpa_path=flash
+2026-03-11T02:30:18,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.506270,stage=no_finetune
+2026-03-11T02:30:37,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:30:37,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.410714,stage=no_finetune sdpa_path=flash
+2026-03-11T02:30:37,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.392857,stage=no_finetune
+2026-03-11T02:31:40,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T02:31:40,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.621713,stage=no_finetune sdpa_path=flash
+2026-03-11T02:31:40,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.621713,stage=no_finetune
+2026-03-11T02:32:02,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:32:02,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T02:32:02,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:32:41,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.464286,stage=no_finetune
+2026-03-11T02:32:41,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.464286,stage=no_finetune sdpa_path=flash
+2026-03-11T02:32:41,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.410714,stage=no_finetune
+2026-03-11T02:33:59,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.583486,stage=no_finetune
+2026-03-11T02:33:59,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.583486,stage=no_finetune sdpa_path=flash
+2026-03-11T02:33:59,compressed_models/modernbert/dense/boolq/pretrained_base,boolq,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.584709,stage=no_finetune
+2026-03-11T02:34:29,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:34:29,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.527076,stage=no_finetune sdpa_path=flash
+2026-03-11T02:34:29,compressed_models/modernbert/dense/rte_sg/pretrained_base,rte_sg,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.527076,stage=no_finetune
+2026-03-11T02:35:06,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T02:35:06,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.521944,stage=no_finetune sdpa_path=flash
+2026-03-11T02:35:06,compressed_models/modernbert/dense/wic/pretrained_base,wic,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.521944,stage=no_finetune
+2026-03-11T02:35:32,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.660714,stage=no_finetune
+2026-03-11T02:35:32,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.660714,stage=no_finetune sdpa_path=flash
+2026-03-11T02:35:32,compressed_models/modernbert/dense/cb/pretrained_base,cb,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.660714,stage=no_finetune
+2026-03-11T02:36:36,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.540000,stage=no_finetune
+2026-03-11T02:36:36,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.540000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:36:36,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.530000,stage=no_finetune
+2026-03-11T02:41:23,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.515067,stage=no_finetune
+2026-03-11T02:41:23,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.515067,stage=no_finetune sdpa_path=flash
+2026-03-11T02:41:23,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.515400,stage=no_finetune
+2026-03-11T02:41:53,answerdotai/ModernBERT-base,anli_r1,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.322000,stage=no_finetune
+2026-03-11T02:41:53,answerdotai/ModernBERT-base,anli_r1,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.322000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:41:53,answerdotai/ModernBERT-base,anli_r1,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.322000,stage=no_finetune
+2026-03-11T02:42:24,answerdotai/ModernBERT-base,anli_r2,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.327000,stage=no_finetune
+2026-03-11T02:42:24,answerdotai/ModernBERT-base,anli_r2,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.327000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:42:24,answerdotai/ModernBERT-base,anli_r2,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.328000,stage=no_finetune
+2026-03-11T02:42:56,answerdotai/ModernBERT-base,anli_r3,validation,512,32,bf16,svd,per_head,,,naive,compress_eval,42,accuracy,0.343333,stage=no_finetune
+2026-03-11T02:42:56,answerdotai/ModernBERT-base,anli_r3,validation,512,32,bf16,svd,per_head,,,sdpa,compress_eval,42,accuracy,0.343333,stage=no_finetune sdpa_path=flash
+2026-03-11T02:42:56,answerdotai/ModernBERT-base,anli_r3,validation,512,32,bf16,svd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.343333,stage=no_finetune
+2026-03-11T02:43:47,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.490000,stage=no_finetune
+2026-03-11T02:43:47,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.490000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:43:47,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.490000,stage=no_finetune
+2026-03-11T02:44:18,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.348000,stage=no_finetune
+2026-03-11T02:44:18,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.348000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:44:18,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.345000,stage=no_finetune
+2026-03-11T02:44:47,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.358000,stage=no_finetune
+2026-03-11T02:44:47,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.358000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:44:47,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.354000,stage=no_finetune
+2026-03-11T02:45:18,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,naive,compress_eval,42,accuracy,0.341667,stage=no_finetune
+2026-03-11T02:45:18,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,sdpa,compress_eval,42,accuracy,0.341667,stage=no_finetune sdpa_path=flash
+2026-03-11T02:45:18,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,fwsvd,per_head,,,flashsvd15,compress_eval,42,accuracy,0.344167,stage=no_finetune
+2026-03-11T02:46:08,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.470000,stage=no_finetune
+2026-03-11T02:46:08,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.470000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:46:08,answerdotai/ModernBERT-base,copa,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.520000,stage=no_finetune
+2026-03-11T02:50:57,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.509933,stage=no_finetune
+2026-03-11T02:50:57,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.509933,stage=no_finetune sdpa_path=flash
+2026-03-11T02:50:57,answerdotai/ModernBERT-base,hans,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.510467,stage=no_finetune
+2026-03-11T02:51:28,answerdotai/ModernBERT-base,anli_r1,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.333000,stage=no_finetune
+2026-03-11T02:51:28,answerdotai/ModernBERT-base,anli_r1,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.333000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:51:28,answerdotai/ModernBERT-base,anli_r1,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.333000,stage=no_finetune
+2026-03-11T02:51:57,answerdotai/ModernBERT-base,anli_r2,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.333000,stage=no_finetune
+2026-03-11T02:51:57,answerdotai/ModernBERT-base,anli_r2,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.333000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:51:57,answerdotai/ModernBERT-base,anli_r2,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.333000,stage=no_finetune
+2026-03-11T02:52:30,answerdotai/ModernBERT-base,anli_r3,validation,512,32,bf16,drone,per_head,,,naive,compress_eval,42,accuracy,0.330833,stage=no_finetune
+2026-03-11T02:52:30,answerdotai/ModernBERT-base,anli_r3,validation,512,32,bf16,drone,per_head,,,sdpa,compress_eval,42,accuracy,0.330833,stage=no_finetune sdpa_path=flash
+2026-03-11T02:52:30,answerdotai/ModernBERT-base,anli_r3,validation,512,32,bf16,drone,per_head,,,flashsvd15,compress_eval,42,accuracy,0.330833,stage=no_finetune
+2026-03-11T02:53:32,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.560000,stage=no_finetune
+2026-03-11T02:53:32,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.560000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:53:32,compressed_models/modernbert/dense/mnli/pretrained_base,copa,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.530000,stage=no_finetune
+2026-03-11T02:54:11,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.325000,stage=no_finetune
+2026-03-11T02:54:11,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.325000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:54:11,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r1,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.327000,stage=no_finetune
+2026-03-11T02:54:49,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.331000,stage=no_finetune
+2026-03-11T02:54:49,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.331000,stage=no_finetune sdpa_path=flash
+2026-03-11T02:54:49,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r2,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.332000,stage=no_finetune
+2026-03-11T02:55:30,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,naive,compress_eval,42,accuracy,0.335833,stage=no_finetune
+2026-03-11T02:55:30,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,sdpa,compress_eval,42,accuracy,0.335833,stage=no_finetune sdpa_path=flash
+2026-03-11T02:55:30,compressed_models/modernbert/dense/mnli/pretrained_base,anli_r3,validation,512,32,bf16,adasvd,per_head,,0.527,flashsvd15,compress_eval,42,accuracy,0.339167,stage=no_finetune
