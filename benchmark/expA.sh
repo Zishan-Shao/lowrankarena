@@ -155,6 +155,7 @@ if [[ "${_PHASES}" == *" superglue "* ]]; then
     METHODS="${METHODS}" \
     BACKENDS="naive" \
     RECOMPRESS="${RECOMPRESS}" \
+    REUSE="${REUSE:-false}" \
     MODEL_BASE_DIR="${MODEL_BASE_DIR}" \
     OUT_CSV="${OUT_CSV}" \
     QKV_MODE="${QKV_MODE}" \

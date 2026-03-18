@@ -36,6 +36,7 @@
 #   BACKENDS="naive sdpa flashsvd"    # fp32 excludes flashsvd15 (would cast to fp16)
 #   DTYPE=fp32 BACKENDS="naive sdpa flashsvd"   # fp32 precision test (without flashsvd15)
 #   RECOMPRESS=true     # force recompression (ignore existing checkpoints)
+#   REUSE=true          # reuse existing checkpoints but re-run evaluation (write to CSV again)
 #   OUT_CSV=experiments/expA.csv
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,8 @@ OUT_CSV="${OUT_CSV:-experiments/expA.csv}"
 
 # RECOMPRESS=true forces ignoring existing checkpoints and recompresses
 RECOMPRESS="${RECOMPRESS:-false}"
+# REUSE=true reuses existing checkpoints but re-runs evaluation (writes to CSV again)
+REUSE="${REUSE:-false}"
 
 # ── task → model_id mapping ───────────────────────────────────────────────────
 _model_id_for_task() {
@@ -195,7 +198,7 @@ for TASK in ${TASKS}; do
         # sdpa is actually --backend naive --attn_mode sdpa, not an independent backend
         for BACKEND in ${BACKENDS}; do
             # naive was already evaluated and written to CSV during Step 1 compression; skip duplicate run
-            [[ "${BACKEND}" == "naive" && "${METHOD}" != "dense" && -d "${CKPT_DIR}" && "${RECOMPRESS}" != "true" ]] && \
+            [[ "${BACKEND}" == "naive" && "${METHOD}" != "dense" && -d "${CKPT_DIR}" && "${RECOMPRESS}" != "true" && "${REUSE}" != "true" ]] && \
                 echo "   [skip naive — already in CSV from compress step]" && continue
 
             # Translate sdpa → --backend naive --attn_mode sdpa
