@@ -90,18 +90,64 @@ def _load_glue_summary(dtype='bf16'):
 
 _glue = _load_glue_summary()
 
+# ── Load bf16 full-matrix stage1 scores from expA_full.csv ────────────────────
+def _load_full_matrix_bf16():
+    """Read expA_full.csv (bf16, naive, qkv_mode=full); return (task_scores, gavg).
+
+    task_scores : dict[(method, task)] = metric_value  (stage1 only)
+    gavg        : dict[method] = G-AVG over 8 GLUE tasks
+    """
+    _G8        = ['cola', 'sst2', 'mrpc', 'qqp', 'mnli', 'qnli', 'rte', 'stsb']
+    _normalize = {'cola', 'stsb'}
+    p = os.path.join(_REPO_ROOT, 'experiments', 'results', 'expA_full.csv')
+    if not os.path.exists(p):
+        return {}, {}
+    task_scores = {}
+    with open(p, newline='', encoding='utf-8') as f:
+        for r in _csv.DictReader(f):
+            if r.get('dtype', '').strip() != 'bf16':
+                continue
+            if r.get('backend', '').strip() != 'naive':
+                continue
+            if r.get('qkv_mode', '').strip() != 'full':
+                continue
+            task   = r.get('task', '').strip()
+            method = r.get('method', '').strip()
+            try:
+                v = float(r['metric_value'])
+            except (KeyError, ValueError):
+                continue
+            task_scores[(method, task)] = v   # last row wins
+    gavg = {}
+    for method in set(m for m, _ in task_scores):
+        vals = []
+        for task in _G8:
+            v = task_scores.get((method, task))
+            if v is None:
+                break
+            vals.append((v + 1) / 2 if task in _normalize else v)
+        else:
+            gavg[method] = round(sum(vals) / 8, 6)
+    return task_scores, gavg
+
+_fm_scores, _fm_gavg = _load_full_matrix_bf16()
+
 def _gavg(method, qkv_mode, stage, seq_len=512):
     """Return G-AVG float, or None if missing.
 
     Priority:
       1. expA_fine_tune.csv bf16 computed G-AVG (per_head only)
-      2. glue_summary.csv (bf16 preferred, fp32 fallback)
+      2. expA_full.csv bf16 computed G-AVG (full only, stage1 only)
+      3. glue_summary.csv (bf16 preferred, fp32 fallback)
     """
-    # Prefer bf16 data from expA_fine_tune.csv for per_head
     if qkv_mode == 'per_head':
         ft = _ft_gavg.get((method, stage))
         if ft is not None:
             return ft
+    if qkv_mode == 'full' and stage == 1:
+        v = _fm_gavg.get(method)
+        if v is not None:
+            return v
     v = _glue.get((method, qkv_mode, seq_len), {}).get(f'g_avg_s{stage}', '')
     return float(v) if v else None
 
@@ -116,12 +162,15 @@ def _task_score(method, qkv_mode, task, stage, seq_len=512):
     Priority:
       1. glue_summary.csv (bf16 preferred, fp32 fallback)
       2. expA_fine_tune.csv (per_head only, bf16)
+      3. expA_full.csv (full only, stage1 only, bf16)
     """
     v = _glue.get((method, qkv_mode, seq_len), {}).get(f'{task}_s{stage}', '')
     if v:
         return float(v)
     if qkv_mode == 'per_head':
         return _ft_scores.get((method, task, stage))
+    if qkv_mode == 'full' and stage == 1:
+        return _fm_scores.get((method, task))
     return None
 
 # ── Load param counts from expA.csv (avg over all rows) ──────────────────────
@@ -151,32 +200,37 @@ _PM_SVD_BF16   = round(_COMP_PARAMS * 2 / 1024**2) if _COMP_PARAMS else 132
 
 # ── Load per-task scores from expA.csv (Stage1, bf16, naive backend, per_head) ─
 def _load_expA_scores(tasks, dtype='bf16', backend='naive', qkv_mode='per_head'):
-    """Load per-task metric scores from expA.csv for Stage1 eval.
+    """Load per-task metric scores for Stage1 eval.
 
+    Reads from expA.csv then expA_bert-base-uncased.csv (latter wins on conflict).
     Filters: dtype, backend, qkv_mode.
     Returns dict[(method, task)] = latest metric_value.
     """
-    p = os.path.join(_REPO_ROOT, 'experiments', 'results', 'expA.csv')
-    if not os.path.exists(p):
-        return {}
+    paths = [
+        os.path.join(_REPO_ROOT, 'experiments', 'results', 'expA.csv'),
+        os.path.join(_REPO_ROOT, 'experiments', 'results', 'expA_bert-base-uncased.csv'),
+    ]
     scores = {}
-    with open(p, newline='', encoding='utf-8') as f:
-        for r in _csv.DictReader(f):
-            if r.get('dtype', '').strip() != dtype:
-                continue
-            if r.get('backend', '').strip() != backend:
-                continue
-            if r.get('qkv_mode', '').strip() != qkv_mode:
-                continue
-            task = r.get('task', '').strip()
-            if task not in tasks:
-                continue
-            method = r.get('method', '').strip()
-            try:
-                v = float(r['metric_value'])
-            except (KeyError, ValueError):
-                continue
-            scores[(method, task)] = v   # last row wins (CSV is time-ordered)
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        with open(p, newline='', encoding='utf-8') as f:
+            for r in _csv.DictReader(f):
+                if r.get('dtype', '').strip() != dtype:
+                    continue
+                if r.get('backend', '').strip() != backend:
+                    continue
+                if r.get('qkv_mode', '').strip() != qkv_mode:
+                    continue
+                task = r.get('task', '').strip()
+                if task not in tasks:
+                    continue
+                method = r.get('method', '').strip()
+                try:
+                    v = float(r['metric_value'])
+                except (KeyError, ValueError):
+                    continue
+                scores[(method, task)] = v   # last row wins (time-ordered; later file wins)
     return scores
 
 # ── Load Stage1+Stage2 scores from expA_fine_tune.csv ─────────────────────────
@@ -185,34 +239,39 @@ _NORMALIZE_FT = {'cola', 'stsb'}   # MCC / Pearson: map [-1,1]→[0,1] via (x+1)
 _STAGE_MAP_FT = {'compress_eval': 1, 'compress_finetune': 2}
 
 def _load_fine_tune_data(dtype='bf16', backend='naive', qkv_mode='per_head'):
-    """Read expA_fine_tune.csv; return (task_scores, gavg).
+    """Read expA_fine_tune.csv + expA_fine_tune_bert-base-uncased.csv; return (task_scores, gavg).
 
+    Reads both files; per-model file wins on conflict (more recent data).
     task_scores : dict[(method, task, stage_num)] = metric_value
     gavg        : dict[(method, stage_num)] = G-AVG over 8 GLUE tasks
                   (MCC/Pearson normalized; only emitted when all 8 tasks present)
     """
-    p = os.path.join(_REPO_ROOT, 'experiments', 'results', 'expA_fine_tune.csv')
-    if not os.path.exists(p):
-        return {}, {}
+    paths = [
+        os.path.join(_REPO_ROOT, 'experiments', 'results', 'expA_fine_tune.csv'),
+        os.path.join(_REPO_ROOT, 'experiments', 'results', 'expA_fine_tune_bert-base-uncased.csv'),
+    ]
     task_scores = {}
-    with open(p, newline='', encoding='utf-8') as f:
-        for r in _csv.DictReader(f):
-            if r.get('dtype', '').strip() != dtype:
-                continue
-            if r.get('backend', '').strip() != backend:
-                continue
-            if r.get('qkv_mode', '').strip() != qkv_mode:
-                continue
-            stage_num = _STAGE_MAP_FT.get(r.get('stage', '').strip())
-            if stage_num is None:
-                continue
-            task   = r.get('task', '').strip()
-            method = r.get('method', '').strip()
-            try:
-                v = float(r['metric_value'])
-            except (KeyError, ValueError):
-                continue
-            task_scores[(method, task, stage_num)] = v
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        with open(p, newline='', encoding='utf-8') as f:
+            for r in _csv.DictReader(f):
+                if r.get('dtype', '').strip() != dtype:
+                    continue
+                if r.get('backend', '').strip() != backend:
+                    continue
+                if r.get('qkv_mode', '').strip() != qkv_mode:
+                    continue
+                stage_num = _STAGE_MAP_FT.get(r.get('stage', '').strip())
+                if stage_num is None:
+                    continue
+                task   = r.get('task', '').strip()
+                method = r.get('method', '').strip()
+                try:
+                    v = float(r['metric_value'])
+                except (KeyError, ValueError):
+                    continue
+                task_scores[(method, task, stage_num)] = v
     # Compute G-AVG per (method, stage_num)
     gavg = {}
     for method in set(m for m, _, _ in task_scores):
@@ -228,6 +287,10 @@ def _load_fine_tune_data(dtype='bf16', backend='naive', qkv_mode='per_head'):
     return task_scores, gavg
 
 _ft_scores, _ft_gavg = _load_fine_tune_data()
+
+# Dense G-AVG reference (data-driven; fallback to measured fp32-era value)
+_DENSE_GAVG_S1 = _ft_gavg.get(('dense', 1), 0.863)
+_DENSE_GAVG_S2 = _ft_gavg.get(('dense', 2), _DENSE_GAVG_S1)
 
 _SG_CORE_TASKS = ['boolq', 'rte_sg', 'wic', 'copa']
 _ROB_TASKS     = ['hans', 'anli_r1', 'anli_r2', 'anli_r3']
@@ -384,29 +447,19 @@ fm_s1_n = [_ntasks(m, 'full',     1) for m in _M]
 fig, ax = plt.subplots(figsize=(6, 5))
 for i, (val, n) in enumerate(zip(ph_s1, ph_s1_n)):
     if val is not None:
-        b = ax.bar(x[i] - w/2, val, w, color='#4878CF', alpha=0.88,
+        b = ax.bar(x[i], val, w, color='#4878CF', alpha=0.88,
                    label='Per-head (ra48)' if i == 0 else '_nolegend_')
         lbl = f'{val:.3f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
         ax.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
                 lbl, ha='center', va='bottom', fontsize=8.5)
     else:
-        ax.text(x[i] - w/2, 0.05, 'pending', ha='center', va='bottom',
+        ax.text(x[i], 0.05, 'pending', ha='center', va='bottom',
                 fontsize=8, color='#4878CF', rotation=90, alpha=0.6)
-for i, (val, n) in enumerate(zip(fm_s1, fm_s1_n)):
-    if val is not None:
-        b = ax.bar(x[i] + w/2, val, w, color='#E87B3E', alpha=0.88,
-                   label='Full-matrix (ra312)' if i == 0 else '_nolegend_')
-        lbl = f'{val:.3f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
-        ax.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
-                lbl, ha='center', va='bottom', fontsize=8.5)
-    else:
-        ax.text(x[i] + w/2, 0.05, 'pending', ha='center', va='bottom',
-                fontsize=8, color='#E87B3E', rotation=90, alpha=0.6)
-ax.axhline(0.864, color='gray', linestyle='--', linewidth=1.4, label='Dense (0.864)')
+ax.axhline(_DENSE_GAVG_S1, color='gray', linestyle='--', linewidth=1.4, label=f'Dense ({_DENSE_GAVG_S1:.3f})')
 ax.set_xticks(x); ax.set_xticklabels(methods)
 ax.set_ylabel('GLUE Average (G-AVG)')
 ax.set_title('GLUE Average: Stage 1 — No Finetune\n'
-             '(Per-head ra48 vs Full-matrix ra312, param_ratio ≈ 0.527, bf16)')
+             '(Per-head ra48, param_ratio ≈ 0.527, bf16)')
 ax.set_ylim(0, 1.0)
 ax.legend()
 ax.grid(axis='y', linestyle='--', alpha=0.35)
@@ -424,32 +477,34 @@ fm_s2   = [_gavg(m, 'full',     2) for m in _M]
 ph_s2_n = [_ntasks(m, 'per_head', 2) for m in _M]
 fm_s2_n = [_ntasks(m, 'full',     2) for m in _M]
 
+_has_fm_s2 = all(v is not None for v in fm_s2)
+_ph_s2_x   = x if not _has_fm_s2 else x - w/2  # center bars if no full-matrix
+
 fig, ax = plt.subplots(figsize=(6, 5))
 for i, (val, n) in enumerate(zip(ph_s2, ph_s2_n)):
+    xi = _ph_s2_x[i]
     if val is not None:
-        b = ax.bar(x[i] - w/2, val, w, color='#4878CF', alpha=0.88,
+        b = ax.bar(xi, val, w, color='#4878CF', alpha=0.88,
                    label='Per-head (ra48)' if i == 0 else '_nolegend_')
         lbl = f'{val:.4f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
         ax.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
                 lbl, ha='center', va='bottom', fontsize=8.5)
     else:
-        ax.text(x[i] - w/2, 0.05, 'pending', ha='center', va='bottom',
+        ax.text(xi, 0.05, 'pending', ha='center', va='bottom',
                 fontsize=8, color='#4878CF', rotation=90, alpha=0.6)
-for i, (val, n) in enumerate(zip(fm_s2, fm_s2_n)):
-    if val is not None:
-        b = ax.bar(x[i] + w/2, val, w, color='#E87B3E', alpha=0.88,
-                   label='Full-matrix (ra312)' if i == 0 else '_nolegend_')
-        lbl = f'{val:.4f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
-        ax.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
-                lbl, ha='center', va='bottom', fontsize=8.5)
-    else:
-        ax.text(x[i] + w/2, 0.05, 'pending', ha='center', va='bottom',
-                fontsize=8, color='#E87B3E', rotation=90, alpha=0.6)
-ax.axhline(0.864, color='gray', linestyle='--', linewidth=1.4, label='Dense-ft (0.864)')
+if _has_fm_s2:
+    for i, (val, n) in enumerate(zip(fm_s2, fm_s2_n)):
+        if val is not None:
+            b = ax.bar(x[i] + w/2, val, w, color='#E87B3E', alpha=0.88,
+                       label='Full-matrix (ra312)' if i == 0 else '_nolegend_')
+            lbl = f'{val:.4f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
+            ax.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
+                    lbl, ha='center', va='bottom', fontsize=8.5)
+ax.axhline(_DENSE_GAVG_S2, color='gray', linestyle='--', linewidth=1.4, label=f'Dense-ft ({_DENSE_GAVG_S2:.3f})')
 ax.set_xticks(x); ax.set_xticklabels(methods)
 ax.set_ylabel('GLUE Average (G-AVG)')
 ax.set_title('GLUE Average: Stage 2 — Post-compress Finetune\n'
-             '(Per-head ra48 vs Full-matrix ra312, param_ratio ≈ 0.527, bf16)')
+             '(Per-head ra48, param_ratio ≈ 0.527, bf16)')
 ax.set_ylim(0, 1.06)
 ax.legend()
 ax.grid(axis='y', linestyle='--', alpha=0.35)
@@ -462,56 +517,45 @@ print('✓ fig03_glue_B.png')
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
 for i, (val, n) in enumerate(zip(ph_s1, ph_s1_n)):
     if val is not None:
-        b = ax1.bar(x[i] - w/2, val, w, color='#4878CF', alpha=0.88,
+        b = ax1.bar(x[i], val, w, color='#4878CF', alpha=0.88,
                     label='Per-head (ra48)' if i == 0 else '_nolegend_')
         lbl = f'{val:.3f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
         ax1.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
                  lbl, ha='center', va='bottom', fontsize=8.5)
     else:
-        ax1.text(x[i] - w/2, 0.05, 'pending', ha='center', va='bottom',
+        ax1.text(x[i], 0.05, 'pending', ha='center', va='bottom',
                  fontsize=8, color='#4878CF', rotation=90, alpha=0.6)
-for i, (val, n) in enumerate(zip(fm_s1, fm_s1_n)):
-    if val is not None:
-        b = ax1.bar(x[i] + w/2, val, w, color='#E87B3E', alpha=0.88,
-                    label='Full-matrix (ra312)' if i == 0 else '_nolegend_')
-        lbl = f'{val:.3f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
-        ax1.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
-                 lbl, ha='center', va='bottom', fontsize=8.5)
-    else:
-        ax1.text(x[i] + w/2, 0.05, 'pending', ha='center', va='bottom',
-                 fontsize=8, color='#E87B3E', rotation=90, alpha=0.6)
-ax1.axhline(0.864, color='gray', linestyle='--', linewidth=1.4, label='Dense (0.864)')
+ax1.axhline(_DENSE_GAVG_S1, color='gray', linestyle='--', linewidth=1.4, label=f'Dense ({_DENSE_GAVG_S1:.3f})')
 ax1.set_xticks(x); ax1.set_xticklabels(methods)
 ax1.set_ylabel('GLUE Average (G-AVG)')
 ax1.set_title('(a) Stage 1 — No Finetune')
 ax1.set_ylim(0, 1.0); ax1.legend(); ax1.grid(axis='y', linestyle='--', alpha=0.35)
 for i, (val, n) in enumerate(zip(ph_s2, ph_s2_n)):
+    xi = _ph_s2_x[i]
     if val is not None:
-        b = ax2.bar(x[i] - w/2, val, w, color='#4878CF', alpha=0.88,
+        b = ax2.bar(xi, val, w, color='#4878CF', alpha=0.88,
                     label='Per-head (ra48)' if i == 0 else '_nolegend_')
         lbl = f'{val:.4f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
         ax2.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
                  lbl, ha='center', va='bottom', fontsize=8.5)
     else:
-        ax2.text(x[i] - w/2, 0.05, 'pending', ha='center', va='bottom',
+        ax2.text(xi, 0.05, 'pending', ha='center', va='bottom',
                  fontsize=8, color='#4878CF', rotation=90, alpha=0.6)
-for i, (val, n) in enumerate(zip(fm_s2, fm_s2_n)):
-    if val is not None:
-        b = ax2.bar(x[i] + w/2, val, w, color='#E87B3E', alpha=0.88,
-                    label='Full-matrix (ra312)' if i == 0 else '_nolegend_')
-        lbl = f'{val:.4f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
-        ax2.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
-                 lbl, ha='center', va='bottom', fontsize=8.5)
-    else:
-        ax2.text(x[i] + w/2, 0.05, 'pending', ha='center', va='bottom',
-                 fontsize=8, color='#E87B3E', rotation=90, alpha=0.6)
-ax2.axhline(0.864, color='gray', linestyle='--', linewidth=1.4, label='Dense-ft (0.864)')
+if _has_fm_s2:
+    for i, (val, n) in enumerate(zip(fm_s2, fm_s2_n)):
+        if val is not None:
+            b = ax2.bar(x[i] + w/2, val, w, color='#E87B3E', alpha=0.88,
+                        label='Full-matrix (ra312)' if i == 0 else '_nolegend_')
+            lbl = f'{val:.4f}' + (f'\n({n}/8)' if 0 < n < 8 else '')
+            ax2.text(b[0].get_x() + b[0].get_width()/2, b[0].get_height() + 0.009,
+                     lbl, ha='center', va='bottom', fontsize=8.5)
+ax2.axhline(_DENSE_GAVG_S2, color='gray', linestyle='--', linewidth=1.4, label=f'Dense-ft ({_DENSE_GAVG_S2:.3f})')
 ax2.set_xticks(x); ax2.set_xticklabels(methods)
 ax2.set_ylabel('GLUE Average (G-AVG)')
 ax2.set_title('(b) Stage 2 — Post-compress Finetune')
 ax2.set_ylim(0, 1.0); ax2.legend(); ax2.grid(axis='y', linestyle='--', alpha=0.35)
-fig.suptitle('GLUE Average: Per-head vs Full-matrix Compression\n'
-             '(param_ratio ≈ 0.527, seq=512, bs=32, bf16)', fontsize=12)
+fig.suptitle('GLUE Average: Stage 1 & Stage 2\n'
+             '(Per-head ra48, param_ratio ≈ 0.527, seq=512, bs=32, bf16)', fontsize=12)
 plt.tight_layout()
 plt.savefig(os.path.join(OUT_DIR, 'fig03_glue_combined.png'), bbox_inches='tight')
 plt.close()
@@ -679,7 +723,7 @@ xpos = np.arange(len(x_labels))
 
 # Read from glue_summary.csv where available; fall back to archived fp32 values
 # [Dense, Per-head S1, Full-matrix S1, Per-head S2, Full-matrix S2]
-_dense_mrpc = _task_score('dense', 'per_head', 'mrpc', 1) or 0.913
+_dense_mrpc = _task_score('dense', 'per_head', 'mrpc', 1) or 0.910
 data = {
     'SVD':    [_dense_mrpc,
                _task_score('svd',    'per_head', 'mrpc', 1) or 0.000,
@@ -759,12 +803,12 @@ fig, ax = plt.subplots(figsize=(8.5, 5.8))
 # bf16 memory from expB.csv (real input mode, avg over tasks)
 _nm = _MEM('naive', 1005); _fm = _MEM('flashsvd', 357)
 # G-Avg from glue_summary.csv (current bf16 runs); fallback to fp32 values
-_svd_s1   = _gavg('svd',    'per_head', 1) or 0.434
-_fwsvd_s1 = _gavg('fwsvd',  'per_head', 1) or 0.616
-_drone_s1 = _gavg('drone',  'per_head', 1) or 0.687
-_ada_s1   = _gavg('adasvd', 'per_head', 1) or 0.474
+_svd_s1   = _gavg('svd',    'per_head', 1) or 0.432
+_fwsvd_s1 = _gavg('fwsvd',  'per_head', 1) or 0.573
+_drone_s1 = _gavg('drone',  'per_head', 1) or 0.688
+_ada_s1   = _gavg('adasvd', 'per_head', 1) or 0.476
 points = [
-    (_BF16_DENSE_MEM, 0.864,    'Dense',          'Dense',   'dense'),
+    (_BF16_DENSE_MEM, _DENSE_GAVG_S1, 'Dense',     'Dense',   'dense'),
     (_nm, _svd_s1,   'SVD (Naive)',    'SVD',     'naive'),
     (_fm, _svd_s1,   'SVD (Flash)',    'SVD',     'flash'),
     (_nm, _fwsvd_s1, 'FWSVD (Naive)', 'FWSVD',   'naive'),

@@ -135,11 +135,11 @@ def plot(df, task, dtype, seq_len, outdir):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--csv",     default="eval_encoder/eval_results/expB.csv")
+    p.add_argument("--csv",     default="experiments/results/expB.csv")
     p.add_argument("--task",    default="mnli")
     p.add_argument("--dtype",   default="bf16")
     p.add_argument("--seq_len", type=int, default=512)
-    p.add_argument("--outdir",  default="eval_encoder/eval_results/figures")
+    p.add_argument("--outdir",  default="experiments/figs/figures")
     args = p.parse_args()
 
     df = load(args.csv, args.task, args.dtype, args.seq_len)

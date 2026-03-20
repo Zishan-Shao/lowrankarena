@@ -122,7 +122,7 @@ def plot(df, outdir):
     other_pct  = [max(0.0, 100.0 - r["triton_time_pct"] - r["gemm_time_pct"])
                   for r in rows]
 
-    HIGHLIGHT = {4, 5}
+    HIGHLIGHT = {i for i in {4, 5} if i < len(rows)}
 
     fig_b, ax2 = plt.subplots(figsize=(6.5, 4.5))
     fig_b.suptitle("Rank Heterogeneity Improves Kernel Utilization"
@@ -180,8 +180,8 @@ def plot(df, outdir):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--csv",    default="eval_encoder/eval_results/expD.csv")
-    p.add_argument("--outdir", default="eval_encoder/eval_results/figures")
+    p.add_argument("--csv",    default="experiments/results/expD_mnli_bf16_s512_b32.csv")
+    p.add_argument("--outdir", default="experiments/figs/figures")
     args = p.parse_args()
 
     if not os.path.exists(args.csv):

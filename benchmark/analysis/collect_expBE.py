@@ -115,7 +115,7 @@ def extract_e2(df: pd.DataFrame, outdir: str) -> None:
 
     merged["speedup_real"]  = (merged["naive_lat_real"]  / merged["lat_real"]).round(3)
     merged["speedup_synth"] = (merged["naive_lat_synth"] / merged["lat_synthetic"]).round(3)
-    merged["speedup_delta"] = (merged["speedup_synth"] - merged["speedup_real"]).round(3)
+    merged["speedup_delta"] = (merged["speedup_real"] - merged["speedup_synth"]).round(3)
 
     out_cols = key + ["backend", "lat_real", "lat_synthetic",
                       "speedup_real", "speedup_synth", "speedup_delta", "seq_pad_real"]
