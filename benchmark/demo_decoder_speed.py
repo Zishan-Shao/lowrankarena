@@ -125,12 +125,12 @@ def _make_cache(model, key: str, batch_size: int, max_cache_len: int, dtype, dev
 @torch.no_grad()
 def _generate(model, tokenizer, prompt: str, backend_key: str, *,
               new_tokens: int, device, dtype,
-              ffn_backend: str, enable_flash_dense_attn: bool) -> tuple[str, float, float]:
+              ffn_backend: str, enable_flash_dense_attn: bool) -> tuple[str, float, float, float]:
     """
     Greedy-decode `new_tokens` tokens from `prompt`.
 
-    Returns (generated_text, decode_ms_per_token, decode_tok_s).
-    Prefill is excluded from the timed window.
+    Returns (generated_text, prefill_ms, decode_ms_per_token, decode_tok_s).
+    Prefill and decode are timed separately.
     """
     model.eval()
     _configure_backend(backend_key, ffn_backend=ffn_backend,
@@ -144,15 +144,18 @@ def _generate(model, tokenizer, prompt: str, backend_key: str, *,
     pos_pre = torch.arange(prompt_len, device=device).unsqueeze(0)
 
     # ── Prefill ────────────────────────────────────────────────────────────────
+    if "cuda" in str(device):
+        torch.cuda.synchronize(device)
+    t_pre = time.perf_counter()
     out = model(input_ids=input_ids, past_key_values=cache,
                 position_ids=pos_pre, use_cache=True)
     next_tok = out.logits[:, -1, :].argmax(dim=-1, keepdim=True)
-
     if "cuda" in str(device):
         torch.cuda.synchronize(device)
-    t0 = time.perf_counter()
+    prefill_ms = (time.perf_counter() - t_pre) * 1000.0
 
     # ── Decode loop ────────────────────────────────────────────────────────────
+    t0 = time.perf_counter()
     generated: list[int] = [int(next_tok.item())]
     for step in range(new_tokens - 1):
         cur_pos = prompt_len + step + 1
@@ -169,7 +172,7 @@ def _generate(model, tokenizer, prompt: str, backend_key: str, *,
     ms_per_tok = dt * 1000.0 / max(1, new_tokens)
     tok_s = new_tokens / dt if dt > 0 else float("inf")
     text = tokenizer.decode(generated, skip_special_tokens=True)
-    return text, ms_per_tok, tok_s
+    return text, prefill_ms, ms_per_tok, tok_s
 
 
 # ── Latency benchmark (random tokens, per-step median) ────────────────────────
@@ -233,20 +236,21 @@ def _bench(model, backend_key: str, *,
 
 def _print_gen_table(results: list, args) -> None:
     baseline_ms = next((r["ms"] for r in results if r["ms"] is not None), None)
-    print(f"\n{'='*66}")
-    print(f"  {'Backend':<22}  {'ms/tok':>8}  {'tok/s':>8}  {'Speedup':>9}")
-    print(f"  {'-'*22}  {'-'*8}  {'-'*8}  {'-'*9}")
+    print(f"\n{'='*78}")
+    print(f"  {'Backend':<22}  {'prefill':>9}  {'ms/tok':>8}  {'tok/s':>8}  {'Speedup':>9}")
+    print(f"  {'-'*22}  {'-'*9}  {'-'*8}  {'-'*8}  {'-'*9}")
     for r in results:
         label = r["label"]
         if r["err"] is not None:
-            print(f"  {label:<22}  {'ERROR':>8}  {'---':>8}  {'---':>9}")
+            print(f"  {label:<22}  {'ERROR':>9}  {'---':>8}  {'---':>8}  {'---':>9}")
         else:
-            ms, tok_s = r["ms"], r["tok_s"]
+            pre, ms, tok_s = r["prefill_ms"], r["ms"], r["tok_s"]
             spd = "baseline" if ms == baseline_ms else f"x{baseline_ms/ms:.2f}"
-            print(f"  {label:<22}  {ms:>8.3f}  {tok_s:>8.1f}  {spd:>9}")
-    print(f"{'='*66}")
-    print(f"  new_tokens={args.new_tokens}  dtype={args.dtype}  device={args.device}")
-    print(f"{'='*66}\n")
+            print(f"  {label:<22}  {pre:>8.1f}ms  {ms:>8.3f}  {tok_s:>8.1f}  {spd:>9}")
+    print(f"{'='*78}")
+    print(f"  prompt_toks={results[0].get('prompt_len','?')}  "
+          f"new_tokens={args.new_tokens}  dtype={args.dtype}  device={args.device}")
+    print(f"{'='*78}\n")
 
 
 def _print_bench_table(results: list, args) -> None:
@@ -432,23 +436,27 @@ def main():
             print(f"  [{label:<20s}] generating {args.new_tokens} tokens...",
                   flush=True)
             try:
-                text, ms_tok, tok_s = _generate(
+                text, prefill_ms, ms_tok, tok_s = _generate(
                     model, tokenizer, current_prompt, key,
                     new_tokens=args.new_tokens,
                     device=device, dtype=dtype,
                     ffn_backend=args.ffn_backend,
                     enable_flash_dense_attn=enable_flash_dense,
                 )
+                prompt_len = len(tokenizer(current_prompt).input_ids)
                 preview = text[:100].replace("\n", " ")
-                print(f"  [{label:<20s}] {ms_tok:.3f} ms/tok  {tok_s:.1f} tok/s")
+                print(f"  [{label:<20s}] prefill={prefill_ms:.1f}ms  "
+                      f"decode={ms_tok:.3f}ms/tok  {tok_s:.1f}tok/s")
                 print(f"  output: {preview}")
-                results.append({"key": key, "label": label,
-                                 "ms": ms_tok, "tok_s": tok_s, "err": None})
+                results.append({"key": key, "label": label, "prefill_ms": prefill_ms,
+                                 "ms": ms_tok, "tok_s": tok_s, "prompt_len": prompt_len,
+                                 "err": None})
             except Exception as e:
                 msg = str(e).split("\n")[0][:55]
                 print(f"  [{label:<20s}] FAILED -- {msg}")
-                results.append({"key": key, "label": label,
-                                 "ms": None, "tok_s": None, "err": msg})
+                results.append({"key": key, "label": label, "prefill_ms": None,
+                                 "ms": None, "tok_s": None, "prompt_len": 0,
+                                 "err": msg})
 
         if len(results) > 1:
             _print_gen_table(results, args)
