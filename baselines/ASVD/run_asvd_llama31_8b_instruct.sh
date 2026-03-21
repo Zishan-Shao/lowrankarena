@@ -44,9 +44,6 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
         --save_path "$ASVD_PT" \
         2>&1 | tee "logs/${MODEL_TAG}_asvd_${KEEP}.log"
 
-    HF_DIR="$SAVE_DIR/hf_${KEEP}"
-    echo "=== Convert to HF dir: $HF_DIR ==="
-    python convert_asvd_to_hf_dir.py --input "$ASVD_PT" --output "$HF_DIR"
 done
 
 echo ""
