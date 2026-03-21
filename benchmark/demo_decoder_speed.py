@@ -343,13 +343,20 @@ def main():
     print(f"  Model: {getattr(model.config, '_name_or_path', '?')}")
     print(f"  Params: {n_params:.2f}B  dtype={args.dtype}")
 
-    # Warmup each backend once with a short random-token run
+    # Warmup: two rounds — short shape first (fast), then bench shape (primes CUDA graph)
     print(f"\nWarming up ({args.warmup} rounds per backend)...")
     for key in args.backends:
         label = BACKEND_LABELS[key]
         print(f"  [{label:<20s}] ", end="", flush=True)
         try:
+            # Round 1: short shape
             _bench(model, key, prompt_len=64, new_tokens=16, batch_size=1,
+                   device=device, dtype=dtype, warmup=args.warmup,
+                   ffn_backend=args.ffn_backend,
+                   enable_flash_dense_attn=enable_flash_dense)
+            # Round 2: bench shape — ensures CUDA graph is captured at the right cache size
+            _bench(model, key, prompt_len=args.prompt_len, new_tokens=args.bench_tokens,
+                   batch_size=args.batch_size,
                    device=device, dtype=dtype, warmup=args.warmup,
                    ffn_backend=args.ffn_backend,
                    enable_flash_dense_attn=enable_flash_dense)
