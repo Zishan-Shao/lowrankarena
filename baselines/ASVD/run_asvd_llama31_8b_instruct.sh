@@ -16,6 +16,9 @@ MODEL_TAG="Llama-3.1-8B-Instruct"
 SAVE_DIR="checkpoints/asvd/llama31_8b_instruct"
 HF_TOKEN="${1:-}"
 
+# asvd.py does not support --hf_token; pass token via env var instead
+[ -n "$HF_TOKEN" ] && export HUGGING_FACE_HUB_TOKEN="$HF_TOKEN" && export HF_TOKEN="$HF_TOKEN"
+
 mkdir -p "$SAVE_DIR" logs
 
 for RATIO in 0.2 0.3 0.4 0.5 0.6; do
@@ -39,7 +42,6 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
         --sensitivity_metric ppl \
         --eval_ppl wikitext2 \
         --save_path "$ASVD_PT" \
-        ${HF_TOKEN:+--hf_token "$HF_TOKEN"} \
         2>&1 | tee "logs/${MODEL_TAG}_asvd_${KEEP}.log"
 done
 
