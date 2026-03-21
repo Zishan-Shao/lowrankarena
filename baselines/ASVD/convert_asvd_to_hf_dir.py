@@ -75,7 +75,7 @@ def main():
     args = ap.parse_args()
 
     print(f"Loading {args.input} ...")
-    obj = torch.load(args.input, map_location="cpu")
+    obj = torch.load(args.input, map_location="cpu", weights_only=False)
     if not (isinstance(obj, dict) and "model" in obj and "tokenizer" in obj):
         print("ERROR: expected {'model': ..., 'tokenizer': ...} dict", file=sys.stderr)
         sys.exit(1)
