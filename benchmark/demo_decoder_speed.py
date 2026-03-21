@@ -84,7 +84,8 @@ def _configure_backend(key: str, *, ffn_backend: str = "auto",
         _set_env("FLASH_SVD_BASELINE_DENSE_KVCACHE", False)
         _set_env("FLASH_SVD_REFERENCE_DENSE_ATTN", False)
         _set_env("FLASH_SVD_ENABLE_EXPERIMENTAL_FFN", False)
-        _set_env("FLASH_SVD_MLP_CUDA_GRAPH", False)
+        _set_env("FLASH_SVD_MLP_CUDA_GRAPH", True)
+        os.environ["FLASH_SVD_MLP_CUDA_GRAPH_SCOPE"] = "mlp"
         os.environ["FLASH_SVD_FFN_BACKEND"] = ffn_backend
 
 
@@ -144,24 +145,24 @@ def _generate(model, tokenizer, prompt: str, backend_key: str, *,
     pos_pre = torch.arange(prompt_len, device=device).unsqueeze(0)
 
     # ── Prefill ────────────────────────────────────────────────────────────────
+    cache_pos_pre = torch.arange(prompt_len, device=device, dtype=torch.long)
     if "cuda" in str(device):
         torch.cuda.synchronize(device)
     t_pre = time.perf_counter()
     out = model(input_ids=input_ids, past_key_values=cache,
-                position_ids=pos_pre, use_cache=True)
+                cache_position=cache_pos_pre, use_cache=True)
     next_tok = out.logits[:, -1, :].argmax(dim=-1, keepdim=True)
     if "cuda" in str(device):
         torch.cuda.synchronize(device)
     prefill_ms = (time.perf_counter() - t_pre) * 1000.0
 
-    # ── Decode loop ────────────────────────────────────────────────────────────
+    # ── Decode loop (timed as whole loop, matching evaluater.py) ───────────────
     t0 = time.perf_counter()
     generated: list[int] = [int(next_tok.item())]
     for step in range(new_tokens - 1):
-        cur_pos = prompt_len + step + 1
-        pos = torch.tensor([[cur_pos]], device=device, dtype=torch.long)
+        cache_pos = torch.tensor([prompt_len + step + 1], device=device, dtype=torch.long)
         out = model(input_ids=next_tok, past_key_values=cache,
-                    position_ids=pos, use_cache=True)
+                    cache_position=cache_pos, use_cache=True)
         next_tok = out.logits[:, -1, :].argmax(dim=-1, keepdim=True)
         generated.append(int(next_tok.item()))
 
@@ -184,52 +185,48 @@ def _bench(model, backend_key: str, *,
            ffn_backend: str, enable_flash_dense_attn: bool) -> tuple[float, float]:
     """
     Pure decode-latency benchmark using random token inputs.
+    Timing matches evaluater.py: one sync before loop, one sync after.
 
-    Returns (median_ms_per_token, tok_s).
-    Each decode step is timed individually; median is reported.
+    Returns (ms_per_token, tok_s).
     """
     model.eval()
     vocab = int(getattr(model.config, "vocab_size", 32000))
     max_cache_len = prompt_len + new_tokens + warmup + 2
 
-    def _one_run(timed: bool) -> list[float]:
+    def _one_run(timed: bool) -> float:
         _configure_backend(backend_key, ffn_backend=ffn_backend,
                            enable_flash_dense_attn=enable_flash_dense_attn)
         cache = _make_cache(model, backend_key, batch_size, max_cache_len, dtype, device)
         input_ids = torch.randint(0, vocab, (batch_size, prompt_len),
                                   device=device, dtype=torch.long)
-        pos_pre = torch.arange(prompt_len, device=device).unsqueeze(0).expand(batch_size, -1)
+        cache_pos_pre = torch.arange(prompt_len, device=device, dtype=torch.long)
 
         out = model(input_ids=input_ids, past_key_values=cache,
-                    position_ids=pos_pre, use_cache=True)
+                    cache_position=cache_pos_pre, use_cache=True)
         next_tok = out.logits[:, -1, :].argmax(dim=-1, keepdim=True)
 
-        step_times: list[float] = []
+        if timed and "cuda" in str(device):
+            torch.cuda.synchronize(device)
+        t0 = time.perf_counter()
         for step in range(new_tokens - 1):
-            cur_pos = prompt_len + step + 1
-            pos = torch.full((batch_size, 1), cur_pos, device=device, dtype=torch.long)
-            if timed and "cuda" in str(device):
-                torch.cuda.synchronize(device)
-            t0 = time.perf_counter()
+            cache_pos = torch.tensor([prompt_len + step + 1],
+                                     device=device, dtype=torch.long)
             out = model(input_ids=next_tok, past_key_values=cache,
-                        position_ids=pos, use_cache=True)
+                        cache_position=cache_pos, use_cache=True)
             next_tok = out.logits[:, -1, :].argmax(dim=-1, keepdim=True)
-            if timed and "cuda" in str(device):
-                torch.cuda.synchronize(device)
-            if timed:
-                step_times.append(time.perf_counter() - t0)
-        return step_times
+        if timed and "cuda" in str(device):
+            torch.cuda.synchronize(device)
+        return (time.perf_counter() - t0) if timed else 0.0
 
     for _ in range(warmup):
         _one_run(timed=False)
     if "cuda" in str(device):
         torch.cuda.synchronize(device)
 
-    step_times = _one_run(timed=True)
-    step_times.sort()
-    median_ms = step_times[len(step_times) // 2] * 1000.0
-    tok_s = batch_size / (median_ms / 1000.0)
-    return median_ms, tok_s
+    dt = _one_run(timed=True)
+    ms_per_tok = dt * 1000.0 / max(1, new_tokens - 1)
+    tok_s = batch_size * (new_tokens - 1) / dt if dt > 0 else float("inf")
+    return ms_per_tok, tok_s
 
 
 # ── Table printers ─────────────────────────────────────────────────────────────
