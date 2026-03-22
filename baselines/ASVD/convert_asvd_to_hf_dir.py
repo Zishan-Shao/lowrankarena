@@ -72,9 +72,11 @@ def main():
     ap.add_argument("--dtype",  default=None,
                     choices=["fp32", "fp16", "bf16"],
                     help="Cast weights before saving (default: keep original dtype)")
+    ap.add_argument("--gpu", type=int, default=0,
+                    help="GPU index to use (default: 0); ignored if no CUDA")
     args = ap.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu"
     print(f"Loading {args.input} (map_to={device}) ...")
     obj = torch.load(args.input, map_location=device, weights_only=False)
     if not (isinstance(obj, dict) and "model" in obj and "tokenizer" in obj):
