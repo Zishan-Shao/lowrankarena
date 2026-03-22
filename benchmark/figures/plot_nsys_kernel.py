@@ -177,6 +177,89 @@ def plot(df, outdir):
     print(f"[plot] Saved → {out_b}")
     plt.close(fig_b)
 
+    # ── Combined fig15: 1×2 Kernel Utilization Analysis ──────────────────────
+    fig_c, (cx0, cx1) = plt.subplots(1, 2, figsize=(13.0, 4.5),
+                                      gridspec_kw={"wspace": 0.40})
+
+    # Panel A — GEMM Kernel Diversity
+    colors1 = [BACKEND_COLORS[POINT_META[r["point"]][1]] for r in rows]
+    vals1   = [r["n_gemm_variants"] for r in rows]
+    bars1   = cx0.bar(x, vals1, width=bar_w, color=colors1, zorder=3,
+                      edgecolor="white", linewidth=0.8)
+    ymax1   = 15
+    for rect, v in zip(bars1, vals1):
+        cx0.text(rect.get_x() + rect.get_width() / 2,
+                 rect.get_height() + 0.2,
+                 str(int(v)), ha="center", va="bottom",
+                 fontsize=10, fontweight="bold", color="#222222")
+    cx0.set_xticks(x)
+    cx0.set_xticklabels(labels, fontsize=8)
+    cx0.set_ylabel("# Distinct GEMM Kernel Configs", fontsize=9)
+    cx0.set_title("GEMM Kernel Diversity", fontweight='bold')
+    cx0.set_ylim(0, ymax1)
+    cx0.yaxis.grid(True, linestyle="--", alpha=0.45, zorder=0)
+    cx0.set_axisbelow(True)
+    cx0.axvline(2.5, color="#cccccc", linestyle="--", linewidth=1, zorder=2)
+    cx0.text(1.0, ymax1 * 0.96, "Uniform ranks", ha="center", va="top",
+             fontsize=8, color="#555555", style="italic")
+    cx0.text(4.0, ymax1 * 0.96, "Heterogeneous ranks", ha="center", va="top",
+             fontsize=8, color="#555555", style="italic")
+
+    # Panel B — Kernel Time Breakdown
+    b_triton = cx1.bar(x, triton_pct, width=bar_w, color=C_TRITON,
+                       label="Triton fused (FlashSVD)", zorder=3)
+    b_gemm   = cx1.bar(x, gemm_pct, width=bar_w, bottom=triton_pct,
+                       color=C_GEMM, label="cuBLAS/CUTLASS GEMM", zorder=3)
+    bottom2  = [t + g for t, g in zip(triton_pct, gemm_pct)]
+    cx1.bar(x, other_pct, width=bar_w, bottom=bottom2,
+            color=C_OTHER, label="Other (elementwise, LN…)", zorder=3)
+    for i in HIGHLIGHT:
+        total_h = triton_pct[i] + gemm_pct[i] + other_pct[i]
+        rect = mpatches.Rectangle((x[i] - bar_w / 2, 0), bar_w, total_h,
+                                   linewidth=2.2, edgecolor="#111111",
+                                   facecolor="none", zorder=5)
+        cx1.add_patch(rect)
+        cx1.text(x[i], total_h + 1.5, "★", ha="center", va="bottom",
+                 fontsize=11, color="#111111", zorder=6)
+    for i, t in enumerate(triton_pct):
+        if t >= 8:
+            cx1.text(x[i], t / 2, f"{t:.0f}%\nTriton", ha="center", va="center",
+                     fontsize=7.5, color="white", fontweight="bold", zorder=4)
+        elif t > 0:
+            cx1.text(x[i], t + 1, f"{t:.0f}%", ha="center", va="bottom",
+                     fontsize=7.5, color=C_TRITON, fontweight="bold", zorder=4)
+    cx1.set_xticks(x)
+    cx1.set_xticklabels(labels, fontsize=8)
+    cx1.set_ylabel("GPU Time (%)", fontsize=9)
+    cx1.set_ylim(0, 115)
+    cx1.set_title("Kernel Time Breakdown", fontweight='bold')
+    cx1.yaxis.grid(True, linestyle="--", alpha=0.45, zorder=0)
+    cx1.set_axisbelow(True)
+    cx1.axvline(2.5, color="#cccccc", linestyle="--", linewidth=1, zorder=2)
+    cx1.text(1.0, 113, "Uniform ranks", ha="center", va="top",
+             fontsize=8, color="#555555", style="italic")
+    cx1.text(4.0, 113, "Heterogeneous ranks", ha="center", va="top",
+             fontsize=8, color="#555555", style="italic")
+
+    # Shared legend: backend patches (panel A) + kernel type (panel B)
+    leg_backend = [mpatches.Patch(color=BACKEND_COLORS[b], label=b)
+                   for b in ["Naive", "Flash 1.0", "Flash 1.5"]]
+    handles_b, labels_b = cx1.get_legend_handles_labels()
+    all_handles = leg_backend + handles_b
+    all_labels  = ["Naive", "Flash 1.0", "Flash 1.5"] + labels_b
+    fig_c.legend(all_handles, all_labels, loc='lower center',
+                 ncol=len(all_handles), framealpha=0.9, fontsize=10.5,
+                 bbox_to_anchor=(0.5, -0.08))
+    fig_c.text(0.01, 0.5, "Kernel Utilization Analysis", rotation=90,
+               va='center', ha='center', fontsize=13, fontweight='bold')
+    fig_c.suptitle("Rank Heterogeneity Improves Kernel Utilization  (MNLI, bf16, seq=512)",
+                   fontsize=11, fontweight="bold")
+    fig_c.tight_layout(rect=[0.03, 0.0, 1.0, 0.93])
+    out_c = os.path.join(outdir, "fig15_nsys_combined.png")
+    fig_c.savefig(out_c, dpi=150, bbox_inches="tight")
+    print(f"[plot] Saved → {out_c}")
+    plt.close(fig_c)
+
 
 def main():
     p = argparse.ArgumentParser()

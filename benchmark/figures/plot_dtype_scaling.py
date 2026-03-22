@@ -266,3 +266,70 @@ for i, sl in enumerate(SEQ):
     print(f"  {sl:>4}  {THR_FP32['einsum'][i]:>12.0f}  {THR_FP32['sdpa'][i]:>10.0f}  "
           f"{tf:>10.0f}  {tbf:>10.0f}  x{tbf/tf:>6.2f}")
 print(SEP)
+
+
+# ── Combined fig14: 1×2 Dtype × Backend Scaling ───────────────────────────────
+fig_e, (axA, axB) = plt.subplots(1, 2, figsize=(11.0, 4.0),
+                                  gridspec_kw={"wspace": 0.38})
+
+# Panel A — Memory
+axA.plot(SEQ, MEM_FP32["einsum"], color=C_EINSUM, marker="o",
+         lw=LW, ms=MS, dashes=(4, 2), label="fp32-einsum", zorder=3)
+axA.plot(SEQ, MEM_FP32["sdpa"],   color=C_SDPA,   marker="s",
+         lw=LW, ms=MS, dashes=(2, 2), label="fp32-SDPA",   zorder=3)
+axA.plot(SEQ, MEM_FP32["flash"],  color=C_FLASH,  marker="^",
+         lw=LW, ms=MS, dashes=(1, 1), label="fp32-Flash",  zorder=4)
+axA.plot(SEQ, MEM_BF16_NAIVE,  color=C_BF16_NAIVE,  marker="o",
+         lw=LW, ms=MS, label="bf16-Naive", zorder=4)
+axA.plot(BF16_SEQ, MEM_BF16_FLASH, color=C_BF16_FLASH, marker="D",
+         lw=LW + 0.6, ms=MS, label="bf16-Flash", zorder=5)
+for sl, mn, mf, red in zip(SEQ, MEM_BF16_NAIVE, MEM_BF16_FLASH, MEM_RED_BF16):
+    axA.text(sl, mf - 60, f"−{red:.0f}%",
+             color=C_BF16_FLASH, fontsize=9, va="top", ha="center", fontstyle="italic")
+axA.set_ylim(0, 2500)
+axA.yaxis.set_major_locator(ticker.MultipleLocator(500))
+axA.set_ylabel("Peak GPU Memory (MB)", fontsize=11)
+axA.set_title("Memory Scaling", fontweight="bold")
+axA.set_xticks(SEQ); axA.set_xticklabels([str(s) for s in SEQ])
+axA.set_xlim(96, 576)
+axA.set_xlabel("Sequence Length", fontsize=11)
+axA.grid(axis="y", alpha=0.25, lw=0.8)
+
+# Panel B — Throughput
+axB.plot(SEQ, THR_FP32["einsum"], color=C_EINSUM, marker="o",
+         lw=LW, ms=MS, dashes=(4, 2), label="fp32-einsum", zorder=3)
+axB.plot(SEQ, THR_FP32["sdpa"],   color=C_SDPA,   marker="s",
+         lw=LW, ms=MS, dashes=(2, 2), label="fp32-SDPA",   zorder=3)
+axB.plot(SEQ, THR_FP32["flash"],  color=C_FLASH,  marker="^",
+         lw=LW, ms=MS, dashes=(1, 1), label="fp32-Flash",  zorder=4)
+axB.plot(BF16_SEQ, THR_BF16_FLASH, color=C_BF16_FLASH, marker="D",
+         lw=LW + 0.6, ms=MS, label="bf16-Flash", zorder=5)
+sl512 = SEQ[-1]
+tf_fp32_last = THR_FP32["flash"][-1]
+tf_bf16_last = THR_BF16_FLASH[-1]
+if len(THR_BF16_FLASH):
+    spd = tf_bf16_last / tf_fp32_last
+    axB.annotate(f"×{spd:.1f} vs fp32",
+                 xy=(sl512, tf_bf16_last), xytext=(sl512 - 180, tf_bf16_last + 650),
+                 color=C_BF16_FLASH, fontsize=9, fontstyle="italic",
+                 arrowprops=dict(arrowstyle="->", color=C_BF16_FLASH, lw=1.0))
+axB.set_ylim(0, 3200)
+axB.yaxis.set_major_locator(ticker.MultipleLocator(500))
+axB.set_ylabel("Throughput (samples / sec)", fontsize=11)
+axB.set_title("Throughput Scaling", fontweight="bold")
+axB.set_xticks(SEQ); axB.set_xticklabels([str(s) for s in SEQ])
+axB.set_xlim(96, 576)
+axB.set_xlabel("Sequence Length", fontsize=11)
+axB.grid(axis="y", alpha=0.25, lw=0.8)
+
+handlesA, labelsA = axA.get_legend_handles_labels()
+fig_e.legend(handlesA, labelsA, loc='lower center', ncol=len(handlesA),
+             framealpha=0.9, fontsize=9.5, bbox_to_anchor=(0.5, -0.13))
+fig_e.text(0.01, 0.5, "Dtype × Backend Scaling", rotation=90,
+           va='center', ha='center', fontsize=13, fontweight='bold')
+fig_e.text(0.5, -0.15, SUBTITLE, ha='center', fontsize=8, color='#555555')
+fig_e.tight_layout()
+png_e = f"{FIG_DIR}/fig14_dtype_combined.png"
+fig_e.savefig(png_e, dpi=180, bbox_inches="tight")
+print(f"Saved: {png_e}")
+plt.close(fig_e)

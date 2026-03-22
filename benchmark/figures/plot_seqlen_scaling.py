@@ -318,3 +318,132 @@ for i, x in enumerate(_ref_xs):
         row += f"  {data_seq[b][2][i]:>18.0f}"
     print(row)
 print(SEP)
+
+
+# ── Combined fig07: 1×3 Sequence Length Scaling ────────────────────────────────
+fig_c, (ax0, ax1, ax2) = plt.subplots(1, 3, figsize=(16.0, 4.0),
+                                        gridspec_kw={"wspace": 0.38})
+
+for b in BACKEND_ORDER:
+    if b not in data_seq: continue
+    xs, mem, _ = data_seq[b]
+    lw_b = LW + 0.4 if 'flash' in b else LW
+    ax0.plot(xs, mem, color=COLORS[b], marker=MARKERS[b], lw=lw_b, ms=MS,
+             dashes=DASHES[b] if DASHES[b] else [], label=LABELS[b],
+             zorder=4 if 'flash' in b else 3)
+if "flashsvd15" in data_seq and _ref_b in data_seq:
+    fxs, fmem, _ = data_seq["flashsvd15"]
+    x_last, mf_last = fxs[-1], fmem[-1]
+    idx_n = np.where(_ref_xs == x_last)[0]
+    if len(idx_n):
+        pct = (_ref_mem[idx_n[0]] - mf_last) / _ref_mem[idx_n[0]] * 100
+        ax0.text(x_last + 14, mf_last, f"−{pct:.0f}%\nvs Naive",
+                 color=COLORS["flashsvd15"], fontsize=9,
+                 va='center', ha='left', fontstyle='italic', fontweight='bold')
+ax0.yaxis.set_major_locator(ticker.MultipleLocator(200))
+ax0.set_ylim(bottom=150)
+ax0.set_ylabel("Peak GPU Memory (MB)", fontsize=11)
+ax0.set_title("Memory", fontweight='bold')
+ax0.set_xticks(_ref_xs); ax0.set_xticklabels([str(x) for x in _ref_xs])
+ax0.set_xlim(_ref_xs[0] - 32, _ref_xs[-1] + 80)
+ax0.set_xlabel("Sequence Length", fontsize=11)
+ax0.grid(axis='y', alpha=0.25, lw=0.8)
+
+for b in BACKEND_ORDER:
+    if b not in data_seq: continue
+    xs, _, thr = data_seq[b]
+    lw_b = LW + 0.4 if 'flash' in b else LW
+    ax1.plot(xs, thr, color=COLORS[b], marker=MARKERS[b], lw=lw_b, ms=MS,
+             dashes=DASHES[b] if DASHES[b] else [], label=LABELS[b],
+             zorder=4 if 'flash' in b else 3)
+if "flashsvd15" in data_seq and _ref_b in data_seq:
+    fxs, _, fthr = data_seq["flashsvd15"]
+    x_last = fxs[-1]; tf_last = fthr[-1]
+    idx_n = np.where(_ref_xs == x_last)[0]
+    if len(idx_n):
+        spd = tf_last / _ref_thr[idx_n[0]]
+        ax1.annotate(f"×{spd:.2f}",
+                     xy=(x_last, tf_last), xytext=(x_last - 40, tf_last + 200),
+                     color=COLORS["flashsvd15"], fontsize=9, fontstyle='italic',
+                     ha='center',
+                     arrowprops=dict(arrowstyle="->", color=COLORS["flashsvd15"], lw=0.8))
+ax1.yaxis.set_major_locator(ticker.MultipleLocator(500))
+ax1.set_ylabel("Throughput (samples / sec)", fontsize=11)
+ax1.set_title("Throughput", fontweight='bold')
+ax1.set_xticks(_ref_xs); ax1.set_xticklabels([str(x) for x in _ref_xs])
+ax1.set_xlim(_ref_xs[0] - 32, _ref_xs[-1] + 48)
+ax1.set_xlabel("Sequence Length", fontsize=11)
+ax1.grid(axis='y', alpha=0.25, lw=0.8)
+
+for b in [b for b in BACKEND_ORDER if b != _ref_b]:
+    if b not in data_seq: continue
+    fxs, fmem, _ = data_seq[b]
+    mask = np.isin(fxs, _ref_xs)
+    xs_a = fxs[mask]
+    red = (_ref_mem[np.isin(_ref_xs, xs_a)] - fmem[mask]) / _ref_mem[np.isin(_ref_xs, xs_a)] * 100
+    lw_b = 2.4 if 'flash' in b else LW
+    ax2.plot(xs_a, red, color=COLORS[b], marker=MARKERS[b], lw=lw_b, ms=MS,
+             dashes=DASHES[b] if DASHES[b] else [], label=f"{LABELS[b]} vs Naive",
+             zorder=4 if 'flash' in b else 3)
+    ax2.fill_between(xs_a, 0, red, color=COLORS[b], alpha=0.06)
+ax2.set_ylim(0, 80)
+ax2.yaxis.set_major_locator(ticker.MultipleLocator(20))
+ax2.set_ylabel("Memory Reduction (%) vs. Naive", fontsize=11)
+ax2.set_title("Memory Reduction", fontweight='bold')
+ax2.set_xticks(_ref_xs); ax2.set_xticklabels([str(x) for x in _ref_xs])
+ax2.set_xlim(_ref_xs[0] - 32, _ref_xs[-1] + 48)
+ax2.set_xlabel("Sequence Length", fontsize=11)
+ax2.grid(axis='y', alpha=0.25, lw=0.8)
+
+handles0, labels0 = ax0.get_legend_handles_labels()
+fig_c.legend(handles0, labels0, loc='lower center', ncol=len(handles0),
+             framealpha=0.9, fontsize=9.5, bbox_to_anchor=(0.5, -0.13))
+fig_c.text(0.01, 0.5, "Sequence Length Scaling", rotation=90,
+           va='center', ha='center', fontsize=13, fontweight='bold')
+fig_c.text(0.5, -0.15, SUBTITLE_SEQ, ha='center', fontsize=8, color='#555555')
+fig_c.tight_layout()
+_save(fig_c, "fig07_seqlen_combined")
+
+
+# ── Combined fig08: 1×2 Batch Size Scaling ────────────────────────────────────
+fig_d, (ax3, ax4) = plt.subplots(1, 2, figsize=(11.0, 4.0),
+                                  gridspec_kw={"wspace": 0.38})
+
+for b in BACKEND_ORDER:
+    if b not in data_batch: continue
+    xs, mem, _ = data_batch[b]
+    lw_b = LW + 0.4 if 'flash' in b else LW
+    ax3.plot(xs, mem, color=COLORS[b], marker=MARKERS[b], lw=lw_b, ms=MS,
+             dashes=DASHES[b] if DASHES[b] else [], label=LABELS[b],
+             zorder=4 if 'flash' in b else 3)
+ax3.yaxis.set_major_locator(ticker.MultipleLocator(500))
+ax3.set_ylabel("Peak GPU Memory (MB)", fontsize=11)
+ax3.set_title("Memory", fontweight='bold')
+ax3.set_xticks(_ref_bxs); ax3.set_xticklabels([str(x) for x in _ref_bxs])
+ax3.set_xlim(_ref_bxs[0] - 4, _ref_bxs[-1] + 8)
+ax3.set_xlabel("Batch Size", fontsize=11)
+ax3.grid(axis='y', alpha=0.25, lw=0.8)
+
+for b in BACKEND_ORDER:
+    if b not in data_batch: continue
+    xs, _, thr = data_batch[b]
+    lw_b = LW + 0.4 if 'flash' in b else LW
+    ax4.plot(xs, thr, color=COLORS[b], marker=MARKERS[b], lw=lw_b, ms=MS,
+             dashes=DASHES[b] if DASHES[b] else [], label=LABELS[b],
+             zorder=4 if 'flash' in b else 3)
+ax4.yaxis.set_major_locator(ticker.MultipleLocator(400))
+ax4.set_ylabel("Throughput (samples / sec)", fontsize=11)
+ax4.set_title("Throughput", fontweight='bold')
+ax4.set_xticks(_ref_bxs); ax4.set_xticklabels([str(x) for x in _ref_bxs])
+ax4.set_xlim(_ref_bxs[0] - 4, _ref_bxs[-1] + 8)
+ax4.set_xlabel("Batch Size", fontsize=11)
+ax4.grid(axis='y', alpha=0.25, lw=0.8)
+
+handles3, labels3 = ax3.get_legend_handles_labels()
+fig_d.legend(handles3, labels3, loc='lower center', ncol=len(handles3),
+             framealpha=0.9, fontsize=9.5, bbox_to_anchor=(0.5, -0.13))
+fig_d.text(0.01, 0.5, "Batch Size Scaling", rotation=90,
+           va='center', ha='center', fontsize=13, fontweight='bold')
+fig_d.text(0.5, -0.15, SUBTITLE_BATCH, ha='center', fontsize=8, color='#555555')
+fig_d.tight_layout()
+_save(fig_d, "fig08_batch_combined")
