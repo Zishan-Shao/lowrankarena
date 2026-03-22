@@ -74,8 +74,9 @@ def main():
                     help="Cast weights before saving (default: keep original dtype)")
     args = ap.parse_args()
 
-    print(f"Loading {args.input} ...")
-    obj = torch.load(args.input, map_location="cpu", weights_only=False)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Loading {args.input} (map_to={device}) ...")
+    obj = torch.load(args.input, map_location=device, weights_only=False)
     if not (isinstance(obj, dict) and "model" in obj and "tokenizer" in obj):
         print("ERROR: expected {'model': ..., 'tokenizer': ...} dict", file=sys.stderr)
         sys.exit(1)
@@ -87,6 +88,11 @@ def main():
     print("Merging SVDLinear layers ...")
     n = merge_svd_linears(model)
     print(f"  merged {n} SVDLinear → nn.Linear")
+
+    if device == "cuda":
+        print("  moving to CPU for saving ...")
+        model = model.to("cpu")
+        torch.cuda.empty_cache()
 
     if args.dtype is not None:
         dtype_map = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
