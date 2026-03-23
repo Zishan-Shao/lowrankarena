@@ -47,10 +47,17 @@ def _getattr2(obj, *names):
     return None
 
 
-def _merge(u: nn.Linear, v: nn.Linear) -> torch.Tensor:
-    """Compute merged weight W = u.weight @ v.weight  (no grad)."""
+def _merge(u: nn.Linear, v: nn.Linear, device: str = "cpu") -> torch.Tensor:
+    """Compute merged weight W = u.weight @ v.weight  (no grad).
+
+    If device is a CUDA device, the matmul is performed on that device and the
+    result is immediately moved back to CPU.  The input modules stay on CPU.
+    """
     with torch.no_grad():
-        return u.weight.float() @ v.weight.float()
+        uw = u.weight.float().to(device)
+        vw = v.weight.float().to(device)
+        result = uw @ vw
+        return result.cpu()
 
 
 # ── SVD-LLM projection map ─────────────────────────────────────────────────────
@@ -81,7 +88,7 @@ _MLP_PROJ_MAP = {
 }
 
 
-def _build_merged_state_dict(svd_model: nn.Module) -> dict:
+def _build_merged_state_dict(svd_model: nn.Module, compute_device: str = "cpu") -> dict:
     """
     Walk the SVD-LLM model and produce a state dict with standard HF key names.
 
@@ -122,7 +129,7 @@ def _build_merged_state_dict(svd_model: nn.Module) -> dict:
                     merged[f"{prefix}.self_attn.{hf_name}.weight"] = orig.weight.float()
                 continue
 
-            merged[f"{prefix}.self_attn.{hf_name}.weight"] = _merge(u_mod, v_mod)
+            merged[f"{prefix}.self_attn.{hf_name}.weight"] = _merge(u_mod, v_mod, compute_device)
             # Mark SVD sub-keys as handled
             for uname in u_names:
                 svd_keys.add(f"{prefix}.self_attn.{uname}.weight")
@@ -144,7 +151,7 @@ def _build_merged_state_dict(svd_model: nn.Module) -> dict:
                     merged[f"{prefix}.mlp.{hf_name}.weight"] = orig.weight.float()
                 continue
 
-            merged[f"{prefix}.mlp.{hf_name}.weight"] = _merge(u_mod, v_mod)
+            merged[f"{prefix}.mlp.{hf_name}.weight"] = _merge(u_mod, v_mod, compute_device)
             svd_keys.add(f"{prefix}.mlp.{u_name}.weight")
             svd_keys.add(f"{prefix}.mlp.{v_name}.weight")
 
@@ -193,7 +200,7 @@ def main():
                     help="GPU index to use for merging (e.g. 0); default: CPU")
     args = ap.parse_args()
 
-    device = f"cuda:{args.gpu}" if (args.gpu is not None and torch.cuda.is_available()) else "cpu"
+    compute_device = f"cuda:{args.gpu}" if (args.gpu is not None and torch.cuda.is_available()) else "cpu"
 
     # ── add SVD-LLM to sys.path so SVD_LlamaAttention etc. can be unpickled ──
     _here = os.path.dirname(os.path.abspath(__file__))
@@ -201,17 +208,12 @@ def main():
         if _p not in sys.path:
             sys.path.insert(0, _p)
 
-    print(f"Loading {args.input} (map_to={device}) ...")
-    model, tokenizer = _load_checkpoint(args.input, map_location=device)
+    print(f"Loading {args.input} (CPU, matmul on {compute_device}) ...")
+    model, tokenizer = _load_checkpoint(args.input, map_location="cpu")
     model.eval()
 
     print("Merging low-rank projections ...")
-    merged_sd = _build_merged_state_dict(model)
-
-    if device != "cpu":
-        merged_sd = {k: v.cpu() for k, v in merged_sd.items()}
-        del model
-        torch.cuda.empty_cache()
+    merged_sd = _build_merged_state_dict(model, compute_device=compute_device)
     n_merged = sum(
         1 for k in merged_sd
         if any(k.endswith(f".{p}.weight")
