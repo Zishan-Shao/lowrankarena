@@ -163,12 +163,12 @@ def _build_merged_state_dict(svd_model: nn.Module) -> dict:
     return merged
 
 
-def _load_checkpoint(path: str):
+def _load_checkpoint(path: str, map_location: str = "cpu"):
     """Load SVD-LLM .pt with PyTorch>=2.6 compatibility."""
     try:
-        obj = torch.load(path, map_location="cpu", weights_only=True)
+        obj = torch.load(path, map_location=map_location, weights_only=True)
     except Exception:
-        obj = torch.load(path, map_location="cpu", weights_only=False)
+        obj = torch.load(path, map_location=map_location, weights_only=False)
 
     if isinstance(obj, dict) and "model" in obj:
         return obj["model"], obj.get("tokenizer")
@@ -189,7 +189,11 @@ def main():
     ap.add_argument("--dtype",  default=None,
                     choices=["fp32", "fp16", "bf16"],
                     help="Cast weights before saving (default: keep original dtype)")
+    ap.add_argument("--gpu", type=int, default=None,
+                    help="GPU index to use for merging (e.g. 0); default: CPU")
     args = ap.parse_args()
+
+    device = f"cuda:{args.gpu}" if (args.gpu is not None and torch.cuda.is_available()) else "cpu"
 
     # ── add SVD-LLM to sys.path so SVD_LlamaAttention etc. can be unpickled ──
     _here = os.path.dirname(os.path.abspath(__file__))
@@ -197,12 +201,17 @@ def main():
         if _p not in sys.path:
             sys.path.insert(0, _p)
 
-    print(f"Loading {args.input} ...")
-    model, tokenizer = _load_checkpoint(args.input)
+    print(f"Loading {args.input} (map_to={device}) ...")
+    model, tokenizer = _load_checkpoint(args.input, map_location=device)
     model.eval()
 
     print("Merging low-rank projections ...")
     merged_sd = _build_merged_state_dict(model)
+
+    if device != "cpu":
+        merged_sd = {k: v.cpu() for k, v in merged_sd.items()}
+        del model
+        torch.cuda.empty_cache()
     n_merged = sum(
         1 for k in merged_sd
         if any(k.endswith(f".{p}.weight")
