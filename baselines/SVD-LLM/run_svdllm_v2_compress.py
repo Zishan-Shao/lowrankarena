@@ -23,7 +23,11 @@ def main():
     parser.add_argument("--attn_ratio", type=float, default=None)
     parser.add_argument("--mlp_ratio", type=float, default=None)
     parser.add_argument("--svd_method", type=str, default="full", choices=["full", "randomized"])
-    parser.add_argument("--local_update", action="store_true", help="apply whitening_local_update after whitening_hetero")
+    parser.add_argument("--local_update", action="store_true",
+                        help="[BROKEN] apply whitening_local_update after whitening_hetero. "
+                             "Does NOT work: whitening_hetero already replaces layers with SVD modules, "
+                             "so whitening_local_update finds q_u_proj/q_v_proj instead of q_proj "
+                             "and crashes with KeyError on profiling_mat lookup.")
     parser.add_argument("--dataset", type=str, default="wikitext2")
     parser.add_argument("--updating_nsamples", type=int, default=256)
     parser.add_argument("--seed", type=int, default=0)
