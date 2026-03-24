@@ -1,0 +1,134 @@
+#!/bin/bash
+# SVD-LLM V1 (whitening only) + V2 (whitening + local update)
+# Model: Qwen/Qwen3-8B-Instruct
+# Ratios: 0.2 0.3 0.4 0.5 0.6
+#
+# Usage:
+#   bash run_compress_qwen3_8b_instruct.sh
+#
+# Results CSV: checkpoints/svdllm/qwen3_8b_instruct/results.csv
+
+set -eo pipefail
+cd "$(dirname "$0")"
+
+MODEL="Qwen/Qwen3-8B-Instruct"
+MODEL_TAG="Qwen3-8B-Instruct"
+MODEL_PREFIX="Qwen_Qwen3_8B_Instruct"
+SAVE_DIR="checkpoints/svdllm/qwen3_8b_instruct"
+SEQ_LEN=2048
+EVAL_BS=2
+CSV="$SAVE_DIR/results.csv"
+PROF_MAT="$SAVE_DIR/${MODEL_PREFIX}_profiling_wikitext2_256_0.pt"
+
+mkdir -p "$SAVE_DIR" logs
+
+keep_file() { python -c "print(1 - $1)"; }
+keep_csv()  { python -c "print(round(1 - $1, 1))"; }
+
+parse_ppl() {
+    local f="$1"
+    python -c "
+import re
+txt = open('$f').read()
+m = re.search(r\"'wikitext2':\\s*([0-9]+\\.[0-9]+)\", txt)
+print(m.group(1) if m else 'N/A')
+"
+}
+
+parse_ms() {
+    local f="$1" tag="$2"
+    python -c "
+import re
+txt = open('$f').read()
+m = re.search(r'^${tag} decode: ([0-9]+\.?[0-9]*) ms/token', txt, re.MULTILINE)
+print(m.group(1) if m else 'N/A')
+"
+}
+
+eval_and_log() {
+    local ckpt="$1" method="$2" keep="$3"
+    echo "=== Eval PPL: $method keep=$keep ==="
+    local ppl_out; ppl_out=$(mktemp)
+    python SVDLLM.py \
+        --model "$MODEL" --model_path "$ckpt" \
+        --step 4 --model_seq_len $SEQ_LEN --eval_batch_size $EVAL_BS \
+        2>&1 | tee "$ppl_out"
+    local ppl; ppl=$(parse_ppl "$ppl_out")
+    rm -f "$ppl_out"
+
+    local base_ms="N/A" flash_ms="N/A" speedup="N/A"
+    if [ "$ckpt" != "original" ]; then
+        echo "=== Bench speed: $method keep=$keep ==="
+        local bench_out; bench_out=$(mktemp)
+        python bench_flashsvd_vs_svd_decode.py \
+            --checkpoint "$ckpt" \
+            --dtype bf16 --prompt_len 512 --new_tokens 128 --warmup 5 \
+            --experimental_flash_dense_attn \
+            2>&1 | tee "$bench_out"
+        base_ms=$(parse_ms "$bench_out" "SVD")
+        flash_ms=$(parse_ms "$bench_out" "FlashSVD")
+        speedup=$(python -c "
+b, f = '$base_ms', '$flash_ms'
+try: print(f'{float(b)/float(f):.3f}')
+except: print('N/A')
+")
+        rm -f "$bench_out"
+    fi
+
+    echo "$MODEL_TAG,$method,$keep,$ppl,$base_ms,$flash_ms,$speedup" >> "$CSV"
+    echo "  → $MODEL_TAG,$method,$keep ppl=$ppl base=${base_ms}ms flash=${flash_ms}ms speedup=${speedup}x"
+}
+
+# ── init CSV ──────────────────────────────────────────────────────────────────
+if [ ! -f "$CSV" ]; then
+    echo "model,method,keep_ratio,wikitext2_ppl,baseline_ms,flashsvd_ms,speedup" > "$CSV"
+    eval_and_log "original" "baseline" "1.0"
+else
+    echo "=== CSV already exists, skipping baseline eval ==="
+fi
+
+# ── V1 compress ───────────────────────────────────────────────────────────────
+for RATIO in 0.2 0.3 0.4 0.5 0.6; do
+    KEEP_FILE=$(keep_file $RATIO)
+    CKPT="$SAVE_DIR/${MODEL_PREFIX}_whitening_only_${KEEP_FILE}.pt"
+    if [ -f "$CKPT" ]; then
+        echo "=== V1 checkpoint exists, skipping: $CKPT ==="
+    else
+        KEEP=$(keep_csv $RATIO)
+        echo "=== Compress V1 ratio=$RATIO (keep=$KEEP) ==="
+        PROF_ARG=""
+        [ -f "$PROF_MAT" ] && PROF_ARG="--profiling_mat_path $PROF_MAT"
+        python SVDLLM.py --model "$MODEL" --step 1 --ratio $RATIO \
+            $PROF_ARG \
+            --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN \
+            2>&1 | tee logs/${MODEL_TAG}_v1_${KEEP}.log
+    fi
+done
+
+# ── V2 compress ───────────────────────────────────────────────────────────────
+for RATIO in 0.2 0.3 0.4 0.5 0.6; do
+    KEEP_FILE=$(keep_file $RATIO)
+    CKPT="$SAVE_DIR/${MODEL_PREFIX}_whitening_then_update_${KEEP_FILE}.pt"
+    if [ -f "$CKPT" ]; then
+        echo "=== V2 checkpoint exists, skipping: $CKPT ==="
+    else
+        KEEP=$(keep_csv $RATIO)
+        echo "=== Compress V2 ratio=$RATIO (keep=$KEEP) ==="
+        python SVDLLM.py --model "$MODEL" --step 2 --ratio $RATIO \
+            --profiling_mat_path "$PROF_MAT" \
+            --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN \
+            2>&1 | tee logs/${MODEL_TAG}_v2_${KEEP}.log
+    fi
+done
+
+# ── Eval all ──────────────────────────────────────────────────────────────────
+for RATIO in 0.2 0.3 0.4 0.5 0.6; do
+    KEEP_FILE=$(keep_file $RATIO)
+    KEEP_CSV=$(keep_csv $RATIO)
+    eval_and_log "$SAVE_DIR/${MODEL_PREFIX}_whitening_only_${KEEP_FILE}.pt"        "V1" "$KEEP_CSV"
+    eval_and_log "$SAVE_DIR/${MODEL_PREFIX}_whitening_then_update_${KEEP_FILE}.pt" "V2" "$KEEP_CSV"
+done
+
+echo ""
+echo "=== All done. Results: $CSV ==="
+cat "$CSV"

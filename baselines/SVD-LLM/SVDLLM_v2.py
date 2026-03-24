@@ -15,6 +15,7 @@ from component.svd_llama import (
 )
 from component.svd_mistral import SVD_MistralAttention, SVD_MistralMLP
 from component.svd_opt import SVDOPTDecoderLayer
+from component.svd_qwen import SVD_LlamaAttention as SVD_QwenAttention, SVD_LlamaMLP as SVD_QwenMLP
 
 current_path = os.path.dirname(os.path.abspath(__file__))
 parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -68,12 +69,10 @@ def randomized_svd(W: torch.Tensor, rank: int, niter: int = 2, oversample: int =
 @torch.no_grad()
 def profle_svdllm(name, model, calib_loader, dev):
     """SVD-LLM v2 style profiling: compute whitening factor via symmetric sqrt (no Cholesky)."""
-    if "llama" in name or "mistral" in name or "vicuna" in name:
-        layers = model.model.layers
-    elif "opt" in name:
+    if "opt" in name:
         layers = model.model.decoder.layers
     else:
-        raise ValueError(f"Unsupported model name for profiling: {name}")
+        layers = model.model.layers
 
     model = model.to(dev)
     prev_cache = getattr(model.config, 'use_cache', False)
@@ -226,14 +225,24 @@ def whitening_hetero(
                 ratio=mlp_ratio,
                 compat_ranks=compat_ranks,
             )
+        elif "qwen" in model_name.lower():
+            svd_attn = SVD_QwenAttention(
+                config=model.config, ratio=attn_ratio, compat_ranks=compat_ranks, compat_attention=compat_attn,
+                base_attn=layer.self_attn,
+            )
+            svd_mlp = SVD_QwenMLP(
+                hidden_size=layer.hidden_size,
+                intermediate_size=model.config.intermediate_size,
+                hidden_act=model.config.hidden_act,
+                ratio=mlp_ratio,
+                compat_ranks=compat_ranks,
+            )
         elif "mistral" in model_name:
             svd_attn = SVD_MistralAttention(config=model.config, ratio=attn_ratio)
             svd_mlp = SVD_MistralMLP(config=model.config, ratio=mlp_ratio)
         elif 'opt' in model_name:
             # OPT has a single ratio in the decoder layer class; approximate with max of both.
             svd_decoder = SVDOPTDecoderLayer(model.config, ratio=max(attn_ratio, mlp_ratio))
-        else:
-            raise ValueError(f"Unsupported model name for whitening_hetero: {model_name}")
 
         for n in subset:
             orig_dtype = subset[n].weight.dtype

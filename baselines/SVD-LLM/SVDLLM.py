@@ -15,6 +15,7 @@ from component.svd_llama import (
 )
 from component.svd_mistral import SVD_MistralAttention, SVD_MistralMLP
 from component.svd_opt import SVDOPTDecoderLayer
+from component.svd_qwen import SVD_LlamaAttention as SVD_QwenAttention, SVD_LlamaMLP as SVD_QwenMLP
 from utils.model_utils import *
 from evaluater import * 
 
@@ -505,6 +506,11 @@ def whitening(
             compat_attn = _compat_enabled('attention', False)
             svd_attn = SVD_LlamaAttention(config=model.config, ratio=ratio, compat_ranks=compat_ranks, compat_attention=compat_attn)
             svd_mlp = SVD_LlamaMLP(hidden_size=layer.hidden_size, intermediate_size=model.config.intermediate_size, hidden_act=model.config.hidden_act, ratio=ratio, compat_ranks=compat_ranks)
+        elif "qwen" in model_name.lower():
+            compat_ranks = _compat_enabled('ranks', False)
+            compat_attn = _compat_enabled('attention', False)
+            svd_attn = SVD_QwenAttention(config=model.config, ratio=ratio, compat_ranks=compat_ranks, compat_attention=compat_attn, base_attn=layer.self_attn)
+            svd_mlp = SVD_QwenMLP(hidden_size=layer.hidden_size, intermediate_size=model.config.intermediate_size, hidden_act=model.config.hidden_act, ratio=ratio, compat_ranks=compat_ranks)
         elif "mistral" in model_name:
             svd_attn = SVD_MistralAttention(config=model.config, ratio=ratio)
             svd_mlp = SVD_MistralMLP(config=model.config, ratio=ratio)
@@ -821,6 +827,9 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         if "llama" in model_name or "vicuna" in model_name:
             svd_attn = SVD_LlamaAttention(config=model.config, ratio=ratio)
             svd_mlp = SVD_LlamaMLP(hidden_size=layer.hidden_size, intermediate_size=model.config.intermediate_size, hidden_act=model.config.hidden_act, ratio=ratio)
+        elif "qwen" in model_name.lower():
+            svd_attn = SVD_QwenAttention(config=model.config, ratio=ratio, base_attn=layer.self_attn)
+            svd_mlp = SVD_QwenMLP(hidden_size=layer.hidden_size, intermediate_size=model.config.intermediate_size, hidden_act=model.config.hidden_act, ratio=ratio)
         elif "mistral" in model_name:
             svd_attn = SVD_MistralAttention(config=model.config, ratio=ratio)
             svd_mlp = SVD_MistralMLP(config=model.config, ratio=ratio)
