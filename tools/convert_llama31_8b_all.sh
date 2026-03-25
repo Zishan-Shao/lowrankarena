@@ -32,8 +32,8 @@ for pt in "$PT_DIR"/meta_llama_Llama_3.1_8B_*.pt; do
     [[ -f "$pt" ]] || continue
     base=$(basename "$pt" .pt)
     # Extract tag (method) and ratio
-    tag=$(echo "$base" | grep -oP '(whitening_only|whitening_then_update|basis_sharing|v2)')
-    ratio=$(echo "$base" | grep -oP '[0-9]+\.[0-9]+$')
+    tag=$(echo "$base" | grep -oP '(whitening_only|whitening_then_update|basis_sharing|v2)' || true)
+    ratio=$(echo "$base" | grep -oP '[0-9]+\.[0-9]+$' || true)
     [[ -z "$tag" || -z "$ratio" ]] && { echo "  [skip] cannot parse tag/ratio: $base"; continue; }
     out="$PT_DIR/hf_${tag}_${ratio}"
     if [[ -d "$out" ]]; then
@@ -47,7 +47,7 @@ done
 # ── ASVD checkpoints ──────────────────────────────────────────────────────────
 for pt in "$PT_DIR"/Llama_3.1_8B_asvd_raw_*.pt; do
     [[ -f "$pt" ]] || continue
-    ratio=$(basename "$pt" .pt | grep -oP '[0-9]+\.[0-9]+$')
+    ratio=$(basename "$pt" .pt | grep -oP '[0-9]+\.[0-9]+$' || true)
     [[ -z "$ratio" ]] && { echo "  [skip] cannot parse ratio: $(basename "$pt")"; continue; }
     out="$PT_DIR/hf_asvd_raw_${ratio}"
     if [[ -d "$out" ]]; then
