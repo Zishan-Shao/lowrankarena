@@ -204,7 +204,8 @@ def main():
 
     # ── add SVD-LLM to sys.path so SVD_LlamaAttention etc. can be unpickled ──
     _here = os.path.dirname(os.path.abspath(__file__))
-    for _p in [_here, os.path.join(_here, "flashsvd_component")]:
+    _svdllm_dir = os.path.normpath(os.path.join(_here, "..", "baselines", "SVD-LLM"))
+    for _p in [_svdllm_dir, os.path.join(_svdllm_dir, "flashsvd_component")]:
         if _p not in sys.path:
             sys.path.insert(0, _p)
 
