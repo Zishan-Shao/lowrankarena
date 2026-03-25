@@ -26,6 +26,12 @@ import argparse
 import os
 import sys
 
+# Add ASVD source dir so 'modules.svd_linear' etc. can be unpickled
+_here = os.path.dirname(os.path.abspath(__file__))
+_asvd_dir = os.path.normpath(os.path.join(_here, "..", "baselines", "ASVD"))
+if _asvd_dir not in sys.path:
+    sys.path.insert(0, _asvd_dir)
+
 import torch
 import torch.nn as nn
 
