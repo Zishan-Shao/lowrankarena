@@ -713,6 +713,59 @@ plt.close()
 print('✓ fig03_cb.png')
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Figure 3e — Robustness Accuracy (HANS, ANLI-R1/R2/R3, Stage1, bf16)
+# ──────────────────────────────────────────────────────────────────────────────
+_task_labels_rob = {'hans': 'HANS', 'anli_r1': 'ANLI-R1', 'anli_r2': 'ANLI-R2', 'anli_r3': 'ANLI-R3'}
+
+n_rob = len(_ROB_TASKS)
+x_rob = np.arange(n_rob)
+bw_rob = 0.19
+offsets_rob = np.linspace(-(len(_method_keys_ord)-1)/2*bw_rob,
+                           (len(_method_keys_ord)-1)/2*bw_rob,
+                           len(_method_keys_ord))
+
+fig_rob, ax_rob = plt.subplots(figsize=(9, 5.2))
+for mi, (mk, mn, mc) in enumerate(zip(_method_keys_ord, _method_names_sg, _method_clrs_sg)):
+    for ti, task in enumerate(_ROB_TASKS):
+        xi = x_rob[ti] + offsets_rob[mi]
+        v  = _sg(mk, task)
+        if v is not None:
+            ax_rob.bar(xi, v, bw_rob, color=mc, alpha=0.88,
+                       label=mn if ti == 0 else '_nolegend_',
+                       edgecolor='white', linewidth=0.8)
+            ax_rob.text(xi, v + 0.012, f'{v:.3f}',
+                        ha='center', va='bottom', fontsize=7.5, color=mc, fontweight='bold')
+        else:
+            ax_rob.text(xi, 0.05, 'pending', ha='center', va='bottom',
+                        fontsize=7, color=mc, rotation=90, alpha=0.55)
+
+ax_rob.axhline(0.5, color='gray', linestyle=':', alpha=0.5, linewidth=1.0, label='Chance (0.5)')
+ax_rob.set_xticks(x_rob)
+ax_rob.set_xticklabels([_task_labels_rob[t] for t in _ROB_TASKS])
+ax_rob.set_ylabel('Accuracy')
+ax_rob.set_title('Robustness Accuracy: HANS & ANLI\n'
+                 '(per-head ra48, param_ratio \u2248 0.527, bf16, seq=512)')
+ax_rob.set_ylim(0, 0.82)
+ax_rob.legend(loc='upper right', fontsize=8.5)
+ax_rob.grid(axis='y', linestyle='--', alpha=0.35)
+
+_rob_avgs = {}
+for mk, mn in zip(_method_keys_ord, _method_names_sg):
+    vals = [_sg(mk, t) for t in _ROB_TASKS if _sg(mk, t) is not None]
+    _rob_avgs[mn] = round(sum(vals)/len(vals), 3) if vals else None
+_rob_avg_str = '  '.join(f'{mn}: {v:.3f}' if v else f'{mn}: —'
+                          for mn, v in _rob_avgs.items())
+ax_rob.text(0.01, 0.97, f'Rob-AVG\n{_rob_avg_str}',
+            transform=ax_rob.transAxes, fontsize=7.5, va='top', ha='left',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='#FFFFDD',
+                      edgecolor='#AAAAAA', alpha=0.9))
+
+fig_rob.tight_layout()
+fig_rob.savefig(os.path.join(OUT_DIR, 'fig03_robustness.png'), bbox_inches='tight')
+plt.close(fig_rob)
+print('✓ fig03_robustness.png')
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Figure 4 — MRPC F1: structural collapse & recovery
 # ──────────────────────────────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(9.5, 5.2))
