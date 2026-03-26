@@ -1,0 +1,517 @@
+nohup: ignoring input
+=== CSV already exists, skipping baseline eval ===
+=== Compress V1 ratio=0.2 (keep=0.8) ===
+Downloading shards:   0%|          | 0/4 [00:00<?, ?it/s]Downloading shards:  25%|██▌       | 1/4 [00:46<02:20, 46.83s/it]Downloading shards:  50%|█████     | 2/4 [01:30<01:29, 44.91s/it]Downloading shards:  75%|███████▌  | 3/4 [02:13<00:44, 44.08s/it]Downloading shards: 100%|██████████| 4/4 [02:25<00:00, 31.56s/it]Downloading shards: 100%|██████████| 4/4 [02:25<00:00, 36.46s/it]
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:05<00:17,  5.85s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:13<00:13,  6.63s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:20<00:06,  6.94s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:21<00:00,  4.79s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:21<00:00,  5.46s/it]
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:18<09:24, 18.22s/it]  6%|▋         | 2/32 [00:35<08:55, 17.83s/it]  9%|▉         | 3/32 [00:57<09:27, 19.58s/it] 12%|█▎        | 4/32 [01:15<08:49, 18.92s/it] 16%|█▌        | 5/32 [01:33<08:21, 18.59s/it] 19%|█▉        | 6/32 [01:54<08:30, 19.62s/it] 22%|██▏       | 7/32 [02:16<08:27, 20.29s/it] 25%|██▌       | 8/32 [02:34<07:50, 19.61s/it] 28%|██▊       | 9/32 [02:52<07:18, 19.06s/it] 31%|███▏      | 10/32 [03:10<06:53, 18.79s/it] 34%|███▍      | 11/32 [03:32<06:55, 19.76s/it] 38%|███▊      | 12/32 [03:54<06:43, 20.20s/it] 41%|████      | 13/32 [04:12<06:12, 19.63s/it] 44%|████▍     | 14/32 [04:29<05:42, 19.03s/it] 47%|████▋     | 15/32 [04:51<05:36, 19.81s/it] 50%|█████     | 16/32 [05:12<05:22, 20.19s/it] 53%|█████▎    | 17/32 [05:34<05:10, 20.67s/it] 56%|█████▋    | 18/32 [05:56<04:55, 21.09s/it] 59%|█████▉    | 19/32 [06:18<04:35, 21.23s/it] 62%|██████▎   | 20/32 [06:36<04:04, 20.39s/it] 66%|██████▌   | 21/32 [06:58<03:49, 20.88s/it] 69%|██████▉   | 22/32 [07:20<03:31, 21.18s/it] 72%|███████▏  | 23/32 [07:38<03:03, 20.36s/it] 75%|███████▌  | 24/32 [08:01<02:47, 20.91s/it] 78%|███████▊  | 25/32 [08:19<02:20, 20.05s/it] 81%|████████▏ | 26/32 [08:40<02:02, 20.47s/it] 84%|████████▍ | 27/32 [09:02<01:44, 20.89s/it] 88%|████████▊ | 28/32 [09:20<01:20, 20.09s/it] 91%|█████████ | 29/32 [09:38<00:58, 19.53s/it] 94%|█████████▍| 30/32 [09:56<00:37, 18.98s/it] 97%|█████████▋| 31/32 [10:15<00:18, 18.82s/it]100%|██████████| 32/32 [10:37<00:00, 19.82s/it]100%|██████████| 32/32 [10:37<00:00, 19.91s/it]
+Start SVD decomposition after whitening...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:18<09:18, 18.01s/it]  6%|▋         | 2/32 [00:34<08:33, 17.12s/it]  9%|▉         | 3/32 [00:49<07:50, 16.22s/it] 12%|█▎        | 4/32 [01:04<07:19, 15.69s/it] 16%|█▌        | 5/32 [01:19<06:59, 15.55s/it] 19%|█▉        | 6/32 [01:34<06:40, 15.41s/it] 22%|██▏       | 7/32 [01:50<06:25, 15.44s/it] 25%|██▌       | 8/32 [02:05<06:09, 15.38s/it] 28%|██▊       | 9/32 [02:20<05:51, 15.30s/it] 31%|███▏      | 10/32 [02:36<05:35, 15.27s/it] 34%|███▍      | 11/32 [02:51<05:20, 15.24s/it] 38%|███▊      | 12/32 [03:06<05:03, 15.16s/it] 41%|████      | 13/32 [03:21<04:48, 15.20s/it] 44%|████▍     | 14/32 [03:36<04:34, 15.26s/it] 47%|████▋     | 15/32 [03:52<04:20, 15.31s/it] 50%|█████     | 16/32 [04:07<04:06, 15.42s/it] 53%|█████▎    | 17/32 [04:23<03:50, 15.35s/it] 56%|█████▋    | 18/32 [04:38<03:34, 15.30s/it] 59%|█████▉    | 19/32 [04:53<03:18, 15.29s/it] 62%|██████▎   | 20/32 [05:08<03:02, 15.24s/it] 66%|██████▌   | 21/32 [05:23<02:47, 15.21s/it] 69%|██████▉   | 22/32 [05:38<02:30, 15.08s/it] 72%|███████▏  | 23/32 [05:53<02:15, 15.06s/it] 75%|███████▌  | 24/32 [06:08<02:00, 15.06s/it] 78%|███████▊  | 25/32 [06:24<01:45, 15.13s/it] 81%|████████▏ | 26/32 [06:39<01:30, 15.09s/it] 84%|████████▍ | 27/32 [06:53<01:15, 15.02s/it] 88%|████████▊ | 28/32 [07:09<01:00, 15.07s/it] 91%|█████████ | 29/32 [07:24<00:45, 15.11s/it] 94%|█████████▍| 30/32 [07:39<00:29, 15.00s/it] 97%|█████████▋| 31/32 [07:54<00:15, 15.05s/it]100%|██████████| 32/32 [08:09<00:00, 15.03s/it]100%|██████████| 32/32 [08:09<00:00, 15.29s/it]
+=== Compress V1 ratio=0.3 (keep=0.7) ===
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:01,  1.53it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.44it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.41it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.73it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.61it/s]
+Start SVD decomposition after whitening...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:17<09:11, 17.79s/it]  6%|▋         | 2/32 [00:32<08:06, 16.23s/it]  9%|▉         | 3/32 [00:47<07:34, 15.68s/it] 12%|█▎        | 4/32 [01:03<07:13, 15.47s/it] 16%|█▌        | 5/32 [01:17<06:49, 15.18s/it] 19%|█▉        | 6/32 [01:32<06:33, 15.15s/it] 22%|██▏       | 7/32 [01:47<06:17, 15.08s/it] 25%|██▌       | 8/32 [02:02<05:58, 14.94s/it] 28%|██▊       | 9/32 [02:17<05:43, 14.92s/it] 31%|███▏      | 10/32 [02:32<05:27, 14.90s/it] 34%|███▍      | 11/32 [02:46<05:11, 14.82s/it] 38%|███▊      | 12/32 [03:01<04:58, 14.91s/it] 41%|████      | 13/32 [03:16<04:43, 14.90s/it] 44%|████▍     | 14/32 [03:31<04:26, 14.82s/it] 47%|████▋     | 15/32 [03:46<04:13, 14.89s/it] 50%|█████     | 16/32 [04:01<03:58, 14.94s/it] 53%|█████▎    | 17/32 [04:16<03:42, 14.85s/it] 56%|█████▋    | 18/32 [04:31<03:28, 14.92s/it] 59%|█████▉    | 19/32 [04:46<03:14, 14.96s/it] 62%|██████▎   | 20/32 [05:01<02:59, 14.95s/it] 66%|██████▌   | 21/32 [05:16<02:44, 14.92s/it] 69%|██████▉   | 22/32 [05:30<02:28, 14.89s/it] 72%|███████▏  | 23/32 [05:46<02:14, 14.99s/it] 75%|███████▌  | 24/32 [06:01<01:59, 14.98s/it] 78%|███████▊  | 25/32 [06:16<01:46, 15.17s/it] 81%|████████▏ | 26/32 [06:32<01:31, 15.22s/it] 84%|████████▍ | 27/32 [06:46<01:15, 15.14s/it] 88%|████████▊ | 28/32 [07:02<01:00, 15.12s/it] 91%|█████████ | 29/32 [07:17<00:45, 15.16s/it] 94%|█████████▍| 30/32 [07:32<00:30, 15.07s/it] 97%|█████████▋| 31/32 [07:47<00:15, 15.04s/it]100%|██████████| 32/32 [08:02<00:00, 15.02s/it]100%|██████████| 32/32 [08:02<00:00, 15.07s/it]
+=== Compress V1 ratio=0.4 (keep=0.6) ===
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.48it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.37it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.36it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.71it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.58it/s]
+Start SVD decomposition after whitening...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:16<08:45, 16.95s/it]  6%|▋         | 2/32 [00:31<07:53, 15.79s/it]  9%|▉         | 3/32 [00:46<07:23, 15.29s/it] 12%|█▎        | 4/32 [01:01<07:06, 15.23s/it] 16%|█▌        | 5/32 [01:16<06:45, 15.01s/it] 19%|█▉        | 6/32 [01:31<06:30, 15.04s/it] 22%|██▏       | 7/32 [01:46<06:15, 15.00s/it] 25%|██▌       | 8/32 [02:01<06:00, 15.03s/it] 28%|██▊       | 9/32 [02:16<05:45, 15.01s/it] 31%|███▏      | 10/32 [02:31<05:29, 14.99s/it] 34%|███▍      | 11/32 [02:46<05:13, 14.91s/it] 38%|███▊      | 12/32 [03:01<05:00, 15.00s/it] 41%|████      | 13/32 [03:16<04:44, 14.97s/it] 44%|████▍     | 14/32 [03:30<04:27, 14.87s/it] 47%|████▋     | 15/32 [03:45<04:13, 14.91s/it] 50%|█████     | 16/32 [04:00<03:59, 14.95s/it] 53%|█████▎    | 17/32 [04:15<03:42, 14.85s/it] 56%|█████▋    | 18/32 [04:30<03:29, 14.93s/it] 59%|█████▉    | 19/32 [04:45<03:14, 14.96s/it] 62%|██████▎   | 20/32 [05:00<02:59, 14.95s/it] 66%|██████▌   | 21/32 [05:15<02:44, 14.91s/it] 69%|██████▉   | 22/32 [05:30<02:28, 14.86s/it] 72%|███████▏  | 23/32 [05:45<02:14, 14.95s/it] 75%|███████▌  | 24/32 [06:00<01:59, 14.91s/it] 78%|███████▊  | 25/32 [06:15<01:44, 14.92s/it] 81%|████████▏ | 26/32 [06:29<01:29, 14.89s/it] 84%|████████▍ | 27/32 [06:44<01:14, 14.83s/it] 88%|████████▊ | 28/32 [07:00<01:00, 15.01s/it] 91%|█████████ | 29/32 [07:14<00:44, 14.97s/it] 94%|█████████▍| 30/32 [07:29<00:29, 14.91s/it] 97%|█████████▋| 31/32 [07:44<00:14, 14.88s/it]100%|██████████| 32/32 [07:59<00:00, 14.86s/it]100%|██████████| 32/32 [07:59<00:00, 14.98s/it]
+=== Compress V1 ratio=0.5 (keep=0.5) ===
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:01,  1.62it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.50it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.43it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.77it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.66it/s]
+Start SVD decomposition after whitening...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:16<08:39, 16.75s/it]  6%|▋         | 2/32 [00:31<07:45, 15.53s/it]  9%|▉         | 3/32 [00:45<07:16, 15.04s/it] 12%|█▎        | 4/32 [01:00<06:58, 14.94s/it] 16%|█▌        | 5/32 [01:14<06:36, 14.68s/it] 19%|█▉        | 6/32 [01:29<06:22, 14.69s/it] 22%|██▏       | 7/32 [01:44<06:06, 14.65s/it] 25%|██▌       | 8/32 [01:58<05:48, 14.53s/it] 28%|██▊       | 9/32 [02:13<05:34, 14.54s/it] 31%|███▏      | 10/32 [02:27<05:19, 14.54s/it] 34%|███▍      | 11/32 [02:41<05:04, 14.48s/it] 38%|███▊      | 12/32 [02:56<04:51, 14.58s/it] 41%|████      | 13/32 [03:11<04:36, 14.57s/it] 44%|████▍     | 14/32 [03:25<04:20, 14.48s/it] 47%|████▋     | 15/32 [03:40<04:06, 14.52s/it] 50%|█████     | 16/32 [03:54<03:52, 14.56s/it] 53%|█████▎    | 17/32 [04:08<03:36, 14.45s/it] 56%|█████▋    | 18/32 [04:23<03:23, 14.54s/it] 59%|█████▉    | 19/32 [04:38<03:09, 14.58s/it] 62%|██████▎   | 20/32 [04:53<02:55, 14.59s/it] 66%|██████▌   | 21/32 [05:07<02:40, 14.59s/it] 69%|██████▉   | 22/32 [05:22<02:25, 14.55s/it] 72%|███████▏  | 23/32 [05:36<02:11, 14.61s/it] 75%|███████▌  | 24/32 [05:51<01:56, 14.58s/it] 78%|███████▊  | 25/32 [06:06<01:42, 14.61s/it] 81%|████████▏ | 26/32 [06:20<01:27, 14.63s/it] 84%|████████▍ | 27/32 [06:35<01:13, 14.61s/it] 88%|████████▊ | 28/32 [06:50<00:59, 14.83s/it] 91%|█████████ | 29/32 [07:05<00:44, 14.83s/it] 94%|█████████▍| 30/32 [07:20<00:29, 14.78s/it] 97%|█████████▋| 31/32 [07:34<00:14, 14.79s/it]100%|██████████| 32/32 [07:49<00:00, 14.79s/it]100%|██████████| 32/32 [07:49<00:00, 14.68s/it]
+=== Compress V1 ratio=0.6 (keep=0.4) ===
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:01,  1.65it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.42it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.41it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.75it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.63it/s]
+Start SVD decomposition after whitening...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:16<08:32, 16.55s/it]  6%|▋         | 2/32 [00:31<07:46, 15.57s/it]  9%|▉         | 3/32 [00:45<07:17, 15.08s/it] 12%|█▎        | 4/32 [01:00<06:57, 14.92s/it] 16%|█▌        | 5/32 [01:14<06:35, 14.64s/it] 19%|█▉        | 6/32 [01:29<06:20, 14.62s/it] 22%|██▏       | 7/32 [01:43<06:03, 14.55s/it] 25%|██▌       | 8/32 [01:57<05:46, 14.42s/it] 28%|██▊       | 9/32 [02:12<05:31, 14.41s/it] 31%|███▏      | 10/32 [02:26<05:16, 14.40s/it] 34%|███▍      | 11/32 [02:40<05:00, 14.32s/it] 38%|███▊      | 12/32 [02:55<04:48, 14.43s/it] 41%|████      | 13/32 [03:09<04:34, 14.42s/it] 44%|████▍     | 14/32 [03:24<04:20, 14.47s/it] 47%|████▋     | 15/32 [03:38<04:05, 14.46s/it] 50%|█████     | 16/32 [03:53<03:53, 14.57s/it] 53%|█████▎    | 17/32 [04:07<03:36, 14.45s/it] 56%|█████▋    | 18/32 [04:22<03:23, 14.52s/it] 59%|█████▉    | 19/32 [04:37<03:08, 14.54s/it] 62%|██████▎   | 20/32 [04:51<02:54, 14.53s/it] 66%|██████▌   | 21/32 [05:06<02:39, 14.49s/it] 69%|██████▉   | 22/32 [05:20<02:24, 14.46s/it] 72%|███████▏  | 23/32 [05:35<02:10, 14.53s/it] 75%|███████▌  | 24/32 [05:49<01:55, 14.50s/it] 78%|███████▊  | 25/32 [06:04<01:41, 14.50s/it] 81%|████████▏ | 26/32 [06:18<01:26, 14.46s/it] 84%|████████▍ | 27/32 [06:32<01:11, 14.39s/it] 88%|████████▊ | 28/32 [06:47<00:57, 14.41s/it] 91%|█████████ | 29/32 [07:01<00:43, 14.45s/it] 94%|█████████▍| 30/32 [07:15<00:28, 14.38s/it] 97%|█████████▋| 31/32 [07:30<00:14, 14.38s/it]100%|██████████| 32/32 [07:44<00:00, 14.38s/it]100%|██████████| 32/32 [07:44<00:00, 14.52s/it]
+=== Compress V2 ratio=0.2 (keep=0.8) ===
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:01,  1.57it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.44it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.75it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.63it/s]
+Start SVD decomposition then update...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:20<10:27, 20.26s/it]  6%|▋         | 2/32 [00:38<09:31, 19.05s/it]  9%|▉         | 3/32 [00:56<08:57, 18.54s/it] 12%|█▎        | 4/32 [01:14<08:33, 18.33s/it] 16%|█▌        | 5/32 [01:31<08:07, 18.06s/it] 19%|█▉        | 6/32 [01:50<07:50, 18.08s/it] 22%|██▏       | 7/32 [02:08<07:31, 18.05s/it] 25%|██▌       | 8/32 [02:25<07:10, 17.93s/it] 28%|██▊       | 9/32 [02:43<06:52, 17.92s/it] 31%|███▏      | 10/32 [03:01<06:34, 17.91s/it] 34%|███▍      | 11/32 [03:19<06:14, 17.83s/it] 38%|███▊      | 12/32 [03:37<05:58, 17.92s/it] 41%|████      | 13/32 [03:55<05:40, 17.91s/it] 44%|████▍     | 14/32 [04:12<05:20, 17.83s/it] 47%|████▋     | 15/32 [04:30<05:03, 17.85s/it] 50%|█████     | 16/32 [04:48<04:46, 17.92s/it] 53%|█████▎    | 17/32 [05:06<04:27, 17.83s/it] 56%|█████▋    | 18/32 [05:24<04:10, 17.92s/it] 59%|█████▉    | 19/32 [05:42<03:53, 17.98s/it] 62%|██████▎   | 20/32 [06:00<03:35, 17.97s/it] 66%|██████▌   | 21/32 [06:18<03:17, 17.97s/it] 69%|██████▉   | 22/32 [06:36<02:59, 17.93s/it] 72%|███████▏  | 23/32 [06:54<02:42, 18.02s/it] 75%|███████▌  | 24/32 [07:12<02:24, 18.01s/it] 78%|███████▊  | 25/32 [07:30<02:06, 18.03s/it] 81%|████████▏ | 26/32 [07:48<01:47, 18.00s/it] 84%|████████▍ | 27/32 [08:06<01:29, 17.93s/it] 88%|████████▊ | 28/32 [08:24<01:11, 17.91s/it] 91%|█████████ | 29/32 [08:42<00:53, 17.92s/it] 94%|█████████▍| 30/32 [08:59<00:35, 17.86s/it] 97%|█████████▋| 31/32 [09:17<00:17, 17.87s/it]100%|██████████| 32/32 [09:35<00:00, 17.87s/it]100%|██████████| 32/32 [09:35<00:00, 17.99s/it]
+[LocalUpdate] layer 0: err=1.166960e+00 -> 6.847187e-01
+[LocalUpdate] layer 1: err=1.257196e+00 -> 6.281396e-01
+[LocalUpdate] layer 2: err=1.781749e+00 -> 1.043319e+00
+[LocalUpdate] layer 3: err=1.996667e+00 -> 1.204902e+00
+[LocalUpdate] layer 4: err=1.855821e+00 -> 1.127455e+00
+[LocalUpdate] layer 5: err=2.010580e+00 -> 1.122098e+00
+[LocalUpdate] layer 6: err=1.916759e+00 -> 1.134836e+00
+[LocalUpdate] layer 7: err=1.698328e+00 -> 1.031388e+00
+[LocalUpdate] layer 8: err=1.938402e+00 -> 1.135730e+00
+[LocalUpdate] layer 9: err=1.909025e+00 -> 1.116897e+00
+[LocalUpdate] layer 10: err=1.750428e+00 -> 1.056627e+00
+[LocalUpdate] layer 11: err=1.758296e+00 -> 1.048466e+00
+[LocalUpdate] layer 12: err=1.831558e+00 -> 1.103401e+00
+[LocalUpdate] layer 13: err=1.766061e+00 -> 1.050689e+00
+[LocalUpdate] layer 14: err=2.008927e+00 -> 1.162353e+00
+[LocalUpdate] layer 15: err=2.197568e+00 -> 1.252959e+00
+[LocalUpdate] layer 16: err=1.898767e+00 -> 1.100715e+00
+[LocalUpdate] layer 17: err=2.150066e+00 -> 1.170093e+00
+[LocalUpdate] layer 18: err=1.997932e+00 -> 1.100956e+00
+[LocalUpdate] layer 19: err=2.029573e+00 -> 1.095197e+00
+[LocalUpdate] layer 20: err=2.100766e+00 -> 1.147953e+00
+[LocalUpdate] layer 21: err=2.145161e+00 -> 1.092119e+00
+[LocalUpdate] layer 22: err=2.078620e+00 -> 1.101405e+00
+[LocalUpdate] layer 23: err=2.081513e+00 -> 1.100219e+00
+[LocalUpdate] layer 24: err=2.074262e+00 -> 1.047377e+00
+[LocalUpdate] layer 25: err=2.025238e+00 -> 1.019931e+00
+[LocalUpdate] layer 26: err=2.124195e+00 -> 1.060171e+00
+[LocalUpdate] layer 27: err=1.939522e+00 -> 9.347007e-01
+[LocalUpdate] layer 28: err=1.985314e+00 -> 1.005352e+00
+[LocalUpdate] layer 29: err=1.861560e+00 -> 8.601869e-01
+[LocalUpdate] layer 30: err=1.546639e+00 -> 6.897738e-01
+[LocalUpdate] layer 31: err=1.098434e+00 -> 4.563704e-01
+=== Compress V2 ratio=0.3 (keep=0.7) ===
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:01,  1.51it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.42it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.39it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.73it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.60it/s]
+Start SVD decomposition then update...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:19<09:59, 19.34s/it]  6%|▋         | 2/32 [00:36<09:10, 18.35s/it]  9%|▉         | 3/32 [00:54<08:39, 17.90s/it] 12%|█▎        | 4/32 [01:12<08:18, 17.80s/it] 16%|█▌        | 5/32 [01:29<07:54, 17.56s/it] 19%|█▉        | 6/32 [01:46<07:37, 17.58s/it] 22%|██▏       | 7/32 [02:04<07:18, 17.55s/it] 25%|██▌       | 8/32 [02:21<06:58, 17.43s/it] 28%|██▊       | 9/32 [02:38<06:40, 17.43s/it] 31%|███▏      | 10/32 [02:56<06:23, 17.43s/it] 34%|███▍      | 11/32 [03:13<06:04, 17.37s/it] 38%|███▊      | 12/32 [03:31<05:49, 17.49s/it] 41%|████      | 13/32 [03:48<05:32, 17.50s/it] 44%|████▍     | 14/32 [04:06<05:13, 17.41s/it] 47%|████▋     | 15/32 [04:23<04:57, 17.48s/it] 50%|█████     | 16/32 [04:41<04:40, 17.52s/it] 53%|█████▎    | 17/32 [04:58<04:21, 17.41s/it] 56%|█████▋    | 18/32 [05:16<04:04, 17.48s/it] 59%|█████▉    | 19/32 [05:33<03:47, 17.53s/it] 62%|██████▎   | 20/32 [05:51<03:30, 17.52s/it] 66%|██████▌   | 21/32 [06:09<03:14, 17.66s/it] 69%|██████▉   | 22/32 [06:26<02:55, 17.56s/it] 72%|███████▏  | 23/32 [06:44<02:38, 17.61s/it] 75%|███████▌  | 24/32 [07:01<02:20, 17.55s/it] 78%|███████▊  | 25/32 [07:19<02:02, 17.57s/it] 81%|████████▏ | 26/32 [07:36<01:45, 17.52s/it] 84%|████████▍ | 27/32 [07:53<01:27, 17.44s/it] 88%|████████▊ | 28/32 [08:11<01:09, 17.43s/it] 91%|█████████ | 29/32 [08:29<00:52, 17.60s/it] 94%|█████████▍| 30/32 [08:46<00:35, 17.52s/it] 97%|█████████▋| 31/32 [09:04<00:17, 17.50s/it]100%|██████████| 32/32 [09:21<00:00, 17.46s/it]100%|██████████| 32/32 [09:21<00:00, 17.55s/it]
+[LocalUpdate] layer 0: err=1.375913e+00 -> 8.534159e-01
+[LocalUpdate] layer 1: err=1.481259e+00 -> 7.597499e-01
+[LocalUpdate] layer 2: err=2.110621e+00 -> 1.253829e+00
+[LocalUpdate] layer 3: err=2.350908e+00 -> 1.443600e+00
+[LocalUpdate] layer 4: err=2.159404e+00 -> 1.342853e+00
+[LocalUpdate] layer 5: err=2.355113e+00 -> 1.328381e+00
+[LocalUpdate] layer 6: err=2.234771e+00 -> 1.333730e+00
+[LocalUpdate] layer 7: err=1.982135e+00 -> 1.203008e+00
+[LocalUpdate] layer 8: err=2.260193e+00 -> 1.315551e+00
+[LocalUpdate] layer 9: err=2.221048e+00 -> 1.300828e+00
+[LocalUpdate] layer 10: err=2.036662e+00 -> 1.227983e+00
+[LocalUpdate] layer 11: err=2.053034e+00 -> 1.213078e+00
+[LocalUpdate] layer 12: err=2.113190e+00 -> 1.256365e+00
+[LocalUpdate] layer 13: err=2.051185e+00 -> 1.214300e+00
+[LocalUpdate] layer 14: err=2.317765e+00 -> 1.324234e+00
+[LocalUpdate] layer 15: err=2.513480e+00 -> 1.413544e+00
+[LocalUpdate] layer 16: err=2.218215e+00 -> 1.258471e+00
+[LocalUpdate] layer 17: err=2.455821e+00 -> 1.311171e+00
+[LocalUpdate] layer 18: err=2.315186e+00 -> 1.247781e+00
+[LocalUpdate] layer 19: err=2.339406e+00 -> 1.213537e+00
+[LocalUpdate] layer 20: err=2.421322e+00 -> 1.263185e+00
+[LocalUpdate] layer 21: err=2.448707e+00 -> 1.183833e+00
+[LocalUpdate] layer 22: err=2.390003e+00 -> 1.189430e+00
+[LocalUpdate] layer 23: err=2.393997e+00 -> 1.177033e+00
+[LocalUpdate] layer 24: err=2.394889e+00 -> 1.120943e+00
+[LocalUpdate] layer 25: err=2.331477e+00 -> 1.072579e+00
+[LocalUpdate] layer 26: err=2.407073e+00 -> 1.094485e+00
+[LocalUpdate] layer 27: err=2.196928e+00 -> 9.507070e-01
+[LocalUpdate] layer 28: err=2.235848e+00 -> 1.014461e+00
+[LocalUpdate] layer 29: err=2.101045e+00 -> 8.511574e-01
+[LocalUpdate] layer 30: err=1.770777e+00 -> 6.959131e-01
+[LocalUpdate] layer 31: err=1.249335e+00 -> 4.481178e-01
+=== Compress V2 ratio=0.4 (keep=0.6) ===
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:01,  1.56it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.47it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.45it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.80it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.67it/s]
+Start SVD decomposition then update...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:18<09:44, 18.86s/it]  6%|▋         | 2/32 [00:36<08:56, 17.89s/it]  9%|▉         | 3/32 [00:53<08:26, 17.47s/it] 12%|█▎        | 4/32 [01:10<08:05, 17.33s/it] 16%|█▌        | 5/32 [01:26<07:41, 17.08s/it] 19%|█▉        | 6/32 [01:43<07:24, 17.11s/it] 22%|██▏       | 7/32 [02:01<07:07, 17.09s/it] 25%|██▌       | 8/32 [02:17<06:47, 16.97s/it] 28%|██▊       | 9/32 [02:34<06:30, 16.98s/it] 31%|███▏      | 10/32 [02:51<06:13, 16.98s/it] 34%|███▍      | 11/32 [03:08<05:55, 16.92s/it] 38%|███▊      | 12/32 [03:25<05:40, 17.03s/it] 41%|████      | 13/32 [03:42<05:23, 17.02s/it] 44%|████▍     | 14/32 [03:59<05:04, 16.93s/it] 47%|████▋     | 15/32 [04:16<04:49, 17.05s/it] 50%|█████     | 16/32 [04:33<04:33, 17.07s/it] 53%|█████▎    | 17/32 [04:50<04:14, 16.95s/it] 56%|█████▋    | 18/32 [05:07<03:58, 17.02s/it] 59%|█████▉    | 19/32 [05:24<03:41, 17.07s/it] 62%|██████▎   | 20/32 [05:41<03:24, 17.05s/it] 66%|██████▌   | 21/32 [05:58<03:07, 17.02s/it] 69%|██████▉   | 22/32 [06:15<02:49, 17.00s/it] 72%|███████▏  | 23/32 [06:33<02:33, 17.08s/it] 75%|███████▌  | 24/32 [06:51<02:18, 17.32s/it] 78%|███████▊  | 25/32 [07:08<02:00, 17.26s/it] 81%|████████▏ | 26/32 [07:25<01:42, 17.16s/it] 84%|████████▍ | 27/32 [07:41<01:25, 17.04s/it] 88%|████████▊ | 28/32 [07:58<01:08, 17.02s/it] 91%|█████████ | 29/32 [08:15<00:51, 17.01s/it] 94%|█████████▍| 30/32 [08:32<00:33, 16.95s/it] 97%|█████████▋| 31/32 [08:49<00:16, 16.94s/it]100%|██████████| 32/32 [09:06<00:00, 16.94s/it]100%|██████████| 32/32 [09:06<00:00, 17.08s/it]
+[LocalUpdate] layer 0: err=1.600836e+00 -> 1.048845e+00
+[LocalUpdate] layer 1: err=1.715229e+00 -> 9.042985e-01
+[LocalUpdate] layer 2: err=2.467315e+00 -> 1.478097e+00
+[LocalUpdate] layer 3: err=2.724104e+00 -> 1.689890e+00
+[LocalUpdate] layer 4: err=2.478813e+00 -> 1.564546e+00
+[LocalUpdate] layer 5: err=2.701541e+00 -> 1.497045e+00
+[LocalUpdate] layer 6: err=2.565418e+00 -> 1.470036e+00
+[LocalUpdate] layer 7: err=2.300663e+00 -> 1.335781e+00
+[LocalUpdate] layer 8: err=2.616896e+00 -> 1.468948e+00
+[LocalUpdate] layer 9: err=2.559596e+00 -> 1.462229e+00
+[LocalUpdate] layer 10: err=2.343560e+00 -> 1.388780e+00
+[LocalUpdate] layer 11: err=2.365547e+00 -> 1.374428e+00
+[LocalUpdate] layer 12: err=2.400340e+00 -> 1.385883e+00
+[LocalUpdate] layer 13: err=2.351550e+00 -> 1.339043e+00
+[LocalUpdate] layer 14: err=2.609176e+00 -> 1.436181e+00
+[LocalUpdate] layer 15: err=2.817279e+00 -> 1.532174e+00
+[LocalUpdate] layer 16: err=2.555351e+00 -> 1.388618e+00
+[LocalUpdate] layer 17: err=2.743379e+00 -> 1.420446e+00
+[LocalUpdate] layer 18: err=2.622233e+00 -> 1.358510e+00
+[LocalUpdate] layer 19: err=2.644181e+00 -> 1.298925e+00
+[LocalUpdate] layer 20: err=2.739899e+00 -> 1.330282e+00
+[LocalUpdate] layer 21: err=2.755160e+00 -> 1.235642e+00
+[LocalUpdate] layer 22: err=2.704318e+00 -> 1.229739e+00
+[LocalUpdate] layer 23: err=2.721079e+00 -> 1.209978e+00
+[LocalUpdate] layer 24: err=2.718786e+00 -> 1.146253e+00
+[LocalUpdate] layer 25: err=2.638551e+00 -> 1.076080e+00
+[LocalUpdate] layer 26: err=2.682211e+00 -> 1.073408e+00
+[LocalUpdate] layer 27: err=2.459090e+00 -> 9.122639e-01
+[LocalUpdate] layer 28: err=2.494284e+00 -> 9.672057e-01
+[LocalUpdate] layer 29: err=2.340585e+00 -> 8.006050e-01
+[LocalUpdate] layer 30: err=2.018439e+00 -> 6.637247e-01
+[LocalUpdate] layer 31: err=1.423106e+00 -> 4.253606e-01
+=== Compress V2 ratio=0.5 (keep=0.5) ===
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:01,  1.56it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.46it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.45it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.79it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.66it/s]
+Start SVD decomposition then update...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:18<09:30, 18.39s/it]  6%|▋         | 2/32 [00:35<08:43, 17.45s/it]  9%|▉         | 3/32 [00:51<08:14, 17.06s/it] 12%|█▎        | 4/32 [01:08<07:53, 16.91s/it] 16%|█▌        | 5/32 [01:24<07:30, 16.67s/it] 19%|█▉        | 6/32 [01:41<07:13, 16.68s/it] 22%|██▏       | 7/32 [01:58<06:56, 16.67s/it] 25%|██▌       | 8/32 [02:14<06:37, 16.55s/it] 28%|██▊       | 9/32 [02:30<06:20, 16.56s/it] 31%|███▏      | 10/32 [02:47<06:04, 16.56s/it] 34%|███▍      | 11/32 [03:03<05:46, 16.50s/it] 38%|███▊      | 12/32 [03:20<05:31, 16.60s/it] 41%|████      | 13/32 [03:37<05:15, 16.59s/it] 44%|████▍     | 14/32 [03:53<04:57, 16.51s/it] 47%|████▋     | 15/32 [04:10<04:41, 16.55s/it] 50%|█████     | 16/32 [04:26<04:25, 16.60s/it] 53%|█████▎    | 17/32 [04:43<04:07, 16.51s/it] 56%|█████▋    | 18/32 [05:00<03:52, 16.59s/it] 59%|█████▉    | 19/32 [05:16<03:36, 16.62s/it] 62%|██████▎   | 20/32 [05:33<03:19, 16.63s/it] 66%|██████▌   | 21/32 [05:49<03:02, 16.59s/it] 69%|██████▉   | 22/32 [06:06<02:45, 16.55s/it] 72%|███████▏  | 23/32 [06:23<02:29, 16.64s/it] 75%|███████▌  | 24/32 [06:39<02:12, 16.62s/it] 78%|███████▊  | 25/32 [06:56<01:56, 16.64s/it] 81%|████████▏ | 26/32 [07:12<01:39, 16.60s/it] 84%|████████▍ | 27/32 [07:29<01:22, 16.54s/it] 88%|████████▊ | 28/32 [07:45<01:06, 16.55s/it] 91%|█████████ | 29/32 [08:02<00:49, 16.56s/it] 94%|█████████▍| 30/32 [08:18<00:33, 16.50s/it] 97%|█████████▋| 31/32 [08:35<00:16, 16.52s/it]100%|██████████| 32/32 [08:51<00:00, 16.52s/it]100%|██████████| 32/32 [08:51<00:00, 16.62s/it]
+[LocalUpdate] layer 0: err=1.845526e+00 -> 1.275151e+00
+[LocalUpdate] layer 1: err=1.966358e+00 -> 1.069045e+00
+[LocalUpdate] layer 2: err=2.850472e+00 -> 1.707466e+00
+[LocalUpdate] layer 3: err=3.115015e+00 -> 1.933834e+00
+[LocalUpdate] layer 4: err=2.803533e+00 -> 1.753243e+00
+[LocalUpdate] layer 5: err=3.050049e+00 -> 1.544088e+00
+[LocalUpdate] layer 6: err=2.965829e+00 -> 1.495266e+00
+[LocalUpdate] layer 7: err=2.678486e+00 -> 1.446574e+00
+[LocalUpdate] layer 8: err=2.994634e+00 -> 1.570041e+00
+[LocalUpdate] layer 9: err=2.897616e+00 -> 1.580086e+00
+[LocalUpdate] layer 10: err=2.662155e+00 -> 1.497378e+00
+[LocalUpdate] layer 11: err=2.668090e+00 -> 1.468766e+00
+[LocalUpdate] layer 12: err=2.657215e+00 -> 1.445925e+00
+[LocalUpdate] layer 13: err=2.653296e+00 -> 1.402173e+00
+[LocalUpdate] layer 14: err=2.893052e+00 -> 1.481830e+00
+[LocalUpdate] layer 15: err=3.094723e+00 -> 1.572881e+00
+[LocalUpdate] layer 16: err=2.882045e+00 -> 1.445607e+00
+[LocalUpdate] layer 17: err=3.025867e+00 -> 1.457291e+00
+[LocalUpdate] layer 18: err=2.914084e+00 -> 1.375510e+00
+[LocalUpdate] layer 19: err=2.948771e+00 -> 1.307006e+00
+[LocalUpdate] layer 20: err=3.052700e+00 -> 1.311508e+00
+[LocalUpdate] layer 21: err=3.070975e+00 -> 1.209394e+00
+[LocalUpdate] layer 22: err=3.039144e+00 -> 1.200638e+00
+[LocalUpdate] layer 23: err=3.071943e+00 -> 1.177044e+00
+[LocalUpdate] layer 24: err=3.068182e+00 -> 1.099909e+00
+[LocalUpdate] layer 25: err=2.966033e+00 -> 1.027986e+00
+[LocalUpdate] layer 26: err=2.987577e+00 -> 1.003299e+00
+[LocalUpdate] layer 27: err=2.745011e+00 -> 8.417134e-01
+[LocalUpdate] layer 28: err=2.791852e+00 -> 8.844187e-01
+[LocalUpdate] layer 29: err=2.626681e+00 -> 7.301252e-01
+[LocalUpdate] layer 30: err=2.303162e+00 -> 6.144872e-01
+[LocalUpdate] layer 31: err=1.665724e+00 -> 3.988980e-01
+=== Compress V2 ratio=0.6 (keep=0.4) ===
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:01,  1.67it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.48it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.45it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.80it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.68it/s]
+Start SVD decomposition then update...
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:17<09:17, 17.97s/it]  6%|▋         | 2/32 [00:34<08:32, 17.07s/it]  9%|▉         | 3/32 [00:50<08:02, 16.65s/it] 12%|█▎        | 4/32 [01:06<07:42, 16.50s/it] 16%|█▌        | 5/32 [01:22<07:19, 16.27s/it] 19%|█▉        | 6/32 [01:39<07:03, 16.29s/it] 22%|██▏       | 7/32 [01:55<06:46, 16.27s/it] 25%|██▌       | 8/32 [02:11<06:27, 16.14s/it] 28%|██▊       | 9/32 [02:27<06:11, 16.14s/it] 31%|███▏      | 10/32 [02:43<05:55, 16.14s/it] 34%|███▍      | 11/32 [02:59<05:37, 16.07s/it] 38%|███▊      | 12/32 [03:15<05:23, 16.18s/it] 41%|████      | 13/32 [03:31<05:07, 16.16s/it] 44%|████▍     | 14/32 [03:47<04:49, 16.06s/it] 47%|████▋     | 15/32 [04:03<04:33, 16.10s/it] 50%|█████     | 16/32 [04:20<04:18, 16.15s/it] 53%|█████▎    | 17/32 [04:35<04:00, 16.06s/it] 56%|█████▋    | 18/32 [04:52<03:45, 16.14s/it] 59%|█████▉    | 19/32 [05:08<03:30, 16.19s/it] 62%|██████▎   | 20/32 [05:24<03:14, 16.20s/it] 66%|██████▌   | 21/32 [05:40<02:57, 16.17s/it] 69%|██████▉   | 22/32 [05:56<02:41, 16.13s/it] 72%|███████▏  | 23/32 [06:13<02:25, 16.21s/it] 75%|███████▌  | 24/32 [06:29<02:09, 16.18s/it] 78%|███████▊  | 25/32 [06:45<01:53, 16.20s/it] 81%|████████▏ | 26/32 [07:02<01:37, 16.33s/it] 84%|████████▍ | 27/32 [07:18<01:21, 16.21s/it] 88%|████████▊ | 28/32 [07:34<01:04, 16.18s/it] 91%|█████████ | 29/32 [07:50<00:48, 16.18s/it] 94%|█████████▍| 30/32 [08:06<00:32, 16.12s/it] 97%|█████████▋| 31/32 [08:22<00:16, 16.12s/it]100%|██████████| 32/32 [08:38<00:00, 16.12s/it]100%|██████████| 32/32 [08:38<00:00, 16.21s/it]
+[LocalUpdate] layer 0: err=2.113361e+00 -> 1.535737e+00
+[LocalUpdate] layer 1: err=2.227935e+00 -> 1.258835e+00
+[LocalUpdate] layer 2: err=3.261440e+00 -> 1.935780e+00
+[LocalUpdate] layer 3: err=3.535082e+00 -> 2.139700e+00
+[LocalUpdate] layer 4: err=3.167036e+00 -> 1.824110e+00
+[LocalUpdate] layer 5: err=3.431613e+00 -> 1.532550e+00
+[LocalUpdate] layer 6: err=3.326384e+00 -> 1.472720e+00
+[LocalUpdate] layer 7: err=3.010734e+00 -> 1.479215e+00
+[LocalUpdate] layer 8: err=3.332598e+00 -> 1.562128e+00
+[LocalUpdate] layer 9: err=3.205887e+00 -> 1.577119e+00
+[LocalUpdate] layer 10: err=2.978663e+00 -> 1.471760e+00
+[LocalUpdate] layer 11: err=2.999764e+00 -> 1.463530e+00
+[LocalUpdate] layer 12: err=2.910869e+00 -> 1.392088e+00
+[LocalUpdate] layer 13: err=2.996146e+00 -> 1.360242e+00
+[LocalUpdate] layer 14: err=3.164728e+00 -> 1.405109e+00
+[LocalUpdate] layer 15: err=3.351943e+00 -> 1.499866e+00
+[LocalUpdate] layer 16: err=3.200621e+00 -> 1.427588e+00
+[LocalUpdate] layer 17: err=3.335127e+00 -> 1.421047e+00
+[LocalUpdate] layer 18: err=3.206771e+00 -> 1.326967e+00
+[LocalUpdate] layer 19: err=3.275466e+00 -> 1.269242e+00
+[LocalUpdate] layer 20: err=3.389235e+00 -> 1.258368e+00
+[LocalUpdate] layer 21: err=3.413849e+00 -> 1.154188e+00
+[LocalUpdate] layer 22: err=3.401771e+00 -> 1.157166e+00
+[LocalUpdate] layer 23: err=3.420367e+00 -> 1.124235e+00
+[LocalUpdate] layer 24: err=3.453047e+00 -> 1.050478e+00
+[LocalUpdate] layer 25: err=3.311344e+00 -> 9.804559e-01
+[LocalUpdate] layer 26: err=3.355948e+00 -> 9.469166e-01
+[LocalUpdate] layer 27: err=3.070841e+00 -> 8.008853e-01
+[LocalUpdate] layer 28: err=3.168809e+00 -> 8.328652e-01
+[LocalUpdate] layer 29: err=2.970773e+00 -> 6.962868e-01
+[LocalUpdate] layer 30: err=2.584838e+00 -> 5.952417e-01
+[LocalUpdate] layer 31: err=1.931848e+00 -> 3.891496e-01
+=== Eval PPL: V1 keep=0.8 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_only_0.8.pt...
+[wikitext2] tokens: 290674 | time: 141.06s | 2,061 tok/s | 1986.72 ms/batch
+PPL after pruning: {'wikitext2': 599.6888917513519}
+Weight Memory: 25302.77 MiB
+Peak Memory (allocated): 35618.19 MiB
+Peak Memory (reserved):  37150.00 MiB
+Total eval time: 143.10s
+=== Bench speed: V1 keep=0.8 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=655 max_cache_len=646 (Rq=1638, Rk=655, Rv=655)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.241s | 2,128 tok/s
+Decode : new_tokens=128 | time 3.996s | 31.216 ms/token | 32 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=655 max_cache_len=646 (Rq=1638, Rk=655, Rv=655)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.050s | 10,256 tok/s
+Decode : new_tokens=128 | time 4.260s | 33.279 ms/token | 30 tok/s
+
+---- Summary ----
+SVD decode: 31.216 ms/token | 32 tok/s
+FlashSVD decode: 33.279 ms/token | 30 tok/s
+FlashSVD speedup vs SVD: 0.94x
+  → Llama-3.1-8B-Instruct,V1,0.8 ppl=599.6888917513519 base=31.216ms flash=33.279ms speedup=0.938x
+=== Eval PPL: V2 keep=0.8 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_then_update_0.8.pt...
+[wikitext2] tokens: 290674 | time: 140.23s | 2,073 tok/s | 1975.05 ms/batch
+PPL after pruning: {'wikitext2': 26.63750877727918}
+Weight Memory: 25302.77 MiB
+Peak Memory (allocated): 35618.19 MiB
+Peak Memory (reserved):  37150.00 MiB
+Total eval time: 142.80s
+=== Bench speed: V2 keep=0.8 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=1638 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.241s | 2,120 tok/s
+Decode : new_tokens=128 | time 3.997s | 31.228 ms/token | 32 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=1638 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.053s | 9,610 tok/s
+Decode : new_tokens=128 | time 4.251s | 33.211 ms/token | 30 tok/s
+
+---- Summary ----
+SVD decode: 31.228 ms/token | 32 tok/s
+FlashSVD decode: 33.211 ms/token | 30 tok/s
+FlashSVD speedup vs SVD: 0.94x
+  → Llama-3.1-8B-Instruct,V2,0.8 ppl=26.63750877727918 base=31.228ms flash=33.211ms speedup=0.940x
+=== Eval PPL: V1 keep=0.7 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_only_0.7.pt...
+[wikitext2] tokens: 290674 | time: 125.68s | 2,313 tok/s | 1770.09 ms/batch
+PPL after pruning: {'wikitext2': 6343.45342049913}
+Weight Memory: 22643.77 MiB
+Peak Memory (allocated): 32830.69 MiB
+Peak Memory (reserved):  34622.00 MiB
+Total eval time: 128.20s
+=== Bench speed: V1 keep=0.7 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=573 max_cache_len=646 (Rq=1433, Rk=573, Rv=573)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.299s | 1,715 tok/s
+Decode : new_tokens=128 | time 3.918s | 30.606 ms/token | 33 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=573 max_cache_len=646 (Rq=1433, Rk=573, Rv=573)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.051s | 10,031 tok/s
+Decode : new_tokens=128 | time 4.165s | 32.536 ms/token | 31 tok/s
+
+---- Summary ----
+SVD decode: 30.606 ms/token | 33 tok/s
+FlashSVD decode: 32.536 ms/token | 31 tok/s
+FlashSVD speedup vs SVD: 0.94x
+  → Llama-3.1-8B-Instruct,V1,0.7 ppl=6343.45342049913 base=30.606ms flash=32.536ms speedup=0.941x
+=== Eval PPL: V2 keep=0.7 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_then_update_0.7.pt...
+[wikitext2] tokens: 290674 | time: 127.77s | 2,275 tok/s | 1799.64 ms/batch
+PPL after pruning: {'wikitext2': 55.64745812829588}
+Weight Memory: 22643.77 MiB
+Peak Memory (allocated): 32830.69 MiB
+Peak Memory (reserved):  34622.00 MiB
+Total eval time: 130.41s
+=== Bench speed: V2 keep=0.7 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=1433 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.248s | 2,068 tok/s
+Decode : new_tokens=128 | time 3.954s | 30.892 ms/token | 32 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=1433 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.053s | 9,702 tok/s
+Decode : new_tokens=128 | time 4.198s | 32.794 ms/token | 30 tok/s
+
+---- Summary ----
+SVD decode: 30.892 ms/token | 32 tok/s
+FlashSVD decode: 32.794 ms/token | 30 tok/s
+FlashSVD speedup vs SVD: 0.94x
+  → Llama-3.1-8B-Instruct,V2,0.7 ppl=55.64745812829588 base=30.892ms flash=32.794ms speedup=0.942x
+=== Eval PPL: V1 keep=0.6 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_only_0.6.pt...
+[wikitext2] tokens: 290674 | time: 108.06s | 2,690 tok/s | 1522.00 ms/batch
+PPL after pruning: {'wikitext2': 7362.358324994289}
+Weight Memory: 19978.02 MiB
+Peak Memory (allocated): 30304.19 MiB
+Peak Memory (reserved):  31838.00 MiB
+Total eval time: 110.55s
+=== Bench speed: V1 keep=0.6 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=491 max_cache_len=646 (Rq=1228, Rk=491, Rv=491)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.223s | 2,296 tok/s
+Decode : new_tokens=128 | time 3.973s | 31.039 ms/token | 32 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=491 max_cache_len=646 (Rq=1228, Rk=491, Rv=491)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.053s | 9,728 tok/s
+Decode : new_tokens=128 | time 4.213s | 32.911 ms/token | 30 tok/s
+
+---- Summary ----
+SVD decode: 31.039 ms/token | 32 tok/s
+FlashSVD decode: 32.911 ms/token | 30 tok/s
+FlashSVD speedup vs SVD: 0.94x
+  → Llama-3.1-8B-Instruct,V1,0.6 ppl=7362.358324994289 base=31.039ms flash=32.911ms speedup=0.943x
+=== Eval PPL: V2 keep=0.6 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_then_update_0.6.pt...
+[wikitext2] tokens: 290674 | time: 108.92s | 2,669 tok/s | 1534.10 ms/batch
+PPL after pruning: {'wikitext2': 121.5724275755874}
+Weight Memory: 19978.02 MiB
+Peak Memory (allocated): 30304.19 MiB
+Peak Memory (reserved):  31838.00 MiB
+Total eval time: 111.05s
+=== Bench speed: V2 keep=0.6 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=1228 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.222s | 2,310 tok/s
+Decode : new_tokens=128 | time 3.996s | 31.216 ms/token | 32 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=1228 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.053s | 9,705 tok/s
+Decode : new_tokens=128 | time 4.221s | 32.980 ms/token | 30 tok/s
+
+---- Summary ----
+SVD decode: 31.216 ms/token | 32 tok/s
+FlashSVD decode: 32.980 ms/token | 30 tok/s
+FlashSVD speedup vs SVD: 0.95x
+  → Llama-3.1-8B-Instruct,V2,0.6 ppl=121.5724275755874 base=31.216ms flash=32.980ms speedup=0.947x
+=== Eval PPL: V1 keep=0.5 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_only_0.5.pt...
+[wikitext2] tokens: 290674 | time: 92.78s | 3,133 tok/s | 1306.82 ms/batch
+PPL after pruning: {'wikitext2': 13865.482453409924}
+Weight Memory: 17314.27 MiB
+Peak Memory (allocated): 27608.22 MiB
+Peak Memory (reserved):  29114.00 MiB
+Total eval time: 94.83s
+=== Bench speed: V1 keep=0.5 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=409 max_cache_len=646 (Rq=1024, Rk=409, Rv=409)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.280s | 1,828 tok/s
+Decode : new_tokens=128 | time 4.002s | 31.267 ms/token | 32 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=409 max_cache_len=646 (Rq=1024, Rk=409, Rv=409)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.067s | 7,593 tok/s
+Decode : new_tokens=128 | time 4.265s | 33.324 ms/token | 30 tok/s
+
+---- Summary ----
+SVD decode: 31.267 ms/token | 32 tok/s
+FlashSVD decode: 33.324 ms/token | 30 tok/s
+FlashSVD speedup vs SVD: 0.94x
+  → Llama-3.1-8B-Instruct,V1,0.5 ppl=13865.482453409924 base=31.267ms flash=33.324ms speedup=0.938x
+=== Eval PPL: V2 keep=0.5 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_then_update_0.5.pt...
+[wikitext2] tokens: 290674 | time: 94.69s | 3,070 tok/s | 1333.73 ms/batch
+PPL after pruning: {'wikitext2': 265.3118274661193}
+Weight Memory: 17314.27 MiB
+Peak Memory (allocated): 27608.22 MiB
+Peak Memory (reserved):  29114.00 MiB
+Total eval time: 96.75s
+=== Bench speed: V2 keep=0.5 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=1024 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.217s | 2,361 tok/s
+Decode : new_tokens=128 | time 4.055s | 31.682 ms/token | 32 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=1024 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.045s | 11,278 tok/s
+Decode : new_tokens=128 | time 4.165s | 32.540 ms/token | 31 tok/s
+
+---- Summary ----
+SVD decode: 31.682 ms/token | 32 tok/s
+FlashSVD decode: 32.540 ms/token | 31 tok/s
+FlashSVD speedup vs SVD: 0.97x
+  → Llama-3.1-8B-Instruct,V2,0.5 ppl=265.3118274661193 base=31.682ms flash=32.540ms speedup=0.974x
+=== Eval PPL: V1 keep=0.4 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_only_0.4.pt...
+[wikitext2] tokens: 290674 | time: 79.72s | 3,646 tok/s | 1122.86 ms/batch
+PPL after pruning: {'wikitext2': 22736.291006997373}
+Weight Memory: 14655.27 MiB
+Peak Memory (allocated): 24904.69 MiB
+Peak Memory (reserved):  26430.00 MiB
+Total eval time: 82.13s
+=== Bench speed: V1 keep=0.4 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=327 max_cache_len=646 (Rq=819, Rk=327, Rv=327)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.222s | 2,303 tok/s
+Decode : new_tokens=128 | time 3.998s | 31.234 ms/token | 32 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=327 max_cache_len=646 (Rq=819, Rk=327, Rv=327)
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.045s | 11,316 tok/s
+Decode : new_tokens=128 | time 4.213s | 32.916 ms/token | 30 tok/s
+
+---- Summary ----
+SVD decode: 31.234 ms/token | 32 tok/s
+FlashSVD decode: 32.916 ms/token | 30 tok/s
+FlashSVD speedup vs SVD: 0.95x
+  → Llama-3.1-8B-Instruct,V1,0.4 ppl=22736.291006997373 base=31.234ms flash=32.916ms speedup=0.949x
+=== Eval PPL: V2 keep=0.4 ===
+evaluating checkpoints/svdllm/llama31_8b_instruct/meta_llama_Llama_3.1_8B_Instruct_whitening_then_update_0.4.pt...
+[wikitext2] tokens: 290674 | time: 80.65s | 3,604 tok/s | 1135.92 ms/batch
+PPL after pruning: {'wikitext2': 636.7360559185068}
+Weight Memory: 14655.27 MiB
+Peak Memory (allocated): 24904.69 MiB
+Peak Memory (reserved):  26430.00 MiB
+Total eval time: 82.79s
+=== Bench speed: V2 keep=0.4 ===
+The 'batch_size' attribute of StaticCache is deprecated and will be removed in v4.49. Use the more precisely named 'self.max_batch_size' attribute instead.
+==== FlashSVD vs SVD Decode Benchmark ====
+Config: prompt_len=512 new_tokens=128 warmup=5 batch=1 dtype=bf16 device=cuda ffn_backend=auto mlp_cuda_graph=1 scope=mlp baseline_dense_kvcache=0 lowrank_cache=0
+
+[Low-Rank baseline]
+[StaticCache] H=32 Hk=8 REP=4 Dh=128 R=819 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.315s | 1,624 tok/s
+Decode : new_tokens=128 | time 4.014s | 31.363 ms/token | 32 tok/s
+
+[FlashSVD]
+[FlashSVDDenseKVCache] H=32 Hk=8 REP=4 Dh=128 R=819 max_cache_len=646
+=== KV-Cache Prefill/Decode Benchmark ===
+Prefill: prompt_len=512 | time 0.048s | 10,660 tok/s
+Decode : new_tokens=128 | time 4.264s | 33.313 ms/token | 30 tok/s
+
+---- Summary ----
+SVD decode: 31.363 ms/token | 32 tok/s
+FlashSVD decode: 33.313 ms/token | 30 tok/s
+FlashSVD speedup vs SVD: 0.94x
+  → Llama-3.1-8B-Instruct,V2,0.4 ppl=636.7360559185068 base=31.363ms flash=33.313ms speedup=0.941x
+
+=== All done. Results: checkpoints/svdllm/llama31_8b_instruct/results.csv ===
+model,method,keep_ratio,wikitext2_ppl,baseline_ms,flashsvd_ms,speedup
+Llama-3.1-8B-Instruct,V1,0.8,599.6888917513519,31.216,33.279,0.938
+Llama-3.1-8B-Instruct,V2,0.8,26.63750877727918,31.228,33.211,0.940
+Llama-3.1-8B-Instruct,V1,0.7,6343.45342049913,30.606,32.536,0.941
+Llama-3.1-8B-Instruct,V2,0.7,55.64745812829588,30.892,32.794,0.942
+Llama-3.1-8B-Instruct,V1,0.6,7362.358324994289,31.039,32.911,0.943
+Llama-3.1-8B-Instruct,V2,0.6,121.5724275755874,31.216,32.980,0.947
+Llama-3.1-8B-Instruct,V1,0.5,13865.482453409924,31.267,33.324,0.938
+Llama-3.1-8B-Instruct,V2,0.5,265.3118274661193,31.682,32.540,0.974
+Llama-3.1-8B-Instruct,V1,0.4,22736.291006997373,31.234,32.916,0.949
+Llama-3.1-8B-Instruct,V2,0.4,636.7360559185068,31.363,33.313,0.941
