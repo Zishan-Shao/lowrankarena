@@ -104,7 +104,7 @@ def _iter_texts(dataset_name: str):
             if ex.get("text", "").strip():
                 yield ex["text"]
     elif name in {"c4"}:
-        ds = load_dataset("c4", "en", split="validation", streaming=True)
+        ds = load_dataset("allenai/c4", "en", split="validation", streaming=True)
         for ex in ds:
             if ex.get("text", "").strip():
                 yield ex["text"]
