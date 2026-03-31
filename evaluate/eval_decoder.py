@@ -109,7 +109,7 @@ def _iter_texts(dataset_name: str):
             if ex.get("text", "").strip():
                 yield ex["text"]
     elif name in {"ptb", "penn_treebank"}:
-        ds = load_dataset("ptb_text_only", split="test")
+        ds = load_dataset("ptb-text-only", "penn-treebank", split="test")
         for ex in ds:
             txt = ex.get("sentence", ex.get("text", ""))
             if txt.strip():
