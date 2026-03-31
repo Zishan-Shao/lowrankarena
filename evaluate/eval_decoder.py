@@ -291,19 +291,10 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     # itself — this is the documented HF usage and avoids the "pretrained is
     # not str" warning.  Fall back to passing the model object when the
     # checkpoint is not a standard HF dir (e.g. Dobi's model.pt layout).
-    # Pass checkpoint as a string (path or HF model id) whenever possible —
-    # this is the documented lm-eval usage and avoids the "pretrained is not
-    # str" warning.  Only fall back to passing the model object for Dobi-style
-    # dirs that contain model.pt instead of standard HF weights.
     use_path = checkpoint is not None and not (Path(checkpoint) / "model.pt").exists()
-
     if use_path:
-        hflm = HFLM(
-            pretrained=checkpoint,
-            dtype=dtype_str,
-            batch_size=batch_size,
-            device=device,
-        )
+        hflm = HFLM(pretrained=checkpoint, dtype=dtype_str,
+                    batch_size=batch_size, device=device)
     else:
         hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size)
 
@@ -340,7 +331,10 @@ def main() -> None:
     parser.add_argument("--device",        default="cuda:0")
     parser.add_argument("--output_csv",    default="results/decoder_eval.csv")
     parser.add_argument("--seq_len",       type=int, default=2048)
-    parser.add_argument("--batch_size",    default="2")
+    parser.add_argument("--batch_size",       default="2",
+                        help="Batch size for PPL eval.")
+    parser.add_argument("--lmeval_batch_size", default="auto",
+                        help="Batch size for lm-eval. 'auto' lets lm-eval maximize GPU usage.")
     parser.add_argument("--tasks",         default=DEFAULT_TASKS)
     parser.add_argument("--task_set",      default="main6",
                         help="Tag for the task set used (for result versioning).")
@@ -401,7 +395,7 @@ def main() -> None:
     if not args.no_lmeval:
         tasks = [t.strip() for t in args.tasks.split(",") if t.strip()]
         try:
-            lmeval = run_lmeval(model, tokenizer, tasks, args.batch_size,
+            lmeval = run_lmeval(model, tokenizer, tasks, args.lmeval_batch_size,
                                 checkpoint=args.checkpoint,
                                 dtype_str={"bf16": "bfloat16", "fp16": "float16",
                                            "fp32": "float32"}[args.dtype],
