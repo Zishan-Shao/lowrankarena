@@ -298,7 +298,8 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     out = lm_evaluator.simple_evaluate(model=hflm, tasks=tasks, num_fewshot=0)
     raw = out["results"]
 
-    actual_bs = str(getattr(hflm, "batch_size", batch_size))
+    actual_bs = str(getattr(hflm, "_batch_size",
+                    getattr(hflm, "batch_size", batch_size)))
     print(f"  lm-eval batch_size: {actual_bs}")
 
     scores: dict[str, float] = {}
