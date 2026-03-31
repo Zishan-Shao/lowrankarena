@@ -278,50 +278,37 @@ def eval_ppl(model, tokenizer, datasets: list[str],
 # ── lm-eval ───────────────────────────────────────────────────────────────────
 
 def run_lmeval(model, tokenizer, tasks: list[str],
-               batch_size: int | str) -> dict[str, float]:
+               batch_size: int | str,
+               checkpoint: str | None = None,
+               dtype_str: str = "bfloat16",
+               device: str = "cuda:0") -> dict[str, float]:
     print(f"\n--- lm-eval zero-shot: {tasks} ---", flush=True)
 
-    try:
-        from lm_eval.models.huggingface import HFLM
-        from lm_eval import evaluator as lm_evaluator
+    from lm_eval.models.huggingface import HFLM
+    from lm_eval import evaluator as lm_evaluator
+
+    # Prefer passing the checkpoint path string so lm-eval loads the model
+    # itself — this is the documented HF usage and avoids the "pretrained is
+    # not str" warning.  Fall back to passing the model object when the
+    # checkpoint is not a standard HF dir (e.g. Dobi's model.pt layout).
+    use_path = (
+        checkpoint is not None
+        and Path(checkpoint).is_dir()
+        and not (Path(checkpoint) / "model.pt").exists()
+    )
+
+    if use_path:
+        hflm = HFLM(
+            pretrained=checkpoint,
+            dtype=dtype_str,
+            batch_size=batch_size,
+            device=device,
+        )
+    else:
         hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size)
-        out  = lm_evaluator.simple_evaluate(model=hflm, tasks=tasks, num_fewshot=0)
-        raw  = out["results"]
 
-    except (ImportError, TypeError):
-        from lm_eval.base import BaseLM
-        from lm_eval import evaluator as lm_evaluator
-
-        class _LM(BaseLM):
-            def __init__(self, m, tok, b):
-                super().__init__()
-                self._m, self._tok = m, tok
-                self._bs = int(b) if str(b).isdigit() else 1
-                self._dev = next(m.parameters()).device
-            @property
-            def eot_token_id(self): return self._tok.eos_token_id
-            @property
-            def max_length(self):
-                return getattr(self._m.config, "max_position_embeddings", 2048)
-            @property
-            def max_gen_toks(self): return 256
-            @property
-            def batch_size(self): return self._bs
-            @property
-            def device(self): return self._dev
-            def tok_encode(self, s): return self._tok.encode(s, add_special_tokens=False)
-            def tok_decode(self, ts): return self._tok.decode(ts)
-            def _model_call(self, inps):
-                with torch.no_grad():
-                    return self._m(inps)[0]
-            def _model_generate(self, ctx, max_len, eos):
-                return self._m.generate(ctx, max_length=max_len,
-                                        eos_token_id=eos, do_sample=False)
-
-        lm_obj = _LM(model, tokenizer, batch_size)
-        out = lm_evaluator.simple_evaluate(lm_obj, tasks=tasks,
-                                           num_fewshot=0, no_cache=True)
-        raw = out["results"]
+    out = lm_evaluator.simple_evaluate(model=hflm, tasks=tasks, num_fewshot=0)
+    raw = out["results"]
 
     scores: dict[str, float] = {}
     for task in tasks:
@@ -414,7 +401,11 @@ def main() -> None:
     if not args.no_lmeval:
         tasks = [t.strip() for t in args.tasks.split(",") if t.strip()]
         try:
-            lmeval = run_lmeval(model, tokenizer, tasks, args.batch_size)
+            lmeval = run_lmeval(model, tokenizer, tasks, args.batch_size,
+                                checkpoint=args.checkpoint,
+                                dtype_str={"bf16": "bfloat16", "fp16": "float16",
+                                           "fp32": "float32"}[args.dtype],
+                                device=args.device)
         except Exception as exc:
             print(f"[error] lm-eval failed: {exc}")
             lmeval_ok = False
