@@ -52,7 +52,7 @@ TASK_METRICS: dict[str, str] = {
     "openbookqa":    "acc_norm",
 }
 DEFAULT_TASKS    = ",".join(TASK_METRICS)
-DEFAULT_DATASETS = "wikitext2,c4,ptb"
+DEFAULT_DATASETS = "wikitext2,c4"
 
 METRIC_PROTOCOL = ";".join(f"{t}={m}" for t, m in TASK_METRICS.items())
 
