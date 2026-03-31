@@ -291,11 +291,11 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     # itself — this is the documented HF usage and avoids the "pretrained is
     # not str" warning.  Fall back to passing the model object when the
     # checkpoint is not a standard HF dir (e.g. Dobi's model.pt layout).
-    use_path = (
-        checkpoint is not None
-        and Path(checkpoint).is_dir()
-        and not (Path(checkpoint) / "model.pt").exists()
-    )
+    # Pass checkpoint as a string (path or HF model id) whenever possible —
+    # this is the documented lm-eval usage and avoids the "pretrained is not
+    # str" warning.  Only fall back to passing the model object for Dobi-style
+    # dirs that contain model.pt instead of standard HF weights.
+    use_path = checkpoint is not None and not (Path(checkpoint) / "model.pt").exists()
 
     if use_path:
         hflm = HFLM(
