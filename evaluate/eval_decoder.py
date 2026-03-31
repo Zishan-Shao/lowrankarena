@@ -7,16 +7,20 @@ Output: one appended row in a CSV
 Usage:
     python eval_decoder.py \
         --checkpoint /path/to/hf_dir \
-        --model_tag  Llama-3.1-8B \
-        --method     SVDLLMv2 \
-        --keep_ratio 0.8 \
+        --model_family llama \
+        --model_tag    Llama-3.1-8B \
+        --is_instruct  0 \
+        --method       SVDLLMv2 \
+        --keep_ratio   0.8 \
         --dtype bf16 --device cuda:0 \
         --output_csv results/llama31_8b.csv
 
     # Baseline from HF Hub:
     python eval_decoder.py \
-        --checkpoint meta-llama/Llama-3.1-8B \
-        --model_tag Llama-3.1-8B \
+        --checkpoint   meta-llama/Llama-3.1-8B \
+        --model_family llama \
+        --model_tag    Llama-3.1-8B \
+        --is_instruct  0 \
         --method baseline --keep_ratio 1.0 \
         --output_csv results/llama31_8b.csv
 
@@ -31,6 +35,7 @@ import csv
 import math
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -49,12 +54,28 @@ TASK_METRICS: dict[str, str] = {
 DEFAULT_TASKS    = ",".join(TASK_METRICS)
 DEFAULT_DATASETS = "wikitext2,c4,ptb"
 
+METRIC_PROTOCOL = ";".join(f"{t}={m}" for t, m in TASK_METRICS.items())
+
 CSV_FIELDS = [
-    "model_tag", "method", "keep_ratio", "dtype",
+    # identity
+    "model_family", "model_tag", "is_instruct", "method", "keep_ratio", "dtype",
+    # status
+    "compression_success", "eval_success",
+    # protocol
+    "task_set", "metric_protocol",
+    # PPL
     "wikitext2_ppl", "c4_ppl", "ptb_ppl",
+    # zero-shot tasks
     "piqa", "hellaswag", "arc_easy", "arc_challenge", "winogrande", "openbookqa",
     "avg_score",
-    "checkpoint_path", "notes",
+    # checkpoint info
+    "checkpoint_path", "checkpoint_size_gb",
+    # run config
+    "seq_len", "eval_batch_size", "device",
+    # versions
+    "lm_eval_version", "transformers_version",
+    # misc
+    "timestamp", "notes",
 ]
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -71,6 +92,31 @@ def _get_metric(task_result: dict, metric: str) -> float:
     """Handle lm_eval v0.3 ('acc') and v0.4+ ('acc,none') key formats."""
     v = task_result.get(f"{metric},none", task_result.get(metric))
     return float(v) if v is not None else float("nan")
+
+
+def _dir_size_gb(path: str) -> float:
+    """Total size of all files in a directory, in GB. Returns nan if not a dir."""
+    p = Path(path)
+    if not p.is_dir():
+        return float("nan")
+    total = sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
+    return total / (1024 ** 3)
+
+
+def _lm_eval_version() -> str:
+    try:
+        import lm_eval
+        return getattr(lm_eval, "__version__", "unknown")
+    except ImportError:
+        return "not_installed"
+
+
+def _transformers_version() -> str:
+    try:
+        import transformers
+        return transformers.__version__
+    except ImportError:
+        return "not_installed"
 
 
 # ── loading ───────────────────────────────────────────────────────────────────
@@ -103,7 +149,7 @@ def _iter_texts(dataset_name: str):
         for ex in ds:
             if ex.get("text", "").strip():
                 yield ex["text"]
-    elif name in {"c4"}:
+    elif name == "c4":
         ds = load_dataset("allenai/c4", "en", split="validation", streaming=True)
         for ex in ds:
             if ex.get("text", "").strip():
@@ -132,7 +178,6 @@ def eval_ppl(model, tokenizer, datasets: list[str],
             ids.extend(tokenizer.encode(txt, add_special_tokens=False))
             if eos is not None:
                 ids.append(int(eos))
-            # c4 is streaming; 5 M tokens is enough for a stable PPL estimate
             if ds_name == "c4" and len(ids) > 5_000_000:
                 break
 
@@ -145,9 +190,7 @@ def eval_ppl(model, tokenizer, datasets: list[str],
         flat = torch.tensor(ids[: n_seq * seq_len + 1], dtype=torch.long)
         x = flat[:-1].view(n_seq, seq_len)
 
-        total_loss = 0.0
-        total_tokens = 0
-
+        total_loss, total_tokens = 0.0, 0
         if torch.cuda.is_available():
             torch.cuda.synchronize()
         t0 = time.perf_counter()
@@ -156,9 +199,8 @@ def eval_ppl(model, tokenizer, datasets: list[str],
             xb = x[i : i + batch_size].to(device)
             out = model(input_ids=xb, attention_mask=torch.ones_like(xb),
                         use_cache=False)
-            logits = out.logits                       # [B, S, V]
             loss = F.cross_entropy(
-                logits[:, :-1, :].contiguous().view(-1, logits.size(-1)),
+                out.logits[:, :-1, :].contiguous().view(-1, out.logits.size(-1)),
                 xb[:, 1:].contiguous().view(-1),
                 reduction="sum",
             )
@@ -185,13 +227,11 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     try:
         from lm_eval.models.huggingface import HFLM
         from lm_eval import evaluator as lm_evaluator
-
         hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size)
         out  = lm_evaluator.simple_evaluate(model=hflm, tasks=tasks, num_fewshot=0)
         raw  = out["results"]
 
     except (ImportError, TypeError):
-        # lm_eval v0.3 fallback
         from lm_eval.base import BaseLM
         from lm_eval import evaluator as lm_evaluator
 
@@ -201,7 +241,6 @@ def run_lmeval(model, tokenizer, tasks: list[str],
                 self._m, self._tok = m, tok
                 self._bs = int(b) if str(b).isdigit() else 1
                 self._dev = next(m.parameters()).device
-
             @property
             def eot_token_id(self): return self._tok.eos_token_id
             @property
@@ -223,9 +262,8 @@ def run_lmeval(model, tokenizer, tasks: list[str],
                                         eos_token_id=eos, do_sample=False)
 
         lm_obj = _LM(model, tokenizer, batch_size)
-        out = lm_evaluator.simple_evaluate(
-            lm_obj, tasks=tasks, num_fewshot=0, no_cache=True
-        )
+        out = lm_evaluator.simple_evaluate(lm_obj, tasks=tasks,
+                                           num_fewshot=0, no_cache=True)
         raw = out["results"]
 
     scores: dict[str, float] = {}
@@ -244,33 +282,39 @@ def run_lmeval(model, tokenizer, tasks: list[str],
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint",  required=True,
-                        help="HF model id or local HF dir.")
-    parser.add_argument("--model_tag",   required=True,
-                        help="Short name written to CSV (e.g. Llama-3.1-8B).")
-    parser.add_argument("--method",      required=True,
-                        help="Compression method name for CSV.")
-    parser.add_argument("--keep_ratio",  required=True, type=float,
-                        help="1 - compression_ratio; 1.0 for baseline.")
-    parser.add_argument("--dtype",       default="bf16",
+    parser.add_argument("--checkpoint",    required=True)
+    parser.add_argument("--model_family",  required=True,
+                        help="Model family for grouping (e.g. llama, qwen).")
+    parser.add_argument("--model_tag",     required=True,
+                        help="Short name for CSV (e.g. Llama-3.1-8B).")
+    parser.add_argument("--is_instruct",   required=True, choices=["0", "1"],
+                        help="0 = base model, 1 = instruct model.")
+    parser.add_argument("--method",        required=True)
+    parser.add_argument("--keep_ratio",    required=True, type=float)
+    parser.add_argument("--dtype",         default="bf16",
                         choices=["bf16", "fp16", "fp32"])
-    parser.add_argument("--device",      default="cuda:0")
-    parser.add_argument("--output_csv",  default="results/decoder_eval.csv")
-    parser.add_argument("--seq_len",     type=int, default=2048)
-    parser.add_argument("--batch_size",  default="2",
-                        help="Batch size for PPL and lm-eval. 'auto' lets lm-eval choose.")
-    parser.add_argument("--tasks",       default=DEFAULT_TASKS)
-    parser.add_argument("--datasets",    default=DEFAULT_DATASETS,
-                        help="Comma-separated PPL datasets: wikitext2, c4, ptb.")
-    parser.add_argument("--hf_token",    default="")
-    parser.add_argument("--no_ppl",      action="store_true")
-    parser.add_argument("--no_lmeval",   action="store_true")
-    parser.add_argument("--notes",       default="")
+    parser.add_argument("--device",        default="cuda:0")
+    parser.add_argument("--output_csv",    default="results/decoder_eval.csv")
+    parser.add_argument("--seq_len",       type=int, default=2048)
+    parser.add_argument("--batch_size",    default="2")
+    parser.add_argument("--tasks",         default=DEFAULT_TASKS)
+    parser.add_argument("--task_set",      default="main6",
+                        help="Tag for the task set used (for result versioning).")
+    parser.add_argument("--datasets",      default=DEFAULT_DATASETS)
+    parser.add_argument("--hf_token",      default="")
+    parser.add_argument("--no_ppl",        action="store_true")
+    parser.add_argument("--no_lmeval",     action="store_true")
+    parser.add_argument("--compression_success", default="yes",
+                        choices=["yes", "no"])
+    parser.add_argument("--notes",         default="")
     args = parser.parse_args()
 
     dtype = {"bf16": torch.bfloat16,
              "fp16": torch.float16,
              "fp32": torch.float32}[args.dtype]
+
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    ckpt_size_gb = _dir_size_gb(args.checkpoint)
 
     # ── load ──────────────────────────────────────────────────────────────────
     print(f"\n{'='*64}")
@@ -288,29 +332,32 @@ def main() -> None:
 
     # ── PPL ───────────────────────────────────────────────────────────────────
     ppl: dict[str, float] = {}
+    ppl_ok = True
     if not args.no_ppl:
         print("\n--- PPL ---")
         datasets = [d.strip() for d in args.datasets.split(",") if d.strip()]
         bs_ppl   = int(args.batch_size) if args.batch_size != "auto" else 1
-        ppl = eval_ppl(model, tokenizer, datasets,
-                       args.seq_len, bs_ppl, args.device)
+        try:
+            ppl = eval_ppl(model, tokenizer, datasets,
+                           args.seq_len, bs_ppl, args.device)
+        except Exception as exc:
+            print(f"[error] PPL failed: {exc}")
+            ppl_ok = False
 
     # ── lm-eval ───────────────────────────────────────────────────────────────
     lmeval: dict[str, float] = {}
+    lmeval_ok = True
     if not args.no_lmeval:
         tasks = [t.strip() for t in args.tasks.split(",") if t.strip()]
         try:
             lmeval = run_lmeval(model, tokenizer, tasks, args.batch_size)
         except Exception as exc:
             print(f"[error] lm-eval failed: {exc}")
+            lmeval_ok = False
             for t in tasks:
                 lmeval[t] = float("nan")
 
-    # ── peak memory ───────────────────────────────────────────────────────────
-    peak_gb = 0.0
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-        peak_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
+    eval_success = "yes" if (ppl_ok and lmeval_ok) else "no"
 
     # ── avg_score ─────────────────────────────────────────────────────────────
     task_list = [t.strip() for t in args.tasks.split(",") if t.strip()]
@@ -323,22 +370,35 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     row = {
-        "model_tag":      args.model_tag,
-        "method":         args.method,
-        "keep_ratio":     args.keep_ratio,
-        "dtype":          args.dtype,
-        "wikitext2_ppl":  _fmt(ppl.get("wikitext2", float("nan"))),
-        "c4_ppl":         _fmt(ppl.get("c4",        float("nan"))),
-        "ptb_ppl":        _fmt(ppl.get("ptb",       float("nan"))),
-        "piqa":           _fmt(lmeval.get("piqa",          float("nan"))),
-        "hellaswag":      _fmt(lmeval.get("hellaswag",     float("nan"))),
-        "arc_easy":       _fmt(lmeval.get("arc_easy",      float("nan"))),
-        "arc_challenge":  _fmt(lmeval.get("arc_challenge", float("nan"))),
-        "winogrande":     _fmt(lmeval.get("winogrande",    float("nan"))),
-        "openbookqa":     _fmt(lmeval.get("openbookqa",    float("nan"))),
-        "avg_score":      _fmt(avg_score),
-        "checkpoint_path": args.checkpoint,
-        "notes":          args.notes,
+        "model_family":        args.model_family,
+        "model_tag":           args.model_tag,
+        "is_instruct":         args.is_instruct,
+        "method":              args.method,
+        "keep_ratio":          args.keep_ratio,
+        "dtype":               args.dtype,
+        "compression_success": args.compression_success,
+        "eval_success":        eval_success,
+        "task_set":            args.task_set,
+        "metric_protocol":     METRIC_PROTOCOL,
+        "wikitext2_ppl":       _fmt(ppl.get("wikitext2", float("nan"))),
+        "c4_ppl":              _fmt(ppl.get("c4",        float("nan"))),
+        "ptb_ppl":             _fmt(ppl.get("ptb",       float("nan"))),
+        "piqa":                _fmt(lmeval.get("piqa",          float("nan"))),
+        "hellaswag":           _fmt(lmeval.get("hellaswag",     float("nan"))),
+        "arc_easy":            _fmt(lmeval.get("arc_easy",      float("nan"))),
+        "arc_challenge":       _fmt(lmeval.get("arc_challenge", float("nan"))),
+        "winogrande":          _fmt(lmeval.get("winogrande",    float("nan"))),
+        "openbookqa":          _fmt(lmeval.get("openbookqa",    float("nan"))),
+        "avg_score":           _fmt(avg_score),
+        "checkpoint_path":     args.checkpoint,
+        "checkpoint_size_gb":  _fmt(ckpt_size_gb),
+        "seq_len":             args.seq_len,
+        "eval_batch_size":     args.batch_size,
+        "device":              args.device,
+        "lm_eval_version":     _lm_eval_version(),
+        "transformers_version": _transformers_version(),
+        "timestamp":           timestamp,
+        "notes":               args.notes,
     }
 
     write_header = not out_path.exists() or out_path.stat().st_size == 0
@@ -351,7 +411,7 @@ def main() -> None:
     print(f"\n{'='*64}")
     print(f"Done → {out_path}")
     print(f"  wiki2={row['wikitext2_ppl']}  c4={row['c4_ppl']}  "
-          f"avg={row['avg_score']}  peak={peak_gb:.1f}GB")
+          f"avg={row['avg_score']}  eval_success={eval_success}")
 
 
 if __name__ == "__main__":

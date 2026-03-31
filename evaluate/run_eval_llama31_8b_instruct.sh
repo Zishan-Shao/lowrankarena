@@ -16,7 +16,9 @@
 set -eo pipefail
 cd "$(dirname "$0")"
 
+MODEL_FAMILY="llama"
 MODEL_TAG="Llama-3.1-8B-Instruct"
+IS_INSTRUCT="1"
 BASE_MODEL="meta-llama/Llama-3.1-8B-Instruct"
 CKPT_BASE="../hf_ckpts/LowRankArena/llama31_8b_instruct"
 CSV="results/llama31_8b_instruct.csv"
@@ -34,14 +36,16 @@ eval_one() {
     echo ""
     echo ">>> $method  keep=$keep"
     python eval_decoder.py \
-        --checkpoint  "$ckpt" \
-        --model_tag   "$MODEL_TAG" \
-        --method      "$method" \
-        --keep_ratio  "$keep" \
-        --dtype       "$DTYPE" \
-        --device      "$DEVICE" \
-        --output_csv  "$CSV" \
-        --batch_size  "$BATCH" \
+        --checkpoint   "$ckpt" \
+        --model_family "$MODEL_FAMILY" \
+        --model_tag    "$MODEL_TAG" \
+        --is_instruct  "$IS_INSTRUCT" \
+        --method       "$method" \
+        --keep_ratio   "$keep" \
+        --dtype        "$DTYPE" \
+        --device       "$DEVICE" \
+        --output_csv   "$CSV" \
+        --batch_size   "$BATCH" \
         $TOKEN_ARG
 }
 
