@@ -121,8 +121,45 @@ def _transformers_version() -> str:
 
 # ── loading ───────────────────────────────────────────────────────────────────
 
+def _load_model_pt(pt_path: Path, dtype: torch.dtype, device: str):
+    """Load a model from a .pt file inside an otherwise HF-style directory.
+
+    Dobi-SVD saves SVDTransformLayer objects, so we register those classes
+    before calling torch.load to avoid unpickling errors.
+    """
+    dobi_root = Path(__file__).resolve().parent.parent / "baselines" / "Dobi-SVD"
+    for p in (str(dobi_root), str(dobi_root / "modules")):
+        if p not in __import__("sys").path:
+            __import__("sys").path.insert(0, p)
+    try:
+        import modules.module as _  # noqa: F401
+    except ImportError:
+        try:
+            import module as _  # noqa: F401
+        except ImportError:
+            pass  # no SVDTransformLayer needed if not Dobi
+
+    obj = torch.load(pt_path, map_location="cpu", weights_only=False)
+    # obj may be the model directly, or {'model': ..., 'tokenizer': ...}
+    model = obj["model"] if isinstance(obj, dict) else obj
+    return model.to(dtype=dtype).to(device)
+
+
 def load_model(checkpoint: str, dtype: torch.dtype, device: str,
                hf_token: str | None):
+    ckpt_dir = Path(checkpoint)
+    model_pt = ckpt_dir / "model.pt"
+
+    # Directory has model.pt instead of standard safetensors/bin weights
+    if model_pt.is_file():
+        from transformers import AutoTokenizer
+        extra = {"token": hf_token} if hf_token else {}
+        tokenizer = AutoTokenizer.from_pretrained(
+            checkpoint, trust_remote_code=True, **extra
+        )
+        model = _load_model_pt(model_pt, dtype, device)
+        return model, tokenizer
+
     from transformers import AutoModelForCausalLM, AutoTokenizer
     extra = {"token": hf_token} if hf_token else {}
     tokenizer = AutoTokenizer.from_pretrained(
@@ -130,7 +167,7 @@ def load_model(checkpoint: str, dtype: torch.dtype, device: str,
     )
     model = AutoModelForCausalLM.from_pretrained(
         checkpoint,
-        torch_dtype=dtype,
+        dtype=dtype,
         device_map=device,
         trust_remote_code=True,
         low_cpu_mem_usage=True,
