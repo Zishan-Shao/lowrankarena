@@ -47,7 +47,7 @@ TASK_METRICS: dict[str, str] = {
     "openbookqa":    "acc_norm",
 }
 DEFAULT_TASKS    = ",".join(TASK_METRICS)
-DEFAULT_DATASETS = "wikitext2,c4"
+DEFAULT_DATASETS = "wikitext2,c4,ptb"
 
 CSV_FIELDS = [
     "model_tag", "method", "keep_ratio", "dtype",
