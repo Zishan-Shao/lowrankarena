@@ -52,7 +52,7 @@ TASK_METRICS: dict[str, str] = {
     "openbookqa":    "acc_norm",
 }
 DEFAULT_TASKS    = ",".join(TASK_METRICS)
-DEFAULT_DATASETS = "wikitext2,c4"
+DEFAULT_DATASETS = "wikitext2,c4,ptb"
 
 METRIC_PROTOCOL = ";".join(f"{t}={m}" for t, m in TASK_METRICS.items())
 
@@ -155,7 +155,7 @@ def _iter_texts(dataset_name: str):
             if ex.get("text", "").strip():
                 yield ex["text"]
     elif name in {"ptb", "penn_treebank"}:
-        ds = load_dataset("ptb-text-only", "penn-treebank", split="test")
+        ds = load_dataset("FALcon6/ptb_text_only", split="test")
         for ex in ds:
             txt = ex.get("sentence", ex.get("text", ""))
             if txt.strip():
