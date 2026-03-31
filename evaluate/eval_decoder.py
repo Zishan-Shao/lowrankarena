@@ -52,7 +52,7 @@ TASK_METRICS: dict[str, str] = {
     "openbookqa":    "acc_norm",
 }
 DEFAULT_TASKS    = ",".join(TASK_METRICS)
-DEFAULT_DATASETS = "wikitext2,c4,ptb"
+DEFAULT_DATASETS = "wikitext2,c4"
 
 METRIC_PROTOCOL = ";".join(f"{t}={m}" for t, m in TASK_METRICS.items())
 
@@ -171,49 +171,54 @@ def eval_ppl(model, tokenizer, datasets: list[str],
     results: dict[str, float] = {}
 
     for ds_name in datasets:
-        print(f"  loading {ds_name} ...", flush=True)
-        eos = tokenizer.eos_token_id
-        ids: list[int] = []
-        for txt in _iter_texts(ds_name):
-            ids.extend(tokenizer.encode(txt, add_special_tokens=False))
-            if eos is not None:
-                ids.append(int(eos))
-            if ds_name == "c4" and len(ids) > 5_000_000:
-                break
+        try:
+            print(f"  loading {ds_name} ...", flush=True)
+            eos = tokenizer.eos_token_id
+            ids: list[int] = []
+            for txt in _iter_texts(ds_name):
+                ids.extend(tokenizer.encode(txt, add_special_tokens=False))
+                if eos is not None:
+                    ids.append(int(eos))
+                if ds_name == "c4" and len(ids) > 5_000_000:
+                    break
 
-        n_seq = (len(ids) - 1) // seq_len
-        if n_seq == 0:
-            print(f"  [warn] not enough tokens for {ds_name}, skipping")
+            n_seq = (len(ids) - 1) // seq_len
+            if n_seq == 0:
+                print(f"  [warn] not enough tokens for {ds_name}, skipping")
+                results[ds_name] = float("nan")
+                continue
+
+            flat = torch.tensor(ids[: n_seq * seq_len + 1], dtype=torch.long)
+            x = flat[:-1].view(n_seq, seq_len)
+
+            total_loss, total_tokens = 0.0, 0
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            t0 = time.perf_counter()
+
+            for i in range(0, n_seq, batch_size):
+                xb = x[i : i + batch_size].to(device)
+                out = model(input_ids=xb, attention_mask=torch.ones_like(xb),
+                            use_cache=False)
+                loss = F.cross_entropy(
+                    out.logits[:, :-1, :].contiguous().view(-1, out.logits.size(-1)),
+                    xb[:, 1:].contiguous().view(-1),
+                    reduction="sum",
+                )
+                total_loss   += float(loss.item())
+                total_tokens += int(xb[:, 1:].numel())
+
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            dt = time.perf_counter() - t0
+
+            ppl = math.exp(total_loss / total_tokens)
+            results[ds_name] = ppl
+            print(f"  {ds_name} PPL={ppl:.4f}  ({total_tokens} tokens, {dt:.1f}s)")
+
+        except Exception as exc:
+            print(f"  [error] {ds_name} PPL failed: {exc}")
             results[ds_name] = float("nan")
-            continue
-
-        flat = torch.tensor(ids[: n_seq * seq_len + 1], dtype=torch.long)
-        x = flat[:-1].view(n_seq, seq_len)
-
-        total_loss, total_tokens = 0.0, 0
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        t0 = time.perf_counter()
-
-        for i in range(0, n_seq, batch_size):
-            xb = x[i : i + batch_size].to(device)
-            out = model(input_ids=xb, attention_mask=torch.ones_like(xb),
-                        use_cache=False)
-            loss = F.cross_entropy(
-                out.logits[:, :-1, :].contiguous().view(-1, out.logits.size(-1)),
-                xb[:, 1:].contiguous().view(-1),
-                reduction="sum",
-            )
-            total_loss   += float(loss.item())
-            total_tokens += int(xb[:, 1:].numel())
-
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        dt = time.perf_counter() - t0
-
-        ppl = math.exp(total_loss / total_tokens)
-        results[ds_name] = ppl
-        print(f"  {ds_name} PPL={ppl:.4f}  ({total_tokens} tokens, {dt:.1f}s)")
 
     return results
 
