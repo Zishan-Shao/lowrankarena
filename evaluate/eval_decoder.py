@@ -103,6 +103,21 @@ def _dir_size_gb(path: str) -> float:
     return total / (1024 ** 3)
 
 
+def _already_done(csv_path: str, model_tag: str, method: str,
+                  keep_ratio: float) -> bool:
+    """Return True if a row with matching (model_tag, method, keep_ratio) exists."""
+    p = Path(csv_path)
+    if not p.exists() or p.stat().st_size == 0:
+        return False
+    with open(p, newline="") as f:
+        for row in csv.DictReader(f):
+            if (row.get("model_tag") == model_tag
+                    and row.get("method") == method
+                    and float(row.get("keep_ratio", -1)) == keep_ratio):
+                return True
+    return False
+
+
 def _lm_eval_version() -> str:
     try:
         import lm_eval
@@ -349,7 +364,14 @@ def main() -> None:
     parser.add_argument("--compression_success", default="yes",
                         choices=["yes", "no"])
     parser.add_argument("--notes",         default="")
+    parser.add_argument("--force",         action="store_true",
+                        help="Re-run even if this entry already exists in the CSV.")
     args = parser.parse_args()
+
+    if not args.force and _already_done(args.output_csv, args.model_tag,
+                                        args.method, args.keep_ratio):
+        print(f"[skip] already in CSV: {args.model_tag} {args.method} keep={args.keep_ratio}")
+        return
 
     dtype = {"bf16": torch.bfloat16,
              "fp16": torch.float16,
