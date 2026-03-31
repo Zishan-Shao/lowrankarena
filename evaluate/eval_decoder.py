@@ -281,16 +281,13 @@ def run_lmeval(model, tokenizer, tasks: list[str],
                batch_size: int | str,
                checkpoint: str | None = None,
                dtype_str: str = "bfloat16",
-               device: str = "cuda:0") -> dict[str, float]:
+               device: str = "cuda:0") -> tuple[dict[str, float], str]:
+    """Returns (scores, actual_batch_size_str)."""
     print(f"\n--- lm-eval zero-shot: {tasks} ---", flush=True)
 
     from lm_eval.models.huggingface import HFLM
     from lm_eval import evaluator as lm_evaluator
 
-    # Prefer passing the checkpoint path string so lm-eval loads the model
-    # itself — this is the documented HF usage and avoids the "pretrained is
-    # not str" warning.  Fall back to passing the model object when the
-    # checkpoint is not a standard HF dir (e.g. Dobi's model.pt layout).
     use_path = checkpoint is not None and not (Path(checkpoint) / "model.pt").exists()
     if use_path:
         hflm = HFLM(pretrained=checkpoint, dtype=dtype_str,
@@ -301,6 +298,9 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     out = lm_evaluator.simple_evaluate(model=hflm, tasks=tasks, num_fewshot=0)
     raw = out["results"]
 
+    actual_bs = str(getattr(hflm, "batch_size", batch_size))
+    print(f"  lm-eval batch_size: {actual_bs}")
+
     scores: dict[str, float] = {}
     for task in tasks:
         if task not in raw:
@@ -310,7 +310,7 @@ def run_lmeval(model, tokenizer, tasks: list[str],
         metric = TASK_METRICS.get(task, "acc")
         scores[task] = _get_metric(raw[task], metric)
         print(f"  {task}: {scores[task]:.4f}  ({metric})")
-    return scores
+    return scores, actual_bs
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
@@ -392,14 +392,16 @@ def main() -> None:
     # ── lm-eval ───────────────────────────────────────────────────────────────
     lmeval: dict[str, float] = {}
     lmeval_ok = True
+    actual_lmeval_bs = args.lmeval_batch_size
     if not args.no_lmeval:
         tasks = [t.strip() for t in args.tasks.split(",") if t.strip()]
         try:
-            lmeval = run_lmeval(model, tokenizer, tasks, args.lmeval_batch_size,
-                                checkpoint=args.checkpoint,
-                                dtype_str={"bf16": "bfloat16", "fp16": "float16",
-                                           "fp32": "float32"}[args.dtype],
-                                device=args.device)
+            lmeval, actual_lmeval_bs = run_lmeval(
+                model, tokenizer, tasks, args.lmeval_batch_size,
+                checkpoint=args.checkpoint,
+                dtype_str={"bf16": "bfloat16", "fp16": "float16",
+                           "fp32": "float32"}[args.dtype],
+                device=args.device)
         except Exception as exc:
             print(f"[error] lm-eval failed: {exc}")
             lmeval_ok = False
@@ -442,7 +444,7 @@ def main() -> None:
         "checkpoint_path":     args.checkpoint,
         "checkpoint_size_gb":  _fmt(ckpt_size_gb),
         "seq_len":             args.seq_len,
-        "eval_batch_size":     args.batch_size,
+        "eval_batch_size":     actual_lmeval_bs,
         "device":              args.device,
         "lm_eval_version":     _lm_eval_version(),
         "transformers_version": _transformers_version(),
