@@ -41,8 +41,8 @@ for pt in "$SVDLLM_PT"/meta_llama_Llama_3.1_8B_Instruct_*.pt; do
     method="${TAG_TO_METHOD[$tag]:-$tag}"
     out="$HF_BASE/$method/hf_${tag}_${keep}"
 
-    if [[ -d "$out" ]]; then
-        echo "[skip] already exists: $out"
+    if [[ -f "$out/lowrank_config.json" ]]; then
+        echo "[skip] already complete: $out"
         continue
     fi
 
@@ -57,8 +57,8 @@ for pt in "$ASVD_PT"/Llama_3.1_8B_Instruct_asvd_raw_*.pt; do
 
     out="$HF_BASE/ASVD/hf_asvd_raw_$keep"
 
-    if [[ -d "$out" ]]; then
-        echo "[skip] already exists: $out"
+    if [[ -f "$out/lowrank_config.json" ]]; then
+        echo "[skip] already complete: $out"
         continue
     fi
 
