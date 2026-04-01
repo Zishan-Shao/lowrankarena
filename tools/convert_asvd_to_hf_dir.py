@@ -44,6 +44,15 @@ def main():
     if _asvd_dir not in sys.path:
         sys.path.insert(0, _asvd_dir)
 
+    # Compatibility: older transformers used SiLUActivation; newer versions removed it.
+    try:
+        import transformers.activations as _act
+        import torch.nn as _nn
+        if not hasattr(_act, "SiLUActivation"):
+            _act.SiLUActivation = _nn.SiLU
+    except Exception:
+        pass
+
     print(f"Loading {args.input} ...")
     obj = torch.load(args.input, map_location="cpu", weights_only=False)
     if not (isinstance(obj, dict) and "model" in obj and "tokenizer" in obj):
