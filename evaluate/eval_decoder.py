@@ -2,7 +2,7 @@
 eval_decoder.py — unified decoder LLM evaluation.
 
 Input:  one HF checkpoint directory (or HF model id for baseline)
-Output: one appended row in a CSV
+Output: one appended row in a CSV  +  one JSON (lm-eval raw output)
 
 Usage:
     python eval_decoder.py \
@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import math
 import os
 import time
@@ -41,20 +42,35 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-# ── constants ─────────────────────────────────────────────────────────────────
+# ── task configuration ────────────────────────────────────────────────────────
 
-TASK_METRICS: dict[str, str] = {
-    "piqa":          "acc",
-    "hellaswag":     "acc_norm",
-    "arc_easy":      "acc",
+# Ordered task list
+ORDERED_TASKS = [
+    "boolq", "arc_challenge", "arc_easy", "hellaswag",
+    "winogrande", "openbookqa", "piqa", "mathqa",
+]
+
+# Primary metric used for avg_score computation
+PRIMARY_METRIC: dict[str, str] = {
+    "boolq":         "acc",
     "arc_challenge": "acc_norm",
+    "arc_easy":      "acc_norm",
+    "hellaswag":     "acc_norm",
     "winogrande":    "acc",
     "openbookqa":    "acc_norm",
+    "piqa":          "acc_norm",
+    "mathqa":        "acc",
 }
-DEFAULT_TASKS    = ",".join(TASK_METRICS)
+
+DEFAULT_TASKS    = ",".join(ORDERED_TASKS)
 DEFAULT_DATASETS = "wikitext2,c4"
 
-METRIC_PROTOCOL = ";".join(f"{t}={m}" for t, m in TASK_METRICS.items())
+METRIC_PROTOCOL = ";".join(f"{t}={PRIMARY_METRIC[t]}" for t in ORDERED_TASKS)
+
+# Per-task CSV columns: {task}_acc, {task}_acc_norm, {task}_std
+_TASK_COLS: list[str] = []
+for _t in ORDERED_TASKS:
+    _TASK_COLS += [f"{_t}_acc", f"{_t}_acc_norm", f"{_t}_std"]
 
 CSV_FIELDS = [
     # identity
@@ -65,8 +81,8 @@ CSV_FIELDS = [
     "task_set", "metric_protocol",
     # PPL
     "wikitext2_ppl", "c4_ppl", "ptb_ppl",
-    # zero-shot tasks
-    "piqa", "hellaswag", "arc_easy", "arc_challenge", "winogrande", "openbookqa",
+    # zero-shot tasks (3 cols per task: acc, acc_norm, std)
+    *_TASK_COLS,
     "avg_score",
     # checkpoint info
     "checkpoint_path", "checkpoint_size_gb",
@@ -92,6 +108,16 @@ def _get_metric(task_result: dict, metric: str) -> float:
     """Handle lm_eval v0.3 ('acc') and v0.4+ ('acc,none') key formats."""
     v = task_result.get(f"{metric},none", task_result.get(metric))
     return float(v) if v is not None else float("nan")
+
+
+def _get_stderr(task_result: dict, metric: str) -> float:
+    """Return stderr for a metric; handles both v0.3 and v0.4+ key formats."""
+    v = task_result.get(f"{metric},stderr",
+        task_result.get(f"{metric}_stderr"))
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return float("nan")
 
 
 def _dir_size_gb(path: str) -> float:
@@ -309,8 +335,12 @@ def run_lmeval(model, tokenizer, tasks: list[str],
                batch_size: int | str,
                checkpoint: str | None = None,
                dtype_str: str = "bfloat16",
-               device: str = "cuda:0") -> tuple[dict[str, float], str]:
-    """Returns (scores, actual_batch_size_str)."""
+               device: str = "cuda:0") -> tuple[dict, str]:
+    """Returns (raw_task_results, actual_batch_size_str).
+
+    raw_task_results: the lm-eval out["results"] dict keyed by task name,
+    each value is the full metric dict (acc,none / acc_norm,none / *,stderr …).
+    """
     print(f"\n--- lm-eval zero-shot: {tasks} ---", flush=True)
 
     from lm_eval.models.huggingface import HFLM
@@ -330,16 +360,17 @@ def run_lmeval(model, tokenizer, tasks: list[str],
                     getattr(hflm, "batch_size", batch_size)))
     print(f"  lm-eval batch_size: {actual_bs}")
 
-    scores: dict[str, float] = {}
+    # Print summary
     for task in tasks:
         if task not in raw:
             print(f"  [warn] '{task}' not in lm_eval output")
-            scores[task] = float("nan")
             continue
-        metric = TASK_METRICS.get(task, "acc")
-        scores[task] = _get_metric(raw[task], metric)
-        print(f"  {task}: {scores[task]:.4f}  ({metric})")
-    return scores, actual_bs
+        primary = PRIMARY_METRIC.get(task, "acc")
+        val = _get_metric(raw[task], primary)
+        std = _get_stderr(raw[task], primary)
+        print(f"  {task}: {val:.4f} ± {std:.4f}  ({primary})")
+
+    return raw, actual_bs, out
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
@@ -365,7 +396,7 @@ def main() -> None:
     parser.add_argument("--lmeval_batch_size", default="auto",
                         help="Batch size for lm-eval. 'auto' lets lm-eval maximize GPU usage.")
     parser.add_argument("--tasks",         default=DEFAULT_TASKS)
-    parser.add_argument("--task_set",      default="main6",
+    parser.add_argument("--task_set",      default="main8",
                         help="Tag for the task set used (for result versioning).")
     parser.add_argument("--datasets",      default=DEFAULT_DATASETS)
     parser.add_argument("--hf_token",      default="")
@@ -419,13 +450,14 @@ def main() -> None:
             ppl_ok = False
 
     # ── lm-eval ───────────────────────────────────────────────────────────────
-    lmeval: dict[str, float] = {}
+    lmeval_raw: dict = {}       # task → full metric dict
+    lmeval_full_out: dict = {}  # full lm-eval output (for JSON)
     lmeval_ok = True
     actual_lmeval_bs = args.lmeval_batch_size
     if not args.no_lmeval:
         tasks = [t.strip() for t in args.tasks.split(",") if t.strip()]
         try:
-            lmeval, actual_lmeval_bs = run_lmeval(
+            lmeval_raw, actual_lmeval_bs, lmeval_full_out = run_lmeval(
                 model, tokenizer, tasks, args.lmeval_batch_size,
                 checkpoint=args.checkpoint,
                 dtype_str={"bf16": "bfloat16", "fp16": "float16",
@@ -434,22 +466,37 @@ def main() -> None:
         except Exception as exc:
             print(f"[error] lm-eval failed: {exc}")
             lmeval_ok = False
-            for t in tasks:
-                lmeval[t] = float("nan")
 
     eval_success = "yes" if (ppl_ok and lmeval_ok) else "no"
 
-    # ── avg_score ─────────────────────────────────────────────────────────────
+    # ── save lm-eval JSON ─────────────────────────────────────────────────────
+    out_path = Path(args.output_csv)
+    if lmeval_full_out:
+        json_dir = out_path.parent / "json"
+        json_dir.mkdir(parents=True, exist_ok=True)
+        safe_tag = args.model_tag.replace("/", "_").replace(" ", "_")
+        ts_compact = timestamp.replace(":", "").replace("-", "").replace("T", "_")
+        json_name  = f"{safe_tag}_{args.method}_{args.keep_ratio}_{ts_compact}.json"
+        json_path  = json_dir / json_name
+        try:
+            with open(json_path, "w") as jf:
+                json.dump(lmeval_full_out, jf, indent=2, default=str)
+            print(f"  lm-eval JSON → {json_path}")
+        except Exception as exc:
+            print(f"  [warn] could not save JSON: {exc}")
+
+    # ── avg_score (primary metric per task) ───────────────────────────────────
     task_list = [t.strip() for t in args.tasks.split(",") if t.strip()]
-    valid     = [lmeval[t] for t in task_list
-                 if not math.isnan(lmeval.get(t, float("nan")))]
+    valid: list[float] = []
+    for task in task_list:
+        primary = PRIMARY_METRIC.get(task, "acc")
+        v = _get_metric(lmeval_raw.get(task, {}), primary)
+        if not math.isnan(v):
+            valid.append(v)
     avg_score = sum(valid) / len(valid) if valid else float("nan")
 
-    # ── write CSV ─────────────────────────────────────────────────────────────
-    out_path = Path(args.output_csv)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    row = {
+    # ── build CSV row ─────────────────────────────────────────────────────────
+    row: dict = {
         "model_family":        args.model_family,
         "model_tag":           args.model_tag,
         "is_instruct":         args.is_instruct,
@@ -463,12 +510,6 @@ def main() -> None:
         "wikitext2_ppl":       _fmt(ppl.get("wikitext2", float("nan"))),
         "c4_ppl":              _fmt(ppl.get("c4",        float("nan"))),
         "ptb_ppl":             _fmt(ppl.get("ptb",       float("nan"))),
-        "piqa":                _fmt(lmeval.get("piqa",          float("nan"))),
-        "hellaswag":           _fmt(lmeval.get("hellaswag",     float("nan"))),
-        "arc_easy":            _fmt(lmeval.get("arc_easy",      float("nan"))),
-        "arc_challenge":       _fmt(lmeval.get("arc_challenge", float("nan"))),
-        "winogrande":          _fmt(lmeval.get("winogrande",    float("nan"))),
-        "openbookqa":          _fmt(lmeval.get("openbookqa",    float("nan"))),
         "avg_score":           _fmt(avg_score),
         "checkpoint_path":     args.checkpoint,
         "checkpoint_size_gb":  _fmt(ckpt_size_gb),
@@ -480,6 +521,17 @@ def main() -> None:
         "timestamp":           timestamp,
         "notes":               args.notes,
     }
+
+    # Per-task columns
+    for task in ORDERED_TASKS:
+        tr = lmeval_raw.get(task, {})
+        row[f"{task}_acc"]      = _fmt(_get_metric(tr, "acc"))
+        row[f"{task}_acc_norm"] = _fmt(_get_metric(tr, "acc_norm"))
+        primary = PRIMARY_METRIC.get(task, "acc")
+        row[f"{task}_std"]      = _fmt(_get_stderr(tr, primary))
+
+    # ── write CSV ─────────────────────────────────────────────────────────────
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     write_header = not out_path.exists() or out_path.stat().st_size == 0
     with open(out_path, "a", newline="") as f:
