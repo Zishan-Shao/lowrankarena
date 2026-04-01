@@ -261,7 +261,20 @@ def _iter_texts(dataset_name: str):
             if ex.get("text", "").strip():
                 yield ex["text"]
     elif name in {"ptb", "penn_treebank"}:
-        ds = load_dataset("FALcon6/ptb_text_only", split="test")
+        _ptb_mirrors = [
+            ("shenlong7/ptb_text_only", "penn_treebank"),
+            ("FALcon6/ptb_text_only",   "penn_treebank"),
+        ]
+        ds = None
+        for _repo, _cfg in _ptb_mirrors:
+            try:
+                ds = load_dataset(_repo, _cfg, split="test",
+                                  trust_remote_code=True)
+                break
+            except Exception:
+                continue
+        if ds is None:
+            raise RuntimeError("Could not load PTB from any mirror")
         for ex in ds:
             txt = ex.get("sentence", ex.get("text", ""))
             if txt.strip():
