@@ -34,6 +34,15 @@ import torch
 
 def _load_checkpoint(path: str, map_location: str = "cpu"):
     """Load SVD-LLM .pt with PyTorch>=2.6 compatibility."""
+    # Compatibility: older transformers used SiLUActivation; newer versions removed it.
+    try:
+        import transformers.activations as _act
+        import torch.nn as _nn
+        if not hasattr(_act, "SiLUActivation"):
+            _act.SiLUActivation = _nn.SiLU
+    except Exception:
+        pass
+
     try:
         obj = torch.load(path, map_location=map_location, weights_only=True)
     except Exception:
