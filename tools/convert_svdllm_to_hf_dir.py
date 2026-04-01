@@ -92,7 +92,14 @@ def main():
 
     # ── save config ───────────────────────────────────────────────────────────
     if hasattr(model, "config"):
-        model.config.save_pretrained(args.output)
+        # Some old checkpoints store torch.dtype objects in config, which are
+        # not JSON-serializable.  Convert them to strings before saving.
+        cfg = model.config
+        for attr in list(vars(cfg)):
+            val = getattr(cfg, attr, None)
+            if isinstance(val, torch.dtype):
+                setattr(cfg, attr, str(val))
+        cfg.save_pretrained(args.output)
         print("  config saved")
 
     # ── save tokenizer ────────────────────────────────────────────────────────
