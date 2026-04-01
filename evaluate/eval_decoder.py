@@ -137,25 +137,53 @@ def _transformers_version() -> str:
 # ── loading ───────────────────────────────────────────────────────────────────
 
 def _load_model_pt(pt_path: Path, dtype: torch.dtype, device: str):
-    """Load a model from a .pt file inside an otherwise HF-style directory.
+    """Load a model from a model.pt file inside a checkpoint directory.
 
-    Dobi-SVD saves SVDTransformLayer objects, so we register those classes
-    before calling torch.load to avoid unpickling errors.
+    Reads lowrank_config.json (if present) to determine which framework's
+    classes need to be on sys.path before torch.load.  Falls back to the
+    Dobi-SVD path for directories that have no lowrank_config.json.
     """
-    dobi_root = Path(__file__).resolve().parent.parent / "baselines" / "Dobi-SVD"
-    for p in (str(dobi_root), str(dobi_root / "modules")):
-        if p not in __import__("sys").path:
-            __import__("sys").path.insert(0, p)
-    try:
-        import modules.module as _  # noqa: F401
-    except ImportError:
+    import sys as _sys
+    import json as _json
+
+    root = Path(__file__).resolve().parent.parent
+    ckpt_dir = pt_path.parent
+
+    # Determine framework from lowrank_config.json
+    cfg_file = ckpt_dir / "lowrank_config.json"
+    framework = "dobi"  # default
+    if cfg_file.exists():
         try:
-            import module as _  # noqa: F401
+            meta = _json.loads(cfg_file.read_text())
+            framework = meta.get("framework", "dobi")
+        except Exception:
+            pass
+
+    if framework == "svdllm":
+        svdllm_dir = root / "baselines" / "SVD-LLM"
+        for p in (str(svdllm_dir), str(svdllm_dir / "flashsvd_component")):
+            if p not in _sys.path:
+                _sys.path.insert(0, p)
+
+    elif framework == "asvd":
+        asvd_dir = root / "baselines" / "ASVD"
+        if str(asvd_dir) not in _sys.path:
+            _sys.path.insert(0, str(asvd_dir))
+
+    else:  # dobi (or unknown)
+        dobi_root = root / "baselines" / "Dobi-SVD"
+        for p in (str(dobi_root), str(dobi_root / "modules")):
+            if p not in _sys.path:
+                _sys.path.insert(0, p)
+        try:
+            import modules.module as _  # noqa: F401
         except ImportError:
-            pass  # no SVDTransformLayer needed if not Dobi
+            try:
+                import module as _  # noqa: F401
+            except ImportError:
+                pass
 
     obj = torch.load(pt_path, map_location="cpu", weights_only=False)
-    # obj may be the model directly, or {'model': ..., 'tokenizer': ...}
     model = obj["model"] if isinstance(obj, dict) else obj
     return model.to(dtype=dtype).to(device)
 
