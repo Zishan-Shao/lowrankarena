@@ -77,7 +77,11 @@ def main():
 
     # ── save config ───────────────────────────────────────────────────────────
     if hasattr(model, "config"):
-        model.config.save_pretrained(args.output)
+        cfg = model.config
+        for attr in list(vars(cfg)):
+            if isinstance(getattr(cfg, attr, None), torch.dtype):
+                setattr(cfg, attr, str(getattr(cfg, attr)))
+        cfg.save_pretrained(args.output)
         print("  config saved")
 
     # ── save tokenizer ────────────────────────────────────────────────────────
