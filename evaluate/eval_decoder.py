@@ -237,6 +237,12 @@ def _load_model_pt(pt_path: Path, dtype: torch.dtype, device: str):
 
     obj = torch.load(pt_path, map_location="cpu", weights_only=False)
     model = obj["model"] if isinstance(obj, dict) else obj
+
+    # Fix any nn.SiLU instances that lost 'inplace' after unpickling.
+    for m in model.modules():
+        if isinstance(m, _nn.SiLU) and not hasattr(m, "inplace"):
+            m.inplace = False
+
     return model.to(dtype=dtype).to(device)
 
 
