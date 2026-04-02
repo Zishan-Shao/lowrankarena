@@ -261,20 +261,30 @@ def _iter_texts(dataset_name: str):
             if ex.get("text", "").strip():
                 yield ex["text"]
     elif name in {"ptb", "penn_treebank"}:
+        # Priority 1: local file pre-downloaded by tools/download_ptb.py
+        _local = Path(__file__).resolve().parent.parent / "data" / "ptb" / "ptb_test.txt"
+        if _local.exists():
+            for line in _local.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    yield line.strip()
+            return
+        # Priority 2: HF datasets (works only with datasets<3.0)
         _ptb_mirrors = [
             ("shenlong7/ptb_text_only", "penn_treebank"),
             ("FALcon6/ptb_text_only",   "penn_treebank"),
+            ("ptb_text_only",           "penn_treebank"),
         ]
         ds = None
         for _repo, _cfg in _ptb_mirrors:
             try:
-                ds = load_dataset(_repo, _cfg, split="test",
-                                  trust_remote_code=True)
+                ds = load_dataset(_repo, _cfg, split="test")
                 break
             except Exception:
                 continue
         if ds is None:
-            raise RuntimeError("Could not load PTB from any mirror")
+            print("  [warn] PTB local file not found and HF mirrors unavailable.")
+            print("  [warn] Run: python tools/download_ptb.py")
+            return
         for ex in ds:
             txt = ex.get("sentence", ex.get("text", ""))
             if txt.strip():
