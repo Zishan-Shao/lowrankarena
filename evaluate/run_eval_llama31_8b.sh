@@ -36,16 +36,17 @@ eval_one() {
     echo ""
     echo ">>> $method  keep=$keep"
     python eval_decoder.py \
-        --checkpoint   "$ckpt" \
-        --model_family "$MODEL_FAMILY" \
-        --model_tag    "$MODEL_TAG" \
-        --is_instruct  "$IS_INSTRUCT" \
-        --method       "$method" \
-        --keep_ratio   "$keep" \
-        --dtype        "$DTYPE" \
-        --device       "$DEVICE" \
-        --output_csv   "$CSV" \
-        --batch_size   "$BATCH" \
+        --checkpoint        "$ckpt" \
+        --model_family      "$MODEL_FAMILY" \
+        --model_tag         "$MODEL_TAG" \
+        --is_instruct       "$IS_INSTRUCT" \
+        --method            "$method" \
+        --keep_ratio        "$keep" \
+        --dtype             "$DTYPE" \
+        --device            "$DEVICE" \
+        --output_csv        "$CSV" \
+        --batch_size        "$BATCH" \
+        --lmeval_batch_size 2 \
         $TOKEN_ARG
 }
 
