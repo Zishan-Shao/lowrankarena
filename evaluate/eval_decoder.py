@@ -63,7 +63,7 @@ PRIMARY_METRIC: dict[str, str] = {
 }
 
 DEFAULT_TASKS    = ",".join(ORDERED_TASKS)
-DEFAULT_DATASETS = "wikitext2,c4"
+DEFAULT_DATASETS = "wikitext2,c4,ptb"
 
 METRIC_PROTOCOL = ";".join(f"{t}={PRIMARY_METRIC[t]}" for t in ORDERED_TASKS)
 
