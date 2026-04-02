@@ -61,18 +61,21 @@ fi
 
 for method_dir in "$CKPT_BASE"/*/; do
     [ -d "$method_dir" ] || continue
-    method=$(basename "$method_dir")
+    parent_method=$(basename "$method_dir")
 
     for ckpt_dir in "$method_dir"*/; do
         [ -d "$ckpt_dir" ] || continue
-        ckpt_dir="${ckpt_dir%/}"   # strip trailing slash
+        ckpt_dir="${ckpt_dir%/}"
 
-        # extract keep_ratio from the end of the directory name (e.g. hf_asvd_raw_0.4 → 0.4)
         keep=$(basename "$ckpt_dir" | grep -oE '[0-9]+\.[0-9]+$')
         if [ -z "$keep" ]; then
             echo "  [skip] cannot parse keep_ratio from: $(basename "$ckpt_dir")"
             continue
         fi
+
+        # Extract variant tag: hf_whitening_only_0.5 → whitening_only
+        tag=$(basename "$ckpt_dir" | sed 's/^hf_//' | sed 's/_[0-9]*\.[0-9]*$//')
+        method="${parent_method}_${tag}"
 
         eval_one "$ckpt_dir" "$method" "$keep"
     done

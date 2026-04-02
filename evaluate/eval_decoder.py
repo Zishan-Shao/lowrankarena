@@ -391,7 +391,7 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     else:
         hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size)
 
-    kwargs = dict(model=hflm, tasks=tasks, num_fewshot=0)
+    kwargs = dict(model=hflm, tasks=tasks, num_fewshot=0, log_samples=False)
     if include_path is not None:
         try:
             from lm_eval.tasks import TaskManager
@@ -529,8 +529,10 @@ def main() -> None:
         json_name  = f"{safe_tag}_{args.method}_{args.keep_ratio}_{ts_compact}.json"
         json_path  = json_dir / json_name
         try:
+            # Save only aggregated results (not per-sample logs) to keep size small
             with open(json_path, "w") as jf:
-                json.dump(lmeval_full_out, jf, indent=2, default=str)
+                json.dump(lmeval_full_out.get("results", lmeval_full_out),
+                          jf, indent=2, default=str)
             print(f"  lm-eval JSON → {json_path}")
         except Exception as exc:
             print(f"  [warn] could not save JSON: {exc}")

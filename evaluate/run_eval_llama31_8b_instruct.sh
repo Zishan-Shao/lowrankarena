@@ -61,7 +61,7 @@ fi
 
 for method_dir in "$CKPT_BASE"/*/; do
     [ -d "$method_dir" ] || continue
-    method=$(basename "$method_dir")
+    parent_method=$(basename "$method_dir")
 
     for ckpt_dir in "$method_dir"*/; do
         [ -d "$ckpt_dir" ] || continue
@@ -72,6 +72,12 @@ for method_dir in "$CKPT_BASE"/*/; do
             echo "  [skip] cannot parse keep_ratio from: $(basename "$ckpt_dir")"
             continue
         fi
+
+        # Extract variant tag from dir name (strip hf_ prefix and trailing _keep_ratio)
+        # e.g. hf_whitening_only_0.5 → whitening_only
+        #      hf_v2_0.5            → v2
+        tag=$(basename "$ckpt_dir" | sed 's/^hf_//' | sed 's/_[0-9]*\.[0-9]*$//')
+        method="${parent_method}_${tag}"
 
         eval_one "$ckpt_dir" "$method" "$keep"
     done
