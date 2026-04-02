@@ -63,7 +63,7 @@ PRIMARY_METRIC: dict[str, str] = {
 }
 
 DEFAULT_TASKS    = ",".join(ORDERED_TASKS)
-DEFAULT_DATASETS = "wikitext2,c4,ptb"
+DEFAULT_DATASETS = "wikitext2,c4_stream,ptb"
 
 METRIC_PROTOCOL = ";".join(f"{t}={PRIMARY_METRIC[t]}" for t in ORDERED_TASKS)
 
@@ -287,7 +287,7 @@ def _iter_texts(dataset_name: str):
         for ex in ds:
             if ex.get("text", "").strip():
                 yield ex["text"]
-    elif name == "c4":
+    elif name in {"c4", "c4_stream"}:
         ds = load_dataset("allenai/c4", "en", split="validation", streaming=True)
         for ex in ds:
             if ex.get("text", "").strip():
@@ -592,7 +592,7 @@ def main() -> None:
         "task_set":            args.task_set,
         "metric_protocol":     METRIC_PROTOCOL,
         "wikitext2_ppl":       _fmt(ppl.get("wikitext2", float("nan"))),
-        "c4_ppl":              _fmt(ppl.get("c4",        float("nan"))),
+        "c4_ppl":              _fmt(ppl.get("c4_stream", ppl.get("c4", float("nan")))),
         "ptb_ppl":             _fmt(ppl.get("ptb",       float("nan"))),
         "avg_score":           _fmt(avg_score),
         "checkpoint_path":     args.checkpoint,
