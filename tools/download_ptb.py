@@ -31,7 +31,7 @@ def try_hf(out_path: Path) -> bool:
     for repo, cfg in mirrors:
         try:
             print(f"  trying HF: {repo} / {cfg} ...")
-            ds = load_dataset(repo, cfg, split="test")
+            ds = load_dataset(repo, cfg, split="test", trust_remote_code=True)
             sentences = [ex.get("sentence", ex.get("text", ""))
                          for ex in ds
                          if ex.get("sentence", ex.get("text", "")).strip()]
