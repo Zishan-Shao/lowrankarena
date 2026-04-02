@@ -1,8 +1,9 @@
 task: mathqa_local
 dataset_path: json
 dataset_name: null
-data_files:
-  test: "../data/mathqa/test.jsonl"
+dataset_kwargs:
+  data_files:
+    test: "../data/mathqa/test.jsonl"
 output_type: multiple_choice
 test_split: test
 doc_to_text: "Question: {{Problem}}\nOptions: {{options}}\nAnswer:"
