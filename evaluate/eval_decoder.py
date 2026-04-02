@@ -171,6 +171,32 @@ def _load_model_pt(pt_path: Path, dtype: torch.dtype, device: str):
     """
     import sys as _sys
     import json as _json
+    import torch.nn as _nn
+    import torch.nn.functional as _F
+
+    # Shim 1: SiLUActivation removed in newer transformers — replace with a
+    # compat class that has 'inplace' as a class-level attribute so it survives
+    # unpickling with an empty __dict__.
+    try:
+        import transformers.activations as _act
+        if not hasattr(_act, "SiLUActivation"):
+            class _SiLUActivationCompat(_nn.Module):
+                inplace = False
+                def forward(self, x):
+                    return _F.silu(x)
+            _act.SiLUActivation = _SiLUActivationCompat
+    except Exception:
+        pass
+
+    # Shim 2: ASVD SVDLinear stores plain nn.SiLU objects; older checkpoints
+    # may lose the 'inplace' instance attr after unpickling.  Patch forward()
+    # to use a getattr fallback so it never raises AttributeError.
+    try:
+        def _silu_forward_safe(self, x):
+            return _F.silu(x, inplace=getattr(self, "inplace", False))
+        _nn.SiLU.forward = _silu_forward_safe
+    except Exception:
+        pass
 
     root = Path(__file__).resolve().parent.parent
     ckpt_dir = pt_path.parent
