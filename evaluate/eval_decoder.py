@@ -354,16 +354,31 @@ def eval_ppl(model, tokenizer, datasets: list[str],
 
 # ── lm-eval ───────────────────────────────────────────────────────────────────
 
+_TASKS_DIR = Path(__file__).resolve().parent / "tasks"
+_MATHQA_LOCAL = Path(__file__).resolve().parent.parent / "data" / "mathqa" / "test.jsonl"
+
+
 def run_lmeval(model, tokenizer, tasks: list[str],
                batch_size: int | str,
                checkpoint: str | None = None,
                dtype_str: str = "bfloat16",
                device: str = "cuda:0") -> tuple[dict, str]:
-    """Returns (raw_task_results, actual_batch_size_str).
+    """Returns (raw_task_results, actual_batch_size_str, full_out).
 
     raw_task_results: the lm-eval out["results"] dict keyed by task name,
     each value is the full metric dict (acc,none / acc_norm,none / *,stderr …).
+
+    If local data/mathqa/test.jsonl exists, 'mathqa' is swapped to the
+    local task 'mathqa_local' (bypasses datasets script restriction).
     """
+    # Replace 'mathqa' with local task if available
+    use_mathqa_local = "mathqa" in tasks and _MATHQA_LOCAL.exists()
+    if use_mathqa_local:
+        tasks = ["mathqa_local" if t == "mathqa" else t for t in tasks]
+        print(f"  [mathqa] using local file: {_MATHQA_LOCAL}")
+
+    include_path = str(_TASKS_DIR) if use_mathqa_local else None
+
     print(f"\n--- lm-eval zero-shot: {tasks} ---", flush=True)
 
     from lm_eval.models.huggingface import HFLM
@@ -376,15 +391,23 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     else:
         hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size)
 
-    out = lm_evaluator.simple_evaluate(model=hflm, tasks=tasks, num_fewshot=0)
+    kwargs = dict(model=hflm, tasks=tasks, num_fewshot=0)
+    if include_path is not None:
+        kwargs["include_path"] = include_path
+    out = lm_evaluator.simple_evaluate(**kwargs)
     raw = out["results"]
+
+    # Remap mathqa_local → mathqa in results so callers see consistent key
+    if use_mathqa_local and "mathqa_local" in raw:
+        raw["mathqa"] = raw.pop("mathqa_local")
 
     actual_bs = str(getattr(hflm, "_batch_size",
                     getattr(hflm, "batch_size", batch_size)))
     print(f"  lm-eval batch_size: {actual_bs}")
 
-    # Print summary
-    for task in tasks:
+    # Print summary (use original task names)
+    orig_tasks = ["mathqa" if t == "mathqa_local" else t for t in tasks]
+    for task in orig_tasks:
         if task not in raw:
             print(f"  [warn] '{task}' not in lm_eval output")
             continue
