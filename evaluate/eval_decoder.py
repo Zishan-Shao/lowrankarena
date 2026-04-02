@@ -393,7 +393,11 @@ def run_lmeval(model, tokenizer, tasks: list[str],
 
     kwargs = dict(model=hflm, tasks=tasks, num_fewshot=0)
     if include_path is not None:
-        kwargs["include_path"] = include_path
+        try:
+            from lm_eval.tasks import TaskManager
+            kwargs["task_manager"] = TaskManager(include_path=include_path)
+        except Exception:
+            kwargs["include_path"] = include_path
     out = lm_evaluator.simple_evaluate(**kwargs)
     raw = out["results"]
 
