@@ -60,13 +60,23 @@ TypeError: Object of type dtype is not JSON serializable
 部分老 checkpoint 的 `model.config` 里有 `torch.dtype` 类型的属性（如 `torch_dtype`），`json.dumps` 无法序列化。
 
 **修复**
-`convert_svdllm_to_hf_dir.py` 和 `convert_asvd_to_hf_dir.py` 保存前转成字符串：
+`convert_svdllm_to_hf_dir.py`：用递归 `_sanitize` 处理 `cfg.to_dict()` 的输出，直接写 `config.json`，绕开 `save_pretrained`。
+`vars(cfg)` 循环只处理实例属性，但 `to_dict()` 可能从其他来源（如 `torch_dtype` property）重新生成 `torch.dtype` 字段，递归方式才能全覆盖：
 ```python
-for attr in list(vars(cfg)):
-    if isinstance(getattr(cfg, attr, None), torch.dtype):
-        setattr(cfg, attr, str(getattr(cfg, attr)))
-cfg.save_pretrained(args.output)
+def _sanitize(obj):
+    if isinstance(obj, torch.dtype):
+        return str(obj)
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return type(obj)(_sanitize(v) for v in obj)
+    return obj
+
+cfg_dict = _sanitize(cfg.to_dict())
+with open(os.path.join(args.output, "config.json"), "w") as f:
+    json.dump(cfg_dict, f, indent=2, sort_keys=True)
 ```
+注意：instruct 版 v2 checkpoint 未复现此 bug，因其 config 在序列化时 `torch_dtype` 已是字符串。
 
 ---
 

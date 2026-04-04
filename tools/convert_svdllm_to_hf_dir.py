@@ -92,14 +92,26 @@ def main():
 
     # ── save config ───────────────────────────────────────────────────────────
     if hasattr(model, "config"):
-        # Some old checkpoints store torch.dtype objects in config, which are
-        # not JSON-serializable.  Convert them to strings before saving.
         cfg = model.config
-        for attr in list(vars(cfg)):
-            val = getattr(cfg, attr, None)
-            if isinstance(val, torch.dtype):
-                setattr(cfg, attr, str(val))
-        cfg.save_pretrained(args.output)
+
+        def _sanitize(obj):
+            """Recursively convert non-JSON-serializable types (e.g. torch.dtype)."""
+            if isinstance(obj, torch.dtype):
+                return str(obj)
+            if isinstance(obj, dict):
+                return {k: _sanitize(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return type(obj)(_sanitize(v) for v in obj)
+            return obj
+
+        try:
+            cfg_dict = _sanitize(cfg.to_dict())
+        except Exception:
+            cfg_dict = _sanitize(vars(cfg).copy())
+
+        import json as _json
+        with open(os.path.join(args.output, "config.json"), "w") as _f:
+            _json.dump(cfg_dict, _f, indent=2, sort_keys=True)
         print("  config saved")
 
     # ── save tokenizer ────────────────────────────────────────────────────────
