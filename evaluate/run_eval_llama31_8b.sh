@@ -46,7 +46,7 @@ eval_one() {
         --device            "$DEVICE" \
         --output_csv        "$CSV" \
         --batch_size        "$BATCH" \
-        --lmeval_batch_size 2 \
+        --lmeval_batch_size 8 \
         $TOKEN_ARG
 }
 
