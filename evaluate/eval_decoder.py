@@ -340,7 +340,7 @@ def eval_ppl(model, tokenizer, datasets: list[str],
                 ids.extend(tokenizer.encode(txt, add_special_tokens=False))
                 if eos is not None:
                     ids.append(int(eos))
-                if ds_name.lower() in {"c4", "c4_stream"} and len(ids) > 2_000_000:
+                if ds_name.lower() in {"c4", "c4_stream"} and len(ids) > 5_000_000:
                     break
 
             n_seq = (len(ids) - 1) // seq_len
