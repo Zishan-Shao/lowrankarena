@@ -260,7 +260,6 @@ def _resolve_checkpoint(checkpoint: str) -> str:
 
 def load_model(checkpoint: str, dtype: torch.dtype, device: str,
                hf_token: str | None, tokenizer_path: str | None = None):
-    checkpoint = _resolve_checkpoint(checkpoint)
     ckpt_dir = Path(checkpoint)
     model_pt = ckpt_dir / "model.pt"
 
@@ -535,6 +534,7 @@ def main() -> None:
              "fp32": torch.float32}[args.dtype]
 
     timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    args.checkpoint = _resolve_checkpoint(args.checkpoint)
     ckpt_size_gb = _dir_size_gb(args.checkpoint)
 
     # ── load ──────────────────────────────────────────────────────────────────
