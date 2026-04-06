@@ -280,14 +280,26 @@ def load_model(checkpoint: str, dtype: torch.dtype, device: str,
     tokenizer = AutoTokenizer.from_pretrained(
         checkpoint, trust_remote_code=True, **extra
     )
-    model = AutoModelForCausalLM.from_pretrained(
-        checkpoint,
-        dtype=dtype,
-        device_map=device,
-        trust_remote_code=True,
-        low_cpu_mem_usage=True,
-        **extra,
-    )
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            checkpoint,
+            dtype=dtype,
+            device_map=device,
+            trust_remote_code=True,
+            low_cpu_mem_usage=True,
+            **extra,
+        )
+    except TypeError:
+        # Some custom model classes (e.g. DobiSVDLlamaForCausalLM) don't accept
+        # 'dtype' in __init__; load without it and cast afterwards.
+        model = AutoModelForCausalLM.from_pretrained(
+            checkpoint,
+            device_map=device,
+            trust_remote_code=True,
+            low_cpu_mem_usage=True,
+            **extra,
+        )
+        model = model.to(dtype=dtype)
     return model, tokenizer
 
 
