@@ -441,17 +441,7 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     from lm_eval.models.huggingface import HFLM
     from lm_eval import evaluator as lm_evaluator
 
-    use_path = checkpoint is not None and not (Path(checkpoint) / "model.pt").exists()
-    if use_path:
-        try:
-            hflm = HFLM(pretrained=checkpoint, tokenizer=tokenizer,
-                        dtype=dtype_str, batch_size=batch_size, device=device)
-        except TypeError:
-            # Older lm-eval versions don't accept tokenizer= alongside a path string
-            hflm = HFLM(pretrained=checkpoint, dtype=dtype_str,
-                        batch_size=batch_size, device=device)
-    else:
-        hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size)
+    hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size)
 
     kwargs = dict(model=hflm, tasks=tasks, num_fewshot=0, log_samples=False)
     if include_path is not None:
