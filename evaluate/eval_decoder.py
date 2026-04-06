@@ -246,8 +246,21 @@ def _load_model_pt(pt_path: Path, dtype: torch.dtype, device: str):
     return model.to(dtype=dtype).to(device)
 
 
+def _resolve_checkpoint(checkpoint: str) -> str:
+    """If the checkpoint dir lacks config.json, descend to find it (handles
+    nested save paths like .../outer/inner/inner where inner has the files)."""
+    p = Path(checkpoint)
+    if (p / "config.json").exists() or (p / "model.pt").exists():
+        return checkpoint
+    # BFS one level deep
+    for child in sorted(p.rglob("config.json")):
+        return str(child.parent)
+    return checkpoint
+
+
 def load_model(checkpoint: str, dtype: torch.dtype, device: str,
-               hf_token: str | None):
+               hf_token: str | None, tokenizer_path: str | None = None):
+    checkpoint = _resolve_checkpoint(checkpoint)
     ckpt_dir = Path(checkpoint)
     model_pt = ckpt_dir / "model.pt"
 
@@ -255,8 +268,9 @@ def load_model(checkpoint: str, dtype: torch.dtype, device: str,
     if model_pt.is_file():
         from transformers import AutoTokenizer
         extra = {"token": hf_token} if hf_token else {}
+        tok_src = tokenizer_path or checkpoint
         tokenizer = AutoTokenizer.from_pretrained(
-            checkpoint, trust_remote_code=True, **extra
+            tok_src, trust_remote_code=True, **extra
         )
         model = _load_model_pt(model_pt, dtype, device)
         return model, tokenizer
@@ -482,6 +496,9 @@ def main() -> None:
                         help="Tag for the task set used (for result versioning).")
     parser.add_argument("--datasets",      default=DEFAULT_DATASETS)
     parser.add_argument("--hf_token",      default="")
+    parser.add_argument("--tokenizer",     default="",
+                        help="Tokenizer path/id override (for model.pt checkpoints "
+                             "whose directory lacks tokenizer files).")
     parser.add_argument("--no_ppl",        action="store_true")
     parser.add_argument("--no_lmeval",     action="store_true")
     parser.add_argument("--compression_success", default="yes",
@@ -509,7 +526,8 @@ def main() -> None:
     print(f"checkpoint: {args.checkpoint}")
     t0 = time.time()
     model, tokenizer = load_model(args.checkpoint, dtype, args.device,
-                                  hf_token=args.hf_token or None)
+                                  hf_token=args.hf_token or None,
+                                  tokenizer_path=args.tokenizer or None)
     model.eval()
     print(f"loaded in {time.time() - t0:.1f}s")
 

@@ -47,6 +47,7 @@ eval_one() {
         --output_csv        "$CSV" \
         --batch_size        "$BATCH" \
         --lmeval_batch_size 2 \
+        --tokenizer         "$BASE_MODEL" \
         $TOKEN_ARG
 }
 
