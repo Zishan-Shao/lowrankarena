@@ -442,11 +442,21 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     """
     # Replace 'mathqa' with local task if available
     use_mathqa_local = "mathqa" in tasks and _MATHQA_LOCAL.exists()
+    _tmp_tasks_dir = None
     if use_mathqa_local:
         tasks = ["mathqa_local" if t == "mathqa" else t for t in tasks]
         print(f"  [mathqa] using local file: {_MATHQA_LOCAL}")
+        # Write a temp YAML with the absolute path so lm-eval can resolve it
+        import tempfile, shutil
+        _tmp_tasks_dir = Path(tempfile.mkdtemp())
+        _orig_yaml = (_TASKS_DIR / "mathqa_local.yaml").read_text()
+        _abs_yaml = _orig_yaml.replace(
+            '"../data/mathqa/test.jsonl"',
+            f'"{_MATHQA_LOCAL.as_posix()}"'
+        )
+        (_tmp_tasks_dir / "mathqa_local.yaml").write_text(_abs_yaml)
 
-    include_path = str(_TASKS_DIR) if use_mathqa_local else None
+    include_path = str(_tmp_tasks_dir) if use_mathqa_local else None
 
     print(f"\n--- lm-eval zero-shot: {tasks} ---", flush=True)
 
@@ -464,6 +474,10 @@ def run_lmeval(model, tokenizer, tasks: list[str],
             kwargs["include_path"] = include_path
     out = lm_evaluator.simple_evaluate(**kwargs)
     raw = out["results"]
+
+    # Cleanup temp tasks dir
+    if _tmp_tasks_dir is not None:
+        shutil.rmtree(_tmp_tasks_dir, ignore_errors=True)
 
     # Remap mathqa_local → mathqa in results so callers see consistent key
     if use_mathqa_local and "mathqa_local" in raw:
