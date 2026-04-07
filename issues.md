@@ -1,6 +1,6 @@
 # Issues
 
-## [OPEN] whitening_then_update PPL=29 是 unigram 假象
+## [CLOSED] whitening_then_update PPL=29 是 unigram 假象
 
 **发现时间**: 2026-04-07  
 **影响**: SVDLLMv1 whitening_then_update 系列的 zero-shot 数据不可信
@@ -27,18 +27,20 @@ PPL=29 + 所有 zero-shot ≈ chance level，在真实 LM 中不可能同时成�
 BoolQ 恒选 "No" → acc = False 标签占比 = **0.378287**  
 MathQA 恒选 "a" → acc = "a" 正确频率 = **0.205695**
 
-### 待验证
+### 已验证 (2026-04-07)
 
-服务器可用后运行：
+运行 `check_lmeval_compat.py` 结果：
 
-```bash
-python evaluate/check_lmeval_compat.py \
-    --checkpoint ../hf_ckpts/LowRankArena/llama31_8b/SVDLLMv1/hf_whitening_then_update_0.8 \
-    --tokenizer  meta-llama/Llama-3.1-8B \
-    --device cuda:0
+```
+use_cache=False (PPL path): boolq_deg=True  mathqa_deg=True
+use_cache=True  (lm-eval default): boolq_deg=True  mathqa_deg=True
+HFLM (actual lm-eval):  boolq_deg=True  mathqa_deg=True
 ```
 
-预期：`use_cache=False`（PPL 路径）也显示 DEGENERATE，确认 PPL=29 是假象。
+三路全部 DEGENERATE，确认：
+- 不是 KV-cache bug（两种 use_cache 结果一致）
+- 不是 lm-eval 接口问题（HFLM 路径相同）
+- **根因确定**：模型在 whitening 步骤已坍塌，PPL=29 是 unigram entropy 假象
 
 ### 影响范围
 

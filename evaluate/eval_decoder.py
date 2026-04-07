@@ -260,14 +260,19 @@ def _resolve_checkpoint(checkpoint: str) -> str:
 
 def load_model(checkpoint: str, dtype: torch.dtype, device: str,
                hf_token: str | None, tokenizer_path: str | None = None):
-    ckpt_dir = Path(checkpoint)
-    model_pt = ckpt_dir / "model.pt"
+    ckpt_path = Path(checkpoint)
+
+    # checkpoint is a .pt file directly (e.g. .../model_name.pt)
+    if ckpt_path.is_file() and ckpt_path.suffix == ".pt":
+        model_pt = ckpt_path
+    else:
+        model_pt = ckpt_path / "model.pt"
 
     # Directory has model.pt instead of standard safetensors/bin weights
     if model_pt.is_file():
         from transformers import AutoTokenizer
         extra = {"token": hf_token} if hf_token else {}
-        tok_src = tokenizer_path or checkpoint
+        tok_src = tokenizer_path or str(ckpt_path.parent)
         tokenizer = AutoTokenizer.from_pretrained(
             tok_src, trust_remote_code=True, **extra
         )
