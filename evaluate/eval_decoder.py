@@ -604,6 +604,25 @@ def main() -> None:
             valid.append(v)
     avg_score = sum(valid) / len(valid) if valid else float("nan")
 
+    # ── degenerate zero-shot detection ────────────────────────────────────────
+    # A degenerate model outputs constant logits regardless of input; this
+    # collapses BoolQ accuracy to the "No" label fraction (~0.3783) and MathQA
+    # accuracy to the "a" answer fraction (~0.2057).  Both together = degenerate.
+    _BOOLQ_DEGENERATE = 0.378287
+    _MATHQA_DEGENERATE = 0.205695
+    _boolq_val  = _get_metric(lmeval_raw.get("boolq",  {}), "acc")
+    _mathqa_val = _get_metric(lmeval_raw.get("mathqa", {}), "acc")
+    _is_degenerate = (
+        not math.isnan(_boolq_val)
+        and not math.isnan(_mathqa_val)
+        and abs(_boolq_val  - _BOOLQ_DEGENERATE)  < 1e-5
+        and abs(_mathqa_val - _MATHQA_DEGENERATE) < 1e-5
+    )
+    if _is_degenerate:
+        print("  [warn] DEGENERATE zero-shot: model outputs constant logits "
+              "(boolq=0.3783, mathqa=0.2057 = label-distribution baseline)")
+        args.notes = ("DEGENERATE_ZEROSHOT; " + args.notes).rstrip("; ")
+
     # ── build CSV row ─────────────────────────────────────────────────────────
     row: dict = {
         "model_family":        args.model_family,
