@@ -48,16 +48,16 @@ _MATHQA_CORRECT = [1, 2, 2]          # b=1, c=2, c=2
 
 @torch.no_grad()
 def _loglikelihood_direct(model, tokenizer, context: str, continuations: list[str],
-                          device: str) -> list[float]:
+                          device: str, use_cache: bool = False) -> list[float]:
     """Compute log P(continuation | context) for each continuation via direct
-    forward pass (same teacher-forcing as PPL eval)."""
+    forward pass.  use_cache=False mirrors PPL eval; True mirrors lm-eval default."""
     scores = []
     ctx_ids = tokenizer.encode(context, add_special_tokens=True)
     for cont in continuations:
         cont_ids = tokenizer.encode(cont, add_special_tokens=False)
         full_ids = ctx_ids + cont_ids
         inp = torch.tensor([full_ids], dtype=torch.long, device=device)
-        out = model(input_ids=inp, use_cache=False)
+        out = model(input_ids=inp, use_cache=use_cache)
         logits = out.logits[0]  # [T, V]
         log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
         # sum log probs over the continuation tokens
@@ -87,13 +87,18 @@ def _loglikelihood_hflm(model, tokenizer, context: str, continuations: list[str]
     return [r[0] for r in results]   # r = (log_prob, is_greedy)
 
 
-def _evaluate_samples(model, tokenizer, device, use_hflm: bool):
+def _evaluate_samples(model, tokenizer, device, use_hflm: bool,
+                      use_cache_override: bool = False):
     print(f"\n{'─'*60}")
-    mode = "HFLM (lm-eval)" if use_hflm else "Direct forward"
+    mode = "HFLM (lm-eval)" if use_hflm else f"Direct forward (use_cache={use_cache_override})"
     print(f"Mode: {mode}")
     print(f"{'─'*60}")
 
-    fn = _loglikelihood_hflm if use_hflm else _loglikelihood_direct
+    if use_hflm:
+        fn = _loglikelihood_hflm
+    else:
+        fn = lambda model, tokenizer, ctx, conts, dev: _loglikelihood_direct(
+            model, tokenizer, ctx, conts, dev, use_cache=use_cache_override)
 
     # ── BoolQ ─────────────────────────────────────────────────────────────────
     print("\n[BoolQ]  correct=yes(0) when true, no(1) when false")
@@ -159,9 +164,18 @@ def main():
     model.eval()
     print(f"Loaded: {type(model).__name__}")
 
-    # ── Direct forward (same as PPL eval) ────────────────────────────────────
+    # ── Direct forward, use_cache=False (same as PPL eval) ───────────────────
+    print("\n[use_cache=False — same path as PPL eval]")
     deg_boolq_d, deg_mathqa_d = _evaluate_samples(model, tokenizer,
                                                    args.device, use_hflm=False)
+
+    # ── Direct forward, use_cache=True (model default, same as lm-eval) ──────
+    print("\n[use_cache=True — model default, mirrors lm-eval calling convention]")
+    deg_boolq_c, deg_mathqa_c = _evaluate_samples(model, tokenizer,
+                                                   args.device, use_hflm=False,
+                                                   use_cache_override=True)
+    if (deg_boolq_d != deg_boolq_c) or (deg_mathqa_d != deg_mathqa_c):
+        print("\n  !! use_cache=True changes results → KV-cache path is broken in this checkpoint")
 
     # ── lm-eval HFLM ─────────────────────────────────────────────────────────
     if not args.no_hflm:
@@ -174,17 +188,14 @@ def main():
 
         # ── compare ──────────────────────────────────────────────────────────
         print(f"\n{'─'*60}")
-        print("Comparison: Direct vs HFLM")
+        print("Summary")
+        print(f"  use_cache=False (PPL path): boolq_deg={deg_boolq_d}  mathqa_deg={deg_mathqa_d}")
+        print(f"  use_cache=True  (lm-eval default): boolq_deg={deg_boolq_c}  mathqa_deg={deg_mathqa_c}")
         if deg_boolq_h is not None:
-            boolq_match  = deg_boolq_d  == deg_boolq_h
-            mathqa_match = deg_mathqa_d == deg_mathqa_h
-            print(f"  BoolQ  degenerate: direct={deg_boolq_d}  hflm={deg_boolq_h}"
-                  f"  match={boolq_match}")
-            print(f"  MathQA degenerate: direct={deg_mathqa_d}  hflm={deg_mathqa_h}"
-                  f"  match={mathqa_match}")
-            if not boolq_match or not mathqa_match:
-                print("  !! MISMATCH: lm-eval HFLM gives different results than "
-                      "direct forward → lm-eval compat bug in this checkpoint")
+            print(f"  HFLM (actual lm-eval):  boolq_deg={deg_boolq_h}  mathqa_deg={deg_mathqa_h}")
+            if (deg_boolq_d != deg_boolq_h) or (deg_mathqa_d != deg_mathqa_h):
+                print("  !! MISMATCH: lm-eval gives different results than direct(use_cache=False)"
+                      " → checkpoint has a KV-cache or calling-convention bug")
 
     print()
 
