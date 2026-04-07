@@ -210,6 +210,13 @@ def _load_model_pt(pt_path: Path, dtype: torch.dtype, device: str):
             framework = meta.get("framework", "dobi")
         except Exception:
             pass
+    # Fallback: infer from filename (e.g. standalone .pt files without config)
+    if framework == "dobi":
+        pt_name = pt_path.stem.lower()
+        if any(k in pt_name for k in ("whitening", "svdllm", "svd_llm")):
+            framework = "svdllm"
+        elif "asvd" in pt_name:
+            framework = "asvd"
 
     if framework == "svdllm":
         svdllm_dir = root / "baselines" / "SVD-LLM"
