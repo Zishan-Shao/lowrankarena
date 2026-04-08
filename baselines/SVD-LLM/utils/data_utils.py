@@ -40,8 +40,8 @@ def _iter_texts(dataset_name: str, split: str):
             yield _first_text_field(ex)
         return
     if name in {"c4", "c4_en"}:
-        # Use streaming to avoid downloading huge shards when only a few samples are needed.
-        ds = load_dataset("c4", "en", split=split, streaming=True)
+        # datasets>=3.0 dropped script-based loaders; use the parquet mirror instead.
+        ds = load_dataset("allenai/c4", "en", split=split, streaming=True)
         for ex in ds:
             yield _first_text_field(ex)
         return
