@@ -43,7 +43,7 @@ def process_file(path: Path, dry_run: bool = False) -> None:
     size_before = path.stat().st_size
     print(f"\n[{path.name}]  {size_before / 1e9:.3f} GB", end="", flush=True)
 
-    obj = torch.load(path, map_location="cpu")
+    obj = torch.load(path, map_location="cpu", weights_only=False)
 
     model = obj.get('model') if isinstance(obj, dict) else None
     if model is None:
