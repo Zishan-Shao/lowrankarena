@@ -67,6 +67,63 @@ CSV `baselines/SVD-LLM/checkpoints/svdllm/llama31_8b/results.csv` 中：
 
 ---
 
+## [CLOSED] HAP-E dense baseline 掉点来源分析
+
+**发现时间**: 2026-04-08  
+**影响**: 明确了我们的 zero-shot 评估协议与 HAP-E 的差异来源，不影响压缩质量结论
+
+### 现象
+
+我们的 dense baseline（Llama-3.1-8B）与 HAP-E 论文数字存在差距：
+
+| Task | 我们 (zero-shot) | HAP-E | Gap |
+|---|---|---|---|
+| HellaSwag acc_norm | 79.0% | 81.7% | −2.7% |
+| ARC-c acc_norm | 53.7% | 58.2% | −4.5% |
+
+### 排查过程（2026-04-08/09）
+
+**假说一：add_bos_token 缺失**
+
+`eval_decoder.py` 把 model/tokenizer 对象传给 HFLM，HFLM 无法从 tokenizer_config.json 自动检测 `add_bos_token`，默认 False。而 Llama tokenizer 应为 True。
+
+验证：patch `eval_decoder.py`，显式读取 `tokenizer.add_bos_token` 传给 HFLM。
+
+结果：ARC-c 仍为 53.67%（=patch 前）。**假说一证伪。**
+
+根因：Llama-3.1 用 tiktoken 包装的 `PreTrainedTokenizerFast`，`add_bos_token` 不是其实例属性，`getattr` 返回 False，patch 形同虚设。
+
+**假说二：num_fewshot 不一致**
+
+验证：对 dense baseline 分别跑 25-shot ARC-c 和 10-shot HellaSwag。
+
+结果：
+
+| Task | 我们 zero-shot | 我们 few-shot | HAP-E |
+|---|---|---|---|
+| ARC-c acc_norm | 53.67% | **58.11%** ± 1.44% | 58.2% |
+| HellaSwag acc_norm | 79.0% | **82.33%** ± 0.38% | 81.7% |
+
+few-shot 结果与 HAP-E 在误差范围内完全吻合。**假说二成立，gap 100% 由 num_fewshot 解释。**
+
+### 根因结论
+
+HAP-E 虽在论文中写 "zero-shot benchmarks"，实际对 HellaSwag 用 10-shot、ARC-c 用 25-shot，与 Open LLM Leaderboard v1 标准配置一致。最可能的原因是使用了 lm-eval v0.3.x（task YAML 内置默认 few-shot），而非显式指定。
+
+HAP-E 的 "zero-shot" 含义是"压缩后无 fine-tuning"，不是 lm-eval 的 `num_fewshot=0`。
+
+### 对 paper 的影响
+
+- 我们的 zero-shot 评估协议（num_fewshot=0）内部完全一致，无需修改
+- 不能直接引用 HAP-E 的 dense 数字与我们的压缩结果放同一列比较
+- 如需对比，只比 relative degradation（相对各自 dense baseline 的下降），或加 footnote 说明协议差异
+
+### 备注
+
+`eval_decoder.py` 加了 `--add_bos_token` 手动开关备用。CSV 中原始 baseline（ARC-c 54.86%）与官方 lm-eval CLI 结果一致，无系统性偏差。
+
+---
+
 ## [OPEN] SVDLLMv2 zero-shot 大面积退化
 
 **发现时间**: 2026-04-07  

@@ -568,8 +568,9 @@ class LlamaRotaryEmbedding(torch.nn.Module):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
-        # This `if` block is unlikely to be run after we build sin/cos in `__init__`. Keep the logic here just in case.
-        if seq_len > self.max_seq_len_cached:
+        # cos_cached/sin_cached are non-persistent (persistent=False) and may be absent after
+        # loading from a checkpoint that was saved without them.  Recompute lazily when needed.
+        if self.cos_cached is None or seq_len > self.max_seq_len_cached:
             self.max_seq_len_cached = seq_len
             t = torch.arange(self.max_seq_len_cached, device=x.device, dtype=self.inv_freq.dtype)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq)

@@ -750,6 +750,20 @@ def whitening(
         del layer
         torch.cuda.empty_cache()
 
+    # Drop cos_cached/sin_cached from every rotary_emb before saving.
+    # These are non-persistent caches (persistent=False) that can be recomputed on the fly
+    # from inv_freq at inference time.  Keeping them in the checkpoint wastes ~2 GB because
+    # LlamaRotaryEmbedding.__init__ pre-builds them in fp32 for Llama-3.1-8B
+    # (131072 positions × 128 dims × fp32 × 2 buffers × 32 layers ≈ 4 GB).
+    # forward() in flashsvd_component/svd_llama.py handles None cos/sin via lazy init.
+    for _m in model.modules():
+        if hasattr(_m, 'rotary_emb'):
+            _re = _m.rotary_emb
+            if 'cos_cached' in _re._buffers:
+                _re._buffers['cos_cached'] = None
+            if 'sin_cached' in _re._buffers:
+                _re._buffers['sin_cached'] = None
+
 
 @torch.no_grad()
 def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, dev, direct_update=False, update_us=False):
