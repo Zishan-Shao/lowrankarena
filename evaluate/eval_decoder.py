@@ -431,7 +431,8 @@ def run_lmeval(model, tokenizer, tasks: list[str],
                batch_size: int | str,
                checkpoint: str | None = None,
                dtype_str: str = "bfloat16",
-               device: str = "cuda:0") -> tuple[dict, str]:
+               device: str = "cuda:0",
+               add_bos_token: bool | None = None) -> tuple[dict, str]:
     """Returns (raw_task_results, actual_batch_size_str, full_out).
 
     raw_task_results: the lm-eval out["results"] dict keyed by task name,
@@ -463,12 +464,20 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     from lm_eval.models.huggingface import HFLM
     from lm_eval import evaluator as lm_evaluator
 
-    # When pretrained= is a model object, HFLM skips tokenizer-config detection
-    # and defaults add_bos_token=False.  Mirror what HFLM does when loading from
-    # a checkpoint path: read add_bos_token directly from the tokenizer object.
-    _add_bos = getattr(tokenizer, "add_bos_token", False)
+    # When pretrained= is a model object, HFLM cannot auto-detect add_bos_token
+    # from tokenizer_config.json (only available when loading from a string path).
+    # Llama-3.x fast tokenizer does NOT expose add_bos_token as an instance attr,
+    # so getattr fallback returns False — we must read from init_kwargs or config.
+    if add_bos_token is None:
+        # Try init_kwargs (populated by AutoTokenizer.from_pretrained)
+        _tok_cfg = getattr(tokenizer, "init_kwargs", {}) or {}
+        add_bos_token = bool(_tok_cfg.get(
+            "add_bos_token",
+            getattr(tokenizer, "add_bos_token", False),
+        ))
     hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size,
-                add_bos_token=_add_bos)
+                add_bos_token=add_bos_token)
+    print(f"  [lm-eval] add_bos_token={add_bos_token}")
 
     kwargs = dict(model=hflm, tasks=tasks, num_fewshot=0, log_samples=False)
     if include_path is not None:
@@ -538,6 +547,11 @@ def main() -> None:
                              "whose directory lacks tokenizer files).")
     parser.add_argument("--no_ppl",        action="store_true")
     parser.add_argument("--no_lmeval",     action="store_true")
+    parser.add_argument("--add_bos_token", default=None,
+                        choices=["true", "false"],
+                        help="Override add_bos_token for HFLM. "
+                             "Auto-detected from tokenizer init_kwargs if not set. "
+                             "Use 'true' for Llama family models.")
     parser.add_argument("--compression_success", default="yes",
                         choices=["yes", "no"])
     parser.add_argument("--notes",         default="")
@@ -595,12 +609,18 @@ def main() -> None:
     if not args.no_lmeval:
         tasks = [t.strip() for t in args.tasks.split(",") if t.strip()]
         try:
+            _add_bos_override = (
+                True  if args.add_bos_token == "true"  else
+                False if args.add_bos_token == "false" else
+                None
+            )
             lmeval_raw, actual_lmeval_bs, lmeval_full_out = run_lmeval(
                 model, tokenizer, tasks, args.lmeval_batch_size,
                 checkpoint=args.checkpoint,
                 dtype_str={"bf16": "bfloat16", "fp16": "float16",
                            "fp32": "float32"}[args.dtype],
-                device=args.device)
+                device=args.device,
+                add_bos_token=_add_bos_override)
         except Exception as exc:
             print(f"[error] lm-eval failed: {exc}")
             lmeval_ok = False
