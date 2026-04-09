@@ -463,7 +463,12 @@ def run_lmeval(model, tokenizer, tasks: list[str],
     from lm_eval.models.huggingface import HFLM
     from lm_eval import evaluator as lm_evaluator
 
-    hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size)
+    # When pretrained= is a model object, HFLM skips tokenizer-config detection
+    # and defaults add_bos_token=False.  Mirror what HFLM does when loading from
+    # a checkpoint path: read add_bos_token directly from the tokenizer object.
+    _add_bos = getattr(tokenizer, "add_bos_token", False)
+    hflm = HFLM(pretrained=model, tokenizer=tokenizer, batch_size=batch_size,
+                add_bos_token=_add_bos)
 
     kwargs = dict(model=hflm, tasks=tasks, num_fewshot=0, log_samples=False)
     if include_path is not None:

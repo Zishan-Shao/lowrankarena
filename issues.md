@@ -29,7 +29,7 @@ MathQA 恒选 "a" → acc = "a" 正确频率 = **0.205695**
 
 ### 已验证 (2026-04-07)
 
-运行 `check_lmeval_compat.py` 结果：
+**验证一：评估路径排查（check_lmeval_compat.py）**
 
 ```
 use_cache=False (PPL path): boolq_deg=True  mathqa_deg=True
@@ -37,10 +37,23 @@ use_cache=True  (lm-eval default): boolq_deg=True  mathqa_deg=True
 HFLM (actual lm-eval):  boolq_deg=True  mathqa_deg=True
 ```
 
-三路全部 DEGENERATE，确认：
-- 不是 KV-cache bug（两种 use_cache 结果一致）
-- 不是 lm-eval 接口问题（HFLM 路径相同）
-- **根因确定**：模型在 whitening 步骤已坍塌，PPL=29 是 unigram entropy 假象
+三路全部 DEGENERATE，排除：
+- KV-cache bug（两种 use_cache 结果一致）
+- lm-eval 接口问题（HFLM 路径相同）
+
+**验证二：HF 转换排查（直接评估原始 .pt）**
+
+直接加载压缩后、HF 转换前的 `.pt` checkpoint：
+
+```
+checkpoint: .../meta_llama_Llama_3.1_8B_whitening_then_update_0.8.pt
+wiki2=29.23  c4=115.71  boolq=0.3783  hellaswag=0.2601  avg=0.333  DEGENERATE_ZEROSHOT
+```
+
+与 HF 转换后结果完全一致，排除：
+- HF 格式转换引入的误差
+
+**结论：问题在压缩本身。** whitening 步骤破坏了 Llama-3.1-8B 的模型权重，local update 无法恢复。
 
 ### 影响范围
 
