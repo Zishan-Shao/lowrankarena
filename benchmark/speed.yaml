@@ -1,0 +1,19 @@
+name: speed
+kind: speed
+description: Speed benchmark scaffold for latency and throughput reporting.
+selection:
+  benchmarks:
+    - speed
+  enabled_only: true
+speed:
+  batch_sizes:
+    - 1
+    - 4
+    - 8
+  sequence_lengths:
+    - 512
+    - 2048
+report:
+  result_dir: results/speed
+  output_dir: results/tables
+  filename: speed.md

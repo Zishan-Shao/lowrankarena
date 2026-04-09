@@ -1,0 +1,16 @@
+name: pruning
+kind: eval
+description: Pruning-oriented benchmark scaffold.
+selection:
+  benchmarks:
+    - pruning
+  enabled_only: true
+eval:
+  dataset: pruning_suite
+  tasks:
+    - piqa
+    - winogrande
+report:
+  result_dir: results/eval
+  output_dir: results/tables
+  filename: pruning.md

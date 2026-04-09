@@ -1,0 +1,15 @@
+# Core
+huggingface_hub>=0.33
+PyYAML>=6.0
+safetensors>=0.5
+transformers>=4.57,<4.58
+pytest>=8.0
+
+# Evaluation / serving
+lm-eval==0.4.11
+vllm==0.18.1
+
+# FlashAttention-2
+packaging>=24.0
+ninja>=1.11
+flash-attn>=2.8.3,<3

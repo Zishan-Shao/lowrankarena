@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lowrankarena"
+version = "0.1.0"
+description = "Scaffold for LowRankArena benchmark and checkpoint management."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "LowRankArena" },
+]
+dependencies = [
+  "huggingface_hub>=0.33",
+  "PyYAML>=6.0",
+  "safetensors>=0.5",
+  "transformers>=4.57,<4.58",
+]
+
+[project.optional-dependencies]
+eval = [
+  "lm-eval==0.4.11",
+]
+speed = [
+  "vllm==0.18.1",
+  "packaging>=24.0",
+  "ninja>=1.11",
+  "flash-attn>=2.8.3,<3",
+]
+full = [
+  "lm-eval==0.4.11",
+  "vllm==0.18.1",
+  "packaging>=24.0",
+  "ninja>=1.11",
+  "flash-attn>=2.8.3,<3",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+namespaces = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

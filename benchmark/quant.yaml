@@ -1,0 +1,16 @@
+name: quant
+kind: eval
+description: Quantization and compression benchmark scaffold.
+selection:
+  benchmarks:
+    - quant
+  enabled_only: true
+eval:
+  dataset: quant_suite
+  tasks:
+    - boolq
+    - lambada_openai
+report:
+  result_dir: results/eval
+  output_dir: results/tables
+  filename: quant.md
