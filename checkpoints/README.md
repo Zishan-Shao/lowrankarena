@@ -25,3 +25,5 @@ This directory tracks the local manifest for checkpoints used by the new LowRank
 ## Update Pattern
 
 Use `scripts/add_checkpoint.py` to append or replace rows while keeping a consistent schema.
+
+Locally generated artifacts from `compress/` should only be registered after they are exported into a loadable local checkpoint directory. Once that is true, register them with `source=local` and `subpath=<relative artifact dir>`, then use the normal benchmark scripts.
