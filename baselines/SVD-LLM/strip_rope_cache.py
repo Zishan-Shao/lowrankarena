@@ -39,7 +39,7 @@ def strip_rope_cache(model):
     return count
 
 
-def process_file(path: Path, dry_run: bool = False) -> None:
+def process_file(path: Path, dry_run: bool = False, backup: bool = False) -> None:
     size_before = path.stat().st_size
     print(f"\n[{path.name}]  {size_before / 1e9:.3f} GB", end="", flush=True)
 
@@ -60,6 +60,11 @@ def process_file(path: Path, dry_run: bool = False) -> None:
     if dry_run:
         print("  [dry-run, not saved]")
         return
+
+    if backup:
+        bak = path.with_suffix('.pt.bak')
+        path.rename(bak)
+        print(f"  bak→{bak.name}", end="", flush=True)
 
     torch.save(obj, path)
     size_after = path.stat().st_size
@@ -86,6 +91,7 @@ def main():
     parser.add_argument('targets', nargs='+', help='checkpoint file(s) or directory')
     parser.add_argument('--recursive', action='store_true', help='recurse into subdirectories')
     parser.add_argument('--dry-run', action='store_true', help='report sizes without modifying files')
+    parser.add_argument('--backup', action='store_true', help='rename original to .pt.bak before overwriting')
     args = parser.parse_args()
 
     paths = collect_pts(args.targets, args.recursive)
@@ -93,9 +99,9 @@ def main():
         print("No .pt files found.")
         sys.exit(0)
 
-    print(f"Found {len(paths)} checkpoint(s). dry_run={args.dry_run}")
+    print(f"Found {len(paths)} checkpoint(s). dry_run={args.dry_run} backup={args.backup}")
     for p in paths:
-        process_file(p, dry_run=args.dry_run)
+        process_file(p, dry_run=args.dry_run, backup=args.backup)
     print("\nDone.")
 
 
