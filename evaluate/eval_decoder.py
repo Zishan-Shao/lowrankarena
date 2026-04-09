@@ -279,7 +279,7 @@ def load_model(checkpoint: str, dtype: torch.dtype, device: str,
     if model_pt.is_file():
         from transformers import AutoTokenizer
         extra = {"token": hf_token} if hf_token else {}
-        tok_src = tokenizer_path or str(ckpt_path.parent)
+        tok_src = tokenizer_path or str(ckpt_path)
         tokenizer = AutoTokenizer.from_pretrained(
             tok_src, trust_remote_code=True, **extra
         )
