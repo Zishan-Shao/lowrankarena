@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--speed-repeat", type=int, default=None)
     parser.add_argument("--speed-warmup", type=int, default=None)
     parser.add_argument("--speed-gpu-memory-utilization", type=float, default=None)
+    parser.add_argument("--speed-max-model-len", type=int, default=None)
     parser.add_argument("--speed-enforce-eager", action="store_true")
     return parser.parse_args()
 
@@ -50,6 +51,7 @@ def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> lis
                     repeat=args.speed_repeat,
                     warmup=args.speed_warmup,
                     gpu_memory_utilization=args.speed_gpu_memory_utilization,
+                    max_model_len=args.speed_max_model_len,
                     enforce_eager=True if args.speed_enforce_eager else None,
                 )
             )

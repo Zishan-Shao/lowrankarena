@@ -6,6 +6,9 @@ The guiding rule is simple: benchmark policy lives in [`benchmark/`](../benchmar
 
 ## Core Modules
 
+- [`arena.py`](./arena.py): minimal public facade for listing, registering, evaluating, and reporting checkpoints.
+- [`modeling/`](./modeling): shared low-rank runtime grouped by supported base-model family.
+  The current family groups are [`llama/`](./modeling/llama/README.md) and [`qwen/`](./modeling/qwen/README.md).
 - [`load.py`](./load.py): resolve checkpoint records into local or Hugging Face load targets.
 - [`loader.py`](./loader.py): compatibility re-export for code that expects a `loader` module name.
 - [`registry.py`](./registry.py): read, filter, and update checkpoint manifest records.
@@ -20,6 +23,8 @@ The guiding rule is simple: benchmark policy lives in [`benchmark/`](../benchmar
 
 ## Design Intent
 
+- Keep the public API thin: `Arena` is the only intended entrypoint for programmatic use.
+- Support methods through a shared family-level runtime, not through per-checkpoint custom forward definitions.
 - Keep external dependencies at the boundary.
 - Normalize raw backend output into a project-owned JSON shape.
 - Make it easy to swap runners without rewriting every CLI entrypoint.

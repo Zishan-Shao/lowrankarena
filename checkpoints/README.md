@@ -7,6 +7,7 @@ This directory tracks the local manifest for checkpoints used by the new LowRank
 - Hosted checkpoints live in the gated Hugging Face repository: `https://huggingface.co/Duke-CEI-SVD/LowRankArena/tree/main`
 - At this stage, `index.csv` stores top-level folder entries observed from that repository.
 - Individual exported variants, exact low-rank methods, and loader-specific metadata should be added incrementally.
+- Optional sidecar manifests live under [`checkpoints/manifests/`](./manifests/README.md) when a checkpoint needs richer metadata than the flat CSV schema can express.
 
 ## `index.csv` Columns
 
@@ -25,5 +26,7 @@ This directory tracks the local manifest for checkpoints used by the new LowRank
 ## Update Pattern
 
 Use `scripts/add_checkpoint.py` to append or replace rows while keeping a consistent schema.
+
+When a checkpoint is not a standard Transformers or vLLM load target, add a sidecar manifest first and keep the CSV row disabled by default. This preserves discoverability without polluting the default benchmark path with artifacts that still require export or a custom loader.
 
 Locally generated artifacts from `compress/` should only be registered after they are exported into a loadable local checkpoint directory. Once that is true, register them with `source=local` and `subpath=<relative artifact dir>`, then use the normal benchmark scripts.

@@ -94,6 +94,23 @@ def save_checkpoint_index(
     return index_path
 
 
+def merge_checkpoint_indexes(paths: Iterable[str | Path]) -> list[CheckpointRecord]:
+    merged: dict[str, CheckpointRecord] = {}
+    for path in paths:
+        for record in load_checkpoint_index(path):
+            merged[record.name] = record
+    return list(merged.values())
+
+
+def upsert_checkpoint(
+    record: CheckpointRecord,
+    path: str | Path = DEFAULT_INDEX_PATH,
+) -> Path:
+    records = {item.name: item for item in load_checkpoint_index(path)}
+    records[record.name] = record
+    return save_checkpoint_index(records.values(), path=path)
+
+
 def get_checkpoint(name: str, path: str | Path = DEFAULT_INDEX_PATH) -> CheckpointRecord:
     for record in load_checkpoint_index(path):
         if record.name == name:

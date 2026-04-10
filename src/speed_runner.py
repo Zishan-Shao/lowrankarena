@@ -27,6 +27,7 @@ class VllmSpeedRequest:
     tensor_parallel_size: int | None = None
     gpu_memory_utilization: float | None = None
     dtype: str | None = None
+    max_model_len: int | None = None
     enforce_eager: bool | None = None
     trust_remote_code: bool = True
     local_files_only: bool = False
@@ -80,6 +81,11 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         else speed_config.get("gpu_memory_utilization", 0.9)
     )
     dtype = request.dtype or speed_config.get("dtype", "auto")
+    max_model_len = (
+        int(request.max_model_len)
+        if request.max_model_len is not None
+        else (int(speed_config["max_model_len"]) if speed_config.get("max_model_len") is not None else None)
+    )
     enforce_eager = bool(request.enforce_eager if request.enforce_eager is not None else speed_config.get("enforce_eager", False))
 
     loaded = load_checkpoint(
@@ -101,6 +107,7 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         trust_remote_code=request.trust_remote_code,
         gpu_memory_utilization=gpu_memory_utilization,
         dtype=dtype,
+        max_model_len=max_model_len,
         enforce_eager=enforce_eager,
     )
 
@@ -180,6 +187,7 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
             "tensor_parallel_size": tensor_parallel_size,
             "gpu_memory_utilization": gpu_memory_utilization,
             "dtype": dtype,
+            "max_model_len": max_model_len,
             "enforce_eager": enforce_eager,
         },
         "generated_at": utc_timestamp(),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 from src.registry import load_checkpoint_index
@@ -14,7 +15,22 @@ def test_expected_layout_exists() -> None:
         "requirements.txt",
         "benchmark/README.md",
         "src/load.py",
+        "src/__init__.py",
+        "src/arena.py",
         "src/README.md",
+        "src/modeling/README.md",
+        "src/modeling/__init__.py",
+        "src/modeling/common.py",
+        "src/modeling/llama/README.md",
+        "src/modeling/llama/__init__.py",
+        "src/modeling/llama/configuration_lowrank_llama.py",
+        "src/modeling/llama/modeling_lowrank_llama.py",
+        "src/modeling/qwen/README.md",
+        "src/modeling/qwen/__init__.py",
+        "src/modeling/qwen/configuration_lowrank_qwen2.py",
+        "src/modeling/qwen/modeling_lowrank_qwen2.py",
+        "src/modeling/qwen/configuration_lowrank_qwen3.py",
+        "src/modeling/qwen/modeling_lowrank_qwen3.py",
         "src/loader.py",
         "src/benchmarking.py",
         "src/lm_eval_runner.py",
@@ -42,6 +58,7 @@ def test_expected_layout_exists() -> None:
         "scripts/add_checkpoint.py",
         "checkpoints/index.csv",
         "checkpoints/README.md",
+        "checkpoints/manifests/README.md",
         "compress/README.md",
         "compress/artifacts/README.md",
         "compress/common.py",
@@ -73,6 +90,7 @@ def test_expected_layout_exists() -> None:
         "results/figures/README.md",
         "results/figures/.gitkeep",
         "tests/README.md",
+        "tests/test_arena.py",
         "tests/test_benchmark_configs.py",
     ]
     for relative_path in expected_paths:
@@ -82,5 +100,13 @@ def test_expected_layout_exists() -> None:
 def test_default_checkpoint_manifest_is_seeded() -> None:
     records = load_checkpoint_index(PROJECT_ROOT / "checkpoints" / "index.csv")
     assert len(records) >= 9
-    assert all(record.repo_id == "Duke-CEI-SVD/LowRankArena" for record in records)
     assert any(record.name == "llama31-8b-svdllm-0.6" for record in records)
+
+
+def test_exporter_uses_repo_modeling_root() -> None:
+    exporter = PROJECT_ROOT / "compress" / "svd" / "SVD-LLM" / "huggingface_repos" / "export_svdllm_lowrank.py"
+    spec = spec_from_file_location("export_svdllm_lowrank", exporter)
+    module = module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    assert module.MODELING_ROOT == PROJECT_ROOT / "src" / "modeling"

@@ -12,7 +12,7 @@ Each script is intentionally thin. It should parse arguments, resolve the reques
 - [`run_all.py`](./run_all.py): compatibility alias for `run_main.py`.
 - [`run_compress.py`](./run_compress.py): plan or dispatch optional artifact-generation flows from [`compress/`](../compress/README.md).
 - [`make_table.py`](./make_table.py): build lightweight table artifacts from normalized result JSON files.
-- [`add_checkpoint.py`](./add_checkpoint.py): update [`checkpoints/index.csv`](../checkpoints/index.csv) while preserving schema consistency.
+- [`add_checkpoint.py`](./add_checkpoint.py): update [`checkpoints/index.csv`](../checkpoints/index.csv) or import a sidecar manifest from [`checkpoints/manifests/`](../checkpoints/manifests/README.md).
 
 ## Design Intent
 

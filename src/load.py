@@ -118,12 +118,63 @@ def load_from_record(
         local_path = Path(record.subpath).expanduser()
         if not local_path.is_absolute():
             local_path = project_path(record.subpath)
+        resolved_local_path = str(local_path.resolve())
+        metadata: dict[str, Any] = {"status": "resolved", "source": "local"}
+        if not any([load_config, load_tokenizer, load_model]):
+            return LoadedCheckpoint(
+                record=record,
+                locator=resolved_local_path,
+                loader="local",
+                local_path=resolved_local_path,
+                metadata=metadata,
+            )
+        try:
+            from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+        except ImportError as exc:  # pragma: no cover - depends on optional runtime packages.
+            raise CheckpointLoadError("transformers is required to load local checkpoints.") from exc
+
+        config = None
+        tokenizer = None
+        model = None
+        try:
+            if load_config:
+                config = AutoConfig.from_pretrained(
+                    resolved_local_path,
+                    trust_remote_code=trust_remote_code,
+                    local_files_only=True,
+                )
+            if load_tokenizer:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    resolved_local_path,
+                    trust_remote_code=trust_remote_code,
+                    local_files_only=True,
+                )
+            if load_model:
+                model = AutoModelForCausalLM.from_pretrained(
+                    resolved_local_path,
+                    device_map=device_map,
+                    torch_dtype=torch_dtype,
+                    trust_remote_code=trust_remote_code,
+                    local_files_only=True,
+                )
+        except Exception as exc:
+            raise CheckpointLoadError(
+                f"Failed to load local checkpoint '{record.name}' from '{resolved_local_path}'."
+            ) from exc
+
+        metadata["status"] = "loaded"
+        metadata["loaded_config"] = load_config
+        metadata["loaded_tokenizer"] = load_tokenizer
+        metadata["loaded_model"] = load_model
         return LoadedCheckpoint(
             record=record,
-            locator=str(local_path.resolve()),
-            loader="local",
-            local_path=str(local_path.resolve()),
-            metadata={"status": "resolved", "source": "local"},
+            locator=resolved_local_path,
+            loader="transformers",
+            local_path=resolved_local_path,
+            metadata=metadata,
+            config=config,
+            tokenizer=tokenizer,
+            model=model,
         )
 
     if record.source != "huggingface":

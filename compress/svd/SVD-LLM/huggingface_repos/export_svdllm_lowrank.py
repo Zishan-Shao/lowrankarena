@@ -12,15 +12,12 @@ from transformers import AutoTokenizer
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SVDLLM_ROOT = SCRIPT_DIR.parent
-REPO_ROOT = SCRIPT_DIR.parents[2]
-LOWRANK_HF_ROOT = REPO_ROOT / "lowrank_hf"
+REPO_ROOT = SCRIPT_DIR.parents[3]
+MODELING_ROOT = REPO_ROOT / "src" / "modeling"
 
 sys.path.insert(0, str(SVDLLM_ROOT))
+sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(REPO_ROOT))
-
-from lowrank_hf.configuration_lowrank_llama import LowRankLlamaConfig
-from lowrank_hf.configuration_lowrank_qwen2 import LowRankQwen2Config
-from lowrank_hf.configuration_lowrank_qwen3 import LowRankQwen3Config
 
 
 MODULE_NAME_MAP = {
@@ -98,6 +95,8 @@ def _build_low_rank_specs(model) -> dict[str, dict[str, int]]:
         target_name = _canonical_low_rank_name(name)
         if target_name is None:
             continue
+        if not isinstance(module, torch.nn.Linear):
+            continue
 
         if name.endswith("_v_proj"):
             rank = int(module.out_features)
@@ -112,7 +111,6 @@ def _build_low_rank_specs(model) -> dict[str, dict[str, int]]:
                 f"Rank mismatch for {target_name}: {existing['rank']} vs {rank}"
             )
     return specs
-
 
 def _remap_state_dict(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     remapped = {}
@@ -150,9 +148,10 @@ def _save_tokenizer(tokenizer, output_dir: Path, tokenizer_id: str | None):
     fallback_tokenizer.save_pretrained(output_dir)
 
 
-def _copy_model_code(output_dir: Path, filenames: tuple[str, ...]):
+def _copy_model_code(output_dir: Path, source_dir: Path, filenames: tuple[str, ...]):
     for filename in filenames:
-        shutil.copy2(LOWRANK_HF_ROOT / filename, output_dir / filename)
+        source_path = (source_dir / filename).resolve()
+        shutil.copy2(source_path, output_dir / Path(filename).name)
 
 
 def _jsonify(value):
@@ -168,6 +167,8 @@ def _jsonify(value):
 def _select_model_spec(source_model):
     model_type = getattr(source_model.config, "model_type", None)
     if model_type == "llama":
+        from src.modeling.llama.configuration_lowrank_llama import LowRankLlamaConfig
+
         return {
             "config_cls": LowRankLlamaConfig,
             "auto_map": {
@@ -176,13 +177,16 @@ def _select_model_spec(source_model):
                 "AutoModelForCausalLM": "modeling_lowrank_llama.LowRankLlamaForCausalLM",
             },
             "architectures": ["LowRankLlamaForCausalLM"],
+            "source_dir": MODELING_ROOT / "llama",
             "copy_files": (
+                "../common.py",
                 "configuration_lowrank_llama.py",
                 "modeling_lowrank_llama.py",
-                "modeling_lowrank_common.py",
             ),
         }
     if model_type == "qwen2":
+        from src.modeling.qwen.configuration_lowrank_qwen2 import LowRankQwen2Config
+
         return {
             "config_cls": LowRankQwen2Config,
             "auto_map": {
@@ -191,13 +195,16 @@ def _select_model_spec(source_model):
                 "AutoModelForCausalLM": "modeling_lowrank_qwen2.LowRankQwen2ForCausalLM",
             },
             "architectures": ["LowRankQwen2ForCausalLM"],
+            "source_dir": MODELING_ROOT / "qwen",
             "copy_files": (
+                "../common.py",
                 "configuration_lowrank_qwen2.py",
                 "modeling_lowrank_qwen2.py",
-                "modeling_lowrank_common.py",
             ),
         }
     if model_type == "qwen3":
+        from src.modeling.qwen.configuration_lowrank_qwen3 import LowRankQwen3Config
+
         return {
             "config_cls": LowRankQwen3Config,
             "auto_map": {
@@ -206,10 +213,11 @@ def _select_model_spec(source_model):
                 "AutoModelForCausalLM": "modeling_lowrank_qwen3.LowRankQwen3ForCausalLM",
             },
             "architectures": ["LowRankQwen3ForCausalLM"],
+            "source_dir": MODELING_ROOT / "qwen",
             "copy_files": (
+                "../common.py",
                 "configuration_lowrank_qwen3.py",
                 "modeling_lowrank_qwen3.py",
-                "modeling_lowrank_common.py",
             ),
         }
     raise ValueError(f"Unsupported base model_type for low-rank export: {model_type}")
@@ -275,7 +283,6 @@ def main():
 
     _prepend_pythonpaths(args.checkpoint_pythonpath)
     _install_legacy_activation_compat()
-
     payload = _load_checkpoint(checkpoint_path)
     source_model = payload["model"]
     tokenizer = payload.get("tokenizer")
@@ -284,14 +291,16 @@ def main():
     remapped_state_dict = _remap_state_dict(source_model.state_dict())
     config, model_spec = _build_config(source_model, low_rank_specs, method_label=args.method_label)
 
+    print("[export] saving config and model code", flush=True)
     config.save_pretrained(output_dir)
-    _copy_model_code(output_dir, filenames=model_spec["copy_files"])
+    _copy_model_code(output_dir, source_dir=model_spec["source_dir"], filenames=model_spec["copy_files"])
     _save_tokenizer(tokenizer, output_dir, tokenizer_id=args.tokenizer_id or getattr(config, "_name_or_path", None))
 
     generation_config = getattr(source_model, "generation_config", None)
     if generation_config is not None:
         generation_config.save_pretrained(output_dir)
 
+    print("[export] writing safetensors shards", flush=True)
     save_torch_state_dict(
         remapped_state_dict,
         str(output_dir),

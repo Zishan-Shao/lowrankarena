@@ -6,6 +6,7 @@ LowRankArena is a benchmark repository for evaluating low-rank checkpoints, comp
 
 - `old/` is treated as archived material and is not part of the new scaffold.
 - Checkpoint metadata is tracked in `checkpoints/index.csv`.
+- Rich per-checkpoint sidecar metadata can live under `checkpoints/manifests/`.
 - The source of truth for hosted checkpoints is the gated Hugging Face repository: `Duke-CEI-SVD/LowRankArena`.
 - `compress/` is optional. Main benchmark runs should load released checkpoints directly.
 
@@ -60,6 +61,20 @@ lowrankarena/
 │       ├── gptq.py
 │       └── rtn.py
 ├── src/
+│   ├── __init__.py
+│   ├── arena.py
+│   ├── modeling/
+│   │   ├── __init__.py
+│   │   ├── README.md
+│   │   ├── common.py
+│   │   ├── llama/
+│   │   │   ├── configuration_lowrank_llama.py
+│   │   │   └── modeling_lowrank_llama.py
+│   │   └── qwen/
+│   │       ├── configuration_lowrank_qwen2.py
+│   │       ├── modeling_lowrank_qwen2.py
+│   │       ├── configuration_lowrank_qwen3.py
+│   │       └── modeling_lowrank_qwen3.py
 │   ├── load.py
 │   ├── loader.py
 │   ├── benchmarking.py
@@ -89,6 +104,8 @@ lowrankarena/
 │   └── add_checkpoint.py
 ├── checkpoints/
 │   ├── index.csv
+│   ├── manifests/
+│   │   └── README.md
 │   └── README.md
 ├── results/
 │   ├── eval/
@@ -115,6 +132,25 @@ lowrankarena/
    - optionally register the artifact into `checkpoints/index.csv`
    - then run the normal eval and speed flow
 
+## Programmatic API
+
+The minimal public API is `Arena`. It wraps the existing registry, loader, eval, speed, and reporting modules without introducing a second object model.
+
+```python
+from src import Arena
+
+arena = Arena()
+
+for row in arena.list(enabled_only=False):
+    print(row["id"], row["method"])
+
+print(arena.describe("llama31-8b-svdllm-0.6")["subpath"])
+```
+
+`Arena.register(...)` can add an in-memory checkpoint record or persist it to `checkpoints/index.csv`. `Arena.register_manifest(...)` imports a sidecar manifest from `checkpoints/manifests/` and writes the simplified runnable row into the registry when requested.
+
+Low-rank execution is organized around shared family runtimes under `src/modeling/`. The intended contract is: export a method-specific checkpoint into the arena low-rank schema, then register it. The benchmark runtime is keyed by supported base families such as `llama` and `qwen`, not by per-checkpoint custom forward code. During export, the family-specific runtime files are copied from `src/modeling/<family>/` into the generated Hugging Face artifact.
+
 `compress/` is intentionally not a second benchmarking framework. It only handles artifact generation.
 
 In practice, `compress/svd/` and `compress/prune/` should be treated as method wrappers around heterogeneous baselines, while `compress/quant/` is kept as a more practical local path because quantization is much more likely to run inside the shared `lowrankarena` environment. See `compress/README.md` for the full rationale.
@@ -135,6 +171,7 @@ Two practical caveats from local smoke runs:
 
 - `benchmark/accuracy/ppl.yaml` uses `paloma_ptb`, which requires access to the gated `allenai/paloma` dataset on Hugging Face.
 - On shared GPU machines, `scripts/run_speed.py` may need a lower `--gpu-memory-utilization` value than the default benchmark config, and `--enforce-eager` can be useful for smoke runs.
+- For custom long-context exports, `scripts/run_speed.py --max-model-len <N>` can be necessary to keep vLLM KV-cache requirements aligned with the actual benchmark prompt lengths.
 
 ## Loader Example
 
