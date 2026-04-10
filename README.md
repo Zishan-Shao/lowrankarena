@@ -1,13 +1,12 @@
 # LowRankArena
 
-LowRankArena is a scaffold-first benchmark repository for evaluating low-rank checkpoints, compression variants, and speed/quality tradeoffs. This version is intentionally lightweight: the goal is to establish a clean project layout, stable file formats, and clear extension points before wiring in the full execution logic.
+LowRankArena is a benchmark repository for evaluating low-rank checkpoints, compression variants, and speed/quality tradeoffs. The main benchmark path uses a thin Python wrapper around `lm-eval-harness 0.4.11` for accuracy and `vLLM 0.18.1` for speed, while `compress/` remains the optional artifact-generation layer.
 
 ## Scope
 
 - `old/` is treated as archived material and is not part of the new scaffold.
 - Checkpoint metadata is tracked in `checkpoints/index.csv`.
 - The source of truth for hosted checkpoints is the gated Hugging Face repository: `Duke-CEI-SVD/LowRankArena`.
-- Current Python modules return structured placeholder artifacts so the workflow can be refined incrementally.
 - `compress/` is optional. Main benchmark runs should load released checkpoints directly.
 
 ## Environment
@@ -62,21 +61,29 @@ lowrankarena/
 │       └── rtn.py
 ├── src/
 │   ├── load.py
+│   ├── loader.py
+│   ├── benchmarking.py
+│   ├── lm_eval_runner.py
+│   ├── speed_runner.py
+│   ├── scoring.py
 │   ├── eval.py
 │   ├── speed.py
 │   ├── report.py
 │   ├── registry.py
 │   └── utils.py
 ├── benchmark/
-│   ├── main.yaml
-│   ├── speed.yaml
-│   ├── modern.yaml
-│   ├── pruning.yaml
-│   └── quant.yaml
+│   ├── accuracy/
+│   │   ├── mcq.yaml
+│   │   ├── ppl.yaml
+│   │   └── mmlu.yaml
+│   ├── speed/
+│   │   └── speed.yaml
+│   └── main.yaml
 ├── scripts/
 │   ├── run_eval.py
 │   ├── run_speed.py
 │   ├── run_all.py
+│   ├── run_main.py
 │   ├── run_compress.py
 │   ├── make_table.py
 │   └── add_checkpoint.py
@@ -98,8 +105,10 @@ lowrankarena/
 
 1. Default reviewer path:
    - maintain released checkpoint metadata in `checkpoints/index.csv`
-   - load checkpoints directly with `src/load.py`
-   - run eval, speed, and reporting from `scripts/`
+   - load checkpoints directly with `src/load.py` / `src/loader.py`
+   - run accuracy suites through `src/lm_eval_runner.py`
+   - run speed suites through `src/speed_runner.py`
+   - use `scripts/run_eval.py`, `scripts/run_speed.py`, and `scripts/run_main.py` as CLI entrypoints
 2. Optional author/extender path:
    - generate a local artifact with `scripts/run_compress.py`
    - export a uniform manifest under `compress/artifacts/`
@@ -109,6 +118,23 @@ lowrankarena/
 `compress/` is intentionally not a second benchmarking framework. It only handles artifact generation.
 
 In practice, `compress/svd/` and `compress/prune/` should be treated as method wrappers around heterogeneous baselines, while `compress/quant/` is kept as a more practical local path because quantization is much more likely to run inside the shared `lowrankarena` environment. See `compress/README.md` for the full rationale.
+
+The benchmark configs are now separated by objective:
+
+- `benchmark/accuracy/mcq.yaml` for exact lm-eval-harness `0.4.11` MCQ task IDs: `boolq`, `arc_easy`, `arc_challenge`, `winogrande`, `piqa`, `hellaswag`, `openbookqa`
+- `benchmark/accuracy/ppl.yaml` for exact lm-eval-harness `0.4.11` rolling-loglikelihood task IDs: `wikitext`, `paloma_ptb`, `c4`
+- `benchmark/accuracy/mmlu.yaml` for the official lm-eval-harness `0.4.11` group name: `mmlu`
+- `benchmark/speed/speed.yaml` for vLLM offline inference speed
+- `benchmark/main.yaml` as the aggregate entrypoint
+
+Accuracy configs intentionally use the exact task names exposed by lm-eval-harness. In particular, `c4_stream` is not an lm-eval-harness `0.4.11` task ID in the current environment, so the benchmark config uses `c4` instead.
+
+The accuracy runner calls the `lm-eval run ...` CLI rather than importing deep harness internals. The speed runner uses the `vllm.LLM` Python API directly.
+
+Two practical caveats from local smoke runs:
+
+- `benchmark/accuracy/ppl.yaml` uses `paloma_ptb`, which requires access to the gated `allenai/paloma` dataset on Hugging Face.
+- On shared GPU machines, `scripts/run_speed.py` may need a lower `--gpu-memory-utilization` value than the default benchmark config, and `--enforce-eager` can be useful for smoke runs.
 
 ## Loader Example
 
@@ -148,6 +174,6 @@ For more detail, see `compress/README.md`.
 
 ## Next Build Steps
 
-- Replace stub metrics in `src/eval.py` and `src/speed.py` with real benchmark backends.
 - Expand checkpoint rows from model-family folders to exact exported variants.
 - Add richer result aggregation and plotting in `src/report.py`.
+- Add retry / resume handling for long-running benchmark jobs.

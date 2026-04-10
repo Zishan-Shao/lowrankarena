@@ -1,0 +1,31 @@
+name: ppl
+kind: eval
+description: Rolling loglikelihood suite using exact lm-eval-harness 0.4.11 task IDs.
+selection:
+  benchmarks:
+    - main
+  enabled_only: true
+eval:
+  backend: lm_eval_harness
+  version: 0.4.11
+  dataset: lm_eval_harness
+  metric: word_perplexity
+  metric_fallbacks:
+    - word_perplexity
+    - perplexity
+    - ppl
+  batch_size: auto
+  num_fewshot: 0
+  tasks:
+    - wikitext
+    - paloma_ptb
+    - c4
+  notes:
+    - Use official lm-eval task IDs only.
+    - PTB is exposed as paloma_ptb in lm-eval-harness 0.4.11.
+    - c4_stream is not an lm-eval-harness 0.4.11 task ID; the exact task is c4.
+    - paloma_ptb requires access to the gated allenai/paloma dataset on Hugging Face.
+report:
+  result_dir: results/eval
+  output_dir: results/tables
+  filename: ppl.md

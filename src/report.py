@@ -19,8 +19,16 @@ def flatten_result(payload: dict[str, Any]) -> dict[str, Any]:
         "suite": payload.get("suite", ""),
         "status": payload.get("status", ""),
     }
+    for key, value in payload.get("meta", {}).items():
+        if isinstance(value, list):
+            row[f"meta_{key}"] = ",".join(str(item) for item in value)
+        else:
+            row[f"meta_{key}"] = value
     for key, value in payload.get("metrics", {}).items():
         row[f"metric_{key}"] = value
+    for key, value in payload.get("summary", {}).items():
+        if key != "resolved_metrics":
+            row[f"summary_{key}"] = value
     for key, value in payload.get("stats", {}).items():
         row[f"stat_{key}"] = value
     return row

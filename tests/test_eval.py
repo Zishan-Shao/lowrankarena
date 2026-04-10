@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.eval import evaluate_checkpoint
-from src.utils import load_json
+from src.lm_eval_runner import _build_model_args
+from src.load import load_checkpoint
 
 
 def write_index(path: Path) -> Path:
@@ -20,19 +20,14 @@ def write_index(path: Path) -> Path:
     return path
 
 
-def test_evaluate_checkpoint_writes_stub_result(tmp_path: Path) -> None:
+def test_build_model_args_for_hf_checkpoint(tmp_path: Path) -> None:
     index_path = write_index(tmp_path / "index.csv")
-    output_dir = tmp_path / "results"
-    result = evaluate_checkpoint(
-        checkpoint_name="demo",
-        suite="main",
-        dataset="aggregate",
-        output_dir=output_dir,
-        index_path=str(index_path),
-    )
+    loaded = load_checkpoint("demo", index_path=str(index_path))
+    model_args = _build_model_args(loaded, extra_model_args={"dtype": "float16"})
 
-    payload = load_json(result.output_path)
-    assert result.status == "stub"
-    assert payload["checkpoint"] == "demo"
-    assert payload["suite"] == "main"
-    assert payload["metrics"]["placeholder_score"] == 0.0
+    assert model_args == {
+        "pretrained": "Duke-CEI-SVD/LowRankArena",
+        "revision": "main",
+        "subfolder": "llama31_8b",
+        "dtype": "float16",
+    }

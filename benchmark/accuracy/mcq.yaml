@@ -1,0 +1,29 @@
+name: mcq
+kind: eval
+description: Multiple-choice accuracy suite using exact lm-eval-harness 0.4.11 task IDs.
+selection:
+  benchmarks:
+    - main
+  enabled_only: true
+eval:
+  backend: lm_eval_harness
+  version: 0.4.11
+  dataset: lm_eval_harness
+  metric: acc_norm
+  metric_fallbacks:
+    - acc_norm
+    - acc
+  batch_size: auto
+  num_fewshot: 0
+  tasks:
+    - boolq
+    - arc_easy
+    - arc_challenge
+    - winogrande
+    - piqa
+    - hellaswag
+    - openbookqa
+report:
+  result_dir: results/eval
+  output_dir: results/tables
+  filename: mcq.md

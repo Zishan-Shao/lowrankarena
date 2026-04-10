@@ -4,17 +4,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from src.load import load_checkpoint
-from src.utils import dump_json, ensure_dir, project_path, utc_timestamp
+from src.benchmarking import resolve_suite_path, suite_output_name
+from src.speed_runner import VllmSpeedRequest, run_vllm_speed_suite
 
 
 @dataclass(slots=True)
 class SpeedRequest:
     checkpoint_name: str
-    suite: str = "speed"
+    suite: str = "speed/speed"
     batch_size: int = 1
     sequence_length: int = 2048
+    generation_length: int = 128
     output_dir: str | Path | None = None
+    suite_path: str | Path | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -27,58 +29,57 @@ class SpeedResult:
     stats: dict[str, Any]
 
 
-def result_path_for(request: SpeedRequest) -> Path:
-    output_root = Path(request.output_dir) if request.output_dir else project_path("results", "speed")
-    ensure_dir(output_root)
-    filename = f"{request.suite}__{request.checkpoint_name}.json"
-    return output_root / filename
-
-
 def run_speed(request: SpeedRequest, index_path: str | None = None) -> SpeedResult:
-    loaded = load_checkpoint(request.checkpoint_name, index_path=index_path)
-    stats = {
-        "latency_ms": 0.0,
-        "tokens_per_second": 0.0,
-        "ready_for_backend": False,
-    }
-    payload = {
-        "kind": "speed",
-        "checkpoint": loaded.record.name,
-        "suite": request.suite,
-        "batch_size": request.batch_size,
-        "sequence_length": request.sequence_length,
-        "status": "stub",
-        "locator": loaded.locator,
-        "stats": stats,
-        "extra": request.extra,
-        "generated_at": utc_timestamp(),
-        "notes": "This file is a scaffold artifact. Replace src.speed.run_speed with a real profiler backend.",
-    }
-    output_path = dump_json(payload, result_path_for(request))
+    if index_path is None:
+        raise ValueError("index_path is required for speed runs.")
+
+    requested_suite_path = request.suite_path or request.extra.get("suite_path") or request.extra.get("benchmark_path") or request.suite
+    suite_path = resolve_suite_path(requested_suite_path)
+    result = run_vllm_speed_suite(
+        VllmSpeedRequest(
+            checkpoint_name=request.checkpoint_name,
+            suite_path=suite_path,
+            index_path=index_path,
+            output_dir=request.output_dir,
+            batch_sizes=request.extra.get("batch_sizes", [request.batch_size]),
+            prompt_lengths=request.extra.get("prompt_lengths", [request.sequence_length]),
+            generation_lengths=request.extra.get("generation_lengths", [request.generation_length]),
+            repeat=request.extra.get("repeat"),
+            warmup=request.extra.get("warmup"),
+            tensor_parallel_size=request.extra.get("tensor_parallel_size"),
+            gpu_memory_utilization=request.extra.get("gpu_memory_utilization"),
+            dtype=request.extra.get("dtype"),
+            enforce_eager=request.extra.get("enforce_eager"),
+        )
+    )
     return SpeedResult(
         checkpoint_name=request.checkpoint_name,
-        suite=request.suite,
-        status="stub",
-        output_path=str(output_path),
-        stats=stats,
+        suite=suite_output_name(suite_path),
+        status=result.status,
+        output_path=result.output_path,
+        stats=result.stats,
     )
 
 
 def benchmark_checkpoint(
     checkpoint_name: str,
-    suite: str = "speed",
+    suite: str = "speed/speed",
     batch_size: int = 1,
     sequence_length: int = 2048,
+    generation_length: int = 128,
     output_dir: str | Path | None = None,
     index_path: str | None = None,
     extra: dict[str, Any] | None = None,
+    suite_path: str | Path | None = None,
 ) -> SpeedResult:
     request = SpeedRequest(
         checkpoint_name=checkpoint_name,
         suite=suite,
         batch_size=batch_size,
         sequence_length=sequence_length,
+        generation_length=generation_length,
         output_dir=output_dir,
+        suite_path=suite_path,
         extra=extra or {},
     )
     return run_speed(request, index_path=index_path)

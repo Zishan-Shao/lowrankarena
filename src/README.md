@@ -1,0 +1,25 @@
+# `src/`
+
+This directory contains the reusable runtime code for LowRankArena.
+
+The guiding rule is simple: benchmark policy lives in [`benchmark/`](../benchmark/README.md), CLI entrypoints live in [`scripts/`](../scripts/README.md), and reusable execution logic lives here.
+
+## Core Modules
+
+- [`load.py`](./load.py): resolve checkpoint records into local or Hugging Face load targets.
+- [`loader.py`](./loader.py): compatibility re-export for code that expects a `loader` module name.
+- [`registry.py`](./registry.py): read, filter, and update checkpoint manifest records.
+- [`benchmarking.py`](./benchmarking.py): resolve suite paths and select checkpoints for a suite.
+- [`lm_eval_runner.py`](./lm_eval_runner.py): thin wrapper around `lm-eval run ...`, plus result normalization.
+- [`speed_runner.py`](./speed_runner.py): vLLM-backed offline generation speed runner.
+- [`scoring.py`](./scoring.py): task-level metric selection and summary reduction helpers.
+- [`report.py`](./report.py): lightweight result discovery and table generation.
+- [`eval.py`](./eval.py): compatibility wrapper that forwards eval requests to the real runner.
+- [`speed.py`](./speed.py): compatibility wrapper that forwards speed requests to the real runner.
+- [`utils.py`](./utils.py): shared filesystem, JSON, YAML, and timestamp helpers.
+
+## Design Intent
+
+- Keep external dependencies at the boundary.
+- Normalize raw backend output into a project-owned JSON shape.
+- Make it easy to swap runners without rewriting every CLI entrypoint.

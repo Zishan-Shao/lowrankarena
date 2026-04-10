@@ -4,16 +4,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from src.load import load_checkpoint
-from src.utils import dump_json, ensure_dir, project_path, utc_timestamp
+from src.benchmarking import resolve_suite_path, suite_output_name
+from src.lm_eval_runner import LmEvalRequest, run_lm_eval_suite
 
 
 @dataclass(slots=True)
 class EvalRequest:
     checkpoint_name: str
-    suite: str = "main"
-    dataset: str = "placeholder"
+    suite: str = "accuracy/mcq"
+    dataset: str = "lm_eval_harness"
     output_dir: str | Path | None = None
+    limit: float | int | None = None
+    device: str | None = None
+    batch_size: str | int | None = None
+    suite_path: str | Path | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -26,54 +30,54 @@ class EvalResult:
     metrics: dict[str, Any]
 
 
-def result_path_for(request: EvalRequest) -> Path:
-    output_root = Path(request.output_dir) if request.output_dir else project_path("results", "eval")
-    ensure_dir(output_root)
-    filename = f"{request.suite}__{request.checkpoint_name}.json"
-    return output_root / filename
-
-
 def run_eval(request: EvalRequest, index_path: str | None = None) -> EvalResult:
-    loaded = load_checkpoint(request.checkpoint_name, index_path=index_path)
-    metrics = {
-        "placeholder_score": 0.0,
-        "ready_for_backend": False,
-    }
-    payload = {
-        "kind": "eval",
-        "checkpoint": loaded.record.name,
-        "suite": request.suite,
-        "dataset": request.dataset,
-        "status": "stub",
-        "locator": loaded.locator,
-        "metrics": metrics,
-        "extra": request.extra,
-        "generated_at": utc_timestamp(),
-        "notes": "This file is a scaffold artifact. Replace src.eval.run_eval with a real benchmark backend.",
-    }
-    output_path = dump_json(payload, result_path_for(request))
+    if index_path is None:
+        raise ValueError("index_path is required for eval runs.")
+
+    requested_suite_path = request.suite_path or request.extra.get("suite_path") or request.extra.get("benchmark_path") or request.suite
+    suite_path = resolve_suite_path(requested_suite_path)
+    result = run_lm_eval_suite(
+        LmEvalRequest(
+            checkpoint_name=request.checkpoint_name,
+            suite_path=suite_path,
+            index_path=index_path,
+            output_dir=request.output_dir,
+            device=request.device,
+            batch_size=request.batch_size,
+            limit=request.limit,
+            extra_model_args=request.extra.get("model_args", {}),
+        )
+    )
     return EvalResult(
         checkpoint_name=request.checkpoint_name,
-        suite=request.suite,
-        status="stub",
-        output_path=str(output_path),
-        metrics=metrics,
+        suite=suite_output_name(suite_path),
+        status=result.status,
+        output_path=result.output_path,
+        metrics=result.metrics,
     )
 
 
 def evaluate_checkpoint(
     checkpoint_name: str,
-    suite: str = "main",
-    dataset: str = "placeholder",
+    suite: str = "accuracy/mcq",
+    dataset: str = "lm_eval_harness",
     output_dir: str | Path | None = None,
     index_path: str | None = None,
     extra: dict[str, Any] | None = None,
+    limit: float | int | None = None,
+    device: str | None = None,
+    batch_size: str | int | None = None,
+    suite_path: str | Path | None = None,
 ) -> EvalResult:
     request = EvalRequest(
         checkpoint_name=checkpoint_name,
         suite=suite,
         dataset=dataset,
         output_dir=output_dir,
+        limit=limit,
+        device=device,
+        batch_size=batch_size,
+        suite_path=suite_path,
         extra=extra or {},
     )
     return run_eval(request, index_path=index_path)

@@ -1,0 +1,22 @@
+name: mmlu
+kind: eval
+description: Dedicated MMLU suite using the official lm-eval-harness 0.4.11 group name.
+selection:
+  benchmarks:
+    - main
+  enabled_only: true
+eval:
+  backend: lm_eval_harness
+  version: 0.4.11
+  dataset: lm_eval_harness
+  metric: acc
+  metric_fallbacks:
+    - acc
+  batch_size: auto
+  num_fewshot: 5
+  tasks:
+    - mmlu
+report:
+  result_dir: results/eval
+  output_dir: results/tables
+  filename: mmlu.md

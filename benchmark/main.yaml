@@ -1,17 +1,8 @@
 name: main
-kind: eval
-description: Default quality benchmark scaffold.
-selection:
-  benchmarks:
-    - main
-  enabled_only: true
-eval:
-  dataset: aggregate
-  tasks:
-    - mmlu
-    - arc_challenge
-    - hellaswag
-report:
-  result_dir: results/eval
-  output_dir: results/tables
-  filename: main.md
+kind: aggregate
+description: Top-level benchmark entrypoint that expands into accuracy and speed suites.
+includes:
+  - accuracy/mcq
+  - accuracy/ppl
+  - accuracy/mmlu
+  - speed/speed
