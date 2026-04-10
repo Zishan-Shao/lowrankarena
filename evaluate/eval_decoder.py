@@ -373,12 +373,15 @@ def eval_ppl(model, tokenizer, datasets: list[str],
             print(f"  loading {ds_name} ...", flush=True)
             eos = tokenizer.eos_token_id
             ids: list[int] = []
+            _c4_samples = 0
             for txt in _iter_texts(ds_name):
                 ids.extend(tokenizer.encode(txt, add_special_tokens=False))
                 if eos is not None:
                     ids.append(int(eos))
-                if ds_name.lower() in {"c4", "c4_stream"} and len(ids) > 5_000_000:
-                    break
+                if ds_name.lower() in {"c4", "c4_stream"}:
+                    _c4_samples += 1
+                    if _c4_samples >= 2000:
+                        break
 
             n_seq = (len(ids) - 1) // seq_len
             if n_seq == 0:
