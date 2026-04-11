@@ -60,12 +60,15 @@ def main():
         for i, layer in profiling_mat.items()
     }
 
-    print(f"Compressing with whitening_hetero (ratio={args.ratio}) ...")
+    # V1 (SVDLLM.py) inverts ratio before use: ratio=1-CLI_ratio (keep fraction).
+    # Apply the same convention here so v2_0.8.pt means 80% singular values kept.
+    ratio_keep = 1.0 - args.ratio
+    print(f"Compressing with whitening_hetero (ratio={ratio_keep}) ...")
     whitening_hetero(
         model_name=model_name,
         model=model,
         profiling_mat=profiling_mat,
-        ratio=args.ratio,
+        ratio=ratio_keep,
         dev=dev,
         attn_ratio=args.attn_ratio,
         mlp_ratio=args.mlp_ratio,
@@ -81,7 +84,7 @@ def main():
         dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples,
                                     seed=args.seed, tokenizer=tokenizer,
                                     seqlen=args.model_seq_len)
-        whitening_local_update(args.model, model, dataloader, profiling_mat, args.ratio, dev)
+        whitening_local_update(args.model, model, dataloader, profiling_mat, ratio_keep, dev)
         ckpt_path = os.path.join(args.save_path, f"{model_prefix}_v2_then_update_{keep}.pt")
     else:
         ckpt_path = os.path.join(args.save_path, f"{model_prefix}_v2_{keep}.pt")

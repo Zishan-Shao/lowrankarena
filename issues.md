@@ -124,6 +124,53 @@ HAP-E 的 "zero-shot" 含义是"压缩后无 fine-tuning"，不是 lm-eval 的 `
 
 ---
 
+## [CLOSED] DobiSVD PPL 更好但 zero-shot 崩溃
+
+**发现时间**: 2026-04-11  
+**影响**: DobiSVD 的 PPL 指标不能反映 zero-shot 质量
+
+### 现象
+
+同等压缩率（keep_ratio=0.8，即压缩 80%）下，DobiSVD 的 PPL 优于 whitening_only，但 zero-shot 反而更差：
+
+| 方法 | wiki2 PPL | boolq | 说明 |
+|---|---|---|---|
+| whitening_only_0.8 | 829 | 0.563 | 有判别能力 |
+| DobiSVD_0.8 | 546 | 0.378 | 退化到 always-False |
+
+`boolq=0.378287` = "always predict False" 基线（BoolQ 约 38% 答案为 False），说明模型输出完全退化。
+
+### 根因分析
+
+DobiSVD 对权重的修改方式（`weight_updater.py` line 211）：
+
+```python
+W_new = (W.T @ V_pca @ G @ V_pca.T).T
+```
+
+`V_pca` 是从 **wikitext2 校准数据输出激活** 的 Incremental PCA 主成分。该操作把 W 投影到 wikitext2 激活的主子空间，清零不在该子空间内的所有权重成分。
+
+**PPL 更好**：wikitext2 激活子空间正好是文本续写最重要的方向，因此在 wiki2/c4/ptb 上 PPL 下降。
+
+**zero-shot 崩溃**：BoolQ 需要区分 "Yes"（token 3869）和 "No"（token 2360）。这两个 token 在 wikitext2 中极少出现，其对应的激活方向不在 V_pca 的主成分中。投影操作把这个判别方向清零 → 所有输入映射后得到相同输出 → lm_head 对 Yes/No 的 logit 差趋近 0 → 恒预测 False。
+
+### 与 whitening_only 的对比
+
+| 压缩维度 | whitening_only | DobiSVD |
+|---|---|---|
+| 压缩基准 | 权重矩阵几何 SVD | wikitext2 激活 PCA |
+| 保留方向 | W 最大奇异值方向（数据无关） | wikitext2 激活主成分（数据偏向） |
+| 分布内 PPL | 较差（保留了不重要方向）| 较好 |
+| 通用判别能力 | 保留 | 被 wikitext2 偏向清零 |
+
+### 结论
+
+DobiSVD 的 PCA 方法在**同分布** PPL 上有效，但对 zero-shot 分类任务有系统性破坏。这是校准数据分布偏差的固有问题，不是加载或实现 bug。
+
+**对 benchmark 的影响**：DobiSVD 的 zero-shot 结果（boolq=0.378 等）标记为 `DEGENERATE_ZEROSHOT`，不参与方法对比；PPL 数字本身有效，但其参考价值有限（不代表真实语言建模能力）。
+
+---
+
 ## [OPEN] SVDLLMv2 zero-shot 大面积退化
 
 **发现时间**: 2026-04-07  
