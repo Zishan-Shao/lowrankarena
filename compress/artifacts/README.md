@@ -10,4 +10,4 @@ Files written here are generated products, not hand-maintained source files. A c
 - `compression_log.json`: method-specific execution record.
 - `planned_command.sh`: optional command snapshot for externally executed methods.
 
-Only artifacts that are actually loadable should be registered into [`checkpoints/index.csv`](../../checkpoints/index.csv).
+Only artifacts that are actually loadable should be registered into [`checkpoints/index.csv`](../../checkpoints/index.csv) or a richer sidecar manifest under [`checkpoints/manifests/`](../../checkpoints/manifests/README.md).

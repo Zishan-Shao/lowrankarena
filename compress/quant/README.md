@@ -15,3 +15,4 @@ Quantization is kept as a first-class local path because it is the most likely c
 - Plan or execute quantized artifact generation.
 - Export metadata in the same shape used by the other compression families.
 - Stay aligned with the main benchmark runtime whenever practical.
+- Keep benchmark-time loading, eval, memory, and speed out of this directory.

@@ -7,4 +7,4 @@ The files here are project-owned summaries, not raw `lm-eval` dumps. Raw backend
 ## Expected Content
 
 - One JSON file per `suite x checkpoint`.
-- Stable top-level metadata for checkpoint identity, suite identity, backend version, and normalized task metrics.
+- Shared top-level schema plus eval-specific normalized task metrics in `metrics` and task-level detail in `details`.

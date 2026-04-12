@@ -13,28 +13,29 @@ authors = [
   { name = "LowRankArena" },
 ]
 dependencies = [
-  "huggingface_hub>=0.33",
-  "PyYAML>=6.0",
-  "safetensors>=0.5",
-  "transformers>=4.57,<4.58",
+  "torch==2.10.0",
+  "transformers==4.57.6",
+  "huggingface_hub==0.36.2",
+  "PyYAML==6.0.3",
+  "safetensors==0.5.3",
+  "sentencepiece==0.2.1",
+  "accelerate==1.10.1",
 ]
 
 [project.optional-dependencies]
 eval = [
-  "lm-eval==0.4.11",
+  "lm_eval==0.4.11",
+  "datasets==4.4.2",
+  "evaluate==0.4.5",
 ]
 speed = [
   "vllm==0.18.1",
-  "packaging>=24.0",
-  "ninja>=1.11",
-  "flash-attn>=2.8.3,<3",
 ]
 full = [
-  "lm-eval==0.4.11",
+  "lm_eval==0.4.11",
+  "datasets==4.4.2",
+  "evaluate==0.4.5",
   "vllm==0.18.1",
-  "packaging>=24.0",
-  "ninja>=1.11",
-  "flash-attn>=2.8.3,<3",
 ]
 
 [tool.setuptools]

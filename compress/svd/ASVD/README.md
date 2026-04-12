@@ -1,3 +1,11 @@
+# LowRankArena Note
+
+This directory is a vendored upstream ASVD baseline snapshot used by the `compress/` layer.
+
+- It is not part of the main LowRankArena benchmark runtime.
+- For benchmark-time eval, memory, and speed, use the top-level scripts under [`scripts/`](../../../scripts/README.md).
+- For arena-facing artifact generation, use the wrapper entrypoint in [`compress/svd/asvd.py`](../asvd.py).
+
 # ASVD: Activation-aware Singular Value Decomposition for Compressing Large Language Models
 
 This work explores a novel paradigm for reducing the memory footprint of LLMs to facilitate their wider adoption in various computing environments. We delve into the challenges of traditional low-rank decomposition methods in LLM compression, notably their dependency on extensive training data and computational resources. Addressing these limitations, we propose a training-free approach, including an innovative technique, Activation-aware Singular Value Decomposition (ASVD). ASVD effectively manages weight matrix outliers by adjusting values based on the activation distribution, improving decomposition accuracy and efficiency. Our method also addresses the varying sensitivity of different LLM layers to decomposition, with an iterative calibration process for optimal layer-specific decomposition. Experiments demonstrate that ASVD can compress network by 10\%-20\% without losing reasoning capacities. Additionally, it seamlessly integrates with quantization, showcasing its compatibility.

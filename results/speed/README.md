@@ -7,5 +7,5 @@ Each result file captures both aggregate statistics and per-case measurements so
 ## Expected Content
 
 - One JSON file per `suite x checkpoint`.
-- Aggregate throughput and latency summaries.
-- Per-workload case measurements keyed by prompt length, generation length, and batch size.
+- Shared top-level schema plus aggregate throughput and latency summaries in `metrics`.
+- Per-workload case measurements keyed by prompt length, generation length, and batch size in `details.cases`.

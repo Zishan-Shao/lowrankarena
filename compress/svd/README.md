@@ -13,6 +13,15 @@ The files here are not intended to form one monolithic runtime. Their job is to 
 - [`svd.py`](./svd.py): placeholder wrapper for plain SVD baselines.
 - [`svd_llm.py`](./svd_llm.py): adapter for SVD-LLM export planning.
 
+## Vendored Baselines
+
+Several upstream low-rank projects are vendored or mirrored here as reference baselines:
+
+- [`ASVD/`](./ASVD/README.md)
+- [`Basis_Sharing/`](./Basis_Sharing/README.md)
+- [`Dobi-SVD/`](./Dobi-SVD/readme.md)
+- [`SVD-LLM/`](./SVD-LLM/README.md)
+
 ## Scope
 
 - Build or plan low-rank artifacts.

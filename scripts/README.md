@@ -10,7 +10,7 @@ Each script is intentionally thin. It should parse arguments, resolve the reques
 - [`run_memory.py`](./run_memory.py): run a single Transformers-based memory measurement for one checkpoint.
 - [`run_speed.py`](./run_speed.py): run a single vLLM speed suite against one checkpoint.
 - [`measure_peak_memory.py`](./measure_peak_memory.py): compatibility alias for `run_memory.py`.
-- [`run_main.py`](./run_main.py): execute aggregate benchmark suites such as [`benchmark/main.yaml`](../benchmark/main.yaml).
+- [`run_main.py`](./run_main.py): execute aggregate benchmark suites such as [`benchmark/main.yaml`](../benchmark/main.yaml). This currently aggregates accuracy and speed suites, not memory.
 - [`run_all.py`](./run_all.py): compatibility alias for `run_main.py`.
 - [`run_compress.py`](./run_compress.py): plan or dispatch optional artifact-generation flows from [`compress/`](../compress/README.md).
 - [`make_table.py`](./make_table.py): build lightweight table artifacts from normalized result JSON files.
@@ -21,3 +21,4 @@ Each script is intentionally thin. It should parse arguments, resolve the reques
 - Keep CLI behavior explicit and inspectable.
 - Avoid duplicating business logic across multiple scripts.
 - Preserve a stable user interface even as runners evolve.
+- Keep filesystem outputs predictable: checkpoint artifacts belong in `checkpoints/`, and benchmark outputs belong in `results/`.

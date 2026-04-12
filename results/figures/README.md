@@ -2,7 +2,7 @@
 
 This directory stores derived figures.
 
-It is reserved for generated plots, charts, and publication-ready visual summaries built from normalized benchmark outputs.
+It is reserved for generated plots, charts, and publication-ready visual summaries built from normalized benchmark outputs in `eval`, `memory`, and `speed`.
 
 ## Principle
 

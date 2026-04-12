@@ -14,4 +14,4 @@ The default convention is one file per checkpoint ID:
 
 - `<checkpoint_id>.json`
 
-`src/arena.py` can import a manifest directly and optionally persist its simplified registry row into `checkpoints/index.csv`.
+Use [`scripts/add_checkpoint.py`](../../scripts/add_checkpoint.py) or [`src/arena.py`](../../src/arena.py) to import a manifest and optionally persist its simplified runnable row into [`checkpoints/index.csv`](../index.csv).

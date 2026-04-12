@@ -15,3 +15,4 @@ The key design choice is that runtime support is grouped by supported base-model
 - Base architecture must belong to a supported family.
 - Compressed linear layers must be exported in the arena `ABLinear` schema.
 - Family-specific runtime files are copied into exported Hugging Face artifacts as the remote-code boundary.
+- vLLM-specific checkpoint preparation does not live here; that belongs in [`src/vllm/`](../vllm/README.md).

@@ -1,6 +1,6 @@
 # `src/vllm/`
 
-This folder contains the vLLM-specific adapter and prototype utilities used to make certain LowRankArena checkpoints loadable by vLLM.
+This folder contains the vLLM-specific adapter code and prototype utilities used to make certain LowRankArena checkpoints loadable by vLLM.
 
 ## Why this exists
 
@@ -11,7 +11,7 @@ The original SVD-LLM HF artifact for `llama_7b/SVDLLM/jeffwan_llama_7b_hf_whiten
 
 The wrapper generated here keeps the original weights untouched and only adds the missing base-model registration needed by vLLM.
 
-Materialized wrapper checkpoints should live under [`checkpoints/vllm/`](../../checkpoints/vllm/README.md), and benchmark outputs should live under [`results/`](../../results/README.md).
+Materialized wrapper checkpoints should live under [`checkpoints/vllm/`](../../checkpoints/vllm/README.md), and benchmark outputs should live under [`results/`](../../results/README.md). `src/vllm/` itself is code-only.
 
 The runtime scripts default to a compact terminal mode:
 
@@ -19,15 +19,15 @@ The runtime scripts default to a compact terminal mode:
 - disable checkpoint-load tqdm bars
 - print short wrapper-owned stage updates instead
 
-If you need raw vLLM logs for debugging, add `--verbose-vllm`.
+If you need raw vLLM logs for debugging, add `--verbose-vllm` on the prototype scripts or `--verbose-backend` on the main runner.
 
 Because this folder is named `vllm/`, the runtime entrypoints explicitly resolve the installed vLLM package from the conda environment so the local folder name does not shadow the backend package.
 
 ## Files
 
 - `prepare_svdllm_vllm_model.py`: build a local wrapper model directory from an existing SVD-LLM checkpoint.
-- `vllm_adapter.py`: prototype `prepare_model_for_vllm(...)` adapter that decides whether direct vLLM loading is possible.
-- `prototype_speed_runner.py`: prototype `src/speed_runner.py` replacement that calls the adapter before `LLM(...)`.
+- `vllm_adapter.py`: the adapter that decides whether direct vLLM loading is possible or whether a wrapper checkpoint is required.
+- `prototype_speed_runner.py`: a standalone prototype of the same flow now used by the main speed runner.
 - `test_vllm_svdllm.py`: run a minimal vLLM generation smoke test.
 - `benchmark_vllm_svdllm.py`: run a simple latency/throughput benchmark on the wrapper model.
 
@@ -61,4 +61,4 @@ CUDA_VISIBLE_DEVICES=0 python /home/zs89/lowrankarena/src/vllm/prototype_speed_r
   --enforce-eager
 ```
 
-The last command is the important one for future LowRankArena integration: it mirrors the current `src/speed_runner.py` flow, but inserts `prepare_model_for_vllm(...)` between `load_checkpoint(...)` and `vllm.LLM(...)`.
+The last command mirrors the same preparation step now used by the main [`src/speed_runner.py`](../speed_runner.py).

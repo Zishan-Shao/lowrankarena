@@ -19,3 +19,4 @@ The current test suite is intentionally pragmatic. It focuses on schema, layout,
 
 - Fast structural checks.
 - No requirement to reproduce full benchmark workloads inside unit tests.
+- Prefer pure-Python helper coverage over GPU-heavy end-to-end tests.

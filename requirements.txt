@@ -1,15 +1,24 @@
-# Core
-huggingface_hub>=0.33
-PyYAML>=6.0
-safetensors>=0.5
-transformers>=4.57,<4.58
-pytest>=8.0
+# LowRankArena tested benchmark/runtime stack.
+#
+# These pins match the versions used to validate the current repo-owned flows:
+# load, eval, memory, speed, and demo.
+#
+# Vendored upstream compression baselines under compress/ may still require
+# additional method-specific packages or separate environments.
 
-# Evaluation / serving
-lm-eval==0.4.11
+# Core runtime
+torch==2.10.0
+transformers==4.57.6
+huggingface_hub==0.36.2
+PyYAML==6.0.3
+safetensors==0.5.3
+sentencepiece==0.2.1
+accelerate==1.10.1
+
+# Accuracy / evaluation
+lm_eval==0.4.11
+datasets==4.4.2
+evaluate==0.4.5
+
+# Speed
 vllm==0.18.1
-
-# FlashAttention-2
-packaging>=24.0
-ninja>=1.11
-flash-attn>=2.8.3,<3

@@ -7,4 +7,5 @@ These files are intended to separate active per-process inference peaks from res
 ## Expected Content
 
 - One JSON file per checkpoint invocation.
-- Stable top-level metadata for checkpoint identity, backend identity, runtime config, and peak-memory metrics.
+- Shared top-level schema plus memory-specific peak numbers in `metrics` and breakdowns in `details`.
+- Legacy `peak_memory__*.json` files may still appear from the older compatibility script path, but new runs should prefer the normalized `memory__*.json` naming.

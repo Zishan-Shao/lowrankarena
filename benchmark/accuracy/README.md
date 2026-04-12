@@ -2,7 +2,7 @@
 
 This directory contains accuracy-oriented benchmark suites.
 
-All suites in this directory are specified in terms of exact `lm-eval-harness 0.4.11` task or group names. The Python runner is responsible for turning these configs into `lm-eval run ...` executions and normalizing the output format.
+All suites in this directory are specified in terms of exact `lm-eval-harness 0.4.11` task or group names. The Python runner turns these configs into `lm-eval run ...` executions through [`scripts/run_eval.py`](../../scripts/run_eval.py) and [`src/lm_eval_runner.py`](../../src/lm_eval_runner.py), then writes normalized outputs to [`results/eval/`](../../results/eval/README.md).
 
 ## Files
 
@@ -15,3 +15,4 @@ All suites in this directory are specified in terms of exact `lm-eval-harness 0.
 - Use canonical `lm-eval` task IDs rather than project-local aliases.
 - Record metric preference in the suite config so downstream scoring stays deterministic.
 - Keep environment caveats in the suite that requires them, not in the runner.
+- Keep suite files focused on task selection and metric intent; runtime flags belong in the CLI.

@@ -2,7 +2,7 @@
 
 This directory contains speed benchmark specifications.
 
-Speed suites are intentionally separate from accuracy suites because their runtime, metrics, and failure modes are different. These configs are executed by the vLLM-based runner in [`src/speed_runner.py`](../../src/speed_runner.py).
+Speed suites are intentionally separate from accuracy suites because their runtime, metrics, and failure modes are different. These configs are executed by the vLLM-based runner in [`src/speed_runner.py`](../../src/speed_runner.py), which may first prepare a checkpoint through the [`src/vllm/`](../../src/vllm/README.md) adapter layer.
 
 ## Files
 

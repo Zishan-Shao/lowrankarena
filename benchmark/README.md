@@ -10,6 +10,8 @@ It contains declarative suite specifications only. Execution logic lives in [`sc
 - [`accuracy/`](./accuracy/README.md): accuracy suites backed by `lm-eval-harness 0.4.11`.
 - [`speed/`](./speed/README.md): offline inference speed suites backed by vLLM.
 
+Memory is currently handled by the dedicated CLI path in [`scripts/run_memory.py`](../scripts/run_memory.py) rather than a YAML suite tree under `benchmark/`.
+
 ## Design Intent
 
 - Keep benchmark definitions human-readable and reviewable.

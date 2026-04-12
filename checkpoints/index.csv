@@ -1,4 +1,5 @@
 name,model_family,variant,method,source,repo_id,revision,subpath,benchmarks,enabled,notes
+llama-7b-svdllm-v1-update-0.5,llama,base,svdllm_v1_update,huggingface,Duke-CEI-SVD/LowRankArena,6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6,llama_7b/SVDLLM/jeffwan_llama_7b_hf_whitening_then_update_keep50_hf,main|speed|quant,true,Exact HF export path for the SVD-LLM v1 keep50 LLaMA-7B checkpoint used to validate vLLM speed integration.
 llama2-7b,llama2,base,pending,huggingface,Duke-CEI-SVD/LowRankArena,main,llama2_7b,main|speed|pruning|quant,true,Top-level folder observed in the HF repo. Expand to exact exported checkpoints later.
 llama31-8b,llama3.1,base,pending,huggingface,Duke-CEI-SVD/LowRankArena,main,llama31_8b,main|speed|modern|pruning|quant,true,Top-level folder observed in the HF repo. Expand to exact exported checkpoints later.
 llama31-8b-svdllm-0.6,llama3.1,base,svdllm,huggingface,Duke-CEI-SVD/LowRankArena,main,llama31_8b/SVDLLMv1/hf_whitening_then_update_0.6,main|speed|modern|quant,true,Alias to the base-model SVDLLMv1 0.6 export. Chosen as the default 0.6 entry because prior local benchmarks referenced hf_whitening_then_update_0.6.

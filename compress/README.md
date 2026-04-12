@@ -9,6 +9,7 @@ LowRankArena has two clean paths:
 1. Default reviewer path:
    - load released checkpoints
    - run unified eval
+   - run unified memory measurement
    - run unified speed tests
    - export tables
 2. Optional author/extender path:
@@ -16,7 +17,7 @@ LowRankArena has two clean paths:
    - generate a compressed artifact
    - save it in a benchmark-friendly format
    - optionally register it into `checkpoints/index.csv`
-   - then run the same eval and speed flow
+   - then run the same eval, memory, and speed flow
 
 The main benchmark does **not** depend on re-running compression. `compress/` exists for transparency, small-scale reruns, and extensions to new methods.
 
@@ -141,6 +142,7 @@ Some SVD baselines are already vendored locally:
 - `compress/svd/ASVD`
 - `compress/svd/Dobi-SVD`
 - `compress/svd/SVD-LLM`
+- `compress/svd/Basis_Sharing`
 
 Other baselines are resolved through the registry in `compress/common.py` and can be cloned on demand by `scripts/run_compress.py --clone-baseline`.
 

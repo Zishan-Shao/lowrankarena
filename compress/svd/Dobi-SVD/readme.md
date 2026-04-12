@@ -1,3 +1,11 @@
+# LowRankArena Note
+
+This directory is a vendored upstream Dobi-SVD baseline snapshot used by the `compress/` layer.
+
+- It is not part of the main LowRankArena benchmark runtime.
+- For benchmark-time eval, memory, and speed, use the top-level scripts under [`scripts/`](../../../scripts/README.md).
+- For arena-facing artifact generation, use the wrapper entrypoint in [`compress/svd/dobi_svd.py`](../dobi_svd.py).
+
 <p align="center">
 <img src="fig/logo2.png" width="30%"> <br>
 </p>
@@ -279,4 +287,3 @@ Differences in the primary contributions of the two co–first authors:
 **Jinghan Ke** — Implemented the Taylor-expansion–based solution to the gradient-explosion issue; leveraged quantization-friendly properties to perform remapping, addressing the theoretical bottleneck that singular-value information is under-utilized during truncation; vision-related work: designed the overview figure, created the Dobi-style project page (including several descriptions not present in the paper, reflecting personal perspectives and interpretations), and produced the project video.
 
 Note: The final results were made possible by extensive joint discussion, experimentation, cross-validation, and mutual critique. **When contacting us by email, please include both authors.**
-

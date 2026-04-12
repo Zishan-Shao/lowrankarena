@@ -16,3 +16,4 @@ As with [`compress/svd/`](../svd/README.md), the unification target is the expor
 - Resolve pruning-specific build requests.
 - Preserve method identity and metadata in exported manifests.
 - Keep external pruning repos optional and replaceable.
+- Keep benchmark-time loading, eval, memory, and speed out of this directory.

@@ -2,7 +2,7 @@
 
 This directory stores derived table artifacts.
 
-These files are typically generated from normalized JSON in [`results/eval/`](../eval/README.md) and [`results/speed/`](../speed/README.md), then consumed by README updates, internal review, or paper drafting.
+These files are typically generated from normalized JSON in [`results/eval/`](../eval/README.md), [`results/memory/`](../memory/README.md), and [`results/speed/`](../speed/README.md), then consumed by README updates, internal review, or paper drafting.
 
 ## Typical Outputs
 
