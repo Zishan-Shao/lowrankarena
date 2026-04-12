@@ -1,0 +1,102 @@
+{
+  "artifacts": {},
+  "backend": {
+    "name": "transformers",
+    "version": null
+  },
+  "checkpoint": {
+    "benchmarks": [
+      "main",
+      "speed",
+      "quant"
+    ],
+    "enabled": true,
+    "locator": "hf://Duke-CEI-SVD/LowRankArena@6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama_7b/SVDLLM/jeffwan_llama_7b_hf_whitening_then_update_keep50_hf",
+    "method": "svdllm_v1_update",
+    "model_family": "llama",
+    "name": "llama-7b-svdllm-v1-update-0.5",
+    "notes": "Exact HF export path for the SVD-LLM v1 keep50 LLaMA-7B checkpoint used to validate vLLM speed integration.",
+    "repo_id": "Duke-CEI-SVD/LowRankArena",
+    "revision": "6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6",
+    "source": "huggingface",
+    "subpath": "llama_7b/SVDLLM/jeffwan_llama_7b_hf_whitening_then_update_keep50_hf",
+    "variant": "base"
+  },
+  "config": {
+    "attn_implementation": null,
+    "batch_size": 1,
+    "device": "cuda:0",
+    "dtype": "torch.float16",
+    "generation_length_actual": 8,
+    "generation_length_requested": 8,
+    "local_files_only": false,
+    "prompt_length": 32,
+    "trust_remote_code": true
+  },
+  "details": {
+    "estimated_dense_kv": {
+      "bytes_per_token": 524288,
+      "bytes_per_token_gib": 0.00048828125,
+      "cached_tokens_at_peak": 39,
+      "estimated_peak_kv_bytes": 20447232,
+      "estimated_peak_kv_gib": 0.01904296875
+    },
+    "inference": {
+      "allocated_bytes": 7110010880,
+      "max_allocated_bytes": 7131457024,
+      "max_reserved_bytes": 7686062080,
+      "peak_allocated_gib": 6.641686916351318,
+      "peak_reserved_gib": 7.158203125,
+      "reserved_bytes": 7686062080
+    },
+    "load": {
+      "allocated_bytes": 7101489664,
+      "allocated_gib": 6.6137776374816895,
+      "max_allocated_bytes": 7101489664,
+      "max_reserved_bytes": 7639924736,
+      "reserved_bytes": 7639924736,
+      "reserved_gib": 7.115234375
+    }
+  },
+  "generated_at": "2026-04-12T20:13:31.629552+00:00",
+  "kind": "memory",
+  "metrics": {
+    "buffer_bytes": 256,
+    "buffer_gib": 2.384185791015625e-07,
+    "delta_peak_allocated_bytes_from_load": 29967360,
+    "delta_peak_allocated_gib_from_load": 0.027909278869628906,
+    "delta_peak_reserved_bytes_from_load": 46137344,
+    "delta_peak_reserved_gib_from_load": 0.04296875,
+    "estimated_dense_kv_bytes_per_token": 524288,
+    "estimated_dense_kv_bytes_per_token_gib": 0.00048828125,
+    "estimated_peak_dense_kv_bytes": 20447232,
+    "estimated_peak_dense_kv_gib": 0.01904296875,
+    "load_allocated_bytes": 7101489664,
+    "load_allocated_gib": 6.6137776374816895,
+    "load_reserved_bytes": 7639924736,
+    "load_reserved_gib": 7.115234375,
+    "parameter_bytes": 6999056384,
+    "parameter_gib": 6.518379211425781,
+    "peak_allocated_bytes": 7131457024,
+    "peak_allocated_gib": 6.641686916351318,
+    "peak_reserved_bytes": 7686062080,
+    "peak_reserved_gib": 7.158203125
+  },
+  "runtime": {
+    "device_memory_before_load": {
+      "free_bytes": 72789196800,
+      "free_gib": 67.79022216796875,
+      "total_bytes": 84974239744,
+      "total_gib": 79.138427734375
+    },
+    "model_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama_7b/SVDLLM/jeffwan_llama_7b_hf_whitening_then_update_keep50_hf",
+    "synthetic_input_token_id": 1
+  },
+  "schema_version": "1.0",
+  "status": "completed",
+  "suite": {
+    "id": "memory",
+    "name": "memory",
+    "path": null
+  }
+}

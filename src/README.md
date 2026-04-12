@@ -14,10 +14,13 @@ The guiding rule is simple: benchmark policy lives in [`benchmark/`](../benchmar
 - [`registry.py`](./registry.py): read, filter, and update checkpoint manifest records.
 - [`benchmarking.py`](./benchmarking.py): resolve suite paths and select checkpoints for a suite.
 - [`lm_eval_runner.py`](./lm_eval_runner.py): thin wrapper around `lm-eval run ...`, plus result normalization.
+- [`memory_runner.py`](./memory_runner.py): Transformers-based active-memory measurement runner.
 - [`speed_runner.py`](./speed_runner.py): vLLM-backed offline generation speed runner.
 - [`scoring.py`](./scoring.py): task-level metric selection and summary reduction helpers.
 - [`report.py`](./report.py): lightweight result discovery and table generation.
 - [`eval.py`](./eval.py): compatibility wrapper that forwards eval requests to the real runner.
+- [`memory.py`](./memory.py): compatibility wrapper that forwards memory requests to the real runner.
+- [`result_schema.py`](./result_schema.py): shared top-level JSON schema builder for normalized benchmark outputs.
 - [`speed.py`](./speed.py): compatibility wrapper that forwards speed requests to the real runner.
 - [`utils.py`](./utils.py): shared filesystem, JSON, YAML, and timestamp helpers.
 

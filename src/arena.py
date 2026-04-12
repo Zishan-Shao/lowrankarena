@@ -8,6 +8,8 @@ from typing import Any, Iterator
 
 from src.benchmarking import BENCHMARK_ROOT, resolve_suite_path
 from src.lm_eval_runner import LmEvalRequest, run_lm_eval_suite
+from src.memory_runner import MemoryRequest as RunnerMemoryRequest
+from src.memory_runner import run_memory_measurement
 from src.registry import (
     DEFAULT_INDEX_PATH,
     CheckpointRecord,
@@ -361,6 +363,38 @@ class Arena:
                     enforce_eager=enforce_eager,
                     trust_remote_code=trust_remote_code,
                     local_files_only=local_files_only,
+                )
+            )
+        return asdict(result)
+
+    def memory(
+        self,
+        checkpoint_id: str,
+        *,
+        output_dir: str | Path | None = None,
+        device: str = "cuda:0",
+        dtype: str = "float16",
+        batch_size: int = 1,
+        prompt_length: int = 32,
+        generation_length: int = 8,
+        attn_implementation: str | None = None,
+        local_files_only: bool = False,
+        verbose_backend: bool = False,
+    ) -> dict[str, Any]:
+        with self._runtime_index() as index_path:
+            result = run_memory_measurement(
+                RunnerMemoryRequest(
+                    checkpoint_name=checkpoint_id,
+                    index_path=index_path,
+                    output_dir=output_dir,
+                    device=device,
+                    dtype=dtype,
+                    batch_size=batch_size,
+                    prompt_length=prompt_length,
+                    generation_length=generation_length,
+                    attn_implementation=attn_implementation,
+                    local_files_only=local_files_only,
+                    verbose_backend=verbose_backend,
                 )
             )
         return asdict(result)

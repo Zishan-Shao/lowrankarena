@@ -50,6 +50,8 @@ def run_speed(request: SpeedRequest, index_path: str | None = None) -> SpeedResu
             gpu_memory_utilization=request.extra.get("gpu_memory_utilization"),
             dtype=request.extra.get("dtype"),
             enforce_eager=request.extra.get("enforce_eager"),
+            verbose_backend=bool(request.extra.get("verbose_backend", False)),
+            show_progress=bool(request.extra.get("show_progress", False)),
         )
     )
     return SpeedResult(

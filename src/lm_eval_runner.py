@@ -8,10 +8,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from src.benchmarking import suite_id, suite_output_name
+from src.benchmarking import suite_output_name
 from src.load import CheckpointLoadError, LoadedCheckpoint, load_checkpoint
+from src.result_schema import build_result_payload
 from src.scoring import normalize_lm_eval_tasks
-from src.utils import dump_json, ensure_dir, load_json, load_yaml, project_path, utc_timestamp
+from src.utils import dump_json, ensure_dir, load_json, load_yaml, project_path
 
 
 DEFAULT_LM_EVAL_BIN = os.environ.get("LRA_LM_EVAL_BIN", "lm-eval")
@@ -168,38 +169,38 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
         "scored_task_count": summary["scored_task_count"],
     }
 
-    payload = {
-        "kind": "eval",
-        "backend": eval_config.get("backend", "lm_eval_harness"),
-        "backend_version": raw_payload.get("lm_eval_version"),
-        "checkpoint": loaded.record.name,
-        "suite": suite_output_name(suite_path),
-        "suite_name": suite_config.get("name", suite_path.stem),
-        "suite_path": suite_id(suite_path),
-        "status": "completed",
-        "locator": loaded.locator,
-        "metrics": metrics,
-        "summary": summary,
-        "tasks": tasks,
-        "meta": {
-            "model_family": loaded.record.model_family,
-            "variant": loaded.record.variant,
-            "method": loaded.record.method,
-            "source": loaded.record.source,
-            "repo_id": loaded.record.repo_id,
-            "revision": loaded.record.revision,
-            "subpath": loaded.record.subpath,
-            "benchmarks": loaded.record.benchmarks,
-            "notes": loaded.record.notes,
+    payload = build_result_payload(
+        kind="eval",
+        record=loaded.record,
+        locator=loaded.locator,
+        backend_name=eval_config.get("backend", "lm_eval_harness"),
+        backend_version=raw_payload.get("lm_eval_version"),
+        suite_path=suite_path,
+        suite_name=suite_config.get("name", suite_path.stem),
+        config={
+            "tasks": [str(task) for task in eval_config.get("tasks", [])],
+            "metric": eval_config.get("metric"),
+            "metric_fallbacks": [str(item) for item in eval_config.get("metric_fallbacks", [])],
+            "device": request.device if request.device is not None else eval_config.get("device"),
+            "batch_size": request.batch_size if request.batch_size is not None else eval_config.get("batch_size"),
+            "limit": request.limit if request.limit is not None else eval_config.get("limit"),
+            "num_fewshot": request.num_fewshot if request.num_fewshot is not None else eval_config.get("num_fewshot"),
+            "model_backend": request.model_backend,
         },
-        "raw": {
+        metrics=metrics,
+        artifacts={
             "command": shlex.join(command),
             "result_path": str(raw_result_path),
+        },
+        runtime={
             "config": raw_payload.get("config", {}),
             "n_samples": raw_payload.get("n-samples", {}),
         },
-        "generated_at": utc_timestamp(),
-    }
+        details={
+            "summary": summary,
+            "tasks": tasks,
+        },
+    )
     output_path = dump_json(payload, _result_path_for(request))
     return LmEvalResult(
         checkpoint_name=request.checkpoint_name,

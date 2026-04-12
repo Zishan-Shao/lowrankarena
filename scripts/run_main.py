@@ -53,6 +53,7 @@ def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> lis
                     gpu_memory_utilization=args.speed_gpu_memory_utilization,
                     max_model_len=args.speed_max_model_len,
                     enforce_eager=True if args.speed_enforce_eager else None,
+                    show_progress=True,
                 )
             )
         else:

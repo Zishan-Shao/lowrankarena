@@ -30,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dtype", default=None)
     parser.add_argument("--max-model-len", type=int, default=None)
     parser.add_argument("--enforce-eager", action="store_true")
+    parser.add_argument("--verbose-backend", action="store_true", help="Show raw vLLM logs.")
     return parser.parse_args()
 
 
@@ -52,6 +53,8 @@ def main() -> None:
             dtype=args.dtype,
             max_model_len=args.max_model_len,
             enforce_eager=True if args.enforce_eager else None,
+            verbose_backend=args.verbose_backend,
+            show_progress=True,
         )
     )
     print(json.dumps(asdict(result), indent=2, sort_keys=True))

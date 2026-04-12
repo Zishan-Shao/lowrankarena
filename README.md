@@ -9,6 +9,7 @@ LowRankArena is a benchmark repository for evaluating low-rank checkpoints, comp
 - Rich per-checkpoint sidecar metadata can live under `checkpoints/manifests/`.
 - The source of truth for hosted checkpoints is the gated Hugging Face repository: `Duke-CEI-SVD/LowRankArena`.
 - `compress/` is optional. Main benchmark runs should load released checkpoints directly.
+- Normalized benchmark outputs now share one project-owned top-level JSON schema across `eval`, `speed`, and `memory`.
 
 ## Environment
 
@@ -79,9 +80,12 @@ lowrankarena/
 │   ├── loader.py
 │   ├── benchmarking.py
 │   ├── lm_eval_runner.py
+│   ├── memory_runner.py
 │   ├── speed_runner.py
 │   ├── scoring.py
 │   ├── eval.py
+│   ├── memory.py
+│   ├── result_schema.py
 │   ├── speed.py
 │   ├── report.py
 │   ├── registry.py
@@ -96,6 +100,7 @@ lowrankarena/
 │   └── main.yaml
 ├── scripts/
 │   ├── run_eval.py
+│   ├── run_memory.py
 │   ├── run_speed.py
 │   ├── run_all.py
 │   ├── run_main.py
@@ -104,11 +109,14 @@ lowrankarena/
 │   └── add_checkpoint.py
 ├── checkpoints/
 │   ├── index.csv
+│   ├── vllm/
+│   │   └── README.md
 │   ├── manifests/
 │   │   └── README.md
 │   └── README.md
 ├── results/
 │   ├── eval/
+│   ├── memory/
 │   ├── speed/
 │   ├── tables/
 │   └── figures/
@@ -124,17 +132,18 @@ lowrankarena/
    - maintain released checkpoint metadata in `checkpoints/index.csv`
    - load checkpoints directly with `src/load.py` / `src/loader.py`
    - run accuracy suites through `src/lm_eval_runner.py`
+   - run active-memory checks through `src/memory_runner.py`
    - run speed suites through `src/speed_runner.py`
-   - use `scripts/run_eval.py`, `scripts/run_speed.py`, and `scripts/run_main.py` as CLI entrypoints
+   - use `scripts/run_eval.py`, `scripts/run_memory.py`, `scripts/run_speed.py`, and `scripts/run_main.py` as CLI entrypoints
 2. Optional author/extender path:
    - generate a local artifact with `scripts/run_compress.py`
    - export a uniform manifest under `compress/artifacts/`
    - optionally register the artifact into `checkpoints/index.csv`
-   - then run the normal eval and speed flow
+   - then run the normal eval, memory, and speed flow
 
 ## Programmatic API
 
-The minimal public API is `Arena`. It wraps the existing registry, loader, eval, speed, and reporting modules without introducing a second object model.
+The minimal public API is `Arena`. It wraps the existing registry, loader, eval, memory, speed, and reporting modules without introducing a second object model.
 
 ```python
 from src import Arena
@@ -160,18 +169,21 @@ The benchmark configs are now separated by objective:
 - `benchmark/accuracy/mcq.yaml` for exact lm-eval-harness `0.4.11` MCQ task IDs: `boolq`, `arc_easy`, `arc_challenge`, `winogrande`, `piqa`, `hellaswag`, `openbookqa`
 - `benchmark/accuracy/ppl.yaml` for exact lm-eval-harness `0.4.11` rolling-loglikelihood task IDs: `wikitext`, `paloma_ptb`, `c4`
 - `benchmark/accuracy/mmlu.yaml` for the official lm-eval-harness `0.4.11` group name: `mmlu`
+- `scripts/run_memory.py` for Transformers-based active peak-memory measurement
 - `benchmark/speed/speed.yaml` for vLLM offline inference speed
 - `benchmark/main.yaml` as the aggregate entrypoint
 
 Accuracy configs intentionally use the exact task names exposed by lm-eval-harness. In particular, `c4_stream` is not an lm-eval-harness `0.4.11` task ID in the current environment, so the benchmark config uses `c4` instead.
 
 The accuracy runner calls the `lm-eval run ...` CLI rather than importing deep harness internals. The speed runner uses the `vllm.LLM` Python API directly.
+The memory runner uses plain `transformers` generation plus `torch.cuda.max_memory_allocated()` so its peak measurements are not inflated by vLLM KV-cache reservation.
 
 Two practical caveats from local smoke runs:
 
 - `benchmark/accuracy/ppl.yaml` uses `paloma_ptb`, which requires access to the gated `allenai/paloma` dataset on Hugging Face.
 - On shared GPU machines, `scripts/run_speed.py` may need a lower `--gpu-memory-utilization` value than the default benchmark config, and `--enforce-eager` can be useful for smoke runs.
 - For custom long-context exports, `scripts/run_speed.py --max-model-len <N>` can be necessary to keep vLLM KV-cache requirements aligned with the actual benchmark prompt lengths.
+- `scripts/run_memory.py` measures this process only, so other jobs on the same GPU can still cause OOM, but they do not pollute the reported `peak_allocated` value.
 
 ## Loader Example
 
@@ -208,6 +220,14 @@ This writes a planned local artifact under `compress/artifacts/` with:
 - `planned_command.sh` when the method has a known external command template
 
 For more detail, see `compress/README.md`.
+
+## Common Commands
+
+```bash
+python scripts/run_eval.py llama31-8b-baseline --suite accuracy/mcq
+python scripts/run_memory.py llama-7b-svdllm-v1-update-0.5 --batch-size 1 --prompt-length 32 --generation-length 8
+python scripts/run_speed.py llama-7b-svdllm-v1-update-0.5 --batch-size 1 --prompt-length 32 --generation-length 8 --repeat 1 --warmup 0
+```
 
 ## Next Build Steps
 

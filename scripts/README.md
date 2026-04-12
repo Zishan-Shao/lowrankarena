@@ -7,7 +7,9 @@ Each script is intentionally thin. It should parse arguments, resolve the reques
 ## Entry Points
 
 - [`run_eval.py`](./run_eval.py): run a single accuracy suite against one checkpoint through `lm-eval-harness`.
+- [`run_memory.py`](./run_memory.py): run a single Transformers-based memory measurement for one checkpoint.
 - [`run_speed.py`](./run_speed.py): run a single vLLM speed suite against one checkpoint.
+- [`measure_peak_memory.py`](./measure_peak_memory.py): compatibility alias for `run_memory.py`.
 - [`run_main.py`](./run_main.py): execute aggregate benchmark suites such as [`benchmark/main.yaml`](../benchmark/main.yaml).
 - [`run_all.py`](./run_all.py): compatibility alias for `run_main.py`.
 - [`run_compress.py`](./run_compress.py): plan or dispatch optional artifact-generation flows from [`compress/`](../compress/README.md).

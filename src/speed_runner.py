@@ -7,10 +7,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.benchmarking import suite_id, suite_output_name
+from src.benchmarking import suite_output_name
 from src.load import load_checkpoint
+from src.result_schema import build_result_payload
 from src.scoring import summarize_speed_cases
-from src.utils import dump_json, ensure_dir, load_yaml, project_path, utc_timestamp
+from src.utils import dump_json, ensure_dir, load_yaml, project_path
+from src.vllm.external_vllm import import_installed_vllm, installed_vllm_version
+from src.vllm.terminal_ui import ProgressPrinter, configure_runtime_environment, use_safe_vllm_cwd
+from src.vllm.vllm_adapter import prepare_model_for_vllm
 
 
 @dataclass(slots=True)
@@ -31,6 +35,8 @@ class VllmSpeedRequest:
     enforce_eager: bool | None = None
     trust_remote_code: bool = True
     local_files_only: bool = False
+    verbose_backend: bool = False
+    show_progress: bool = False
 
 
 @dataclass(slots=True)
@@ -59,6 +65,12 @@ def _result_path_for(request: VllmSpeedRequest) -> Path:
 
 
 def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
+    configure_runtime_environment(verbose_vllm=request.verbose_backend)
+    progress = ProgressPrinter(
+        total_steps=4,
+        enabled=request.show_progress and not request.verbose_backend,
+    )
+    progress.step(1, "Loading speed suite")
     suite_path = Path(request.suite_path)
     suite_config = load_yaml(suite_path)
     if suite_config.get("kind") != "speed":
@@ -88,6 +100,7 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
     )
     enforce_eager = bool(request.enforce_eager if request.enforce_eager is not None else speed_config.get("enforce_eager", False))
 
+    progress.step(2, "Preparing checkpoint for vLLM")
     loaded = load_checkpoint(
         request.checkpoint_name,
         index_path=str(request.index_path),
@@ -95,22 +108,36 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         local_files_only=request.local_files_only,
         trust_remote_code=request.trust_remote_code,
     )
-    model_path = loaded.local_path or loaded.locator
+    prepared = prepare_model_for_vllm(
+        loaded,
+        wrapper_cache_root=project_path("checkpoints", "vllm"),
+    )
 
     from transformers import AutoTokenizer
-    from vllm import LLM, SamplingParams
+    installed_vllm = import_installed_vllm()
+    LLM = installed_vllm.LLM
+    SamplingParams = installed_vllm.SamplingParams
 
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=request.trust_remote_code)
-    llm = LLM(
-        model=model_path,
+    tokenizer = AutoTokenizer.from_pretrained(
+        prepared.tokenizer_path,
+        **prepared.build_tokenizer_kwargs(trust_remote_code=request.trust_remote_code),
+    )
+
+    llm_kwargs = prepared.build_llm_kwargs(
         tensor_parallel_size=tensor_parallel_size,
         trust_remote_code=request.trust_remote_code,
         gpu_memory_utilization=gpu_memory_utilization,
         dtype=dtype,
-        max_model_len=max_model_len,
         enforce_eager=enforce_eager,
+        max_model_len=max_model_len,
+        disable_log_stats=not request.verbose_backend,
     )
 
+    with progress.waiting(3, "Initializing vLLM engine"):
+        with use_safe_vllm_cwd():
+            llm = LLM(**llm_kwargs)
+
+    progress.step(4, "Running speed cases")
     cases: list[dict[str, Any]] = []
     for prompt_length in prompt_lengths:
         prompt_token_ids = _build_prompt_token_ids(tokenizer, prompt_length)
@@ -159,45 +186,41 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
                 )
 
     stats = summarize_speed_cases(cases)
-    payload = {
-        "kind": "speed",
-        "backend": speed_config.get("backend", "vllm"),
-        "backend_version": None,
-        "checkpoint": loaded.record.name,
-        "suite": suite_output_name(suite_path),
-        "suite_name": suite_config.get("name", suite_path.stem),
-        "suite_path": suite_id(suite_path),
-        "status": "completed",
-        "locator": loaded.locator,
-        "stats": stats,
-        "cases": cases,
-        "meta": {
-            "model_family": loaded.record.model_family,
-            "variant": loaded.record.variant,
-            "method": loaded.record.method,
-            "source": loaded.record.source,
-            "repo_id": loaded.record.repo_id,
-            "revision": loaded.record.revision,
-            "subpath": loaded.record.subpath,
-            "benchmarks": loaded.record.benchmarks,
-            "notes": loaded.record.notes,
-        },
-        "runtime": {
-            "model_path": model_path,
+    payload = build_result_payload(
+        kind="speed",
+        record=loaded.record,
+        locator=loaded.locator,
+        backend_name=speed_config.get("backend", "vllm"),
+        backend_version=installed_vllm_version(),
+        suite_path=suite_path,
+        suite_name=suite_config.get("name", suite_path.stem),
+        config={
+            "batch_sizes": batch_sizes,
+            "prompt_lengths": prompt_lengths,
+            "generation_lengths": generation_lengths,
+            "repeat": repeat,
+            "warmup": warmup,
             "tensor_parallel_size": tensor_parallel_size,
             "gpu_memory_utilization": gpu_memory_utilization,
             "dtype": dtype,
             "max_model_len": max_model_len,
             "enforce_eager": enforce_eager,
+            "trust_remote_code": request.trust_remote_code,
+            "local_files_only": request.local_files_only,
         },
-        "generated_at": utc_timestamp(),
-    }
-    try:
-        import vllm
-
-        payload["backend_version"] = getattr(vllm, "__version__", None)
-    except Exception:
-        payload["backend_version"] = None
+        metrics=stats,
+        artifacts={},
+        runtime={
+            "model_path": prepared.model_path,
+            "tokenizer_path": prepared.tokenizer_path,
+            "tokenizer_mode": prepared.tokenizer_mode,
+            "model_impl": prepared.model_impl,
+            "preparation_kind": prepared.preparation_kind,
+            "source_model_path": prepared.source_model_path,
+            "preparation_notes": prepared.notes,
+        },
+        details={"cases": cases},
+    )
 
     output_path = dump_json(payload, _result_path_for(request))
     return VllmSpeedResult(
