@@ -1,13 +1,14 @@
-# Checkpoint Manifest
+# `checkpoints/`
 
-This directory tracks the local manifest for checkpoints used by the new LowRankArena scaffold.
+This directory tracks the runnable checkpoint registry and related checkpoint-side metadata used by LowRankArena.
 
 ## Source of Truth
 
 - Hosted checkpoints live in the gated Hugging Face repository: `https://huggingface.co/Duke-CEI-SVD/LowRankArena/tree/main`
-- At this stage, `index.csv` stores top-level folder entries observed from that repository.
-- Individual exported variants, exact low-rank methods, and loader-specific metadata should be added incrementally.
+- `index.csv` is the runnable registry used by the CLI and benchmark runners.
+- Individual exported variants, exact low-rank methods, and loader-specific metadata can be added incrementally.
 - Optional sidecar manifests live under [`checkpoints/manifests/`](./manifests/README.md) when a checkpoint needs richer metadata than the flat CSV schema can express.
+- Materialized vLLM-compatible wrapper checkpoints live under [`checkpoints/vllm/`](./vllm/README.md).
 
 ## `index.csv` Columns
 
@@ -25,7 +26,7 @@ This directory tracks the local manifest for checkpoints used by the new LowRank
 
 ## Update Pattern
 
-Use `scripts/add_checkpoint.py` to append or replace rows while keeping a consistent schema.
+Use [`scripts/add_checkpoint.py`](../scripts/add_checkpoint.py) to append or replace rows while keeping a consistent schema.
 
 When a checkpoint is not a standard Transformers or vLLM load target, add a sidecar manifest first and keep the CSV row disabled by default. This preserves discoverability without polluting the default benchmark path with artifacts that still require export or a custom loader.
 
