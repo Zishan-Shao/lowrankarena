@@ -44,7 +44,7 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     fi
 
     KEEP_DISPLAY=$(python -c "print(round(1 - $RATIO, 1))")
-    echo "=== Compress ${SUFFIX} ratio=$RATIO (保存率=$KEEP_DISPLAY) ==="
+    echo "=== Compress ${SUFFIX} ratio=$RATIO (keep=$KEEP_DISPLAY) ==="
     python run_svdllm_v2_compress.py \
         --model "$MODEL" \
         --ratio $RATIO \

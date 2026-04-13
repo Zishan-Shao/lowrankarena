@@ -171,9 +171,82 @@ DobiSVD 的 PCA 方法在**同分布** PPL 上有效，但对 zero-shot 分类�
 
 ---
 
-## [OPEN] SVDLLMv2 zero-shot 大面积退化
+## [CLOSED] SVDLLMv2 ratio 反转缺失导致全面退化
 
-**发现时间**: 2026-04-07  
-**关联**: 同上
+**发现时间**: 2026-04-12  
+**影响**: 服务器上所有现有 V2 checkpoint 实际压缩率与文件名相反，结果无效
 
-SVDLLMv2（hf_v2_*）所有 keep_ratio 的 boolq=0.378287、mathqa=0.205695，但 wiki2 PPL 从 1180（0.4）到 28100（0.8）不等。PPL 偏高且 zero-shot 退化，说明 v2 在当前压缩参数下质量较差，或与 whitening_then_update 同一根因。待服务器验证。
+### 现象
+
+SVDLLMv2（`v2_0.x.pt`）所有 keep_ratio 的 wiki2 PPL 从 1180（0.4）到 28100（0.8），zero-shot 全部退化（boolq=0.378287）。参考数据（V2 0.8 wiki2 PPL=28.78）与我们的结果（PPL=28100）相差 1000×。
+
+### 根因
+
+`SVDLLM.py`（V1）在 line 1113 做了 ratio 反转：
+
+```python
+args.ratio = 1 - args.ratio   # CLI 0.2 → 内部 0.8 → 保留 80%
+```
+
+`run_svdllm_v2_compress.py`（V2）无此反转：
+
+```python
+keep = 1 - args.ratio                       # 仅用于文件名 → keep=0.8
+whitening_hetero(..., ratio=args.ratio, ...) # 直接用 CLI 值 0.2 → 只保留 20%!
+```
+
+结果：`v2_0.8.pt` 文件名声称保留 80%，实际只保留 20% 奇异值，严重过压缩。
+
+### 修复
+
+`run_svdllm_v2_compress.py` 中加一行（2026-04-12 已提交）：
+
+```python
+ratio_keep = 1.0 - args.ratio   # 与 V1 保持一致
+whitening_hetero(..., ratio=ratio_keep, ...)
+whitening_local_update(..., ratio_keep, ...)  # local_update 同步修复
+```
+
+Shell 脚本传入的 `RATIO in 0.2 0.3 0.4 0.5 0.6` 不变，生成的文件名 `v2_0.8/0.7/0.6/0.5/0.4.pt` 不变，keep_ratio 语义现在正确。
+
+### 操作
+
+服务器上需要删除旧的错误 checkpoint 后重跑：
+
+```bash
+rm checkpoints/svdllm/llama31_8b/meta_llama_Llama_3.1_8B_v2_*.pt
+bash run_compress_llama31_8b_v2.sh [HF_TOKEN]
+```
+
+---
+
+## [OPEN] SVDLLMv1 whitening_then_update 对 Llama-3.1-8B 失效
+
+**发现时间**: 2026-04-12  
+**影响**: whitening_then_update 所有 keep_ratio 的 zero-shot 完全退化，无法作为有效基准
+
+### 现象
+
+| | baseline acc (7-task, 无 mathQA) | update 0.8 | update 0.6 |
+|---|---|---|---|
+| 他人实现（Llama-3.1-8B） | 0.6641 | **0.4275** | 0.3267 |
+| 我们（Llama-3.1-8B） | 0.6655 | **0.3225** | ~0.32 |
+
+eval 协议相同（acc 均值，7 task），baseline 几乎一致。差距完全来自压缩质量。
+
+### 根因
+
+whitening 对 Llama-3.1-8B 损伤远超 Llama-2-7b：
+
+| 模型 | whitening_only 0.8 PPL | after_update PPL | 损伤倍数 |
+|---|---|---|---|
+| Llama-2-7b | 167 | 21.57 | 15× |
+| Llama-3.1-8B | 919 | 29 | **131×** |
+
+`whitening_local_update` 用 16 个 wikitext2 样本做逐层 lstsq 更新。对轻度损伤的 Llama-2-7b，16 样本足以部分恢复；对 Llama-3.1-8B（损伤 131×），16 样本只能过拟合到 unigram 分布（PPL 降到 29 是假象），zero-shot 判别能力无法恢复。
+
+他人实现用 20 个样本（+4），效果显著，说明还有其他关键差异（可能是 transformers 版本、whitening 校准数据量、或校准数据集）。
+
+### 当前处理
+
+CSV 中 `whitening_then_update` 所有行标记为 `DEGENERATE_ZEROSHOT`，不参与方法对比。
