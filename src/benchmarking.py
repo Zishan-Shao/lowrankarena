@@ -57,6 +57,23 @@ def select_checkpoints_for_suite(config: dict, index_path: str | Path) -> list[C
     selection = config.get("selection", {})
     enabled_only = bool(selection.get("enabled_only", True))
     benchmarks = selection.get("benchmarks", [])
+    explicit_names = [str(item) for item in selection.get("checkpoints", []) if str(item).strip()]
+
+    if explicit_names:
+        by_name = {record.name: record for record in records}
+        selected: list[CheckpointRecord] = []
+        missing: list[str] = []
+        for name in explicit_names:
+            record = by_name.get(name)
+            if record is None:
+                missing.append(name)
+                continue
+            if enabled_only and not record.enabled:
+                continue
+            selected.append(record)
+        if missing:
+            raise KeyError(f"Unknown checkpoints in suite selection: {', '.join(missing)}")
+        return selected
 
     if not benchmarks:
         return [record for record in records if record.enabled or not enabled_only]

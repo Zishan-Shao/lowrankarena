@@ -35,11 +35,20 @@ def test_build_result_payload_uses_shared_top_level_shape() -> None:
         metrics={"mean_latency_seconds": 1.23},
         artifacts={"raw_path": "/tmp/demo.json"},
         runtime={"model_path": "/tmp/model"},
+        validation={"passed": True},
         details={"cases": []},
+        run_label="leaderboard",
+        strict_validation=True,
     )
 
-    assert payload["schema_version"] == "1.0"
+    assert payload["schema_version"] == "1.1"
     assert payload["kind"] == "speed"
+    assert payload["run"] == {
+        "label": "leaderboard",
+        "is_smoke": False,
+        "is_leaderboard": True,
+        "strict_validation": True,
+    }
     assert payload["checkpoint"]["name"] == "demo"
     assert payload["checkpoint"]["locator"] == "hf://demo"
     assert payload["suite"] == {
@@ -52,6 +61,7 @@ def test_build_result_payload_uses_shared_top_level_shape() -> None:
     assert payload["metrics"]["mean_latency_seconds"] == 1.23
     assert payload["artifacts"]["raw_path"] == "/tmp/demo.json"
     assert payload["runtime"]["model_path"] == "/tmp/model"
+    assert payload["validation"]["passed"] is True
     assert payload["details"]["cases"] == []
 
 
@@ -66,6 +76,7 @@ def test_build_result_payload_supports_runner_without_suite_path() -> None:
         suite_name="memory",
     )
 
+    assert payload["run"]["label"] == "ad_hoc"
     assert payload["suite"] == {
         "id": "memory",
         "path": None,

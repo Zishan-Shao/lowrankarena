@@ -11,7 +11,8 @@ from src.benchmarking import suite_output_name
 from src.load import load_checkpoint
 from src.result_schema import build_result_payload
 from src.scoring import summarize_speed_cases
-from src.utils import dump_json, ensure_dir, load_yaml, project_path
+from src.utils import dump_json, ensure_dir, load_yaml, run_results_root
+from src.validation import validate_checkpoint_layout
 from src.vllm.external_vllm import import_installed_vllm, installed_vllm_version
 from src.vllm.terminal_ui import ProgressPrinter, configure_runtime_environment, use_safe_vllm_cwd
 from src.vllm.vllm_adapter import prepare_model_for_vllm
@@ -37,6 +38,8 @@ class VllmSpeedRequest:
     local_files_only: bool = False
     verbose_backend: bool = False
     show_progress: bool = False
+    run_label: str = "ad_hoc"
+    strict_validation: bool = False
 
 
 @dataclass(slots=True)
@@ -58,7 +61,7 @@ def _build_prompt_token_ids(tokenizer: Any, prompt_length: int) -> list[int]:
 
 
 def _result_path_for(request: VllmSpeedRequest) -> Path:
-    output_root = Path(request.output_dir) if request.output_dir else project_path("results", "speed")
+    output_root = Path(request.output_dir) if request.output_dir else run_results_root("speed", request.run_label)
     ensure_dir(output_root)
     suite_name = suite_output_name(request.suite_path)
     return output_root / f"{suite_name}__{request.checkpoint_name}.json"
@@ -110,6 +113,10 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
     )
     prepared = prepare_model_for_vllm(
         loaded,
+    )
+    validation_summary = validate_checkpoint_layout(
+        prepared.model_path,
+        strict=request.strict_validation,
     )
 
     from transformers import AutoTokenizer
@@ -184,7 +191,8 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
                     }
                 )
 
-    stats = summarize_speed_cases(cases)
+    aggregation = str(speed_config.get("metric_aggregation", "macro_mean"))
+    stats = summarize_speed_cases(cases, aggregation=aggregation)
     payload = build_result_payload(
         kind="speed",
         record=loaded.record,
@@ -204,6 +212,7 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
             "dtype": dtype,
             "max_model_len": max_model_len,
             "enforce_eager": enforce_eager,
+            "metric_aggregation": aggregation,
             "trust_remote_code": request.trust_remote_code,
             "local_files_only": request.local_files_only,
         },
@@ -218,7 +227,10 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
             "source_model_path": prepared.source_model_path,
             "preparation_notes": prepared.notes,
         },
+        validation=validation_summary,
         details={"cases": cases},
+        run_label=request.run_label,
+        strict_validation=request.strict_validation,
     )
 
     output_path = dump_json(payload, _result_path_for(request))

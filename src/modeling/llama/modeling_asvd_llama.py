@@ -16,7 +16,11 @@ class ASVDLlamaModel(LlamaModel):
 
     def __init__(self, config):
         super().__init__(config)
-        apply_low_rank_replacements(self, getattr(config, "truncation_ranks", {}) or {})
+        self.replaced_low_rank_modules, self.missing_low_rank_modules = apply_low_rank_replacements(
+            self,
+            getattr(config, "truncation_ranks", {}) or {},
+            strict=True,
+        )
 
 
 class ASVDLlamaForCausalLM(LlamaForCausalLM):
@@ -24,4 +28,8 @@ class ASVDLlamaForCausalLM(LlamaForCausalLM):
 
     def __init__(self, config):
         super().__init__(config)
-        apply_low_rank_replacements(self, getattr(config, "truncation_ranks", {}) or {})
+        self.replaced_low_rank_modules, self.missing_low_rank_modules = apply_low_rank_replacements(
+            self,
+            getattr(config, "truncation_ranks", {}) or {},
+            strict=True,
+        )

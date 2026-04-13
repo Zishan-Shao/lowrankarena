@@ -1,0 +1,35 @@
+[1/4] Loading speed suite
+[2/4] Preparing checkpoint for vLLM
+[3/4] Initializing vLLM engine
+[3/4] Initializing vLLM engine (5s elapsed)
+[3/4] Initializing vLLM engine (10s elapsed)
+(EngineCore pid=3398541) <frozen importlib._bootstrap_external>:1328: FutureWarning: The cuda.cudart module is deprecated and will be removed in a future release, please switch to use the cuda.bindings.runtime module instead.
+(EngineCore pid=3398541) <frozen importlib._bootstrap_external>:1328: FutureWarning: The cuda.nvrtc module is deprecated and will be removed in a future release, please switch to use the cuda.bindings.nvrtc module instead.
+[3/4] Initializing vLLM engine (15s elapsed)
+[3/4] Initializing vLLM engine (20s elapsed)
+[3/4] Initializing vLLM engine (25s elapsed)
+(EngineCore pid=3398541) /home/zs89/miniconda3/envs/lowrankarena/lib/python3.13/site-packages/torch/_inductor/compile_fx.py:321: UserWarning: TensorFloat32 tensor cores for float32 matrix multiplication available but not enabled. Consider setting `torch.set_float32_matmul_precision('high')` for better performance.
+(EngineCore pid=3398541)   warnings.warn(
+[3/4] Initializing vLLM engine (30s elapsed)
+[3/4] Initializing vLLM engine (35s elapsed)
+[3/4] Initializing vLLM engine (40s elapsed)
+[3/4] Initializing vLLM engine (45s elapsed)
+[3/4] Initializing vLLM engine (50s elapsed)
+[3/4] Initializing vLLM engine (55s elapsed)
+[3/4] Initializing vLLM engine (60s elapsed)
+[3/4] Initializing vLLM engine done (63.27s)
+[4/4] Running speed cases
+{
+  "checkpoint_name": "llama-7b-svdllm-v1-update-0.5",
+  "output_path": "/home/zs89/lowrankarena/results/leaderboard/speed/speed__leaderboard__llama-7b-svdllm-v1-update-0.5.json",
+  "stats": {
+    "aggregation": "macro_mean",
+    "case_count": 1,
+    "mean_decode_tokens_per_second": 63.881651425233365,
+    "mean_end_to_end_tokens_per_second": 319.4082571261668,
+    "mean_latency_seconds": 2.008394296009404,
+    "mean_prefill_tokens_per_second": 255.52660570093346
+  },
+  "status": "completed",
+  "suite": "speed__leaderboard"
+}

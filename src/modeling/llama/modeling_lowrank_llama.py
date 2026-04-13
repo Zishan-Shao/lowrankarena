@@ -16,7 +16,11 @@ class LowRankLlamaModel(LlamaModel):
 
     def __init__(self, config):
         super().__init__(config)
-        apply_low_rank_replacements(self, getattr(config, "low_rank_modules", {}) or {})
+        self.replaced_low_rank_modules, self.missing_low_rank_modules = apply_low_rank_replacements(
+            self,
+            getattr(config, "low_rank_modules", {}) or {},
+            strict=True,
+        )
 
 
 class LowRankLlamaForCausalLM(LlamaForCausalLM):

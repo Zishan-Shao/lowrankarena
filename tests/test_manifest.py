@@ -40,6 +40,7 @@ def test_expected_layout_exists() -> None:
         "src/eval.py",
         "src/memory.py",
         "src/result_schema.py",
+        "src/validation.py",
         "src/speed.py",
         "src/report.py",
         "src/registry.py",
@@ -49,7 +50,9 @@ def test_expected_layout_exists() -> None:
         "benchmark/accuracy/mcq.yaml",
         "benchmark/accuracy/ppl.yaml",
         "benchmark/accuracy/mmlu.yaml",
+        "benchmark/memory/leaderboard.yaml",
         "benchmark/speed/README.md",
+        "benchmark/speed/leaderboard.yaml",
         "benchmark/speed/speed.yaml",
         "scripts/README.md",
         "scripts/run_eval.py",
@@ -101,6 +104,8 @@ def test_expected_layout_exists() -> None:
         "tests/test_benchmark_configs.py",
         "tests/test_memory.py",
         "tests/test_result_schema.py",
+        "tests/test_scoring.py",
+        "tests/test_validation.py",
         "tests/test_vllm_adapter.py",
     ]
     for relative_path in expected_paths:

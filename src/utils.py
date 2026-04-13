@@ -30,6 +30,16 @@ def ensure_dir(path: str | Path) -> Path:
     return directory
 
 
+def run_results_root(kind: str, run_label: str) -> Path:
+    normalized_kind = kind.strip().lower()
+    normalized_label = run_label.strip().lower()
+    if normalized_label == "leaderboard":
+        return project_path("results", "leaderboard", normalized_kind)
+    if normalized_label == "smoke":
+        return project_path("results", "smoke", normalized_kind)
+    return project_path("results", normalized_kind)
+
+
 def load_yaml(path: str | Path) -> dict[str, Any]:
     if yaml is None:
         raise RuntimeError("PyYAML is required to read benchmark config files.")

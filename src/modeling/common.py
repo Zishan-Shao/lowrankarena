@@ -59,7 +59,14 @@ def extract_rank(spec) -> int:
     return int(spec)
 
 
-def apply_low_rank_replacements(root: nn.Module, module_specs: dict[str, object]):
+def apply_low_rank_replacements(
+    root: nn.Module,
+    module_specs: dict[str, object],
+    *,
+    strict: bool = False,
+) -> tuple[list[str], list[str]]:
+    replaced_modules: list[str] = []
+    missing_modules: list[str] = []
     for name, spec in module_specs.items():
         candidate_names = [name]
         if name.startswith("model."):
@@ -74,11 +81,13 @@ def apply_low_rank_replacements(root: nn.Module, module_specs: dict[str, object]
                 continue
 
         if resolved is None:
+            missing_modules.append(name)
             continue
 
         parent, attr_name = resolved
         original = getattr(parent, attr_name)
         if not isinstance(original, nn.Linear):
+            missing_modules.append(name)
             continue
 
         replacement = LowRankLinear(
@@ -89,3 +98,10 @@ def apply_low_rank_replacements(root: nn.Module, module_specs: dict[str, object]
         )
         replacement.to(device=original.weight.device, dtype=original.weight.dtype)
         setattr(parent, attr_name, replacement)
+        replaced_modules.append(name)
+
+    if strict and missing_modules:
+        raise ValueError(
+            "Low-rank replacement failed for modules: " + ", ".join(sorted(missing_modules))
+        )
+    return replaced_modules, missing_modules

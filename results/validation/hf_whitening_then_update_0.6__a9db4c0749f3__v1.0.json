@@ -1,0 +1,15 @@
+{
+  "issues": [],
+  "layout_kind": "dense",
+  "model_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama31_8b/SVDLLMv1/hf_whitening_then_update_0.6",
+  "model_type": "llama",
+  "parameter_tensor_count": 291,
+  "passed": true,
+  "precision": {
+    "low_rank_factor_dtypes": [],
+    "matches_reference_torch_dtype": true,
+    "reference_torch_dtype": "bfloat16",
+    "uniform_low_rank_precision": true
+  },
+  "validation_version": "1.0"
+}

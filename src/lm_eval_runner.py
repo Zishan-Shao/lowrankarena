@@ -13,7 +13,8 @@ from src.inference_adapter import PreparedInferenceModel, prepare_model_for_infe
 from src.load import load_checkpoint
 from src.result_schema import build_result_payload
 from src.scoring import normalize_lm_eval_tasks
-from src.utils import dump_json, ensure_dir, load_json, load_yaml, project_path
+from src.utils import dump_json, ensure_dir, load_json, load_yaml, project_path, run_results_root
+from src.validation import validate_checkpoint_layout
 
 
 DEFAULT_LM_EVAL_BIN = os.environ.get("LRA_LM_EVAL_BIN", "lm-eval")
@@ -37,6 +38,8 @@ class LmEvalRequest:
     trust_remote_code: bool = True
     local_files_only: bool = False
     extra_model_args: dict[str, Any] = field(default_factory=dict)
+    run_label: str = "ad_hoc"
+    strict_validation: bool = False
 
 
 @dataclass(slots=True)
@@ -57,13 +60,18 @@ def _serialize_cli_value(value: Any) -> str:
     return str(value)
 
 
-def _build_model_args(prepared: PreparedInferenceModel, extra_model_args: dict[str, Any]) -> dict[str, Any]:
+def _build_model_args(
+    prepared: PreparedInferenceModel,
+    extra_model_args: dict[str, Any],
+    *,
+    default_dtype: str = "auto",
+) -> dict[str, Any]:
     model_args: dict[str, Any] = {"pretrained": prepared.model_path}
-    model_args.setdefault("dtype", "auto")
+    model_args.setdefault("dtype", default_dtype)
     if prepared.tokenizer_path != prepared.model_path:
         model_args["tokenizer"] = prepared.tokenizer_path
     if prepared.tokenizer_mode == "slow":
-        model_args["tokenizer_use_fast"] = False
+        model_args["use_fast_tokenizer"] = False
     model_args.update(extra_model_args)
     return model_args
 
@@ -79,7 +87,11 @@ def _build_command(
     if not tasks:
         raise ValueError(f"No lm-eval tasks configured in {request.suite_path}.")
 
-    model_args = _build_model_args(prepared, request.extra_model_args)
+    model_args = _build_model_args(
+        prepared,
+        request.extra_model_args,
+        default_dtype=str(eval_config.get("dtype", "auto")),
+    )
     command: list[str] = [
         request.lm_eval_bin,
         "run",
@@ -127,14 +139,18 @@ def _find_raw_result_path(raw_output_dir: Path) -> Path:
 
 
 def _result_path_for(request: LmEvalRequest) -> Path:
-    output_root = Path(request.output_dir) if request.output_dir else project_path("results", "eval")
+    output_root = Path(request.output_dir) if request.output_dir else run_results_root("eval", request.run_label)
     ensure_dir(output_root)
     suite_name = suite_output_name(request.suite_path)
     return output_root / f"{suite_name}__{request.checkpoint_name}.json"
 
 
 def _raw_output_root(request: LmEvalRequest) -> Path:
-    root = Path(request.raw_output_root) if request.raw_output_root else project_path("results", "eval", "raw")
+    root = (
+        Path(request.raw_output_root)
+        if request.raw_output_root
+        else run_results_root("eval", request.run_label) / "raw"
+    )
     return ensure_dir(root)
 
 
@@ -152,6 +168,10 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
         trust_remote_code=request.trust_remote_code,
     )
     prepared = prepare_model_for_inference(loaded)
+    validation_summary = validate_checkpoint_layout(
+        prepared.model_path,
+        strict=request.strict_validation,
+    )
     raw_output_dir = _raw_output_root(request) / suite_output_name(suite_path) / request.checkpoint_name
     ensure_dir(raw_output_dir)
 
@@ -161,14 +181,29 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
     raw_result_path = _find_raw_result_path(raw_output_dir)
     raw_payload = load_json(raw_result_path)
     eval_config = suite_config.get("eval", {})
+    tracked_metrics = [str(item) for item in eval_config.get("tracked_metrics", []) if str(item).strip()]
     preferred_metrics = [str(eval_config.get("metric"))] if eval_config.get("metric") else []
     preferred_metrics.extend([str(item) for item in eval_config.get("metric_fallbacks", [])])
-    tasks, summary = normalize_lm_eval_tasks(raw_payload.get("results", {}), preferred_metrics=preferred_metrics)
+    if not preferred_metrics:
+        preferred_metrics = list(tracked_metrics)
+    for metric_name in tracked_metrics:
+        if metric_name not in preferred_metrics:
+            preferred_metrics.append(metric_name)
+    aggregation = str(eval_config.get("metric_aggregation", "macro_mean"))
+    tasks, summary = normalize_lm_eval_tasks(
+        raw_payload.get("results", {}),
+        preferred_metrics=preferred_metrics,
+        aggregation=aggregation,
+        primary_metric=str(eval_config.get("metric")) if eval_config.get("metric") else None,
+    )
     metrics = {
         "primary_metric": summary["primary_metric"],
         "mean": summary["mean"],
         "task_count": summary["task_count"],
         "scored_task_count": summary["scored_task_count"],
+        "aggregation": summary["aggregation"],
+        "tracked_metrics": summary["tracked_metrics"],
+        "by_metric": summary["by_metric"],
     }
 
     payload = build_result_payload(
@@ -183,6 +218,9 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
             "tasks": [str(task) for task in eval_config.get("tasks", [])],
             "metric": eval_config.get("metric"),
             "metric_fallbacks": [str(item) for item in eval_config.get("metric_fallbacks", [])],
+            "tracked_metrics": tracked_metrics,
+            "metric_aggregation": aggregation,
+            "dtype": str(eval_config.get("dtype", "auto")),
             "device": request.device if request.device is not None else eval_config.get("device"),
             "batch_size": request.batch_size if request.batch_size is not None else eval_config.get("batch_size"),
             "limit": request.limit if request.limit is not None else eval_config.get("limit"),
@@ -204,10 +242,13 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
             "source_model_path": prepared.source_model_path,
             "preparation_notes": prepared.notes,
         },
+        validation=validation_summary,
         details={
             "summary": summary,
             "tasks": tasks,
         },
+        run_label=request.run_label,
+        strict_validation=request.strict_validation,
     )
     output_path = dump_json(payload, _result_path_for(request))
     return LmEvalResult(

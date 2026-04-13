@@ -2,14 +2,23 @@ name: ppl
 kind: eval
 description: Rolling loglikelihood suite using exact lm-eval-harness 0.4.11 task IDs.
 selection:
-  benchmarks:
-    - main
+  checkpoints:
+    - llama31-8b-asvd-0.4
+    - llama31-8b-dobi-0.8
+    - llama31-8b-svdllm-v1-update-0.6
+    - llama31-8b-svdllm-v2-0.6
+    - llama31-8b-basis-sharing-0.6
+    - llama-7b-svdllm-v1-update-0.5
+    - llama-7b-basis-sharing-0.5
+    - llama-7b-dobi-0.8
   enabled_only: true
 eval:
   backend: lm_eval_harness
   version: 0.4.11
   dataset: lm_eval_harness
+  dtype: float16
   metric: word_perplexity
+  metric_aggregation: macro_mean
   metric_fallbacks:
     - word_perplexity
     - perplexity
@@ -26,6 +35,6 @@ eval:
     - c4_stream is not an lm-eval-harness 0.4.11 task ID; the exact task is c4.
     - paloma_ptb requires access to the gated allenai/paloma dataset on Hugging Face.
 report:
-  result_dir: results/eval
+  result_dir: results/leaderboard/eval
   output_dir: results/tables
   filename: ppl.md

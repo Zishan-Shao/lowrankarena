@@ -1,8 +1,7 @@
 name: main
 kind: aggregate
-description: Top-level benchmark entrypoint that expands into accuracy and speed suites.
+description: Frozen main leaderboard entrypoint for the paper-facing checkpoint set.
 includes:
   - accuracy/mcq
-  - accuracy/ppl
-  - accuracy/mmlu
-  - speed/speed
+  - memory/leaderboard
+  - speed/leaderboard

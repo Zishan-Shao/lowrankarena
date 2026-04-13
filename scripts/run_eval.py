@@ -19,8 +19,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("checkpoint", help="Checkpoint name from checkpoints/index.csv")
     parser.add_argument("--suite", default="accuracy/mcq", help="Benchmark suite name or YAML path")
     parser.add_argument("--index", default=str(ROOT / "checkpoints" / "index.csv"))
-    parser.add_argument("--output-dir", default=str(ROOT / "results" / "eval"))
-    parser.add_argument("--raw-output-dir", default=str(ROOT / "results" / "eval" / "raw"))
+    parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--raw-output-dir", default=None)
     parser.add_argument("--lm-eval-bin", default="lm-eval")
     parser.add_argument("--model-backend", default="hf")
     parser.add_argument("--device", default=None)
@@ -28,6 +28,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=float, default=None)
     parser.add_argument("--num-fewshot", type=int, default=None)
     parser.add_argument("--log-samples", action="store_true")
+    parser.add_argument("--run-label", default="ad_hoc")
+    parser.add_argument("--strict-validation", action="store_true")
     parser.add_argument("--model-arg", action="append", default=[], help="Extra lm-eval model_arg entries like key=value")
     return parser.parse_args()
 
@@ -60,6 +62,8 @@ def main() -> None:
             num_fewshot=args.num_fewshot,
             log_samples=args.log_samples,
             extra_model_args=parse_model_args(args.model_arg),
+            run_label=args.run_label,
+            strict_validation=args.strict_validation,
         )
     )
     print(json.dumps(asdict(result), indent=2, sort_keys=True))

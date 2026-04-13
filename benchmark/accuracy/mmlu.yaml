@@ -2,14 +2,23 @@ name: mmlu
 kind: eval
 description: Dedicated MMLU suite using the official lm-eval-harness 0.4.11 group name.
 selection:
-  benchmarks:
-    - main
+  checkpoints:
+    - llama31-8b-asvd-0.4
+    - llama31-8b-dobi-0.8
+    - llama31-8b-svdllm-v1-update-0.6
+    - llama31-8b-svdllm-v2-0.6
+    - llama31-8b-basis-sharing-0.6
+    - llama-7b-svdllm-v1-update-0.5
+    - llama-7b-basis-sharing-0.5
+    - llama-7b-dobi-0.8
   enabled_only: true
 eval:
   backend: lm_eval_harness
   version: 0.4.11
   dataset: lm_eval_harness
+  dtype: float16
   metric: acc
+  metric_aggregation: macro_mean
   metric_fallbacks:
     - acc
   batch_size: auto
@@ -17,6 +26,6 @@ eval:
   tasks:
     - mmlu
 report:
-  result_dir: results/eval
+  result_dir: results/leaderboard/eval
   output_dir: results/tables
   filename: mmlu.md

@@ -54,6 +54,16 @@ def backend_payload(*, name: str, version: str | None) -> dict[str, Any]:
     }
 
 
+def run_payload(*, label: str, strict_validation: bool) -> dict[str, Any]:
+    normalized = label.strip().lower()
+    return {
+        "label": normalized,
+        "is_smoke": normalized == "smoke",
+        "is_leaderboard": normalized == "leaderboard",
+        "strict_validation": bool(strict_validation),
+    }
+
+
 def build_result_payload(
     *,
     kind: str,
@@ -68,13 +78,17 @@ def build_result_payload(
     artifacts: dict[str, Any] | None = None,
     runtime: dict[str, Any] | None = None,
     details: dict[str, Any] | None = None,
+    validation: dict[str, Any] | None = None,
+    run_label: str = "ad_hoc",
+    strict_validation: bool = False,
     status: str = "completed",
 ) -> dict[str, Any]:
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "kind": kind,
         "status": status,
         "generated_at": utc_timestamp(),
+        "run": run_payload(label=run_label, strict_validation=strict_validation),
         "checkpoint": checkpoint_payload(record, locator=locator),
         "suite": suite_payload(kind=kind, suite_path=suite_path, suite_name=suite_name),
         "backend": backend_payload(name=backend_name, version=backend_version),
@@ -82,5 +96,6 @@ def build_result_payload(
         "metrics": metrics or {},
         "artifacts": artifacts or {},
         "runtime": runtime or {},
+        "validation": validation or {},
         "details": details or {},
     }

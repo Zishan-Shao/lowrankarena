@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("checkpoint", help="Checkpoint name from checkpoints/index.csv")
     parser.add_argument("--index", default=str(ROOT / "checkpoints" / "index.csv"))
-    parser.add_argument("--output-dir", default=str(ROOT / "results" / "memory"))
+    parser.add_argument("--output-dir", default=None)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dtype", default="float16")
     parser.add_argument("--batch-size", type=int, default=1)
@@ -28,6 +28,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--attn-implementation", default=None)
     parser.add_argument("--local-files-only", action="store_true")
     parser.add_argument("--verbose-backend", action="store_true")
+    parser.add_argument("--run-label", default="ad_hoc")
+    parser.add_argument("--strict-validation", action="store_true")
     return parser.parse_args()
 
 
@@ -46,6 +48,8 @@ def main() -> None:
             attn_implementation=args.attn_implementation,
             local_files_only=args.local_files_only,
             verbose_backend=args.verbose_backend,
+            run_label=args.run_label,
+            strict_validation=args.strict_validation,
         )
     )
     print(json.dumps(asdict(result), indent=2, sort_keys=True))

@@ -2,11 +2,19 @@ name: speed
 kind: speed
 description: vLLM offline inference speed suite for latency and throughput reporting.
 selection:
-  benchmarks:
-    - speed
+  checkpoints:
+    - llama31-8b-asvd-0.4
+    - llama31-8b-dobi-0.8
+    - llama31-8b-svdllm-v1-update-0.6
+    - llama31-8b-svdllm-v2-0.6
+    - llama31-8b-basis-sharing-0.6
+    - llama-7b-svdllm-v1-update-0.5
+    - llama-7b-basis-sharing-0.5
+    - llama-7b-dobi-0.8
   enabled_only: true
 speed:
   backend: vllm
+  metric_aggregation: macro_mean
   prompt_lengths:
     - 512
     - 1024

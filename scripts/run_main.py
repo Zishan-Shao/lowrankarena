@@ -11,7 +11,9 @@ if str(ROOT) not in sys.path:
 
 from src.benchmarking import load_suite_config, select_checkpoints_for_suite, suite_id
 from src.lm_eval_runner import LmEvalRequest, run_lm_eval_suite
+from src.memory_runner import MemoryRequest, run_memory_measurement
 from src.speed_runner import VllmSpeedRequest, run_vllm_speed_suite
+from src.utils import dump_json, ensure_dir, load_json
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,7 +28,82 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--speed-gpu-memory-utilization", type=float, default=None)
     parser.add_argument("--speed-max-model-len", type=int, default=None)
     parser.add_argument("--speed-enforce-eager", action="store_true")
+    parser.add_argument("--memory-device", default="cuda:0")
+    parser.add_argument("--memory-dtype", default=None)
+    parser.add_argument("--memory-batch-size", type=int, default=None)
+    parser.add_argument("--memory-prompt-length", type=int, default=None)
+    parser.add_argument("--memory-generation-length", type=int, default=None)
+    parser.add_argument("--memory-attn-implementation", default=None)
     return parser.parse_args()
+
+
+def _normalize_precision(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value).replace("torch.", "").strip().lower()
+
+
+def _precision_audit_path(suite_names: list[str]) -> Path:
+    audit_root = ensure_dir(ROOT / "results" / "leaderboard")
+    label = "__".join(str(item).replace("/", "__") for item in suite_names) or "leaderboard"
+    return audit_root / f"precision_audit__{label}.json"
+
+
+def _write_precision_audit(summary: list[dict[str, str]], suite_names: list[str]) -> dict[str, object]:
+    records: list[dict[str, object]] = []
+    runtime_precisions: set[str] = set()
+    missing_runtime_precision: list[str] = []
+    mixed_checkpoint_precision: list[str] = []
+
+    for item in summary:
+        payload = load_json(item["output_path"])
+        config = payload.get("config", {})
+        validation = payload.get("validation", {})
+        precision = validation.get("precision", {})
+        runtime_precision = _normalize_precision(config.get("dtype"))
+        factor_dtypes = [_normalize_precision(value) for value in precision.get("low_rank_factor_dtypes", []) if value is not None]
+        factor_dtypes = [value for value in factor_dtypes if value]
+        if runtime_precision is None:
+            missing_runtime_precision.append(item["output_path"])
+        else:
+            runtime_precisions.add(runtime_precision)
+        if len(set(factor_dtypes)) > 1:
+            mixed_checkpoint_precision.append(item["output_path"])
+
+        records.append(
+            {
+                "checkpoint": payload.get("checkpoint", {}).get("name"),
+                "suite": payload.get("suite", {}).get("id"),
+                "output_path": item["output_path"],
+                "layout_kind": validation.get("layout_kind"),
+                "runtime_precision": runtime_precision,
+                "low_rank_factor_dtypes": factor_dtypes,
+                "uniform_low_rank_precision": precision.get("uniform_low_rank_precision"),
+                "matches_reference_torch_dtype": precision.get("matches_reference_torch_dtype"),
+            }
+        )
+
+    audit = {
+        "suite_names": suite_names,
+        "passed": not missing_runtime_precision and len(runtime_precisions) <= 1 and not mixed_checkpoint_precision,
+        "runtime_precisions": sorted(runtime_precisions),
+        "missing_runtime_precision": missing_runtime_precision,
+        "mixed_checkpoint_precision": mixed_checkpoint_precision,
+        "records": records,
+    }
+    dump_json(audit, _precision_audit_path(suite_names))
+    if missing_runtime_precision:
+        raise RuntimeError("Leaderboard precision audit found results without an explicit runtime dtype.")
+    if len(runtime_precisions) > 1:
+        raise RuntimeError(
+            "Leaderboard precision audit found mixed runtime dtypes: " + ", ".join(sorted(runtime_precisions))
+        )
+    if mixed_checkpoint_precision:
+        raise RuntimeError(
+            "Leaderboard precision audit found checkpoints with mixed low-rank factor dtypes: "
+            + ", ".join(mixed_checkpoint_precision)
+        )
+    return audit
 
 
 def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> list[dict[str, str]]:
@@ -54,6 +131,25 @@ def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> lis
                     max_model_len=args.speed_max_model_len,
                     enforce_eager=True if args.speed_enforce_eager else None,
                     show_progress=True,
+                    run_label="leaderboard",
+                    strict_validation=True,
+                )
+            )
+        elif kind == "memory":
+            memory_config = config.get("memory", {})
+            result = run_memory_measurement(
+                MemoryRequest(
+                    checkpoint_name=record.name,
+                    index_path=index_path,
+                    device=args.memory_device,
+                    dtype=args.memory_dtype or memory_config.get("dtype", "float16"),
+                    batch_size=args.memory_batch_size or int(memory_config.get("batch_size", 1)),
+                    prompt_length=args.memory_prompt_length or int(memory_config.get("prompt_length", 512)),
+                    generation_length=args.memory_generation_length
+                    or int(memory_config.get("generation_length", 128)),
+                    attn_implementation=args.memory_attn_implementation or memory_config.get("attn_implementation"),
+                    run_label="leaderboard",
+                    strict_validation=True,
                 )
             )
         else:
@@ -65,6 +161,8 @@ def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> lis
                     lm_eval_bin=args.lm_eval_bin,
                     device=args.eval_device,
                     limit=args.limit,
+                    run_label="leaderboard",
+                    strict_validation=True,
                 )
             )
         outputs.append(
@@ -83,6 +181,7 @@ def main() -> None:
     summary: list[dict[str, str]] = []
     for suite_name in args.suites:
         summary.extend(run_suite(suite_name, index_path=args.index, args=args))
+    _write_precision_audit(summary, args.suites)
     print(json.dumps(summary, indent=2, sort_keys=True))
 
 

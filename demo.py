@@ -178,8 +178,6 @@ def _run_eval_smoke(args: argparse.Namespace) -> dict[str, Any]:
             checkpoint_name=args.checkpoint,
             suite_path=suite_path,
             index_path=args.index,
-            output_dir=str(ROOT / "results" / "eval"),
-            raw_output_root=str(ROOT / "results" / "eval" / "raw"),
             lm_eval_bin=args.lm_eval_bin,
             model_backend="hf",
             device=args.device,
@@ -188,6 +186,8 @@ def _run_eval_smoke(args: argparse.Namespace) -> dict[str, Any]:
             num_fewshot=args.eval_num_fewshot,
             trust_remote_code=True,
             local_files_only=args.local_files_only,
+            run_label="smoke",
+            strict_validation=True,
         )
     )
     return {
@@ -204,7 +204,6 @@ def _run_memory_smoke(args: argparse.Namespace) -> dict[str, Any]:
         MemoryRequest(
             checkpoint_name=args.checkpoint,
             index_path=args.index,
-            output_dir=str(ROOT / "results" / "memory"),
             device=args.device,
             dtype=args.memory_dtype,
             batch_size=args.memory_batch_size,
@@ -213,6 +212,8 @@ def _run_memory_smoke(args: argparse.Namespace) -> dict[str, Any]:
             attn_implementation=args.memory_attn_implementation,
             local_files_only=args.local_files_only,
             verbose_backend=args.verbose_backend,
+            run_label="smoke",
+            strict_validation=True,
         )
     )
     return {
@@ -229,7 +230,6 @@ def _run_speed_smoke(args: argparse.Namespace) -> dict[str, Any]:
             checkpoint_name=args.checkpoint,
             suite_path=suite_path,
             index_path=args.index,
-            output_dir=str(ROOT / "results" / "speed"),
             batch_sizes=[args.speed_batch_size],
             prompt_lengths=[args.speed_prompt_length],
             generation_lengths=[args.speed_generation_length],
@@ -243,6 +243,8 @@ def _run_speed_smoke(args: argparse.Namespace) -> dict[str, Any]:
             local_files_only=args.local_files_only,
             verbose_backend=args.verbose_backend,
             show_progress=not args.verbose_backend,
+            run_label="smoke",
+            strict_validation=True,
         )
     )
     return {

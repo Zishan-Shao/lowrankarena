@@ -25,6 +25,10 @@ class SVDLLMLlamaModel(LlamaModel):
         super().__init__(config)
         self.svd_ranks = dict(getattr(config, "svd_ranks", {}) or {})
         self.replaced_svd_modules, self.missing_svd_modules = replace_with_svd_linears(self, self.svd_ranks)
+        if self.missing_svd_modules:
+            raise ValueError(
+                "SVD-LLM replacement failed for modules: " + ", ".join(sorted(self.missing_svd_modules))
+            )
 
 
 class SVDLLMLlamaForCausalLM(LlamaForCausalLM):

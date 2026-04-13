@@ -10,7 +10,8 @@ import torch
 from src.inference_adapter import prepare_model_for_inference
 from src.load import load_checkpoint
 from src.result_schema import build_result_payload
-from src.utils import dump_json, ensure_dir, project_path
+from src.utils import dump_json, ensure_dir, run_results_root
+from src.validation import validate_checkpoint_layout
 
 
 DTYPE_MAP: dict[str, torch.dtype | str] = {
@@ -39,6 +40,8 @@ class MemoryRequest:
     trust_remote_code: bool = True
     local_files_only: bool = False
     verbose_backend: bool = False
+    run_label: str = "ad_hoc"
+    strict_validation: bool = False
 
 
 @dataclass(slots=True)
@@ -150,7 +153,7 @@ def _load_model(
 
 
 def _result_path_for(request: MemoryRequest) -> Path:
-    output_root = Path(request.output_dir) if request.output_dir else project_path("results", "memory")
+    output_root = Path(request.output_dir) if request.output_dir else run_results_root("memory", request.run_label)
     ensure_dir(output_root)
     return output_root / f"memory__{request.checkpoint_name}.json"
 
@@ -180,6 +183,10 @@ def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
         trust_remote_code=request.trust_remote_code,
     )
     prepared = prepare_model_for_inference(loaded)
+    validation_summary = validate_checkpoint_layout(
+        prepared.model_path,
+        strict=request.strict_validation,
+    )
     model_path = prepared.model_path
     if model_path.startswith("hf://"):
         raise RuntimeError("Expected a local checkpoint path after materialization, but only got an HF locator.")
@@ -307,6 +314,7 @@ def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
                 "total_gib": bytes_to_gib(int(total_before)),
             },
         },
+        validation=validation_summary,
         details={
             "load": {
                 **load_snapshot,
@@ -324,6 +332,8 @@ def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
                 "estimated_peak_kv_gib": bytes_to_gib(kv_estimate["estimated_peak_kv_bytes"]),
             },
         },
+        run_label=request.run_label,
+        strict_validation=request.strict_validation,
     )
     output_path = dump_json(payload, _result_path_for(request))
     return MemoryResult(

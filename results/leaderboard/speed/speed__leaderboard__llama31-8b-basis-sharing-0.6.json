@@ -1,0 +1,138 @@
+{
+  "artifacts": {},
+  "backend": {
+    "name": "vllm",
+    "version": "0.18.1"
+  },
+  "checkpoint": {
+    "benchmarks": [
+      "main",
+      "speed",
+      "modern",
+      "quant"
+    ],
+    "enabled": true,
+    "locator": "hf://Duke-CEI-SVD/LowRankArena@main/llama31_8b/Basis_sharing/hf_basis_sharing_0.6",
+    "method": "basis_sharing",
+    "model_family": "llama3.1",
+    "name": "llama31-8b-basis-sharing-0.6",
+    "notes": "Exact HF export path for the Llama-3.1-8B basis-sharing export. This export is already merged back to dense Llama weights and loads directly.",
+    "repo_id": "Duke-CEI-SVD/LowRankArena",
+    "revision": "main",
+    "source": "huggingface",
+    "subpath": "llama31_8b/Basis_sharing/hf_basis_sharing_0.6",
+    "variant": "base"
+  },
+  "config": {
+    "batch_sizes": [
+      1
+    ],
+    "dtype": "float16",
+    "enforce_eager": false,
+    "generation_lengths": [
+      128
+    ],
+    "gpu_memory_utilization": 0.35,
+    "local_files_only": false,
+    "max_model_len": 2048,
+    "metric_aggregation": "macro_mean",
+    "prompt_lengths": [
+      512
+    ],
+    "repeat": 3,
+    "tensor_parallel_size": 1,
+    "trust_remote_code": true,
+    "warmup": 1
+  },
+  "details": {
+    "cases": [
+      {
+        "batch_size": 1,
+        "decode_tokens_per_second": 35.816742615893716,
+        "end_to_end_tokens_per_second": 179.0837130794686,
+        "generation_length": 128,
+        "latency_seconds": 3.5737512423462854,
+        "prefill_tokens_per_second": 143.26697046357486,
+        "prompt_length": 512,
+        "repeat": 3,
+        "runs": [
+          {
+            "decode_tokens_per_second": 35.76817053318799,
+            "end_to_end_tokens_per_second": 178.84085266593993,
+            "generated_tokens": 128.0,
+            "latency_seconds": 3.578600696986541,
+            "prefill_tokens_per_second": 143.07268213275196,
+            "prompt_tokens": 512.0
+          },
+          {
+            "decode_tokens_per_second": 35.85368826523034,
+            "end_to_end_tokens_per_second": 179.2684413261517,
+            "generated_tokens": 128.0,
+            "latency_seconds": 3.5700650670332834,
+            "prefill_tokens_per_second": 143.41475306092136,
+            "prompt_tokens": 512.0
+          },
+          {
+            "decode_tokens_per_second": 35.828369049262825,
+            "end_to_end_tokens_per_second": 179.14184524631412,
+            "generated_tokens": 128.0,
+            "latency_seconds": 3.572587963019032,
+            "prefill_tokens_per_second": 143.3134761970513,
+            "prompt_tokens": 512.0
+          }
+        ],
+        "warmup": 1
+      }
+    ]
+  },
+  "generated_at": "2026-04-13T02:16:15.856312+00:00",
+  "kind": "speed",
+  "metrics": {
+    "aggregation": "macro_mean",
+    "case_count": 1,
+    "mean_decode_tokens_per_second": 35.816742615893716,
+    "mean_end_to_end_tokens_per_second": 179.0837130794686,
+    "mean_latency_seconds": 3.5737512423462854,
+    "mean_prefill_tokens_per_second": 143.26697046357486
+  },
+  "run": {
+    "is_leaderboard": true,
+    "is_smoke": false,
+    "label": "leaderboard",
+    "strict_validation": true
+  },
+  "runtime": {
+    "model_impl": null,
+    "model_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama31_8b/Basis_sharing/hf_basis_sharing_0.6",
+    "preparation_kind": "direct",
+    "preparation_notes": [
+      "checkpoint is directly loadable through Transformers from the local snapshot",
+      "checkpoint looks directly loadable by vLLM"
+    ],
+    "source_model_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama31_8b/Basis_sharing/hf_basis_sharing_0.6",
+    "tokenizer_mode": "auto",
+    "tokenizer_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama31_8b/Basis_sharing/hf_basis_sharing_0.6"
+  },
+  "schema_version": "1.1",
+  "status": "completed",
+  "suite": {
+    "id": "speed__leaderboard",
+    "name": "leaderboard_speed",
+    "path": "speed/leaderboard"
+  },
+  "validation": {
+    "issues": [],
+    "layout_kind": "dense",
+    "model_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama31_8b/Basis_sharing/hf_basis_sharing_0.6",
+    "model_type": "llama",
+    "parameter_tensor_count": 291,
+    "passed": true,
+    "precision": {
+      "low_rank_factor_dtypes": [],
+      "matches_reference_torch_dtype": true,
+      "reference_torch_dtype": "bfloat16",
+      "uniform_low_rank_precision": true
+    },
+    "validation_version": "1.0"
+  }
+}

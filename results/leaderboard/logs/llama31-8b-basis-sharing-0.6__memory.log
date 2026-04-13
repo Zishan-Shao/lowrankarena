@@ -1,0 +1,28 @@
+{
+  "checkpoint_name": "llama31-8b-basis-sharing-0.6",
+  "metrics": {
+    "buffer_bytes": 256,
+    "buffer_gib": 2.384185791015625e-07,
+    "delta_peak_allocated_bytes_from_load": 136730624,
+    "delta_peak_allocated_gib_from_load": 0.12734031677246094,
+    "delta_peak_reserved_bytes_from_load": 142606336,
+    "delta_peak_reserved_gib_from_load": 0.1328125,
+    "estimated_dense_kv_bytes_per_token": 131072,
+    "estimated_dense_kv_bytes_per_token_gib": 0.0001220703125,
+    "estimated_peak_dense_kv_bytes": 83755008,
+    "estimated_peak_dense_kv_gib": 0.0780029296875,
+    "load_allocated_bytes": 16060523008,
+    "load_allocated_gib": 14.95752763748169,
+    "load_reserved_bytes": 16196304896,
+    "load_reserved_gib": 15.083984375,
+    "parameter_bytes": 16060522496,
+    "parameter_gib": 14.957527160644531,
+    "peak_allocated_bytes": 16197253632,
+    "peak_allocated_gib": 15.08486795425415,
+    "peak_reserved_bytes": 16338911232,
+    "peak_reserved_gib": 15.216796875
+  },
+  "output_path": "/home/zs89/lowrankarena/results/leaderboard/memory/memory__llama31-8b-basis-sharing-0.6.json",
+  "status": "completed",
+  "suite": "memory"
+}

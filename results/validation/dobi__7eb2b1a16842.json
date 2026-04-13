@@ -1,0 +1,37 @@
+{
+  "dense_module_count": 6,
+  "dense_modules": [
+    "model.layers.0.self_attn.k_proj",
+    "model.layers.0.self_attn.v_proj",
+    "model.layers.0.self_attn.o_proj",
+    "model.layers.0.mlp.gate_proj",
+    "model.layers.0.mlp.up_proj",
+    "model.layers.0.mlp.down_proj"
+  ],
+  "expected_low_rank_module_count": 1,
+  "expected_low_rank_modules": [
+    "model.layers.0.self_attn.q_proj"
+  ],
+  "issues": [],
+  "layout_kind": "dobi_mixed_factorized",
+  "missing_dense_or_factorized_modules": [],
+  "missing_modules": [],
+  "model_path": "/tmp/tmpr6evn2rh/d/dobi",
+  "model_type": "llama",
+  "observed_ranks": {
+    "model.layers.0.self_attn.q_proj": 2
+  },
+  "passed": true,
+  "precision": {
+    "low_rank_factor_dtypes": [
+      "float16"
+    ],
+    "reference_torch_dtype": "float16",
+    "uniform_low_rank_precision": true
+  },
+  "unexpected_low_rank_modules": [],
+  "validated_low_rank_module_count": 1,
+  "validated_low_rank_modules": [
+    "model.layers.0.self_attn.q_proj"
+  ]
+}

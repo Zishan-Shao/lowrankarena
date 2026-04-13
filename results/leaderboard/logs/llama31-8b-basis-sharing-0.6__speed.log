@@ -1,0 +1,28 @@
+[1/4] Loading speed suite
+[2/4] Preparing checkpoint for vLLM
+[3/4] Initializing vLLM engine
+[3/4] Initializing vLLM engine (5s elapsed)
+(EngineCore pid=3406189) <frozen importlib._bootstrap_external>:1328: FutureWarning: The cuda.cudart module is deprecated and will be removed in a future release, please switch to use the cuda.bindings.runtime module instead.
+(EngineCore pid=3406189) <frozen importlib._bootstrap_external>:1328: FutureWarning: The cuda.nvrtc module is deprecated and will be removed in a future release, please switch to use the cuda.bindings.nvrtc module instead.
+[3/4] Initializing vLLM engine (10s elapsed)
+[3/4] Initializing vLLM engine (15s elapsed)
+[3/4] Initializing vLLM engine (20s elapsed)
+[3/4] Initializing vLLM engine (25s elapsed)
+[3/4] Initializing vLLM engine (30s elapsed)
+[3/4] Initializing vLLM engine (35s elapsed)
+[3/4] Initializing vLLM engine done (38.24s)
+[4/4] Running speed cases
+{
+  "checkpoint_name": "llama31-8b-basis-sharing-0.6",
+  "output_path": "/home/zs89/lowrankarena/results/leaderboard/speed/speed__leaderboard__llama31-8b-basis-sharing-0.6.json",
+  "stats": {
+    "aggregation": "macro_mean",
+    "case_count": 1,
+    "mean_decode_tokens_per_second": 35.816742615893716,
+    "mean_end_to_end_tokens_per_second": 179.0837130794686,
+    "mean_latency_seconds": 3.5737512423462854,
+    "mean_prefill_tokens_per_second": 143.26697046357486
+  },
+  "status": "completed",
+  "suite": "speed__leaderboard"
+}

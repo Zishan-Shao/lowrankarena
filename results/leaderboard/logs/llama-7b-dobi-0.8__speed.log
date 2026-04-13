@@ -1,0 +1,93 @@
+[1/4] Loading speed suite
+[2/4] Preparing checkpoint for vLLM
+[3/4] Initializing vLLM engine
+[3/4] Initializing vLLM engine (5s elapsed)
+[3/4] Initializing vLLM engine (10s elapsed)
+(EngineCore pid=3414753) <frozen importlib._bootstrap_external>:1328: FutureWarning: The cuda.cudart module is deprecated and will be removed in a future release, please switch to use the cuda.bindings.runtime module instead.
+(EngineCore pid=3414753) <frozen importlib._bootstrap_external>:1328: FutureWarning: The cuda.nvrtc module is deprecated and will be removed in a future release, please switch to use the cuda.bindings.nvrtc module instead.
+[3/4] Initializing vLLM engine (15s elapsed)
+[3/4] Initializing vLLM engine (20s elapsed)
+[3/4] Initializing vLLM engine (25s elapsed)
+(EngineCore pid=3414753) /home/zs89/miniconda3/envs/lowrankarena/lib/python3.13/site-packages/torch/_inductor/compile_fx.py:321: UserWarning: TensorFloat32 tensor cores for float32 matrix multiplication available but not enabled. Consider setting `torch.set_float32_matmul_precision('high')` for better performance.
+(EngineCore pid=3414753)   warnings.warn(
+[3/4] Initializing vLLM engine (30s elapsed)
+[3/4] Initializing vLLM engine (35s elapsed)
+[3/4] Initializing vLLM engine (40s elapsed)
+[3/4] Initializing vLLM engine (45s elapsed)
+[3/4] Initializing vLLM engine (50s elapsed)
+[3/4] Initializing vLLM engine (55s elapsed)
+[3/4] Initializing vLLM engine (60s elapsed)
+[3/4] Initializing vLLM engine (65s elapsed)
+[3/4] Initializing vLLM engine (70s elapsed)
+[3/4] Initializing vLLM engine (75s elapsed)
+[3/4] Initializing vLLM engine (80s elapsed)
+[3/4] Initializing vLLM engine (85s elapsed)
+[3/4] Initializing vLLM engine (90s elapsed)
+[3/4] Initializing vLLM engine (95s elapsed)
+[3/4] Initializing vLLM engine (100s elapsed)
+[3/4] Initializing vLLM engine (105s elapsed)
+[3/4] Initializing vLLM engine (110s elapsed)
+[3/4] Initializing vLLM engine (115s elapsed)
+[3/4] Initializing vLLM engine (120s elapsed)
+[3/4] Initializing vLLM engine (125s elapsed)
+[3/4] Initializing vLLM engine (130s elapsed)
+[3/4] Initializing vLLM engine (135s elapsed)
+[3/4] Initializing vLLM engine (140s elapsed)
+[3/4] Initializing vLLM engine (145s elapsed)
+[3/4] Initializing vLLM engine (150s elapsed)
+[3/4] Initializing vLLM engine (155s elapsed)
+[3/4] Initializing vLLM engine (160s elapsed)
+[3/4] Initializing vLLM engine (165s elapsed)
+[3/4] Initializing vLLM engine (170s elapsed)
+[3/4] Initializing vLLM engine (175s elapsed)
+[3/4] Initializing vLLM engine (180s elapsed)
+[3/4] Initializing vLLM engine (185s elapsed)
+[3/4] Initializing vLLM engine (190s elapsed)
+[3/4] Initializing vLLM engine (195s elapsed)
+[3/4] Initializing vLLM engine (200s elapsed)
+[3/4] Initializing vLLM engine (205s elapsed)
+[3/4] Initializing vLLM engine (210s elapsed)
+[3/4] Initializing vLLM engine (215s elapsed)
+[3/4] Initializing vLLM engine (220s elapsed)
+[3/4] Initializing vLLM engine (225s elapsed)
+[3/4] Initializing vLLM engine (230s elapsed)
+[3/4] Initializing vLLM engine (235s elapsed)
+[3/4] Initializing vLLM engine (240s elapsed)
+[3/4] Initializing vLLM engine (245s elapsed)
+[3/4] Initializing vLLM engine (250s elapsed)
+[3/4] Initializing vLLM engine (255s elapsed)
+[3/4] Initializing vLLM engine (260s elapsed)
+[3/4] Initializing vLLM engine (265s elapsed)
+[3/4] Initializing vLLM engine (270s elapsed)
+[3/4] Initializing vLLM engine (275s elapsed)
+[3/4] Initializing vLLM engine (280s elapsed)
+[3/4] Initializing vLLM engine (285s elapsed)
+[3/4] Initializing vLLM engine (290s elapsed)
+[3/4] Initializing vLLM engine (295s elapsed)
+[3/4] Initializing vLLM engine (300s elapsed)
+[3/4] Initializing vLLM engine (305s elapsed)
+[3/4] Initializing vLLM engine (310s elapsed)
+[3/4] Initializing vLLM engine (315s elapsed)
+[3/4] Initializing vLLM engine (320s elapsed)
+[3/4] Initializing vLLM engine (325s elapsed)
+[3/4] Initializing vLLM engine (330s elapsed)
+[3/4] Initializing vLLM engine (335s elapsed)
+[3/4] Initializing vLLM engine (340s elapsed)
+[3/4] Initializing vLLM engine (345s elapsed)
+[3/4] Initializing vLLM engine (350s elapsed)
+[3/4] Initializing vLLM engine done (353.13s)
+[4/4] Running speed cases
+{
+  "checkpoint_name": "llama-7b-dobi-0.8",
+  "output_path": "/home/zs89/lowrankarena/results/leaderboard/speed/speed__leaderboard__llama-7b-dobi-0.8.json",
+  "stats": {
+    "aggregation": "macro_mean",
+    "case_count": 1,
+    "mean_decode_tokens_per_second": 20.134196928205366,
+    "mean_end_to_end_tokens_per_second": 100.67098464102682,
+    "mean_latency_seconds": 6.359023283643182,
+    "mean_prefill_tokens_per_second": 80.53678771282146
+  },
+  "status": "completed",
+  "suite": "speed__leaderboard"
+}
