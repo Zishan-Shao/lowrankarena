@@ -142,7 +142,7 @@ def main():
     print("  lowrank_config.json saved")
 
     print("Done.")
-    print(f"  Load: add baselines/SVD-LLM to sys.path, then torch.load('{model_pt_path}')")
+    print(f"  Saved: {safetensors_path}")
 
 
 if __name__ == "__main__":
