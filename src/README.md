@@ -8,7 +8,7 @@ The guiding rule is simple: benchmark policy lives in [`benchmark/`](../benchmar
 
 - [`arena.py`](./arena.py): minimal public facade for listing, registering, evaluating, and reporting checkpoints.
 - [`modeling/`](./modeling): shared low-rank runtime grouped by supported base-model family.
-  The current family groups are [`llama/`](./modeling/llama/README.md) and [`qwen/`](./modeling/qwen/README.md).
+  The current family groups are [`llama/`](./modeling/llama/README.md), [`mistral/`](./modeling/mistral/README.md), and [`qwen/`](./modeling/qwen/README.md).
 - [`vllm/`](./vllm/README.md): vLLM-specific adapter code and prototype utilities for wrapper-based loading.
 - [`load.py`](./load.py): resolve checkpoint records into local or Hugging Face load targets.
 - [`loader.py`](./loader.py): compatibility re-export for code that expects a `loader` module name.

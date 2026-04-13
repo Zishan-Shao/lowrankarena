@@ -2,11 +2,21 @@ from __future__ import annotations
 
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import SimpleNamespace
 
 from src.registry import load_checkpoint_index
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_exporter_module():
+    exporter = PROJECT_ROOT / "compress" / "svd" / "SVD-LLM" / "huggingface_repos" / "export_svdllm_lowrank.py"
+    spec = spec_from_file_location("export_svdllm_lowrank", exporter)
+    module = module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_expected_layout_exists() -> None:
@@ -25,6 +35,10 @@ def test_expected_layout_exists() -> None:
         "src/modeling/llama/__init__.py",
         "src/modeling/llama/configuration_lowrank_llama.py",
         "src/modeling/llama/modeling_lowrank_llama.py",
+        "src/modeling/mistral/README.md",
+        "src/modeling/mistral/__init__.py",
+        "src/modeling/mistral/configuration_lowrank_mistral.py",
+        "src/modeling/mistral/modeling_lowrank_mistral.py",
         "src/modeling/qwen/README.md",
         "src/modeling/qwen/__init__.py",
         "src/modeling/qwen/configuration_lowrank_qwen2.py",
@@ -103,6 +117,7 @@ def test_expected_layout_exists() -> None:
         "tests/test_arena.py",
         "tests/test_benchmark_configs.py",
         "tests/test_memory.py",
+        "tests/test_modeling.py",
         "tests/test_result_schema.py",
         "tests/test_scoring.py",
         "tests/test_validation.py",
@@ -119,9 +134,18 @@ def test_default_checkpoint_manifest_is_seeded() -> None:
 
 
 def test_exporter_uses_repo_modeling_root() -> None:
-    exporter = PROJECT_ROOT / "compress" / "svd" / "SVD-LLM" / "huggingface_repos" / "export_svdllm_lowrank.py"
-    spec = spec_from_file_location("export_svdllm_lowrank", exporter)
-    module = module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
+    module = _load_exporter_module()
     assert module.MODELING_ROOT == PROJECT_ROOT / "src" / "modeling"
+
+
+def test_exporter_supports_mistral_family() -> None:
+    module = _load_exporter_module()
+    spec = module._select_model_spec(SimpleNamespace(config=SimpleNamespace(model_type="mistral")))
+
+    assert spec["architectures"] == ["LowRankMistralForCausalLM"]
+    assert spec["source_dir"] == PROJECT_ROOT / "src" / "modeling" / "mistral"
+    assert spec["copy_files"] == (
+        "../common.py",
+        "configuration_lowrank_mistral.py",
+        "modeling_lowrank_mistral.py",
+    )

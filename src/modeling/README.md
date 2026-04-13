@@ -8,6 +8,7 @@ The key design choice is that runtime support is grouped by supported base-model
 
 - [`common.py`](./common.py): shared low-rank layer primitives and module-replacement helpers.
 - [`llama/`](./llama/README.md): Llama-family low-rank configs and model wrappers.
+- [`mistral/`](./mistral/README.md): Mistral-family low-rank configs and model wrappers.
 - [`qwen/`](./qwen/README.md): Qwen-family low-rank configs and model wrappers.
 
 ## Contract

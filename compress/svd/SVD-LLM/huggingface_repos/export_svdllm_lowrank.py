@@ -184,6 +184,24 @@ def _select_model_spec(source_model):
                 "modeling_lowrank_llama.py",
             ),
         }
+    if model_type == "mistral":
+        from src.modeling.mistral.configuration_lowrank_mistral import LowRankMistralConfig
+
+        return {
+            "config_cls": LowRankMistralConfig,
+            "auto_map": {
+                "AutoConfig": "configuration_lowrank_mistral.LowRankMistralConfig",
+                "AutoModel": "modeling_lowrank_mistral.LowRankMistralModel",
+                "AutoModelForCausalLM": "modeling_lowrank_mistral.LowRankMistralForCausalLM",
+            },
+            "architectures": ["LowRankMistralForCausalLM"],
+            "source_dir": MODELING_ROOT / "mistral",
+            "copy_files": (
+                "../common.py",
+                "configuration_lowrank_mistral.py",
+                "modeling_lowrank_mistral.py",
+            ),
+        }
     if model_type == "qwen2":
         from src.modeling.qwen.configuration_lowrank_qwen2 import LowRankQwen2Config
 
