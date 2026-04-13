@@ -85,12 +85,13 @@ def main():
 
     os.makedirs(args.output, exist_ok=True)
 
-    # ── save state dict as safetensors ────────────────────────────────────────
+    # ── save state dict as safetensors (sharded) ─────────────────────────────
     try:
         from safetensors.torch import save_file
     except ImportError:
         print("ERROR: safetensors not installed. Run: pip install safetensors")
         sys.exit(1)
+    from transformers.modeling_utils import shard_checkpoint
 
     tensors = {}
     for k, v in model.state_dict().items():
@@ -100,9 +101,22 @@ def main():
             v = v.contiguous()
         tensors[k] = v.cpu()
 
-    safetensors_path = os.path.join(args.output, "model.safetensors")
-    print(f"Saving {len(tensors)} tensors to {safetensors_path} ...")
-    save_file(tensors, safetensors_path)
+    print(f"Sharding {len(tensors)} tensors ...")
+    shards, index = shard_checkpoint(
+        tensors, max_shard_size="5GB", weights_name="model.safetensors"
+    )
+    for shard_file, shard in shards.items():
+        shard_path = os.path.join(args.output, shard_file)
+        print(f"  saving {shard_file} ({len(shard)} tensors) ...")
+        save_file(shard, shard_path)
+    if index is not None:
+        index_path = os.path.join(args.output, "model.safetensors.index.json")
+        with open(index_path, "w") as f:
+            json.dump(index, f, indent=2)
+        print(f"  index saved ({len(shards)} shards)")
+    else:
+        print("  single shard (no index needed)")
+    safetensors_path = os.path.join(args.output, list(shards.keys())[0])
     del tensors
 
     # ── save config ───────────────────────────────────────────────────────────
