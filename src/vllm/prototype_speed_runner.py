@@ -9,23 +9,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
-    sys.path.append(str(REPO_ROOT))
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 from src.benchmarking import suite_id, suite_output_name
 from src.load import load_checkpoint
 from src.scoring import summarize_speed_cases
 from src.utils import dump_json, ensure_dir, load_yaml, utc_timestamp
-from terminal_ui import ProgressPrinter, configure_runtime_environment, print_failure, use_safe_vllm_cwd
-from vllm_adapter import DEFAULT_WRAPPER_CACHE_ROOT, PreparedVllmModel, prepare_model_for_vllm
-from external_vllm import import_installed_vllm, installed_vllm_version
+from vllm.terminal_ui import ProgressPrinter, configure_runtime_environment, print_failure
+from vllm.vllm_adapter import DEFAULT_WRAPPER_CACHE_ROOT, PreparedVllmModel, prepare_model_for_vllm
 
 
-VLLM_ROOT = Path(__file__).resolve().parent
-DEFAULT_INDEX_PATH = REPO_ROOT / "checkpoints" / "index.csv"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "speed"
+VLLM_TRY_ROOT = Path(__file__).resolve().parent
+DEFAULT_INDEX_PATH = VLLM_TRY_ROOT / "checkpoints" / "index.csv"
+DEFAULT_OUTPUT_DIR = VLLM_TRY_ROOT / "results" / "speed"
 DEFAULT_SUITE_PATH = REPO_ROOT / "benchmark" / "speed" / "speed.yaml"
 
 
@@ -74,7 +74,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--index-path",
         default=str(DEFAULT_INDEX_PATH),
-        help="Checkpoint index CSV. Defaults to the local vllm demo index.",
+        help="Checkpoint index CSV. Defaults to the vllm_try demo index.",
     )
     parser.add_argument(
         "--output-dir",
@@ -212,10 +212,7 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
     progress.detail(f"model_path={prepared.model_path}")
 
     from transformers import AutoTokenizer
-
-    installed_vllm = import_installed_vllm()
-    LLM = installed_vllm.LLM
-    SamplingParams = installed_vllm.SamplingParams
+    from vllm import LLM, SamplingParams
 
     progress.step(4, "Loading tokenizer")
     tokenizer_kwargs: dict[str, Any] = {"trust_remote_code": request.trust_remote_code}
@@ -241,9 +238,8 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
     llm_kwargs.update(prepared.extra_llm_kwargs)
 
     try:
-        with use_safe_vllm_cwd():
-            with progress.waiting(5, "Initializing vLLM engine"):
-                llm = LLM(**llm_kwargs)
+        with progress.waiting(5, "Initializing vLLM engine"):
+            llm = LLM(**llm_kwargs)
     except Exception as exc:
         text = str(exc)
         if "Free memory on device" in text or "GPU memory utilization" in text:
@@ -355,7 +351,12 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         },
         "generated_at": utc_timestamp(),
     }
-    payload["backend_version"] = installed_vllm_version()
+    try:
+        import vllm
+
+        payload["backend_version"] = getattr(vllm, "__version__", None)
+    except Exception:
+        payload["backend_version"] = None
 
     output_path = dump_json(payload, _result_path_for(request))
     return VllmSpeedResult(

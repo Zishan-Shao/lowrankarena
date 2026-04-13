@@ -1,0 +1,101 @@
+{
+  "artifacts": {},
+  "backend": {
+    "name": "vllm",
+    "version": "0.18.1"
+  },
+  "checkpoint": {
+    "benchmarks": [
+      "main",
+      "speed",
+      "modern",
+      "quant"
+    ],
+    "enabled": true,
+    "locator": "hf://Duke-CEI-SVD/LowRankArena@main/llama31_8b/llama31_8b_asvd40_hf",
+    "method": "asvd",
+    "model_family": "llama3.1",
+    "name": "llama31-8b-asvd-0.4",
+    "notes": "Exact HF export path for the ASVD Llama-3.1-8B artifact. The base model stays exact low-rank under Transformers; the vLLM wrapper only materializes a dense lm_head because vLLM owns lm_head internally.",
+    "repo_id": "Duke-CEI-SVD/LowRankArena",
+    "revision": "main",
+    "source": "huggingface",
+    "subpath": "llama31_8b/llama31_8b_asvd40_hf",
+    "variant": "base"
+  },
+  "config": {
+    "batch_sizes": [
+      1
+    ],
+    "dtype": "auto",
+    "enforce_eager": true,
+    "generation_lengths": [
+      4
+    ],
+    "gpu_memory_utilization": 0.25,
+    "local_files_only": false,
+    "max_model_len": 2048,
+    "prompt_lengths": [
+      16
+    ],
+    "repeat": 1,
+    "tensor_parallel_size": 1,
+    "trust_remote_code": true,
+    "warmup": 0
+  },
+  "details": {
+    "cases": [
+      {
+        "batch_size": 1,
+        "decode_tokens_per_second": 15.765927501100432,
+        "end_to_end_tokens_per_second": 78.82963750550216,
+        "generation_length": 4,
+        "latency_seconds": 0.25371168297715485,
+        "prefill_tokens_per_second": 63.06371000440173,
+        "prompt_length": 16,
+        "repeat": 1,
+        "runs": [
+          {
+            "decode_tokens_per_second": 15.765927501100432,
+            "end_to_end_tokens_per_second": 78.82963750550216,
+            "generated_tokens": 4.0,
+            "latency_seconds": 0.25371168297715485,
+            "prefill_tokens_per_second": 63.06371000440173,
+            "prompt_tokens": 16.0
+          }
+        ],
+        "warmup": 0
+      }
+    ]
+  },
+  "generated_at": "2026-04-12T23:09:41.809928+00:00",
+  "kind": "speed",
+  "metrics": {
+    "case_count": 1,
+    "mean_decode_tokens_per_second": 15.765927501100432,
+    "mean_end_to_end_tokens_per_second": 78.82963750550216,
+    "mean_latency_seconds": 0.25371168297715485,
+    "mean_prefill_tokens_per_second": 63.06371000440173
+  },
+  "runtime": {
+    "model_impl": "transformers",
+    "model_path": "/home/zs89/lowrankarena/checkpoints/vllm/llama31-8b-asvd-0-4_vllm",
+    "preparation_kind": "asvd_llama_vllm_wrapper",
+    "preparation_notes": [
+      "ASVD low-rank layers stay factorized in the base model.",
+      "vLLM's Transformers backend owns lm_head, so the wrapper materializes a dense lm_head.weight only.",
+      "KV cache stays dense.",
+      "reused an existing compatible vLLM wrapper directory"
+    ],
+    "source_model_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama31_8b/llama31_8b_asvd40_hf",
+    "tokenizer_mode": "auto",
+    "tokenizer_path": "/home/zs89/lowrankarena/checkpoints/vllm/llama31-8b-asvd-0-4_vllm"
+  },
+  "schema_version": "1.0",
+  "status": "completed",
+  "suite": {
+    "id": "speed",
+    "name": "speed",
+    "path": "speed/speed"
+  }
+}

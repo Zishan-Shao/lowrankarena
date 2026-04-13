@@ -1,0 +1,110 @@
+{
+  "artifacts": {},
+  "backend": {
+    "name": "transformers",
+    "version": null
+  },
+  "checkpoint": {
+    "benchmarks": [
+      "main",
+      "speed",
+      "modern",
+      "quant"
+    ],
+    "enabled": true,
+    "locator": "hf://Duke-CEI-SVD/LowRankArena@main/llama31_8b/llama31_8b_asvd40_hf",
+    "method": "asvd",
+    "model_family": "llama3.1",
+    "name": "llama31-8b-asvd-0.4",
+    "notes": "Exact HF export path for the ASVD Llama-3.1-8B artifact. The base model stays exact low-rank under Transformers; the vLLM wrapper only materializes a dense lm_head because vLLM owns lm_head internally.",
+    "repo_id": "Duke-CEI-SVD/LowRankArena",
+    "revision": "main",
+    "source": "huggingface",
+    "subpath": "llama31_8b/llama31_8b_asvd40_hf",
+    "variant": "base"
+  },
+  "config": {
+    "attn_implementation": null,
+    "batch_size": 1,
+    "device": "cuda:0",
+    "dtype": "torch.float16",
+    "generation_length_actual": 4,
+    "generation_length_requested": 4,
+    "local_files_only": false,
+    "prompt_length": 16,
+    "trust_remote_code": true
+  },
+  "details": {
+    "estimated_dense_kv": {
+      "bytes_per_token": 131072,
+      "bytes_per_token_gib": 0.0001220703125,
+      "cached_tokens_at_peak": 19,
+      "estimated_peak_kv_bytes": 2490368,
+      "estimated_peak_kv_gib": 0.0023193359375
+    },
+    "inference": {
+      "allocated_bytes": 7082378752,
+      "max_allocated_bytes": 7088851968,
+      "max_reserved_bytes": 7289700352,
+      "peak_allocated_gib": 6.602007865905762,
+      "peak_reserved_gib": 6.7890625,
+      "reserved_bytes": 7289700352
+    },
+    "load": {
+      "allocated_bytes": 7073857536,
+      "allocated_gib": 6.588043212890625,
+      "max_allocated_bytes": 7073857536,
+      "max_reserved_bytes": 7283408896,
+      "reserved_bytes": 7283408896,
+      "reserved_gib": 6.783203125
+    }
+  },
+  "generated_at": "2026-04-12T23:09:10.605256+00:00",
+  "kind": "memory",
+  "metrics": {
+    "buffer_bytes": 256,
+    "buffer_gib": 2.384185791015625e-07,
+    "delta_peak_allocated_bytes_from_load": 14994432,
+    "delta_peak_allocated_gib_from_load": 0.013964653015136719,
+    "delta_peak_reserved_bytes_from_load": 6291456,
+    "delta_peak_reserved_gib_from_load": 0.005859375,
+    "estimated_dense_kv_bytes_per_token": 131072,
+    "estimated_dense_kv_bytes_per_token_gib": 0.0001220703125,
+    "estimated_peak_dense_kv_bytes": 2490368,
+    "estimated_peak_dense_kv_gib": 0.0023193359375,
+    "load_allocated_bytes": 7073857536,
+    "load_allocated_gib": 6.588043212890625,
+    "load_reserved_bytes": 7283408896,
+    "load_reserved_gib": 6.783203125,
+    "parameter_bytes": 7052992000,
+    "parameter_gib": 6.568610668182373,
+    "peak_allocated_bytes": 7088851968,
+    "peak_allocated_gib": 6.602007865905762,
+    "peak_reserved_bytes": 7289700352,
+    "peak_reserved_gib": 6.7890625
+  },
+  "runtime": {
+    "device_memory_before_load": {
+      "free_bytes": 37121294336,
+      "free_gib": 34.5718994140625,
+      "total_bytes": 84974239744,
+      "total_gib": 79.138427734375
+    },
+    "model_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama31_8b/llama31_8b_asvd40_hf",
+    "preparation_kind": "direct",
+    "preparation_notes": [
+      "checkpoint is directly loadable through Transformers from the local snapshot"
+    ],
+    "source_model_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama31_8b/llama31_8b_asvd40_hf",
+    "synthetic_input_token_id": 128000,
+    "tokenizer_mode": "auto",
+    "tokenizer_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama31_8b/llama31_8b_asvd40_hf"
+  },
+  "schema_version": "1.0",
+  "status": "completed",
+  "suite": {
+    "id": "memory",
+    "name": "memory",
+    "path": null
+  }
+}

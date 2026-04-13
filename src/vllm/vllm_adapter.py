@@ -5,7 +5,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from src.inference_adapter import prepare_model_for_inference
 from src.load import LoadedCheckpoint
+from src.modeling.artifacts import (
+    ensure_asvd_llama_vllm_wrapper,
+    ensure_basis_sharing_llama_wrapper,
+)
 from src.utils import load_json, project_path
 from .prepare_svdllm_vllm_model import (
     WRAPPER_METADATA_NAME,
@@ -85,6 +90,14 @@ def _config_for(model_path: Path) -> dict[str, Any]:
     return load_json(config_path)
 
 
+def _tokenizer_mode_for(model_path: Path, config: dict[str, Any]) -> str:
+    if config.get("model_type") == "svdllm-llama":
+        return "slow"
+    if not (model_path / "tokenizer.json").exists():
+        return "slow"
+    return "auto"
+
+
 def _is_ready_svdllm_wrapper(model_path: Path, config: dict[str, Any]) -> bool:
     auto_map = dict(config.get("auto_map") or {})
     metadata_path = model_path / WRAPPER_METADATA_NAME
@@ -96,6 +109,32 @@ def _is_ready_svdllm_wrapper(model_path: Path, config: dict[str, Any]) -> bool:
         and (model_path / "modeling_svdllm_llama.py").exists()
         and (model_path / "configuration_svdllm_llama.py").exists()
         and metadata_path.exists()
+    )
+
+
+def _is_transformers_ready_wrapper(model_path: Path, config: dict[str, Any]) -> bool:
+    auto_map = dict(config.get("auto_map") or {})
+    return (
+        list(config.get("architectures") or []) == ["TransformersForCausalLM"]
+        and "AutoModel" in auto_map
+        and "AutoModelForCausalLM" in auto_map
+        and (model_path / WRAPPER_METADATA_NAME).exists()
+    )
+
+
+def _is_asvd_checkpoint(config: dict[str, Any]) -> bool:
+    architectures = set(config.get("architectures") or [])
+    auto_map = dict(config.get("auto_map") or {})
+    return "ASVDLlamaForCausalLM" in architectures or auto_map.get("AutoModelForCausalLM", "").endswith(
+        "ASVDLlamaForCausalLM"
+    )
+
+
+def _is_dobi_checkpoint(config: dict[str, Any]) -> bool:
+    architectures = set(config.get("architectures") or [])
+    auto_map = dict(config.get("auto_map") or {})
+    return "DobiSVDLlamaForCausalLM" in architectures or auto_map.get("AutoModelForCausalLM", "").endswith(
+        "DobiSVDLlamaForCausalLM"
     )
 
 
@@ -114,6 +153,7 @@ def prepare_model_for_vllm(
 ) -> PreparedVllmModel:
     source_model_path = _local_model_path(loaded)
     config = _config_for(source_model_path)
+    cache_root = Path(wrapper_cache_root or DEFAULT_WRAPPER_CACHE_ROOT).expanduser().resolve()
 
     if _is_ready_svdllm_wrapper(source_model_path, config):
         return PreparedVllmModel(
@@ -127,7 +167,6 @@ def prepare_model_for_vllm(
         )
 
     if config.get("model_type") == "svdllm-llama":
-        cache_root = Path(wrapper_cache_root or DEFAULT_WRAPPER_CACHE_ROOT).expanduser().resolve()
         wrapper_dir = _default_wrapper_dir(loaded, cache_root)
         materialized = ensure_svdllm_llama_wrapper(source_model_path, wrapper_dir)
         notes = [
@@ -147,12 +186,80 @@ def prepare_model_for_vllm(
             notes=notes,
         )
 
+    if _is_asvd_checkpoint(config):
+        wrapper_dir = _default_wrapper_dir(loaded, cache_root)
+        materialized = ensure_asvd_llama_vllm_wrapper(source_model_path, wrapper_dir)
+        notes = [
+            "ASVD low-rank layers stay factorized in the base model.",
+            "vLLM's Transformers backend owns lm_head, so the wrapper materializes a dense lm_head.weight only.",
+            "KV cache stays dense.",
+        ]
+        if materialized.reused:
+            notes.append("reused an existing compatible vLLM wrapper directory")
+        return PreparedVllmModel(
+            model_path=str(materialized.output_dir),
+            tokenizer_path=str(materialized.output_dir),
+            tokenizer_mode=_tokenizer_mode_for(materialized.output_dir, _config_for(materialized.output_dir)),
+            model_impl="transformers",
+            preparation_kind="asvd_llama_vllm_wrapper",
+            source_model_path=str(source_model_path),
+            notes=notes,
+        )
+
+    if _is_dobi_checkpoint(config):
+        return PreparedVllmModel(
+            model_path=str(source_model_path),
+            tokenizer_path=str(source_model_path),
+            tokenizer_mode=_tokenizer_mode_for(source_model_path, config),
+            model_impl="transformers",
+            preparation_kind="dobi_llama_direct",
+            source_model_path=str(source_model_path),
+            notes=[
+                "DoBi checkpoints are mixed-format: modules listed in dobi_target_modules stay factorized as BLinear(ALinear(x)).",
+                "Any module not listed in dobi_target_modules stays dense.",
+                "vLLM must use the Transformers backend for this custom AutoModel checkpoint.",
+            ],
+        )
+
+    prepared = prepare_model_for_inference(loaded)
+    prepared_model_path = Path(prepared.model_path)
+    prepared_config = _config_for(prepared_model_path)
+
+    if _is_transformers_ready_wrapper(prepared_model_path, prepared_config):
+        notes = list(prepared.notes)
+        notes.append("wrapper already exposes AutoModel and can be handed directly to vLLM.")
+        return PreparedVllmModel(
+            model_path=str(prepared_model_path),
+            tokenizer_path=prepared.tokenizer_path,
+            tokenizer_mode=prepared.tokenizer_mode,
+            model_impl="transformers",
+            preparation_kind=prepared.preparation_kind,
+            source_model_path=prepared.source_model_path,
+            notes=notes,
+        )
+
+    if prepared.preparation_kind == "basis_sharing_llama_wrapper":
+        wrapper_dir = _default_wrapper_dir(loaded, cache_root)
+        materialized = ensure_basis_sharing_llama_wrapper(source_model_path, wrapper_dir)
+        notes = list(prepared.notes)
+        if materialized.reused:
+            notes.append("reused an existing compatible vLLM wrapper directory")
+        return PreparedVllmModel(
+            model_path=str(materialized.output_dir),
+            tokenizer_path=str(materialized.output_dir),
+            tokenizer_mode=_tokenizer_mode_for(materialized.output_dir, _config_for(materialized.output_dir)),
+            model_impl="transformers",
+            preparation_kind="basis_sharing_llama_wrapper",
+            source_model_path=str(source_model_path),
+            notes=notes,
+        )
+
     return PreparedVllmModel(
-        model_path=str(source_model_path),
-        tokenizer_path=str(source_model_path),
-        tokenizer_mode="auto",
+        model_path=str(prepared_model_path),
+        tokenizer_path=prepared.tokenizer_path,
+        tokenizer_mode=prepared.tokenizer_mode,
         model_impl=None,
-        preparation_kind="direct",
-        source_model_path=str(source_model_path),
-        notes=["checkpoint looks directly loadable by vLLM"],
+        preparation_kind=prepared.preparation_kind,
+        source_model_path=prepared.source_model_path,
+        notes=list(prepared.notes) + ["checkpoint looks directly loadable by vLLM"],
     )

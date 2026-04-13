@@ -7,6 +7,7 @@ from typing import Any
 
 import torch
 
+from src.inference_adapter import prepare_model_for_inference
 from src.load import load_checkpoint
 from src.result_schema import build_result_payload
 from src.utils import dump_json, ensure_dir, project_path
@@ -138,7 +139,7 @@ def _load_model(
     from transformers import AutoModelForCausalLM
 
     kwargs: dict[str, Any] = {
-        "dtype": dtype,
+        "torch_dtype": dtype,
         "trust_remote_code": trust_remote_code,
         "local_files_only": local_files_only,
         "low_cpu_mem_usage": True,
@@ -178,7 +179,8 @@ def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
         local_files_only=request.local_files_only,
         trust_remote_code=request.trust_remote_code,
     )
-    model_path = loaded.local_path or loaded.locator
+    prepared = prepare_model_for_inference(loaded)
+    model_path = prepared.model_path
     if model_path.startswith("hf://"):
         raise RuntimeError("Expected a local checkpoint path after materialization, but only got an HF locator.")
 
@@ -292,6 +294,11 @@ def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
         artifacts={},
         runtime={
             "model_path": model_path,
+            "tokenizer_path": prepared.tokenizer_path,
+            "tokenizer_mode": prepared.tokenizer_mode,
+            "preparation_kind": prepared.preparation_kind,
+            "source_model_path": prepared.source_model_path,
+            "preparation_notes": prepared.notes,
             "synthetic_input_token_id": filler_token_id,
             "device_memory_before_load": {
                 "free_bytes": int(free_before),

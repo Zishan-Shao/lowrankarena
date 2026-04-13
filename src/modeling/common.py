@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class LowRankLinear(nn.Module):
@@ -12,6 +14,33 @@ class LowRankLinear(nn.Module):
 
     def forward(self, x):
         return self.ALinear(self.BLinear(x))
+
+
+class SharedBasis(nn.Linear):
+    def __init__(self, num_basis: int, in_features: int):
+        super().__init__(in_features, num_basis, bias=False)
+
+    def forward(self, x):
+        return F.linear(x, self.weight, self.bias)
+
+
+class BasisCoefficient(nn.Linear):
+    def __init__(self, out_features: int, num_basis: int, bias: bool = False):
+        super().__init__(num_basis, out_features, bias=bias)
+        self.out_features = int(out_features)
+
+    def forward(self, x):
+        output_shape = x.size()[:-1] + (self.out_features,)
+        return F.linear(x, self.weight, self.bias).view(output_shape)
+
+
+def build_basis_collection(groups, num_basis: int, in_features: int) -> nn.ModuleDict:
+    module_dict = nn.ModuleDict()
+    for group in groups:
+        basis = SharedBasis(num_basis, in_features)
+        for item in group:
+            module_dict[str(item)] = basis
+    return module_dict
 
 
 def resolve_parent(root: nn.Module, name: str):

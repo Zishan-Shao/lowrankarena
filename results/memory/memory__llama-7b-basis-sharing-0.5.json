@@ -1,0 +1,110 @@
+{
+  "artifacts": {},
+  "backend": {
+    "name": "transformers",
+    "version": null
+  },
+  "checkpoint": {
+    "benchmarks": [
+      "main",
+      "speed",
+      "quant"
+    ],
+    "enabled": true,
+    "locator": "hf://Duke-CEI-SVD/LowRankArena@main/llama_7b/Basis_Sharing/share_llama-7b_50",
+    "method": "basis_sharing",
+    "model_family": "llama",
+    "name": "llama-7b-basis-sharing-0.5",
+    "notes": "Exact HF export path for the legacy LLaMA-7B basis-sharing artifact. This one keeps the shared-basis runtime and needs a local wrapper for inference.",
+    "repo_id": "Duke-CEI-SVD/LowRankArena",
+    "revision": "main",
+    "source": "huggingface",
+    "subpath": "llama_7b/Basis_Sharing/share_llama-7b_50",
+    "variant": "base"
+  },
+  "config": {
+    "attn_implementation": null,
+    "batch_size": 1,
+    "device": "cuda:0",
+    "dtype": "torch.float16",
+    "generation_length_actual": 4,
+    "generation_length_requested": 4,
+    "local_files_only": false,
+    "prompt_length": 16,
+    "trust_remote_code": true
+  },
+  "details": {
+    "estimated_dense_kv": {
+      "bytes_per_token": 524288,
+      "bytes_per_token_gib": 0.00048828125,
+      "cached_tokens_at_peak": 19,
+      "estimated_peak_kv_bytes": 9961472,
+      "estimated_peak_kv_gib": 0.00927734375
+    },
+    "inference": {
+      "allocated_bytes": 7058565120,
+      "max_allocated_bytes": 7060157440,
+      "max_reserved_bytes": 7461666816,
+      "peak_allocated_gib": 6.575284004211426,
+      "peak_reserved_gib": 6.94921875,
+      "reserved_bytes": 7461666816
+    },
+    "load": {
+      "allocated_bytes": 7050043904,
+      "allocated_gib": 6.5658650398254395,
+      "max_allocated_bytes": 7050043904,
+      "max_reserved_bytes": 7438598144,
+      "reserved_bytes": 7438598144,
+      "reserved_gib": 6.927734375
+    }
+  },
+  "generated_at": "2026-04-12T23:09:57.394023+00:00",
+  "kind": "memory",
+  "metrics": {
+    "buffer_bytes": 256,
+    "buffer_gib": 2.384185791015625e-07,
+    "delta_peak_allocated_bytes_from_load": 10113536,
+    "delta_peak_allocated_gib_from_load": 0.009418964385986328,
+    "delta_peak_reserved_bytes_from_load": 23068672,
+    "delta_peak_reserved_gib_from_load": 0.021484375,
+    "estimated_dense_kv_bytes_per_token": 524288,
+    "estimated_dense_kv_bytes_per_token_gib": 0.00048828125,
+    "estimated_peak_dense_kv_bytes": 9961472,
+    "estimated_peak_dense_kv_gib": 0.00927734375,
+    "load_allocated_bytes": 7050043904,
+    "load_allocated_gib": 6.5658650398254395,
+    "load_reserved_bytes": 7438598144,
+    "load_reserved_gib": 6.927734375,
+    "parameter_bytes": 6998597632,
+    "parameter_gib": 6.517951965332031,
+    "peak_allocated_bytes": 7060157440,
+    "peak_allocated_gib": 6.575284004211426,
+    "peak_reserved_bytes": 7461666816,
+    "peak_reserved_gib": 6.94921875
+  },
+  "runtime": {
+    "device_memory_before_load": {
+      "free_bytes": 24691474432,
+      "free_gib": 22.9957275390625,
+      "total_bytes": 84974239744,
+      "total_gib": 79.138427734375
+    },
+    "model_path": "/home/zs89/lowrankarena/checkpoints/inference/llama-7b-basis-sharing-0-5_hf",
+    "preparation_kind": "basis_sharing_llama_wrapper",
+    "preparation_notes": [
+      "basis sharing checkpoint requires a local wrapper that restores the custom runtime.",
+      "reused an existing compatible inference wrapper directory"
+    ],
+    "source_model_path": "/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama_7b/Basis_Sharing/share_llama-7b_50",
+    "synthetic_input_token_id": 1,
+    "tokenizer_mode": "slow",
+    "tokenizer_path": "/home/zs89/lowrankarena/checkpoints/inference/llama-7b-basis-sharing-0-5_hf"
+  },
+  "schema_version": "1.0",
+  "status": "completed",
+  "suite": {
+    "id": "memory",
+    "name": "memory",
+    "path": null
+  }
+}

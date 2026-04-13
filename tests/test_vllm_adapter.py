@@ -81,6 +81,7 @@ def test_prepare_model_for_vllm_direct_path_for_non_svd_model(tmp_path: Path) ->
     model_dir = tmp_path / "model"
     model_dir.mkdir(parents=True, exist_ok=True)
     (model_dir / "config.json").write_text(json.dumps({"model_type": "llama"}), encoding="utf-8")
+    (model_dir / "tokenizer.json").write_text("{}", encoding="utf-8")
     loaded = LoadedCheckpoint(
         record=sample_record(),
         locator=str(model_dir),
@@ -94,3 +95,38 @@ def test_prepare_model_for_vllm_direct_path_for_non_svd_model(tmp_path: Path) ->
     assert prepared.preparation_kind == "direct"
     assert prepared.model_path == str(model_dir)
     assert prepared.tokenizer_mode == "auto"
+
+
+def test_prepare_model_for_vllm_uses_transformers_backend_for_dobi_checkpoint(tmp_path: Path) -> None:
+    model_dir = tmp_path / "dobi"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    (model_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "model_type": "llama",
+                "architectures": ["DobiSVDLlamaForCausalLM"],
+                "auto_map": {
+                    "AutoConfig": "configuration_dobisvd_llama.DobiSVDLlamaConfig",
+                    "AutoModel": "modeling_dobisvd_llama.DobiSVDLlamaModel",
+                    "AutoModelForCausalLM": "modeling_dobisvd_llama.DobiSVDLlamaForCausalLM",
+                },
+                "dobi_target_modules": {
+                    "model.layers.0.self_attn.q_proj": 128,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = LoadedCheckpoint(
+        record=sample_record(),
+        locator=str(model_dir),
+        loader="local",
+        local_path=str(model_dir),
+        metadata={},
+    )
+
+    prepared = prepare_model_for_vllm(loaded)
+
+    assert prepared.preparation_kind == "dobi_llama_direct"
+    assert prepared.model_path == str(model_dir)
+    assert prepared.model_impl == "transformers"

@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from src.benchmarking import suite_output_name
-from src.load import CheckpointLoadError, LoadedCheckpoint, load_checkpoint
+from src.inference_adapter import PreparedInferenceModel, prepare_model_for_inference
+from src.load import load_checkpoint
 from src.result_schema import build_result_payload
 from src.scoring import normalize_lm_eval_tasks
 from src.utils import dump_json, ensure_dir, load_json, load_yaml, project_path
@@ -34,6 +35,7 @@ class LmEvalRequest:
     log_samples: bool = False
     use_cache: str | None = None
     trust_remote_code: bool = True
+    local_files_only: bool = False
     extra_model_args: dict[str, Any] = field(default_factory=dict)
 
 
@@ -55,20 +57,13 @@ def _serialize_cli_value(value: Any) -> str:
     return str(value)
 
 
-def _build_model_args(loaded: LoadedCheckpoint, extra_model_args: dict[str, Any]) -> dict[str, Any]:
-    record = loaded.record
-    if record.source == "local":
-        model_args: dict[str, Any] = {"pretrained": loaded.local_path or loaded.locator}
-    elif record.source == "huggingface":
-        model_args = {"pretrained": record.repo_id}
-        if record.revision:
-            model_args["revision"] = record.revision
-        if record.subpath:
-            model_args["subfolder"] = record.subpath
-    else:
-        raise CheckpointLoadError(f"Unsupported checkpoint source for lm-eval: {record.source}")
-
+def _build_model_args(prepared: PreparedInferenceModel, extra_model_args: dict[str, Any]) -> dict[str, Any]:
+    model_args: dict[str, Any] = {"pretrained": prepared.model_path}
     model_args.setdefault("dtype", "auto")
+    if prepared.tokenizer_path != prepared.model_path:
+        model_args["tokenizer"] = prepared.tokenizer_path
+    if prepared.tokenizer_mode == "slow":
+        model_args["tokenizer_use_fast"] = False
     model_args.update(extra_model_args)
     return model_args
 
@@ -76,15 +71,15 @@ def _build_model_args(loaded: LoadedCheckpoint, extra_model_args: dict[str, Any]
 def _build_command(
     request: LmEvalRequest,
     suite_config: dict[str, Any],
-    loaded: LoadedCheckpoint,
     raw_output_dir: Path,
+    prepared: PreparedInferenceModel,
 ) -> list[str]:
     eval_config = suite_config.get("eval", {})
     tasks = [str(task) for task in eval_config.get("tasks", [])]
     if not tasks:
         raise ValueError(f"No lm-eval tasks configured in {request.suite_path}.")
 
-    model_args = _build_model_args(loaded, request.extra_model_args)
+    model_args = _build_model_args(prepared, request.extra_model_args)
     command: list[str] = [
         request.lm_eval_bin,
         "run",
@@ -149,11 +144,18 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
     if suite_config.get("kind", "eval") != "eval":
         raise ValueError(f"Suite {suite_path} is not an eval suite.")
 
-    loaded = load_checkpoint(request.checkpoint_name, index_path=str(request.index_path))
+    loaded = load_checkpoint(
+        request.checkpoint_name,
+        index_path=str(request.index_path),
+        download=True,
+        local_files_only=request.local_files_only,
+        trust_remote_code=request.trust_remote_code,
+    )
+    prepared = prepare_model_for_inference(loaded)
     raw_output_dir = _raw_output_root(request) / suite_output_name(suite_path) / request.checkpoint_name
     ensure_dir(raw_output_dir)
 
-    command = _build_command(request, suite_config, loaded, raw_output_dir)
+    command = _build_command(request, suite_config, raw_output_dir, prepared)
     subprocess.run(command, check=True, cwd=project_path())
 
     raw_result_path = _find_raw_result_path(raw_output_dir)
@@ -195,6 +197,12 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
         runtime={
             "config": raw_payload.get("config", {}),
             "n_samples": raw_payload.get("n-samples", {}),
+            "model_path": prepared.model_path,
+            "tokenizer_path": prepared.tokenizer_path,
+            "tokenizer_mode": prepared.tokenizer_mode,
+            "preparation_kind": prepared.preparation_kind,
+            "source_model_path": prepared.source_model_path,
+            "preparation_notes": prepared.notes,
         },
         details={
             "summary": summary,

@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.benchmarking import resolve_suite_path
+from src.inference_adapter import prepare_model_for_inference
 from src.lm_eval_runner import LmEvalRequest, run_lm_eval_suite
 from src.load import load_checkpoint
 from src.memory_runner import MemoryRequest, run_memory_measurement
@@ -120,7 +121,8 @@ def _run_load_smoke(args: argparse.Namespace) -> dict[str, Any]:
         local_files_only=args.local_files_only,
         trust_remote_code=True,
     )
-    model_path = loaded.local_path or loaded.locator
+    prepared = prepare_model_for_inference(loaded)
+    model_path = prepared.model_path
     if model_path.startswith("hf://"):
         raise RuntimeError("Expected a local checkpoint path after materialization.")
 
@@ -138,6 +140,8 @@ def _run_load_smoke(args: argparse.Namespace) -> dict[str, Any]:
             trust_remote_code=True,
             local_files_only=True,
         )
+        if isinstance(tokenizer, bool):
+            raise TypeError("AutoTokenizer returned a boolean sentinel instead of a tokenizer instance.")
     except Exception:
         tokenizer = AutoTokenizer.from_pretrained(
             model_path,
@@ -149,6 +153,10 @@ def _run_load_smoke(args: argparse.Namespace) -> dict[str, Any]:
 
     return {
         "model_path": model_path,
+        "tokenizer_path": prepared.tokenizer_path,
+        "tokenizer_mode_prepared": prepared.tokenizer_mode,
+        "preparation_kind": prepared.preparation_kind,
+        "source_model_path": prepared.source_model_path,
         "locator": loaded.locator,
         "loader": loaded.loader,
         "model_type": getattr(config, "model_type", None),
@@ -179,6 +187,7 @@ def _run_eval_smoke(args: argparse.Namespace) -> dict[str, Any]:
             limit=args.eval_limit,
             num_fewshot=args.eval_num_fewshot,
             trust_remote_code=True,
+            local_files_only=args.local_files_only,
         )
     )
     return {
