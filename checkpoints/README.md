@@ -8,7 +8,10 @@ This directory tracks the runnable checkpoint registry and related checkpoint-si
 - `index.csv` is the runnable registry used by the CLI and benchmark runners.
 - Individual exported variants, exact low-rank methods, and loader-specific metadata can be added incrementally.
 - Optional sidecar manifests live under [`checkpoints/manifests/`](./manifests/README.md) when a checkpoint needs richer metadata than the flat CSV schema can express.
-- Materialized vLLM-compatible wrapper checkpoints live under [`checkpoints/vllm/`](./vllm/README.md).
+- Materialized inference wrappers can be archived under [`checkpoints/inference/`](./inference/README.md).
+- Materialized vLLM-compatible wrapper checkpoints can be archived under [`checkpoints/vllm/`](./vllm/README.md).
+
+By default, runtime caches now live outside the git repository under `~/.cache/lowrankarena/` unless overridden with environment variables such as `LRA_INFERENCE_CACHE_ROOT` and `LRA_VLLM_CACHE_ROOT`.
 
 ## `index.csv` Columns
 

@@ -11,7 +11,7 @@ The original SVD-LLM HF artifact for `llama_7b/SVDLLM/jeffwan_llama_7b_hf_whiten
 
 The wrapper generated here keeps the original weights untouched and only adds the missing base-model registration needed by vLLM.
 
-Materialized wrapper checkpoints should live under [`checkpoints/vllm/`](../../checkpoints/vllm/README.md), and benchmark outputs should live under [`results/`](../../results/README.md). `src/vllm/` itself is code-only.
+Materialized wrapper checkpoints default to an external cache under `~/.cache/lowrankarena/vllm`. The tracked [`checkpoints/vllm/`](../../checkpoints/vllm/README.md) folder is only for intentionally archived wrappers. Benchmark outputs should live under [`results/`](../../results/README.md). `src/vllm/` itself is code-only.
 
 The runtime scripts default to a compact terminal mode:
 

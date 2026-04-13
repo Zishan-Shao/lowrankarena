@@ -114,14 +114,17 @@ The benchmark outputs for `eval`, `memory`, and `speed` now share one project-ow
 ## Common Commands
 
 ```bash
+# accuracy
 python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite accuracy/mcq --limit 1
 
+# active memory
 python scripts/run_memory.py \
   llama-7b-svdllm-v1-update-0.5 \
   --batch-size 1 \
   --prompt-length 32 \
   --generation-length 8
 
+# vLLM speed
 python scripts/run_speed.py \
   llama-7b-svdllm-v1-update-0.5 \
   --batch-size 1 \
@@ -130,16 +133,97 @@ python scripts/run_speed.py \
   --repeat 1 \
   --warmup 0
 
-# quick smoke: eval uses --eval-limit 1
-CUDA_VISIBLE_DEVICES=7 python demo.py \
-  llama31-8b-svdllm-v1-update-0.6 \
-  --device cuda:0
+# quick smoke: load + eval(limit=1) + memory + speed
+CUDA_VISIBLE_DEVICES=7 python demo.py llama31-8b-svdllm-v1-update-0.6 --device cuda:0
 
-# slower but more stable eval sanity check
-CUDA_VISIBLE_DEVICES=7 python demo.py \
-  llama31-8b-svdllm-v1-update-0.6 \
+# more stable eval sanity check
+CUDA_VISIBLE_DEVICES=7 python demo.py llama31-8b-svdllm-v1-update-0.6 --device cuda:0 --eval-limit 200
+```
+
+Verified low-overhead smoke commands for the currently supported checkpoint families:
+
+```bash
+# SVD-LLM v1
+CUDA_VISIBLE_DEVICES=0 python demo.py llama-7b-svdllm-v1-update-0.5 \
+  --skip-eval \
   --device cuda:0 \
-  --eval-limit 200
+  --memory-prompt-length 16 \
+  --memory-generation-length 4 \
+  --speed-prompt-length 16 \
+  --speed-generation-length 4 \
+  --speed-repeat 1 \
+  --speed-warmup 0 \
+  --speed-gpu-memory-utilization 0.2
+
+# SVD-LLM v2 on Llama-3.1 / GQA
+CUDA_VISIBLE_DEVICES=4 python demo.py llama31-8b-svdllm-v2-0.6 \
+  --skip-eval \
+  --device cuda:0 \
+  --memory-prompt-length 16 \
+  --memory-generation-length 4 \
+  --speed-prompt-length 16 \
+  --speed-generation-length 4 \
+  --speed-repeat 1 \
+  --speed-warmup 0 \
+  --speed-gpu-memory-utilization 0.35
+
+# ASVD on Llama-3.1 / GQA
+CUDA_VISIBLE_DEVICES=5 python demo.py llama31-8b-asvd-0.4 \
+  --skip-eval \
+  --device cuda:0 \
+  --memory-prompt-length 16 \
+  --memory-generation-length 4 \
+  --speed-prompt-length 16 \
+  --speed-generation-length 4 \
+  --speed-repeat 1 \
+  --speed-warmup 0 \
+  --speed-gpu-memory-utilization 0.25
+
+# Basis sharing
+CUDA_VISIBLE_DEVICES=3 python demo.py llama-7b-basis-sharing-0.5 \
+  --skip-eval \
+  --device cuda:0 \
+  --memory-prompt-length 16 \
+  --memory-generation-length 4 \
+  --speed-prompt-length 16 \
+  --speed-generation-length 4 \
+  --speed-repeat 1 \
+  --speed-warmup 0 \
+  --speed-gpu-memory-utilization 0.2
+
+CUDA_VISIBLE_DEVICES=4 python demo.py llama31-8b-basis-sharing-0.6 \
+  --skip-eval \
+  --device cuda:0 \
+  --memory-prompt-length 16 \
+  --memory-generation-length 4 \
+  --speed-prompt-length 16 \
+  --speed-generation-length 4 \
+  --speed-repeat 1 \
+  --speed-warmup 0 \
+  --speed-gpu-memory-utilization 0.35
+
+# DoBi
+CUDA_VISIBLE_DEVICES=5 python demo.py llama31-8b-dobi-0.8 \
+  --skip-eval \
+  --device cuda:0 \
+  --memory-prompt-length 16 \
+  --memory-generation-length 4 \
+  --speed-prompt-length 16 \
+  --speed-generation-length 4 \
+  --speed-repeat 1 \
+  --speed-warmup 0 \
+  --speed-gpu-memory-utilization 0.25
+
+CUDA_VISIBLE_DEVICES=5 python demo.py llama-7b-dobi-0.8 \
+  --skip-eval \
+  --device cuda:0 \
+  --memory-prompt-length 16 \
+  --memory-generation-length 4 \
+  --speed-prompt-length 16 \
+  --speed-generation-length 4 \
+  --speed-repeat 1 \
+  --speed-warmup 0 \
+  --speed-gpu-memory-utilization 0.2
 ```
 
 ## Notes

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def project_path(*parts: str) -> Path:
     return PROJECT_ROOT.joinpath(*parts)
+
+
+def user_cache_path(*parts: str) -> Path:
+    cache_root = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))).expanduser()
+    return cache_root.joinpath("lowrankarena", *parts)
 
 
 def ensure_dir(path: str | Path) -> Path:

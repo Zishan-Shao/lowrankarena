@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,14 +12,16 @@ from src.modeling.artifacts import (
     ensure_asvd_llama_vllm_wrapper,
     ensure_basis_sharing_llama_wrapper,
 )
-from src.utils import load_json, project_path
+from src.utils import load_json, user_cache_path
 from .prepare_svdllm_vllm_model import (
     WRAPPER_METADATA_NAME,
     ensure_svdllm_llama_wrapper,
 )
 
 
-DEFAULT_WRAPPER_CACHE_ROOT = project_path("checkpoints", "vllm")
+DEFAULT_WRAPPER_CACHE_ROOT = Path(
+    os.environ.get("LRA_VLLM_CACHE_ROOT", str(user_cache_path("vllm")))
+).expanduser()
 
 
 @dataclass(slots=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -7,10 +8,12 @@ from typing import Any
 
 from src.load import LoadedCheckpoint
 from src.modeling.artifacts import ensure_basis_sharing_llama_wrapper
-from src.utils import load_json, project_path
+from src.utils import load_json, user_cache_path
 
 
-DEFAULT_WRAPPER_CACHE_ROOT = project_path("checkpoints", "inference")
+DEFAULT_WRAPPER_CACHE_ROOT = Path(
+    os.environ.get("LRA_INFERENCE_CACHE_ROOT", str(user_cache_path("inference")))
+).expanduser()
 
 
 @dataclass(slots=True)

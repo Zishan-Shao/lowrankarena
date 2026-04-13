@@ -110,7 +110,6 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
     )
     prepared = prepare_model_for_vllm(
         loaded,
-        wrapper_cache_root=project_path("checkpoints", "vllm"),
     )
 
     from transformers import AutoTokenizer
