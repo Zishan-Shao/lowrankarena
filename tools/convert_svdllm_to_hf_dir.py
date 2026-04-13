@@ -85,10 +85,25 @@ def main():
 
     os.makedirs(args.output, exist_ok=True)
 
-    # ── save model object (SVD structure preserved) ───────────────────────────
-    model_pt_path = os.path.join(args.output, "model.pt")
-    print(f"Saving model (with SVD structure) to {model_pt_path} ...")
-    torch.save(model, model_pt_path)
+    # ── save state dict as safetensors ────────────────────────────────────────
+    try:
+        from safetensors.torch import save_file
+    except ImportError:
+        print("ERROR: safetensors not installed. Run: pip install safetensors")
+        sys.exit(1)
+
+    tensors = {}
+    for k, v in model.state_dict().items():
+        if v is None or not isinstance(v, torch.Tensor):
+            continue
+        if not v.is_contiguous():
+            v = v.contiguous()
+        tensors[k] = v.cpu()
+
+    safetensors_path = os.path.join(args.output, "model.safetensors")
+    print(f"Saving {len(tensors)} tensors to {safetensors_path} ...")
+    save_file(tensors, safetensors_path)
+    del tensors
 
     # ── save config ───────────────────────────────────────────────────────────
     if hasattr(model, "config"):
