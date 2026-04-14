@@ -2,6 +2,9 @@ name: main
 kind: aggregate
 description: Frozen main leaderboard entrypoint for the paper-facing checkpoint set.
 includes:
+  - accuracy/ppl
   - accuracy/mcq
+  - accuracy/mmlu_pro
+  - accuracy/gsm8k
   - memory/leaderboard
-  - speed/leaderboard
+  - speed/serve

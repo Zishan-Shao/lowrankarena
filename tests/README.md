@@ -8,6 +8,7 @@ The current test suite is intentionally pragmatic. It focuses on schema, layout,
 
 - [`test_manifest.py`](./test_manifest.py): verify expected repository layout and seed checkpoint rows.
 - [`test_modeling.py`](./test_modeling.py): validate family-level modeling wrappers install shared low-rank layers.
+- [`test_ppl_runner.py`](./test_ppl_runner.py): validate contiguous-block perplexity helper behavior.
 - [`test_load.py`](./test_load.py): validate checkpoint loading helpers.
 - [`test_eval.py`](./test_eval.py): validate small eval-runner helper behavior.
 - [`test_memory.py`](./test_memory.py): validate memory-runner helper behavior.

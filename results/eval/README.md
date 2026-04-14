@@ -7,4 +7,5 @@ The files here are project-owned summaries, not raw `lm-eval` dumps. Raw backend
 ## Expected Content
 
 - One JSON file per `suite x checkpoint`.
-- Shared top-level schema plus eval-specific normalized task metrics in `metrics` and task-level detail in `details`.
+- Shared top-level schema plus eval-specific normalized metrics in `metrics`.
+- `details.tasks` stores normalized per-task rows, and `details.groups` may additionally store normalized lm-eval group aggregates for suites such as `MMLU-Pro`.

@@ -2,15 +2,15 @@
 
 This directory contains the user-facing command-line entrypoints for LowRankArena.
 
-Each script is intentionally thin. It should parse arguments, resolve the requested suite or checkpoint, and delegate real work to [`src/`](../src/README.md).
+Each script is intentionally thin. It should parse arguments, resolve the requested suite or checkpoint, and delegate real work to [`src/`](../src/README.md). Benchmark-critical lm-eval protocol settings belong in suite YAML rather than in handwritten shell snippets.
 
 ## Entry Points
 
-- [`run_eval.py`](./run_eval.py): run a single accuracy suite against one checkpoint through `lm-eval-harness`.
+- [`run_eval.py`](./run_eval.py): run a single accuracy suite against one checkpoint through the suite-selected eval backend.
 - [`run_memory.py`](./run_memory.py): run a single Transformers-based memory measurement for one checkpoint.
 - [`run_speed.py`](./run_speed.py): run a single vLLM speed suite against one checkpoint.
 - [`measure_peak_memory.py`](./measure_peak_memory.py): compatibility alias for `run_memory.py`.
-- [`run_main.py`](./run_main.py): execute aggregate benchmark suites such as [`benchmark/main.yaml`](../benchmark/main.yaml). This currently aggregates accuracy and speed suites, not memory.
+- [`run_main.py`](./run_main.py): execute aggregate benchmark suites such as [`benchmark/main.yaml`](../benchmark/main.yaml). The default `main` suite is paper-facing and currently aggregates perplexity, accuracy, memory, and speed suites. Speed workload parameters can be overridden from the CLI without editing YAML.
 - [`run_all.py`](./run_all.py): compatibility alias for `run_main.py`.
 - [`run_compress.py`](./run_compress.py): plan or dispatch optional artifact-generation flows from [`compress/`](../compress/README.md).
 - [`make_table.py`](./make_table.py): build lightweight table artifacts from normalized result JSON files.

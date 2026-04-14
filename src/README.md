@@ -15,6 +15,7 @@ The guiding rule is simple: benchmark policy lives in [`benchmark/`](../benchmar
 - [`registry.py`](./registry.py): read, filter, and update checkpoint manifest records.
 - [`benchmarking.py`](./benchmarking.py): resolve suite paths and select checkpoints for a suite.
 - [`lm_eval_runner.py`](./lm_eval_runner.py): thin wrapper around `lm-eval run ...`, plus result normalization.
+- [`ppl_runner.py`](./ppl_runner.py): project-owned contiguous-block perplexity runner for unified local PPL evaluation.
 - [`memory_runner.py`](./memory_runner.py): Transformers-based active-memory measurement runner.
 - [`speed_runner.py`](./speed_runner.py): vLLM-backed offline generation speed runner.
 - [`scoring.py`](./scoring.py): task-level metric selection and summary reduction helpers.

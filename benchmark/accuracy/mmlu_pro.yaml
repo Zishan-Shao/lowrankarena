@@ -1,6 +1,6 @@
-name: mcq
+name: mmlu_pro
 kind: eval
-description: Multiple-choice accuracy suite using exact lm-eval-harness 0.4.11 task IDs.
+description: Official MMLU-Pro Chain-of-Thought protocol through the upstream lm-eval group, with the headline score taken from the official weighted group aggregate.
 selection:
   checkpoints:
     - llama31-8b-asvd-0.4
@@ -17,24 +17,18 @@ eval:
   version: 0.4.11
   dataset: lm_eval_harness
   dtype: float16
-  metric: acc_norm
-  metric_fallbacks:
-    - acc
+  metric: exact_match
   tracked_metrics:
-    - acc
-    - acc_norm
+    - exact_match
   metric_aggregation: macro_mean
   batch_size: auto
-  num_fewshot: 0
+  num_fewshot: 5
+  apply_chat_template: false
+  summary_source: groups
+  summary_entity: mmlu_pro
   tasks:
-    - boolq
-    - arc_easy
-    - arc_challenge
-    - winogrande
-    - piqa
-    - hellaswag
-    - openbookqa
+    - mmlu_pro
 report:
   result_dir: results/leaderboard/eval
   output_dir: results/tables
-  filename: mcq.md
+  filename: mmlu_pro.md

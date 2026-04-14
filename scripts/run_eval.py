@@ -15,13 +15,13 @@ from src.lm_eval_runner import LmEvalRequest, run_lm_eval_suite
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run one lm-eval-harness suite for one checkpoint.")
+    parser = argparse.ArgumentParser(description="Run one eval suite for one checkpoint.")
     parser.add_argument("checkpoint", help="Checkpoint name from checkpoints/index.csv")
     parser.add_argument("--suite", default="accuracy/mcq", help="Benchmark suite name or YAML path")
     parser.add_argument("--index", default=str(ROOT / "checkpoints" / "index.csv"))
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--raw-output-dir", default=None)
-    parser.add_argument("--lm-eval-bin", default="lm-eval")
+    parser.add_argument("--lm-eval-bin", default="lm-eval", help="lm-eval executable path for suites that use the lm_eval_harness backend")
     parser.add_argument("--model-backend", default="hf")
     parser.add_argument("--device", default=None)
     parser.add_argument("--batch-size", default=None)

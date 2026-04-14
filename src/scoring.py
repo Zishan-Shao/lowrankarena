@@ -84,6 +84,7 @@ def normalize_lm_eval_tasks(
         if metric_name and metric_name not in unique_metrics:
             unique_metrics.append(metric_name)
     aggregated_values: dict[str, list[float]] = {metric_name: [] for metric_name in unique_metrics}
+    chosen_values: list[float] = []
 
     for task_name, task_result in raw_results.items():
         chosen = choose_task_metric(task_result, preferred_metrics)
@@ -98,6 +99,8 @@ def normalize_lm_eval_tasks(
             "tracked_metrics": tracked,
             "available_metrics": available_metrics,
         }
+        if chosen is not None:
+            chosen_values.append(float(chosen.value))
         for metric_name, metric_payload in tracked.items():
             value = metric_payload.get("value")
             if value is not None:
@@ -111,16 +114,18 @@ def normalize_lm_eval_tasks(
         for metric_name, values in aggregated_values.items()
     }
     resolved_primary_metric = primary_metric if primary_metric in by_metric else None
-    primary_summary = by_metric.get(resolved_primary_metric or "")
+    preferred_summary_mean = (
+        aggregate_values(chosen_values, aggregation=aggregation) if resolved_primary_metric and chosen_values else None
+    )
     summary = {
         "primary_metric": resolved_primary_metric,
         "aggregation": aggregation,
         "resolved_metrics": sorted({item["metric"] for item in normalized.values() if item["metric"]}),
         "tracked_metrics": unique_metrics,
         "by_metric": by_metric,
-        "mean": primary_summary["mean"] if primary_summary else None,
+        "mean": preferred_summary_mean,
         "task_count": len(normalized),
-        "scored_task_count": primary_summary["scored_task_count"] if primary_summary else 0,
+        "scored_task_count": len(chosen_values) if resolved_primary_metric else 0,
     }
     return normalized, summary
 

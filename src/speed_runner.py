@@ -67,6 +67,72 @@ def _result_path_for(request: VllmSpeedRequest) -> Path:
     return output_root / f"{suite_name}__{request.checkpoint_name}.json"
 
 
+def _cartesian_speed_case_specs(
+    *,
+    batch_sizes: list[int],
+    prompt_lengths: list[int],
+    generation_lengths: list[int],
+) -> list[dict[str, int | str]]:
+    cases: list[dict[str, int | str]] = []
+    for prompt_length in prompt_lengths:
+        for generation_length in generation_lengths:
+            for batch_size in batch_sizes:
+                cases.append(
+                    {
+                        "name": f"batch{batch_size}_prompt{prompt_length}_gen{generation_length}",
+                        "batch_size": int(batch_size),
+                        "prompt_length": int(prompt_length),
+                        "generation_length": int(generation_length),
+                    }
+                )
+    return cases
+
+
+def _normalize_speed_case_spec(case: dict[str, Any], *, index: int) -> dict[str, int | str]:
+    required_fields = ("batch_size", "prompt_length", "generation_length")
+    missing = [field for field in required_fields if case.get(field) is None]
+    if missing:
+        raise ValueError(f"Speed case #{index} is missing required fields: {', '.join(missing)}")
+    return {
+        "name": str(case.get("name", f"case_{index}")),
+        "batch_size": int(case["batch_size"]),
+        "prompt_length": int(case["prompt_length"]),
+        "generation_length": int(case["generation_length"]),
+    }
+
+
+def _resolve_speed_case_specs(speed_config: dict[str, Any], request: VllmSpeedRequest) -> list[dict[str, int | str]]:
+    speed_batch_sizes = [int(item) for item in speed_config.get("batch_sizes", [1])]
+    speed_prompt_lengths = [int(item) for item in speed_config.get("prompt_lengths", [512])]
+    speed_generation_lengths = [int(item) for item in speed_config.get("generation_lengths", [128])]
+    has_axis_override = any(
+        value is not None
+        for value in (
+            request.batch_sizes,
+            request.prompt_lengths,
+            request.generation_lengths,
+        )
+    )
+    if has_axis_override:
+        return _cartesian_speed_case_specs(
+            batch_sizes=request.batch_sizes or speed_batch_sizes,
+            prompt_lengths=request.prompt_lengths or speed_prompt_lengths,
+            generation_lengths=request.generation_lengths or speed_generation_lengths,
+        )
+
+    configured_cases = speed_config.get("cases")
+    if configured_cases is not None:
+        if not isinstance(configured_cases, list) or not configured_cases:
+            raise ValueError("Speed suites that define `speed.cases` must provide a non-empty list.")
+        return [_normalize_speed_case_spec(case, index=index) for index, case in enumerate(configured_cases, start=1)]
+
+    return _cartesian_speed_case_specs(
+        batch_sizes=speed_batch_sizes,
+        prompt_lengths=speed_prompt_lengths,
+        generation_lengths=speed_generation_lengths,
+    )
+
+
 def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
     configure_runtime_environment(verbose_vllm=request.verbose_backend)
     progress = ProgressPrinter(
@@ -80,9 +146,10 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         raise ValueError(f"Suite {suite_path} is not a speed suite.")
 
     speed_config = suite_config.get("speed", {})
-    batch_sizes = request.batch_sizes or [int(item) for item in speed_config.get("batch_sizes", [1])]
-    prompt_lengths = request.prompt_lengths or [int(item) for item in speed_config.get("prompt_lengths", [512])]
-    generation_lengths = request.generation_lengths or [int(item) for item in speed_config.get("generation_lengths", [128])]
+    case_specs = _resolve_speed_case_specs(speed_config, request)
+    batch_sizes = sorted({int(case["batch_size"]) for case in case_specs})
+    prompt_lengths = sorted({int(case["prompt_length"]) for case in case_specs})
+    generation_lengths = sorted({int(case["generation_length"]) for case in case_specs})
     repeat = int(request.repeat if request.repeat is not None else speed_config.get("repeat", 5))
     warmup = int(request.warmup if request.warmup is not None else speed_config.get("warmup", 1))
     if repeat < 1:
@@ -143,53 +210,60 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         with use_safe_vllm_cwd():
             llm = LLM(**llm_kwargs)
 
-    progress.step(4, "Running speed cases")
+    progress.step(4, f"Running speed cases ({len(case_specs)} total)")
     cases: list[dict[str, Any]] = []
-    for prompt_length in prompt_lengths:
-        prompt_token_ids = _build_prompt_token_ids(tokenizer, prompt_length)
-        for generation_length in generation_lengths:
-            sampling_params = SamplingParams(
-                temperature=0.0,
-                max_tokens=int(generation_length),
-                ignore_eos=True,
+    prompt_token_ids_by_length: dict[int, list[int]] = {}
+    for case_spec in case_specs:
+        prompt_length = int(case_spec["prompt_length"])
+        generation_length = int(case_spec["generation_length"])
+        batch_size = int(case_spec["batch_size"])
+        case_name = str(case_spec.get("name", f"batch{batch_size}_prompt{prompt_length}_gen{generation_length}"))
+        prompt_token_ids = prompt_token_ids_by_length.get(prompt_length)
+        if prompt_token_ids is None:
+            prompt_token_ids = _build_prompt_token_ids(tokenizer, prompt_length)
+            prompt_token_ids_by_length[prompt_length] = prompt_token_ids
+        sampling_params = SamplingParams(
+            temperature=0.0,
+            max_tokens=generation_length,
+            ignore_eos=True,
+        )
+        prompts = [prompt_token_ids] * batch_size
+        for _ in range(warmup):
+            llm.generate(prompts, sampling_params, use_tqdm=False)
+
+        run_stats: list[dict[str, float]] = []
+        for _ in range(repeat):
+            started = time.perf_counter()
+            outputs = llm.generate(prompts, sampling_params, use_tqdm=False)
+            elapsed = time.perf_counter() - started
+            prompt_tokens = sum(len(output.prompt_token_ids or []) for output in outputs)
+            generated_tokens = sum(len(output.outputs[0].token_ids) for output in outputs)
+            run_stats.append(
+                {
+                    "latency_seconds": elapsed,
+                    "prompt_tokens": float(prompt_tokens),
+                    "generated_tokens": float(generated_tokens),
+                    "prefill_tokens_per_second": float(prompt_tokens) / elapsed if elapsed else 0.0,
+                    "decode_tokens_per_second": float(generated_tokens) / elapsed if elapsed else 0.0,
+                    "end_to_end_tokens_per_second": float(prompt_tokens + generated_tokens) / elapsed if elapsed else 0.0,
+                }
             )
-            for batch_size in batch_sizes:
-                prompts = [prompt_token_ids] * int(batch_size)
-                for _ in range(warmup):
-                    llm.generate(prompts, sampling_params, use_tqdm=False)
 
-                run_stats: list[dict[str, float]] = []
-                for _ in range(repeat):
-                    started = time.perf_counter()
-                    outputs = llm.generate(prompts, sampling_params, use_tqdm=False)
-                    elapsed = time.perf_counter() - started
-                    prompt_tokens = sum(len(output.prompt_token_ids or []) for output in outputs)
-                    generated_tokens = sum(len(output.outputs[0].token_ids) for output in outputs)
-                    run_stats.append(
-                        {
-                            "latency_seconds": elapsed,
-                            "prompt_tokens": float(prompt_tokens),
-                            "generated_tokens": float(generated_tokens),
-                            "prefill_tokens_per_second": float(prompt_tokens) / elapsed if elapsed else 0.0,
-                            "decode_tokens_per_second": float(generated_tokens) / elapsed if elapsed else 0.0,
-                            "end_to_end_tokens_per_second": float(prompt_tokens + generated_tokens) / elapsed if elapsed else 0.0,
-                        }
-                    )
-
-                cases.append(
-                    {
-                        "batch_size": int(batch_size),
-                        "prompt_length": int(prompt_length),
-                        "generation_length": int(generation_length),
-                        "repeat": repeat,
-                        "warmup": warmup,
-                        "latency_seconds": statistics.mean(item["latency_seconds"] for item in run_stats),
-                        "prefill_tokens_per_second": statistics.mean(item["prefill_tokens_per_second"] for item in run_stats),
-                        "decode_tokens_per_second": statistics.mean(item["decode_tokens_per_second"] for item in run_stats),
-                        "end_to_end_tokens_per_second": statistics.mean(item["end_to_end_tokens_per_second"] for item in run_stats),
-                        "runs": run_stats,
-                    }
-                )
+        cases.append(
+            {
+                "name": case_name,
+                "batch_size": batch_size,
+                "prompt_length": prompt_length,
+                "generation_length": generation_length,
+                "repeat": repeat,
+                "warmup": warmup,
+                "latency_seconds": statistics.mean(item["latency_seconds"] for item in run_stats),
+                "prefill_tokens_per_second": statistics.mean(item["prefill_tokens_per_second"] for item in run_stats),
+                "decode_tokens_per_second": statistics.mean(item["decode_tokens_per_second"] for item in run_stats),
+                "end_to_end_tokens_per_second": statistics.mean(item["end_to_end_tokens_per_second"] for item in run_stats),
+                "runs": run_stats,
+            }
+        )
 
     aggregation = str(speed_config.get("metric_aggregation", "macro_mean"))
     stats = summarize_speed_cases(cases, aggregation=aggregation)
@@ -202,6 +276,7 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         suite_path=suite_path,
         suite_name=suite_config.get("name", suite_path.stem),
         config={
+            "cases": case_specs,
             "batch_sizes": batch_sizes,
             "prompt_lengths": prompt_lengths,
             "generation_lengths": generation_lengths,

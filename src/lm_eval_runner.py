@@ -60,6 +60,10 @@ def _serialize_cli_value(value: Any) -> str:
     return str(value)
 
 
+def _serialize_cli_pairs(payload: dict[str, Any]) -> list[str]:
+    return [f"{key}={_serialize_cli_value(value)}" for key, value in payload.items()]
+
+
 def _build_model_args(
     prepared: PreparedInferenceModel,
     extra_model_args: dict[str, Any],
@@ -74,6 +78,45 @@ def _build_model_args(
         model_args["use_fast_tokenizer"] = False
     model_args.update(extra_model_args)
     return model_args
+
+
+def _resolve_include_paths(suite_path: str | Path, raw_paths: Any) -> list[Path]:
+    if raw_paths is None:
+        return []
+    if isinstance(raw_paths, (str, Path)):
+        items = [raw_paths]
+    else:
+        items = list(raw_paths)
+
+    resolved: list[Path] = []
+    for item in items:
+        candidate = Path(str(item))
+        if not candidate.is_absolute():
+            candidate = (project_path() / candidate).resolve()
+        resolved.append(candidate)
+    return resolved
+
+
+def _normalize_summary_entries(
+    raw_entries: dict[str, dict[str, Any]],
+    *,
+    preferred_metrics: list[str],
+    aggregation: str,
+    primary_metric: str | None,
+    entity: str | None = None,
+) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    selected = raw_entries
+    if entity:
+        if entity not in raw_entries:
+            known = ", ".join(sorted(raw_entries))
+            raise KeyError(f"Unknown lm-eval summary entity {entity!r}. Known entities: {known}")
+        selected = {entity: raw_entries[entity]}
+    return normalize_lm_eval_tasks(
+        selected,
+        preferred_metrics=preferred_metrics,
+        aggregation=aggregation,
+        primary_metric=primary_metric,
+    )
 
 
 def _build_command(
@@ -98,7 +141,7 @@ def _build_command(
         "--model",
         request.model_backend,
         "--model_args",
-        *[f"{key}={_serialize_cli_value(value)}" for key, value in model_args.items()],
+        *_serialize_cli_pairs(model_args),
         "--tasks",
         *tasks,
         "--output_path",
@@ -127,6 +170,29 @@ def _build_command(
         command.append("--log_samples")
     if request.trust_remote_code:
         command.append("--trust_remote_code")
+
+    include_paths = _resolve_include_paths(request.suite_path, eval_config.get("include_paths"))
+    for include_path in include_paths:
+        command.extend(["--include_path", str(include_path)])
+
+    gen_kwargs = eval_config.get("gen_kwargs") or {}
+    if gen_kwargs:
+        if not isinstance(gen_kwargs, dict):
+            raise TypeError(f"eval.gen_kwargs must be a mapping in {request.suite_path}.")
+        command.extend(["--gen_kwargs", *_serialize_cli_pairs(gen_kwargs)])
+
+    apply_chat_template = eval_config.get("apply_chat_template")
+    if isinstance(apply_chat_template, str) and apply_chat_template.strip():
+        command.extend(["--apply_chat_template", apply_chat_template.strip()])
+    elif apply_chat_template:
+        command.append("--apply_chat_template")
+
+    if "fewshot_as_multiturn" in eval_config:
+        command.extend(["--fewshot_as_multiturn", _serialize_cli_value(eval_config.get("fewshot_as_multiturn"))])
+
+    system_instruction = eval_config.get("system_instruction")
+    if system_instruction:
+        command.extend(["--system_instruction", str(system_instruction)])
 
     return command
 
@@ -159,6 +225,13 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
     suite_config = load_yaml(suite_path)
     if suite_config.get("kind", "eval") != "eval":
         raise ValueError(f"Suite {suite_path} is not an eval suite.")
+    backend_name = str((suite_config.get("eval") or {}).get("backend", "lm_eval_harness"))
+    if backend_name == "contiguous_ppl":
+        from src.ppl_runner import run_contiguous_ppl_suite
+
+        return run_contiguous_ppl_suite(request, suite_path=suite_path, suite_config=suite_config)
+    if backend_name != "lm_eval_harness":
+        raise ValueError(f"Unsupported eval backend {backend_name!r} in {suite_path}.")
 
     loaded = load_checkpoint(
         request.checkpoint_name,
@@ -190,12 +263,48 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
         if metric_name not in preferred_metrics:
             preferred_metrics.append(metric_name)
     aggregation = str(eval_config.get("metric_aggregation", "macro_mean"))
-    tasks, summary = normalize_lm_eval_tasks(
-        raw_payload.get("results", {}),
+    primary_metric = str(eval_config.get("metric")) if eval_config.get("metric") else None
+    raw_results = raw_payload.get("results", {})
+    raw_groups = raw_payload.get("groups", {})
+    tasks, task_summary = _normalize_summary_entries(
+        raw_results,
         preferred_metrics=preferred_metrics,
         aggregation=aggregation,
-        primary_metric=str(eval_config.get("metric")) if eval_config.get("metric") else None,
+        primary_metric=primary_metric,
     )
+    groups: dict[str, dict[str, Any]] = {}
+    group_summary: dict[str, Any] | None = None
+    if raw_groups:
+        groups, group_summary = _normalize_summary_entries(
+            raw_groups,
+            preferred_metrics=preferred_metrics,
+            aggregation=aggregation,
+            primary_metric=primary_metric,
+        )
+
+    summary_source = str(eval_config.get("summary_source", "results")).strip().lower()
+    summary_entity = str(eval_config.get("summary_entity", "")).strip() or None
+    if summary_source == "results":
+        _, summary = _normalize_summary_entries(
+            raw_results,
+            preferred_metrics=preferred_metrics,
+            aggregation=aggregation,
+            primary_metric=primary_metric,
+            entity=summary_entity,
+        )
+    elif summary_source == "groups":
+        if not raw_groups:
+            raise ValueError(f"Suite {suite_path} requested groups summary_source but lm-eval returned no groups.")
+        _, summary = _normalize_summary_entries(
+            raw_groups,
+            preferred_metrics=preferred_metrics,
+            aggregation=aggregation,
+            primary_metric=primary_metric,
+            entity=summary_entity,
+        )
+    else:
+        raise ValueError(f"Unsupported eval.summary_source={summary_source!r} in {suite_path}.")
+
     metrics = {
         "primary_metric": summary["primary_metric"],
         "mean": summary["mean"],
@@ -204,6 +313,8 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
         "aggregation": summary["aggregation"],
         "tracked_metrics": summary["tracked_metrics"],
         "by_metric": summary["by_metric"],
+        "summary_source": summary_source,
+        "summary_entity": summary_entity,
     }
 
     payload = build_result_payload(
@@ -226,6 +337,13 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
             "limit": request.limit if request.limit is not None else eval_config.get("limit"),
             "num_fewshot": request.num_fewshot if request.num_fewshot is not None else eval_config.get("num_fewshot"),
             "model_backend": request.model_backend,
+            "gen_kwargs": dict(eval_config.get("gen_kwargs") or {}),
+            "include_paths": [str(path) for path in _resolve_include_paths(suite_path, eval_config.get("include_paths"))],
+            "apply_chat_template": eval_config.get("apply_chat_template", False),
+            "fewshot_as_multiturn": eval_config.get("fewshot_as_multiturn"),
+            "system_instruction": eval_config.get("system_instruction"),
+            "summary_source": summary_source,
+            "summary_entity": summary_entity,
         },
         metrics=metrics,
         artifacts={
@@ -245,6 +363,9 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
         validation=validation_summary,
         details={
             "summary": summary,
+            "task_summary": task_summary,
+            "group_summary": group_summary,
+            "groups": groups,
             "tasks": tasks,
         },
         run_label=request.run_label,

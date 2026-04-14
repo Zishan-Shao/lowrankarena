@@ -25,7 +25,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-device", default=None)
     parser.add_argument("--speed-repeat", type=int, default=None)
     parser.add_argument("--speed-warmup", type=int, default=None)
+    parser.add_argument("--speed-batch-size", type=int, action="append", default=None)
+    parser.add_argument("--speed-prompt-length", type=int, action="append", default=None)
+    parser.add_argument("--speed-generation-length", type=int, action="append", default=None)
+    parser.add_argument("--speed-tensor-parallel-size", type=int, default=None)
     parser.add_argument("--speed-gpu-memory-utilization", type=float, default=None)
+    parser.add_argument("--speed-dtype", default=None)
     parser.add_argument("--speed-max-model-len", type=int, default=None)
     parser.add_argument("--speed-enforce-eager", action="store_true")
     parser.add_argument("--memory-device", default="cuda:0")
@@ -125,9 +130,14 @@ def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> lis
                     checkpoint_name=record.name,
                     suite_path=config_path,
                     index_path=index_path,
+                    batch_sizes=args.speed_batch_size,
+                    prompt_lengths=args.speed_prompt_length,
+                    generation_lengths=args.speed_generation_length,
                     repeat=args.speed_repeat,
                     warmup=args.speed_warmup,
+                    tensor_parallel_size=args.speed_tensor_parallel_size,
                     gpu_memory_utilization=args.speed_gpu_memory_utilization,
+                    dtype=args.speed_dtype,
                     max_model_len=args.speed_max_model_len,
                     enforce_eager=True if args.speed_enforce_eager else None,
                     show_progress=True,
