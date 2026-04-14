@@ -12,13 +12,13 @@ if str(ROOT) not in sys.path:
 from src.benchmarking import load_suite_config, select_checkpoints_for_suite, suite_id
 from src.lm_eval_runner import LmEvalRequest, run_lm_eval_suite
 from src.memory_runner import MemoryRequest, run_memory_measurement
-from src.speed_runner import VllmSpeedRequest, run_vllm_speed_suite
+from src.speed_runner import VllmSpeedRequest, run_speed_suite
 from src.utils import dump_json, ensure_dir, load_json
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run aggregate benchmark suites from benchmark/**/*.yaml.")
-    parser.add_argument("--suites", nargs="*", default=["main"], help="Suite names such as main, accuracy/mcq, or speed/speed.")
+    parser.add_argument("--suites", nargs="*", default=["main"], help="Suite names such as main, accuracy/mcq, or speed/serve.")
     parser.add_argument("--index", default=str(ROOT / "checkpoints" / "index.csv"))
     parser.add_argument("--limit", type=float, default=None, help="Optional lm-eval limit override for smoke runs.")
     parser.add_argument("--lm-eval-bin", default="lm-eval")
@@ -125,7 +125,7 @@ def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> lis
     outputs: list[dict[str, str]] = []
     for record in select_checkpoints_for_suite(config, index_path=index_path):
         if kind == "speed":
-            result = run_vllm_speed_suite(
+            result = run_speed_suite(
                 VllmSpeedRequest(
                     checkpoint_name=record.name,
                     suite_path=config_path,
@@ -140,6 +140,9 @@ def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> lis
                     dtype=args.speed_dtype,
                     max_model_len=args.speed_max_model_len,
                     enforce_eager=True if args.speed_enforce_eager else None,
+                    lm_eval_bin=args.lm_eval_bin,
+                    eval_device=args.eval_device,
+                    eval_limit=args.limit,
                     show_progress=True,
                     run_label="leaderboard",
                     strict_validation=True,

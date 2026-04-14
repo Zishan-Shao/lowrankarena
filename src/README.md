@@ -17,7 +17,7 @@ The guiding rule is simple: benchmark policy lives in [`benchmark/`](../benchmar
 - [`lm_eval_runner.py`](./lm_eval_runner.py): thin wrapper around `lm-eval run ...`, plus result normalization.
 - [`ppl_runner.py`](./ppl_runner.py): project-owned contiguous-block perplexity runner for unified local PPL evaluation.
 - [`memory_runner.py`](./memory_runner.py): Transformers-based active-memory measurement runner.
-- [`speed_runner.py`](./speed_runner.py): vLLM-backed offline generation speed runner.
+- [`speed_runner.py`](./speed_runner.py): suite-selected speed runner for both vLLM serving workloads and evaluation-speed workloads.
 - [`scoring.py`](./scoring.py): task-level metric selection and summary reduction helpers.
 - [`report.py`](./report.py): lightweight result discovery and table generation.
 - [`eval.py`](./eval.py): compatibility wrapper that forwards eval requests to the real runner.

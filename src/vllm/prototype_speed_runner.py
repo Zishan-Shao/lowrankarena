@@ -26,7 +26,7 @@ from vllm.vllm_adapter import DEFAULT_WRAPPER_CACHE_ROOT, PreparedVllmModel, pre
 VLLM_TRY_ROOT = Path(__file__).resolve().parent
 DEFAULT_INDEX_PATH = VLLM_TRY_ROOT / "checkpoints" / "index.csv"
 DEFAULT_OUTPUT_DIR = VLLM_TRY_ROOT / "results" / "speed"
-DEFAULT_SUITE_PATH = REPO_ROOT / "benchmark" / "speed" / "speed.yaml"
+DEFAULT_SUITE_PATH = REPO_ROOT / "benchmark" / "speed" / "serve.yaml"
 
 
 @dataclass(slots=True)
@@ -69,7 +69,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--suite-path",
         default=str(DEFAULT_SUITE_PATH),
-        help="Speed suite YAML. Defaults to the repo benchmark/speed/speed.yaml.",
+        help="Speed suite YAML. Defaults to the repo benchmark/speed/serve.yaml.",
     )
     parser.add_argument(
         "--index-path",

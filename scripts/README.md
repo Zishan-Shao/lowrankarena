@@ -8,7 +8,7 @@ Each script is intentionally thin. It should parse arguments, resolve the reques
 
 - [`run_eval.py`](./run_eval.py): run a single accuracy suite against one checkpoint through the suite-selected eval backend.
 - [`run_memory.py`](./run_memory.py): run a single Transformers-based memory measurement for one checkpoint.
-- [`run_speed.py`](./run_speed.py): run a single vLLM speed suite against one checkpoint.
+- [`run_speed.py`](./run_speed.py): run a single speed suite against one checkpoint. Serving suites use `vLLM`; `speed/speed` measures end-to-end evaluation runtime.
 - [`measure_peak_memory.py`](./measure_peak_memory.py): compatibility alias for `run_memory.py`.
 - [`run_main.py`](./run_main.py): execute aggregate benchmark suites such as [`benchmark/main.yaml`](../benchmark/main.yaml). The default `main` suite is paper-facing and currently aggregates perplexity, accuracy, memory, and speed suites. Speed workload parameters can be overridden from the CLI without editing YAML.
 - [`run_all.py`](./run_all.py): compatibility alias for `run_main.py`.

@@ -7,11 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.benchmarking import suite_output_name
+from src.benchmarking import resolve_suite_path, suite_id, suite_output_name
 from src.load import load_checkpoint
+from src.lm_eval_runner import DEFAULT_LM_EVAL_BIN, LmEvalRequest, run_lm_eval_suite
 from src.result_schema import build_result_payload
-from src.scoring import summarize_speed_cases
-from src.utils import dump_json, ensure_dir, load_yaml, run_results_root
+from src.scoring import aggregate_values, summarize_speed_cases
+from src.utils import dump_json, ensure_dir, load_json, load_yaml, run_results_root
 from src.validation import validate_checkpoint_layout
 from src.vllm.external_vllm import import_installed_vllm, installed_vllm_version
 from src.vllm.terminal_ui import ProgressPrinter, configure_runtime_environment, use_safe_vllm_cwd
@@ -34,6 +35,11 @@ class VllmSpeedRequest:
     dtype: str | None = None
     max_model_len: int | None = None
     enforce_eager: bool | None = None
+    lm_eval_bin: str | None = None
+    eval_device: str | None = None
+    eval_batch_size: str | int | None = None
+    eval_limit: float | int | None = None
+    eval_num_fewshot: int | None = None
     trust_remote_code: bool = True
     local_files_only: bool = False
     verbose_backend: bool = False
@@ -65,6 +71,108 @@ def _result_path_for(request: VllmSpeedRequest) -> Path:
     ensure_dir(output_root)
     suite_name = suite_output_name(request.suite_path)
     return output_root / f"{suite_name}__{request.checkpoint_name}.json"
+
+
+def _nested_eval_roots(request: VllmSpeedRequest) -> tuple[Path, Path]:
+    speed_root = Path(request.output_dir) if request.output_dir else run_results_root("speed", request.run_label)
+    eval_root = ensure_dir(speed_root / "eval_artifacts")
+    raw_root = ensure_dir(eval_root / "raw")
+    return eval_root, raw_root
+
+
+def _coerce_count(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    return None
+
+
+def _summarize_nested_eval_run(
+    *,
+    eval_suite_path: Path,
+    wall_time_seconds: float,
+    result_output_path: str,
+    raw_output_path: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    payload = load_json(result_output_path)
+    raw_payload = load_json(raw_output_path)
+    backend_name = str(payload.get("backend", {}).get("name", "eval"))
+    work_unit_kind: str | None = None
+    work_unit_count: int | None = None
+    backend_reported_time_seconds: float | None = None
+
+    if backend_name == "lm_eval_harness":
+        n_samples = raw_payload.get("n-samples", {})
+        if isinstance(n_samples, dict):
+            work_unit_kind = "examples"
+            work_unit_count = sum(_coerce_count(value) or 0 for value in n_samples.values())
+        backend_time = raw_payload.get("total_evaluation_time_seconds")
+        if isinstance(backend_time, (int, float)):
+            backend_reported_time_seconds = float(backend_time)
+    elif backend_name == "contiguous_ppl":
+        tasks = raw_payload.get("tasks", [])
+        if isinstance(tasks, list):
+            work_unit_kind = "tokens"
+            work_unit_count = sum(_coerce_count(item.get("token_count")) or 0 for item in tasks if isinstance(item, dict))
+        backend_time = raw_payload.get("total_evaluation_time_seconds")
+        if isinstance(backend_time, (int, float)):
+            backend_reported_time_seconds = float(backend_time)
+
+    throughput = None
+    if work_unit_count is not None and wall_time_seconds > 0:
+        throughput = float(work_unit_count) / float(wall_time_seconds)
+
+    suite_detail = {
+        "suite": suite_id(eval_suite_path),
+        "suite_name": payload.get("suite", {}).get("name", eval_suite_path.stem),
+        "backend": backend_name,
+        "wall_time_seconds": wall_time_seconds,
+        "backend_reported_time_seconds": backend_reported_time_seconds,
+        "work_unit_kind": work_unit_kind,
+        "work_unit_count": work_unit_count,
+        "work_units_per_second": throughput,
+        "primary_metric": payload.get("metrics", {}).get("primary_metric"),
+        "metric_mean": payload.get("metrics", {}).get("mean"),
+        "output_path": result_output_path,
+        "raw_output_path": raw_output_path,
+    }
+    return suite_detail, payload.get("validation", {})
+
+
+def _summarize_evaluation_speed_runs(suite_runs: list[dict[str, Any]], *, aggregation: str) -> dict[str, Any]:
+    wall_times = [float(item["wall_time_seconds"]) for item in suite_runs if item.get("wall_time_seconds") is not None]
+    grouped_units: dict[str, list[dict[str, Any]]] = {}
+    for item in suite_runs:
+        unit_kind = item.get("work_unit_kind")
+        if not unit_kind:
+            continue
+        grouped_units.setdefault(str(unit_kind), []).append(item)
+
+    by_work_unit: dict[str, dict[str, Any]] = {}
+    for unit_kind, items in grouped_units.items():
+        counts = [int(item["work_unit_count"]) for item in items if item.get("work_unit_count") is not None]
+        throughputs = [float(item["work_units_per_second"]) for item in items if item.get("work_units_per_second") is not None]
+        total_time = sum(float(item["wall_time_seconds"]) for item in items if item.get("wall_time_seconds") is not None)
+        total_count = sum(counts)
+        by_work_unit[unit_kind] = {
+            "suite_count": len(items),
+            "total_count": total_count,
+            "mean_throughput_per_second": aggregate_values(throughputs, aggregation=aggregation),
+            "total_throughput_per_second": (float(total_count) / total_time) if total_time > 0 and total_count > 0 else None,
+        }
+
+    return {
+        "aggregation": aggregation,
+        "suite_count": len(suite_runs),
+        "completed_suite_count": len(suite_runs),
+        "total_wall_time_seconds": sum(wall_times),
+        "mean_suite_wall_time_seconds": aggregate_values(wall_times, aggregation=aggregation),
+        "max_suite_wall_time_seconds": max(wall_times) if wall_times else None,
+        "by_work_unit": by_work_unit,
+    }
 
 
 def _cartesian_speed_case_specs(
@@ -146,6 +254,9 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         raise ValueError(f"Suite {suite_path} is not a speed suite.")
 
     speed_config = suite_config.get("speed", {})
+    backend_name = str(speed_config.get("backend", "vllm")).strip().lower()
+    if backend_name != "vllm":
+        raise ValueError(f"Suite {suite_path} is configured for backend {backend_name!r}, not vllm.")
     case_specs = _resolve_speed_case_specs(speed_config, request)
     batch_sizes = sorted({int(case["batch_size"]) for case in case_specs})
     prompt_lengths = sorted({int(case["prompt_length"]) for case in case_specs})
@@ -316,3 +427,127 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         output_path=str(output_path),
         stats=stats,
     )
+
+
+def run_evaluation_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
+    suite_path = Path(request.suite_path)
+    suite_config = load_yaml(suite_path)
+    if suite_config.get("kind") != "speed":
+        raise ValueError(f"Suite {suite_path} is not a speed suite.")
+
+    speed_config = suite_config.get("speed", {})
+    backend_name = str(speed_config.get("backend", "")).strip().lower()
+    if backend_name not in {"evaluation", "eval"}:
+        raise ValueError(f"Suite {suite_path} is not configured for the evaluation speed backend.")
+
+    eval_suites_raw = list(speed_config.get("eval_suites") or [])
+    if not eval_suites_raw:
+        raise ValueError(f"Suite {suite_path} did not configure any speed.eval_suites.")
+    eval_suite_paths = [resolve_suite_path(item) for item in eval_suites_raw]
+    aggregation = str(speed_config.get("metric_aggregation", "macro_mean"))
+    eval_output_root, eval_raw_output_root = _nested_eval_roots(request)
+    lm_eval_bin = request.lm_eval_bin or str(speed_config.get("lm_eval_bin", DEFAULT_LM_EVAL_BIN))
+    eval_device = request.eval_device if request.eval_device is not None else speed_config.get("device")
+    eval_batch_size = request.eval_batch_size if request.eval_batch_size is not None else speed_config.get("batch_size")
+    eval_limit = request.eval_limit if request.eval_limit is not None else speed_config.get("limit")
+    eval_num_fewshot = request.eval_num_fewshot if request.eval_num_fewshot is not None else speed_config.get("num_fewshot")
+
+    loaded = load_checkpoint(
+        request.checkpoint_name,
+        index_path=str(request.index_path),
+        download=False,
+        local_files_only=request.local_files_only,
+        trust_remote_code=request.trust_remote_code,
+    )
+
+    suite_runs: list[dict[str, Any]] = []
+    validations: dict[str, Any] = {}
+    for eval_suite_path in eval_suite_paths:
+        started = time.perf_counter()
+        eval_result = run_lm_eval_suite(
+            LmEvalRequest(
+                checkpoint_name=request.checkpoint_name,
+                suite_path=eval_suite_path,
+                index_path=request.index_path,
+                output_dir=eval_output_root,
+                raw_output_root=eval_raw_output_root,
+                lm_eval_bin=lm_eval_bin,
+                device=eval_device,
+                batch_size=eval_batch_size,
+                limit=eval_limit,
+                num_fewshot=eval_num_fewshot,
+                trust_remote_code=request.trust_remote_code,
+                local_files_only=request.local_files_only,
+                run_label=request.run_label,
+                strict_validation=request.strict_validation,
+            )
+        )
+        elapsed = time.perf_counter() - started
+        suite_detail, validation = _summarize_nested_eval_run(
+            eval_suite_path=eval_suite_path,
+            wall_time_seconds=elapsed,
+            result_output_path=eval_result.output_path,
+            raw_output_path=eval_result.raw_output_path,
+        )
+        suite_runs.append(suite_detail)
+        validations[suite_detail["suite"]] = validation
+
+    metrics = _summarize_evaluation_speed_runs(suite_runs, aggregation=aggregation)
+    payload = build_result_payload(
+        kind="speed",
+        record=loaded.record,
+        locator=loaded.locator,
+        backend_name=str(speed_config.get("backend", "evaluation")),
+        backend_version=None,
+        suite_path=suite_path,
+        suite_name=str(suite_config.get("name", suite_path.stem)),
+        config={
+            "eval_suites": [suite_id(path) for path in eval_suite_paths],
+            "metric_aggregation": aggregation,
+            "lm_eval_bin": lm_eval_bin,
+            "device": eval_device,
+            "batch_size": eval_batch_size,
+            "limit": eval_limit,
+            "num_fewshot": eval_num_fewshot,
+            "trust_remote_code": request.trust_remote_code,
+            "local_files_only": request.local_files_only,
+        },
+        metrics=metrics,
+        artifacts={
+            "nested_output_root": str(eval_output_root),
+            "nested_raw_output_root": str(eval_raw_output_root),
+        },
+        runtime={
+            "suite_count": len(eval_suite_paths),
+        },
+        validation={
+            "suite_count": len(validations),
+            "per_suite": validations,
+        },
+        details={
+            "suites": suite_runs,
+        },
+        run_label=request.run_label,
+        strict_validation=request.strict_validation,
+    )
+    output_path = dump_json(payload, _result_path_for(request))
+    return VllmSpeedResult(
+        checkpoint_name=request.checkpoint_name,
+        suite=suite_output_name(suite_path),
+        status="completed",
+        output_path=str(output_path),
+        stats=metrics,
+    )
+
+
+def run_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
+    suite_path = Path(request.suite_path)
+    suite_config = load_yaml(suite_path)
+    if suite_config.get("kind") != "speed":
+        raise ValueError(f"Suite {suite_path} is not a speed suite.")
+    backend_name = str((suite_config.get("speed") or {}).get("backend", "vllm")).strip().lower()
+    if backend_name == "vllm":
+        return run_vllm_speed_suite(request)
+    if backend_name in {"evaluation", "eval"}:
+        return run_evaluation_speed_suite(request)
+    raise ValueError(f"Unsupported speed backend {backend_name!r} in {suite_path}.")

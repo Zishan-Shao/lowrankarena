@@ -8,7 +8,7 @@ It contains declarative suite specifications only. Execution logic lives in [`sc
 
 - [`main.yaml`](./main.yaml): aggregate entrypoint that expands into the default paper-facing workload, including `WikiText-2` and `C4` perplexity, headline MCQ accuracy, `MMLU-Pro`, `GSM8K`, memory, and speed.
 - [`accuracy/`](./accuracy/README.md): accuracy suites that select their own backend per suite. Most classification suites still use `lm-eval-harness 0.4.11`, while `ppl` now uses a repo-owned contiguous perplexity runner so preprocessing stays fixed across checkpoints.
-- [`speed/`](./speed/README.md): offline inference speed suites backed by vLLM.
+- [`speed/`](./speed/README.md): serving-speed suites backed by vLLM plus an evaluation-speed suite that measures end-to-end benchmark runtime.
 
 Memory is currently handled by the dedicated CLI path in [`scripts/run_memory.py`](../scripts/run_memory.py) rather than a YAML suite tree under `benchmark/`.
 

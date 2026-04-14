@@ -18,7 +18,7 @@ from src.registry import (
     upsert_checkpoint,
 )
 from src.report import build_table
-from src.speed_runner import VllmSpeedRequest, run_vllm_speed_suite
+from src.speed_runner import VllmSpeedRequest, run_speed_suite
 from src.utils import dump_json, ensure_dir, load_json, project_path
 
 
@@ -326,7 +326,7 @@ class Arena:
         self,
         checkpoint_id: str,
         *,
-        suite: str | Path = "speed/speed",
+        suite: str | Path = "speed/serve",
         output_dir: str | Path | None = None,
         batch_sizes: list[int] | None = None,
         prompt_lengths: list[int] | None = None,
@@ -346,7 +346,7 @@ class Arena:
 
         suite_path = resolve_suite_path(suite, root=self.benchmark_root)
         with self._runtime_index() as index_path:
-            result = run_vllm_speed_suite(
+            result = run_speed_suite(
                 VllmSpeedRequest(
                     checkpoint_name=checkpoint_id,
                     suite_path=suite_path,

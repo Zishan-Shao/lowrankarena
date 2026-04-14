@@ -140,3 +140,18 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     assert edge["speed"]["gpu_memory_utilization"] == 0.6
     assert edge["speed"]["dtype"] == "float16"
     assert edge["speed"]["max_model_len"] == 16384
+
+    eval_speed = load_yaml(PROJECT_ROOT / "benchmark" / "speed" / "speed.yaml")
+    assert eval_speed["speed"]["backend"] == "evaluation"
+    assert eval_speed["speed"]["metric_aggregation"] == "macro_mean"
+    assert eval_speed["selection"]["checkpoints"] == frozen_checkpoints
+    assert eval_speed["speed"]["eval_suites"] == [
+        "accuracy/ppl",
+        "accuracy/mcq",
+        "accuracy/mmlu_pro",
+        "accuracy/gsm8k",
+    ]
+    assert eval_speed["speed"]["metrics"] == [
+        "total_wall_time_seconds",
+        "mean_suite_wall_time_seconds",
+    ]

@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from src.benchmarking import resolve_suite_path, suite_output_name
-from src.speed_runner import VllmSpeedRequest, run_vllm_speed_suite
+from src.speed_runner import VllmSpeedRequest, run_speed_suite
 
 
 @dataclass(slots=True)
 class SpeedRequest:
     checkpoint_name: str
-    suite: str = "speed/speed"
+    suite: str = "speed/serve"
     batch_size: int = 1
     sequence_length: int = 2048
     generation_length: int = 128
@@ -35,7 +35,7 @@ def run_speed(request: SpeedRequest, index_path: str | None = None) -> SpeedResu
 
     requested_suite_path = request.suite_path or request.extra.get("suite_path") or request.extra.get("benchmark_path") or request.suite
     suite_path = resolve_suite_path(requested_suite_path)
-    result = run_vllm_speed_suite(
+    result = run_speed_suite(
         VllmSpeedRequest(
             checkpoint_name=request.checkpoint_name,
             suite_path=suite_path,
@@ -50,8 +50,15 @@ def run_speed(request: SpeedRequest, index_path: str | None = None) -> SpeedResu
             gpu_memory_utilization=request.extra.get("gpu_memory_utilization"),
             dtype=request.extra.get("dtype"),
             enforce_eager=request.extra.get("enforce_eager"),
+            lm_eval_bin=request.extra.get("lm_eval_bin"),
+            eval_device=request.extra.get("eval_device"),
+            eval_batch_size=request.extra.get("eval_batch_size"),
+            eval_limit=request.extra.get("eval_limit"),
+            eval_num_fewshot=request.extra.get("eval_num_fewshot"),
             verbose_backend=bool(request.extra.get("verbose_backend", False)),
             show_progress=bool(request.extra.get("show_progress", False)),
+            run_label=str(request.extra.get("run_label", "ad_hoc")),
+            strict_validation=bool(request.extra.get("strict_validation", False)),
         )
     )
     return SpeedResult(
@@ -65,7 +72,7 @@ def run_speed(request: SpeedRequest, index_path: str | None = None) -> SpeedResu
 
 def benchmark_checkpoint(
     checkpoint_name: str,
-    suite: str = "speed/speed",
+    suite: str = "speed/serve",
     batch_size: int = 1,
     sequence_length: int = 2048,
     generation_length: int = 128,

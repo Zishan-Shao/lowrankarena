@@ -11,13 +11,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.benchmarking import resolve_suite_path
-from src.speed_runner import VllmSpeedRequest, run_vllm_speed_suite
+from src.speed_runner import VllmSpeedRequest, run_speed_suite
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run one vLLM speed suite for one checkpoint.")
+    parser = argparse.ArgumentParser(description="Run one speed suite for one checkpoint.")
     parser.add_argument("checkpoint", help="Checkpoint name from checkpoints/index.csv")
-    parser.add_argument("--suite", default="speed/speed", help="Speed suite name or YAML path")
+    parser.add_argument("--suite", default="speed/serve", help="Speed suite name or YAML path")
     parser.add_argument("--index", default=str(ROOT / "checkpoints" / "index.csv"))
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--batch-size", type=int, action="append", default=None)
@@ -31,6 +31,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-model-len", type=int, default=None)
     parser.add_argument("--enforce-eager", action="store_true")
     parser.add_argument("--verbose-backend", action="store_true", help="Show raw vLLM logs.")
+    parser.add_argument("--lm-eval-bin", default=None, help="lm-eval executable path for evaluation-speed suites.")
+    parser.add_argument("--eval-device", default=None)
+    parser.add_argument("--eval-batch-size", default=None)
+    parser.add_argument("--eval-limit", type=float, default=None)
+    parser.add_argument("--eval-num-fewshot", type=int, default=None)
     parser.add_argument("--run-label", default="ad_hoc")
     parser.add_argument("--strict-validation", action="store_true")
     return parser.parse_args()
@@ -39,7 +44,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     suite_path = resolve_suite_path(args.suite)
-    result = run_vllm_speed_suite(
+    result = run_speed_suite(
         VllmSpeedRequest(
             checkpoint_name=args.checkpoint,
             suite_path=suite_path,
@@ -55,6 +60,11 @@ def main() -> None:
             dtype=args.dtype,
             max_model_len=args.max_model_len,
             enforce_eager=True if args.enforce_eager else None,
+            lm_eval_bin=args.lm_eval_bin,
+            eval_device=args.eval_device,
+            eval_batch_size=args.eval_batch_size,
+            eval_limit=args.eval_limit,
+            eval_num_fewshot=args.eval_num_fewshot,
             verbose_backend=args.verbose_backend,
             show_progress=True,
             run_label=args.run_label,
