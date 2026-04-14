@@ -103,7 +103,7 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
         echo "=== V1 checkpoint exists, skipping: $CKPT ==="
     else
         KEEP=$(keep_csv $RATIO)
-        echo "=== Compress V1 ratio=$RATIO (保存率=$KEEP) ==="
+        echo "=== Compress V1 ratio=$RATIO (keep=$KEEP) ==="
         PROF_ARG=""
         [ -f "$PROF_MAT" ] && PROF_ARG="--profiling_mat_path $PROF_MAT"
         python SVDLLM.py --model "$MODEL" --step 1 --ratio $RATIO \
@@ -113,19 +113,19 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     fi
 done
 
-# ── Step 2: V2 (skip if checkpoint already exists) ───────────────────────────
+# ── Step 2: V1update (whitening_then_update) ──────────────────────────────────
 for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     KEEP_FILE=$(keep_file $RATIO)
     CKPT="$SAVE_DIR/${MODEL_PREFIX}_whitening_then_update_${KEEP_FILE}.pt"
     if [ -f "$CKPT" ]; then
-        echo "=== V2 checkpoint exists, skipping: $CKPT ==="
+        echo "=== V1update checkpoint exists, skipping: $CKPT ==="
     else
         KEEP=$(keep_csv $RATIO)
-        echo "=== Compress V2 ratio=$RATIO (保存率=$KEEP) ==="
+        echo "=== Compress V1update ratio=$RATIO (keep=$KEEP) ==="
         python SVDLLM.py --model "$MODEL" --step 2 --ratio $RATIO \
             --profiling_mat_path "$PROF_MAT" \
             --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN $TOKEN_ARG \
-            2>&1 | tee logs/${MODEL_TAG}_v2_${KEEP}.log
+            2>&1 | tee logs/${MODEL_TAG}_v1update_${KEEP}.log
     fi
 done
 
@@ -134,7 +134,7 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     KEEP_FILE=$(keep_file $RATIO)
     KEEP_CSV=$(keep_csv $RATIO)
     eval_and_log "$SAVE_DIR/${MODEL_PREFIX}_whitening_only_${KEEP_FILE}.pt"        "V1" "$KEEP_CSV"
-    eval_and_log "$SAVE_DIR/${MODEL_PREFIX}_whitening_then_update_${KEEP_FILE}.pt" "V2" "$KEEP_CSV"
+    eval_and_log "$SAVE_DIR/${MODEL_PREFIX}_whitening_then_update_${KEEP_FILE}.pt" "V1update" "$KEEP_CSV"
 done
 
 echo ""
