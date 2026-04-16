@@ -1,0 +1,44 @@
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.10}
+\begin{threeparttable}
+\caption{
+Backend comparison for SVD-compressed BERT on representative GLUE tasks under synthetic inputs.
+Results are reported on MNLI, QQP, and STS-B using bf16, sequence length 512, and batch size 32.
+Synthetic inputs use fixed full-length token sequences, so they remove dataset-specific sequence-length variation and padding effects.
+We compare four inference backends (\texttt{naive}, \texttt{sdpa}, \texttt{flashsvd}, and \texttt{flashsvd15}) in terms of latency, throughput, and peak GPU memory.
+Lower latency and memory are better, while higher throughput is better.
+}
+\label{tab:svd_backend_tasks_synthetic}
+\begin{tabular}{llccc}
+\toprule
+Task & Backend & Latency (ms) $\downarrow$ & Throughput $\uparrow$ & Peak Mem. (MB) $\downarrow$ \\
+\midrule
+\multirow{4}{*}{MNLI}
+& naive      & 51.34 & 623.3  & 989.2 \\
+& sdpa       & 25.33 & 1263.1 & 605.2 \\
+& flashsvd   & 44.40 & 720.8  & \textbf{341.4} \\
+& flashsvd15 & \textbf{22.52} & \textbf{1421.0} & 343.9 \\
+\midrule
+\multirow{4}{*}{QQP}
+& naive      & 51.37 & 622.9  & 989.2 \\
+& sdpa       & 25.48 & 1255.8 & 605.2 \\
+& flashsvd   & 44.67 & 716.3  & \textbf{341.4} \\
+& flashsvd15 & \textbf{22.69} & \textbf{1410.6} & 345.4 \\
+\midrule
+\multirow{4}{*}{STS-B}
+& naive      & 51.41 & 622.4  & 989.2 \\
+& sdpa       & 25.50 & 1254.8 & 605.2 \\
+& flashsvd   & 44.86 & 713.4  & \textbf{341.4} \\
+& flashsvd15 & \textbf{22.63} & \textbf{1414.2} & 343.9 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]
+\footnotesize
+\item Results are shown for SVD-compressed BERT under different backends with synthetic inputs.
+\item The same overall trend as in real-input evaluation is preserved: \texttt{flashsvd15} achieves the best latency and throughput, while \texttt{flashsvd} yields slightly lower peak memory.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

@@ -1,0 +1,49 @@
+\begin{table*}[t]
+\centering
+\small
+\renewcommand{\arraystretch}{1.10}
+\setlength{\tabcolsep}{2pt}
+\begin{threeparttable}
+\caption{
+GLUE results under the \texttt{flashsvd15} backend for the dense baseline, compressed models, and compressed models after post-compression fine-tuning.
+All numbers are percentages; higher is better.
+}
+\label{tab:glue_main_flashsvd15}
+\begin{tabular}{llcccccccccc}
+\toprule
+Group & Method & CoLA & SST-2 & MRPC & QQP & MNLI & QNLI & RTE & STS-B & A-GLUE & A-Acc \\
+\midrule
+Original
+& BERT$_{\mathrm{base}}$
+& 53.4 & 92.4 & 91.0 & 87.8 & 84.6 & 91.6 & 72.6 & 88.1 & 82.7 & 85.3 \\
+\midrule
+\multirow{4}{*}{Compressed}
+& SVD
+& 1.7 & 71.2 & 0.0 & 16.7 & 37.4 & 54.7 & 47.3 & 35.3 & 33.0 & 52.6 \\
+& FWSVD
+& 18.9 & 72.0 & 10.1 & 67.9 & 52.4 & 53.2 & 58.1 & 70.2 & 50.4 & 58.9 \\
+& DRONE
+& 1.9 & 85.3 & 84.8 & 76.2 & 57.9 & 60.2 & 59.9 & 49.4 & \textbf{59.5} & \textbf{65.8} \\
+& AdaSVD
+& -1.5 & 62.0 & 0.7 & 52.1 & 35.2 & 45.9 & 54.9 & 63.3 & 39.1 & 49.5 \\
+\midrule
+\multirow{4}{*}{Compressed + FT}
+& SVD
+& 28.3 & \textbf{91.1} & 84.8 & 87.4 & 82.7 & 88.8 & 59.6 & 86.4 & 76.1 & 80.5 \\
+& FWSVD
+& \textbf{47.5} & 90.5 & 86.7 & \textbf{87.8} & 82.8 & 89.3 & 65.7 & 87.0 & \textbf{79.7} & 82.1 \\
+& DRONE
+& 42.1 & 90.8 & \textbf{89.7} & 87.4 & 82.4 & 89.4 & \textbf{70.4} & 85.4 & \textbf{79.7} & \textbf{83.3} \\
+& AdaSVD
+& 39.4 & \textbf{91.1} & 89.5 & 87.6 & \textbf{82.5} & \textbf{89.8} & 62.8 & \textbf{87.1} & 78.7 & 81.5 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]
+\footnotesize
+\item CoLA is reported with Matthews correlation, MRPC and QQP with F1, STS-B with Pearson correlation, and SST-2/MNLI/QNLI/RTE with accuracy.
+\item A-GLUE averages all eight task metrics as reported in the table.
+\item A-Acc averages only the accuracy-based tasks: SST-2, MNLI, QNLI, and RTE.
+\item Boldface highlights the best compressed result within each compression stage.
+\end{tablenotes}
+\end{threeparttable}
+\end{table*}

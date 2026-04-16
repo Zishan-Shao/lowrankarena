@@ -1,0 +1,30 @@
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.10}
+\begin{threeparttable}
+\caption{
+Backend comparison on GLUE inference efficiency for compressed BERT models.
+Results are averaged over SVD, FWSVD, DRONE, and AdaSVD, and over all eight GLUE tasks using real inputs.
+Lower latency and memory are better; higher throughput and speedup are better.
+}
+\label{tab:backend_comparison_glue}
+\begin{tabular}{lcccc}
+\toprule
+Backend & Avg. Latency (ms) $\downarrow$ & Avg. Throughput $\uparrow$ & Peak Mem. (MB) $\downarrow$ & Speedup vs naive $\uparrow$ \\
+\midrule
+naive      & 64.99 & 492.4  & 1007.2 & 1.00$\times$ \\
+sdpa       & 26.61 & 1203.1 & 623.2  & 2.44$\times$ \\
+flashsvd   & 44.20 & 724.0  & \textbf{359.8} & 1.47$\times$ \\
+flashsvd15 & \textbf{21.79} & \textbf{1471.1} & 361.7 & \textbf{2.98$\times$} \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]
+\footnotesize
+\item Results are averaged over CoLA, SST-2, MRPC, QQP, MNLI, QNLI, RTE, and STS-B.
+\item Results are further averaged over SVD, FWSVD, DRONE, and AdaSVD.
+\item Speedup vs naive is computed from average latency.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

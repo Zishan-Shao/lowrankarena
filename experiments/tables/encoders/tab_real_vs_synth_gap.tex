@@ -1,0 +1,29 @@
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{29pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{threeparttable}
+\caption{
+Real vs. synthetic speedup on GLUE workloads at sequence length 512 and batch size 32.
+We report backend speedup relative to the naive backend.
+}
+\label{tab:real_vs_synth_gap}
+\begin{tabular}{lccc}
+\toprule
+Backend & Real $\uparrow$ & Synthetic $\uparrow$ & Difference \\
+\midrule
+SDPA          & 2.44$\times$ & 2.01$\times$ & 0.43 \\
+FlashSVD v1   & 1.47$\times$ & 1.15$\times$ & 0.32 \\
+FlashSVD v1.5 & 3.02$\times$ & 2.35$\times$ & 0.67 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]
+\footnotesize
+\item Values are averaged over compressed GLUE runs (SVD, FWSVD, DRONE, and AdaSVD; eight tasks).
+\item Real GLUE inputs contain substantial sequence padding, while synthetic inputs use fixed full-length 512-token sequences.
+\item Difference is computed as Real minus Synthetic.
+\item Larger differences indicate a stronger gap between realized speedup on real workloads and speedup measured under synthetic full-length inputs.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

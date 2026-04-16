@@ -1,0 +1,36 @@
+\begin{table}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{9pt}
+\renewcommand{\arraystretch}{1.10}
+\begin{threeparttable}
+\caption{
+Kernel-profile summary on MNLI for representative compressed BERT checkpoints.
+Results are collected at bf16 and sequence length 512.
+We compare the naive, \texttt{flashsvd}, and \texttt{flashsvd15} backends in terms of total kernel calls, GEMM kernel diversity, fragmentation, and the dominant kernel by time share.
+Lower kernel counts, fewer GEMM variants, and lower fragmentation indicate a more streamlined execution pattern.
+}
+\label{tab:kernel_profile_mnli}
+\begin{tabular}{llrrrr}
+\toprule
+Method & Backend & Kernel Calls $\downarrow$ & GEMM Variants $\downarrow$ & Fragmentation $\downarrow$ & Top Kernel (Time \%) \\
+\midrule
+SVD
+& naive      & 23000 & 8  & 920.0 & GEMM (17.1) \\
+& flashsvd   & \textbf{12307} & \textbf{5} & \textbf{559.4} & fused\_ffn\_phase1 (49.4) \\
+& flashsvd15 & 21200 & \textbf{5} & 963.6 & fused\_ffn\_full\_batched\_bias (37.5) \\
+\midrule
+AdaSVD
+& naive      & 23000 & 14 & 741.9 & softmax\_warp\_forward (13.3) \\
+& flashsvd   & 19400 & 10 & 718.5 & fused\_ffn\_phase1 (50.2) \\
+& flashsvd15 & \textbf{14000} & \textbf{9} & \textbf{560.0} & fused\_ffn\_full\_batched\_bias (42.4) \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]
+\footnotesize
+\item Results are collected from MNLI profiling runs.
+\item FlashSVD v1 already reduces execution diversity for SVD checkpoints.
+\item FlashSVD v1.5 shows the clearest kernel-streamlining effect on AdaSVD.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

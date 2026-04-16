@@ -1,0 +1,132 @@
+\subsubsection{GLUE accuracy under FlashSVD v1.5}
+
+Table~\ref{tab:glue_main_flashsvd15} reports GLUE results under the \texttt{flashsvd15} backend for the dense baseline, compressed models, and compressed models after post-compression fine-tuning.
+Overall, post-compression fine-tuning substantially recovers task accuracy across all methods, with DRONE achieving the strongest A-GLUE and A-Acc among the compressed+FT variants.
+Figure~\ref{fig:glue_combined_main} provides a compact visual summary of the same trend, showing that stage-1 compression causes noticeable accuracy degradation while stage-2 post-compression fine-tuning largely restores performance across all methods.
+
+\input{tables/encoders/tab_glue_main_flashsvd15}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/encoders/accuracy/glue_both_stages.png}
+    \caption{
+    GLUE average comparison across compression methods before and after post-compression fine-tuning.
+    Results are shown at bf16 for the per-head compression setting used in the main encoder experiments.
+    The left panel reports stage-1 performance immediately after compression, while the right panel reports stage-2 performance after post-compression fine-tuning.
+    The figure shows that stage-1 accuracy drops vary substantially across methods, whereas fine-tuning recovers most of the lost performance and narrows the gap to the dense baseline.
+    Higher is better.
+    }
+    \label{fig:glue_combined_main}
+\end{figure}
+
+\subsubsection{Backend efficiency on real GLUE inputs}
+
+Table~\ref{tab:backend_comparison_glue} summarizes backend efficiency averaged over compressed GLUE runs.
+Among the evaluated backends, \texttt{flashsvd15} delivers the best latency and throughput, while \texttt{flashsvd} attains slightly lower peak memory.
+Figures~\ref{fig:throughput_backend_main} and~\ref{fig:memory_backend_main} show the same trend from the throughput and memory perspectives, respectively: FlashSVD v1.5 consistently achieves the strongest throughput, while both FlashSVD runtimes remain far more memory-efficient than the naive and SDPA baselines.
+
+\input{tables/encoders/tab_backend_comparison_glue}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.92\linewidth]{figures/encoders/backend_compare/throughput_mnli.png}
+    \caption{
+    Throughput comparison on representative compressed checkpoints under different backends.
+    Results are shown at bf16, sequence length 512, and batch size 32 for representative GLUE tasks.
+    We compare \texttt{sdpa}, \texttt{flashsvd}, and \texttt{flashsvd15} across compressed methods.
+    FlashSVD v1.5 consistently achieves the highest throughput, substantially outperforming FlashSVD v1 and the naive baseline, and often exceeding SDPA as well.
+    Higher is better.
+    }
+    \label{fig:throughput_backend_main}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.92\linewidth]{figures/encoders/backend_compare/peak_memory_mnli.png}
+    \caption{
+    Peak GPU memory comparison on representative compressed checkpoints under different backends.
+    Results are shown at bf16, sequence length 512, and batch size 32 for representative GLUE tasks.
+    The figure compares backend-dependent memory usage across compressed methods, showing that \texttt{flashsvd} attains slightly lower peak memory while \texttt{flashsvd15} remains close and far below the naive and SDPA baselines.
+    Lower is better.
+    }
+    \label{fig:memory_backend_main}
+\end{figure}
+
+\subsubsection{Memory breakdown and scaling behavior}
+
+To better understand where the memory gains come from, we decompose peak inference memory into parameter storage and activation-related overhead.
+Figure~\ref{fig:memory_breakdown_main} shows that low-rank compression reduces parameter memory, but the naive low-rank backend still suffers from large activation and buffer overhead.
+In contrast, FlashSVD eliminates most of this overhead, which is why the total peak memory can fall even below the dense baseline.
+
+We further study whether these gains persist under larger workloads.
+Figure~\ref{fig:seqlen_scaling_main} shows sequence-length scaling, and Figure~\ref{fig:batch_scaling_main} shows batch-size scaling.
+Across both dimensions, FlashSVD v1.5 maintains the best throughput while preserving the memory advantage of fused low-rank execution, indicating that its benefits are not limited to a single operating point.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.92\linewidth]{figures/encoders/memory_analysis/memory_breakdown.png}
+    \caption{
+    Memory breakdown into parameter storage and activation-related overhead for dense and compressed encoder inference.
+    Results are shown at bf16, sequence length 512, and batch size 32.
+    The figure illustrates that compression reduces parameter memory, while the FlashSVD backend further reduces total peak memory by eliminating activation and buffer overhead that remains large under naive low-rank execution.
+    }
+    \label{fig:memory_breakdown_main}
+\end{figure}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/encoders/seqlen_scaling/all_panels.png}
+    \caption{
+    Sequence-length scaling for SVD-compressed BERT under different backends.
+    From left to right, we report peak GPU memory, throughput, and relative memory reduction versus the naive einsum backend.
+    Results are collected at bf16 with batch size 32 using synthetic full-length inputs, and are averaged over compressed methods and tasks.
+    The figure compares how backend efficiency changes as sequence length increases from 128 to 512.
+    FlashSVD backends scale more favorably with sequence length than naive and SDPA baselines, with FlashSVD v1.5 achieving the highest throughput and the largest relative memory reduction at longer sequence lengths.
+    }
+    \label{fig:seqlen_scaling_main}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/encoders/batch_scaling/all_panels.png}
+    \caption{
+    Batch-size scaling for SVD-compressed BERT under different backends.
+    The left panel reports peak GPU memory, and the right panel reports throughput.
+    Results are collected at bf16 with sequence length 512 using synthetic full-length inputs, and are averaged over compressed methods and tasks.
+    We compare the naive einsum backend, SDPA, FlashSVD v1, and FlashSVD v1.5 as batch size increases from 8 to 64.
+    The figure compares how backend choice affects memory growth and throughput scaling under increasing workload parallelism.
+    FlashSVD backends substantially reduce memory across all batch sizes, while FlashSVD v1.5 delivers the strongest throughput, especially at moderate and large batch sizes.
+    }
+    \label{fig:batch_scaling_main}
+\end{figure*}
+
+\subsubsection{Real vs. synthetic benchmarking}
+
+We additionally compare backend speedups measured on real GLUE inputs and on synthetic full-length inputs.
+As shown in Table~\ref{tab:real_vs_synth_gap}, speedups on real GLUE inputs are consistently higher than those measured under synthetic full-length inputs.
+This pattern is especially pronounced for \texttt{flashsvd15}, indicating that synthetic full-length benchmarking can understate realized end-to-end gains on the real GLUE workloads considered here.
+
+\input{tables/encoders/tab_real_vs_synth_gap}
+
+\subsubsection{Kernel-level analysis}
+
+To better understand the efficiency differences, we inspect kernel-level execution on MNLI.
+Table~\ref{tab:kernel_profile_mnli} shows that fused FlashSVD backends reduce execution diversity and simplify the kernel mix relative to the naive path.
+This effect is especially clear for AdaSVD under \texttt{flashsvd15}, which exhibits fewer kernel calls, fewer GEMM variants, and lower fragmentation.
+Figure~\ref{fig:kernel_breakdown_main} complements this view by showing that heterogeneous-rank compression increases kernel diversity in the naive path, while FlashSVD backends consolidate dispatch and shift a substantial fraction of runtime into fused execution.
+
+\input{tables/encoders/tab_kernel_profile_mnli}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/encoders/nsys/combined.png}
+    \caption{
+    Kernel-level utilization analysis under uniform-rank and heterogeneous-rank compression on MNLI.
+    Results are collected at bf16 and sequence length 512.
+    The left panel reports the number of distinct GEMM kernel configurations, and the right panel shows GPU time breakdown across fused Triton kernels, cuBLAS/CUTLASS GEMM kernels, and other operations.
+    We compare SVD and AdaSVD checkpoints under the naive backend, FlashSVD v1, and FlashSVD v1.5.
+    The figure is designed to compare how rank heterogeneity changes execution structure and how much of the runtime can be shifted into fused kernels.
+    Heterogeneous-rank compression increases kernel diversity under the naive backend, while both FlashSVD backends consolidate dispatch and shift a substantial fraction of runtime into fused execution.
+    }
+    \label{fig:kernel_breakdown_main}
+\end{figure*}
