@@ -1220,6 +1220,13 @@ if __name__ == '__main__':
             profiling_mat = torch.load(args.profiling_mat_path)
         whitening_local_update(args.model, model, dataloader, profiling_mat, args.ratio, args.DEV)
         if args.save_path is not None:
+            for _m in model.modules():
+                if hasattr(_m, 'rotary_emb'):
+                    _re = _m.rotary_emb
+                    if 'cos_cached' in _re._buffers:
+                        _re._buffers['cos_cached'] = None
+                    if 'sin_cached' in _re._buffers:
+                        _re._buffers['sin_cached'] = None
             torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_whitening_then_update_' + str(args.ratio) + '.pt')  # fp32
     elif args.step == 3:
         model, tokenizer = get_model_from_huggingface(args.model, hf_token=args.hf_token)
@@ -1230,6 +1237,13 @@ if __name__ == '__main__':
         dataloader, _ = get_loaders(args.dataset, nsamples=args.updating_nsamples, seed=args.seed, tokenizer=tokenizer, seqlen=args.model_seq_len)
         whitening_local_update(model_name=args.model, model=model, dataloader=dataloader, profiling_mat=None, ratio=args.ratio, dev=args.DEV, direct_update=True)
         if args.save_path is not None:
+            for _m in model.modules():
+                if hasattr(_m, 'rotary_emb'):
+                    _re = _m.rotary_emb
+                    if 'cos_cached' in _re._buffers:
+                        _re._buffers['cos_cached'] = None
+                    if 'sin_cached' in _re._buffers:
+                        _re._buffers['sin_cached'] = None
             torch.save({'model': model, 'tokenizer': tokenizer}, args.save_path + "/" + args.model.replace("/", "_").replace("-", "_") +'_update_only_' + str(args.ratio) + '.pt')   # fp32
     elif args.step >= 4:
         print(f"evaluating {args.model_path}...")
