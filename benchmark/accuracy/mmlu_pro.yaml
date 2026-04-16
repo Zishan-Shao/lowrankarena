@@ -23,6 +23,8 @@ eval:
   metric_aggregation: macro_mean
   batch_size: auto
   num_fewshot: 5
+  gen_kwargs:
+    max_gen_toks: 256
   apply_chat_template: false
   summary_source: groups
   summary_entity: mmlu_pro

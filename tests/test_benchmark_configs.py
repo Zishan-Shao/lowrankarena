@@ -64,6 +64,7 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     assert mmlu_pro["eval"]["metric"] == "exact_match"
     assert mmlu_pro["eval"]["tracked_metrics"] == ["exact_match"]
     assert mmlu_pro["eval"]["num_fewshot"] == 5
+    assert mmlu_pro["eval"]["gen_kwargs"] == {"max_gen_toks": 256}
     assert mmlu_pro["eval"]["apply_chat_template"] is False
     assert mmlu_pro["eval"]["summary_source"] == "groups"
     assert mmlu_pro["eval"]["summary_entity"] == "mmlu_pro"

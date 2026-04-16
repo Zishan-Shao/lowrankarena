@@ -63,3 +63,36 @@ def test_build_command_includes_suite_level_lm_eval_contract_flags(tmp_path: Pat
     assert "--fewshot_as_multiturn" in command
     assert "False" in command
     assert "--apply_chat_template" not in command
+
+
+def test_build_command_clamps_max_gen_toks_to_model_context_window(tmp_path: Path) -> None:
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text('{"max_position_embeddings": 2048}', encoding="utf-8")
+    suite_path = tmp_path / "mmlu_pro.yaml"
+    suite_path.write_text("name: mmlu_pro\n", encoding="utf-8")
+    request = LmEvalRequest(
+        checkpoint_name="demo",
+        suite_path=suite_path,
+        index_path=str(tmp_path / "index.csv"),
+        lm_eval_bin="lm-eval",
+    )
+    prepared = PreparedInferenceModel(
+        model_path=str(model_dir),
+        tokenizer_path=str(model_dir),
+        tokenizer_mode="auto",
+        preparation_kind="direct",
+        source_model_path=str(model_dir),
+    )
+    suite_config = {
+        "eval": {
+            "tasks": ["mmlu_pro"],
+            "gen_kwargs": {"max_gen_toks": 4096, "temperature": 0.0},
+        }
+    }
+
+    command = _build_command(request, suite_config, tmp_path / "raw", prepared)
+
+    assert "--gen_kwargs" in command
+    assert "max_gen_toks=2047" in command
+    assert "max_gen_toks=4096" not in command

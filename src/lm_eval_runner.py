@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shlex
 import subprocess
@@ -18,6 +19,8 @@ from src.validation import validate_checkpoint_layout
 
 
 DEFAULT_LM_EVAL_BIN = os.environ.get("LRA_LM_EVAL_BIN", "lm-eval")
+TOKENIZER_INFINITY_THRESHOLD = 10**12
+eval_logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -95,6 +98,84 @@ def _resolve_include_paths(suite_path: str | Path, raw_paths: Any) -> list[Path]
             candidate = (project_path() / candidate).resolve()
         resolved.append(candidate)
     return resolved
+
+
+def _coerce_positive_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    coerced = int(value)
+    if coerced <= 0:
+        raise ValueError(f"Expected a positive integer, got {value!r}.")
+    return coerced
+
+
+def _infer_model_max_length(prepared: PreparedInferenceModel) -> int | None:
+    search_paths = [Path(prepared.model_path)]
+    tokenizer_path = Path(prepared.tokenizer_path)
+    if tokenizer_path not in search_paths:
+        search_paths.append(tokenizer_path)
+
+    config_attrs = (
+        "n_positions",
+        "max_position_embeddings",
+        "n_ctx",
+        "model_max_length",
+        "max_sequence_length",
+        "max_seq_len",
+        "seq_length",
+    )
+    for base_path in search_paths:
+        config_path = base_path / "config.json"
+        if not config_path.exists():
+            continue
+        config = load_json(config_path)
+        for attr in config_attrs:
+            value = _coerce_positive_int(config.get(attr))
+            if value is not None:
+                return value
+
+    for base_path in search_paths:
+        tokenizer_config_path = base_path / "tokenizer_config.json"
+        if not tokenizer_config_path.exists():
+            continue
+        tokenizer_config = load_json(tokenizer_config_path)
+        value = _coerce_positive_int(tokenizer_config.get("model_max_length"))
+        if value is not None and value < TOKENIZER_INFINITY_THRESHOLD:
+            return value
+
+    return None
+
+
+def _effective_gen_kwargs(
+    eval_config: dict[str, Any],
+    *,
+    prepared: PreparedInferenceModel,
+    suite_path: str | Path,
+) -> dict[str, Any]:
+    raw_gen_kwargs = eval_config.get("gen_kwargs") or {}
+    if not raw_gen_kwargs:
+        return {}
+    if not isinstance(raw_gen_kwargs, dict):
+        raise TypeError(f"eval.gen_kwargs must be a mapping in {suite_path}.")
+
+    gen_kwargs = dict(raw_gen_kwargs)
+    max_gen_toks = _coerce_positive_int(gen_kwargs.get("max_gen_toks"))
+    model_max_length = _infer_model_max_length(prepared)
+    if (
+        max_gen_toks is not None
+        and model_max_length is not None
+        and max_gen_toks >= model_max_length
+    ):
+        clamped = model_max_length - 1
+        eval_logger.warning(
+            "Clamping eval.gen_kwargs.max_gen_toks from %s to %s for %s because model_max_length is %s.",
+            max_gen_toks,
+            clamped,
+            suite_path,
+            model_max_length,
+        )
+        gen_kwargs["max_gen_toks"] = clamped
+    return gen_kwargs
 
 
 def _normalize_summary_entries(
@@ -175,10 +256,12 @@ def _build_command(
     for include_path in include_paths:
         command.extend(["--include_path", str(include_path)])
 
-    gen_kwargs = eval_config.get("gen_kwargs") or {}
+    gen_kwargs = _effective_gen_kwargs(
+        eval_config,
+        prepared=prepared,
+        suite_path=request.suite_path,
+    )
     if gen_kwargs:
-        if not isinstance(gen_kwargs, dict):
-            raise TypeError(f"eval.gen_kwargs must be a mapping in {request.suite_path}.")
         command.extend(["--gen_kwargs", *_serialize_cli_pairs(gen_kwargs)])
 
     apply_chat_template = eval_config.get("apply_chat_template")
@@ -254,6 +337,11 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
     raw_result_path = _find_raw_result_path(raw_output_dir)
     raw_payload = load_json(raw_result_path)
     eval_config = suite_config.get("eval", {})
+    effective_gen_kwargs = _effective_gen_kwargs(
+        eval_config,
+        prepared=prepared,
+        suite_path=suite_path,
+    )
     tracked_metrics = [str(item) for item in eval_config.get("tracked_metrics", []) if str(item).strip()]
     preferred_metrics = [str(eval_config.get("metric"))] if eval_config.get("metric") else []
     preferred_metrics.extend([str(item) for item in eval_config.get("metric_fallbacks", [])])
@@ -337,7 +425,7 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
             "limit": request.limit if request.limit is not None else eval_config.get("limit"),
             "num_fewshot": request.num_fewshot if request.num_fewshot is not None else eval_config.get("num_fewshot"),
             "model_backend": request.model_backend,
-            "gen_kwargs": dict(eval_config.get("gen_kwargs") or {}),
+            "gen_kwargs": effective_gen_kwargs,
             "include_paths": [str(path) for path in _resolve_include_paths(suite_path, eval_config.get("include_paths"))],
             "apply_chat_template": eval_config.get("apply_chat_template", False),
             "fewshot_as_multiturn": eval_config.get("fewshot_as_multiturn"),

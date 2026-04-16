@@ -23,6 +23,7 @@ Suites in this directory select their own evaluation backend through the `eval.b
 ## LM-Eval Contracts
 
 - `mmlu_pro.yaml` does not apply a chat template. It uses the upstream `mmlu_pro` group, so the prompt, 5-shot CoT context, extraction regex, temperature, and stop sequence follow the installed harness task definition.
+- `mmlu_pro.yaml` overrides only `max_gen_toks=256` at the suite layer so 2048-context LLaMA-7B checkpoints do not trip the HF backend assertion on the upstream task's `max_gen_toks: 2048`.
 - `mmlu_pro.yaml` reads the official `groups.mmlu_pro` aggregate for the main score and keeps the 14-domain subject breakdown in the normalized task details for appendix reporting.
 - `gsm8k.yaml` does not apply a chat template. It evaluates the upstream `gsm8k` lm-eval task under the pinned `lm_eval==0.4.11` environment.
 
