@@ -30,7 +30,7 @@ convert_one() {
         return
     fi
     echo "  Converting: $input"
-    python "$script" --input "$input" --output "$output"
+    python "$script" --input "$input" --output "$output" --dtype bf16
 }
 
 for KEEP in 0.8 0.7 0.6 0.5 0.4; do
