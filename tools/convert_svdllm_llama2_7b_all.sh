@@ -48,6 +48,12 @@ for KEEP in 0.8 0.7 0.6 0.5 0.4; do
         "$OUT_BASE/SVDLLMv1/hf_whitening_then_update_${KEEP}" \
         "$CONVERT_SVDLLM"
 
+    # V2: whitening_hetero
+    convert_one \
+        "$SVDLLM_CKPT_DIR/${PREFIX}_v2_${KEEP}.pt" \
+        "$OUT_BASE/SVDLLMv2/hf_v2_${KEEP}" \
+        "$CONVERT_SVDLLM"
+
     # Basis Sharing
     convert_one \
         "$SVDLLM_CKPT_DIR/${PREFIX}_basis_sharing_${KEEP}.pt" \
