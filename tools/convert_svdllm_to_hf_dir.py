@@ -85,20 +85,27 @@ def main():
 
     os.makedirs(args.output, exist_ok=True)
 
-    # ── save state dict as safetensors (sharded) ─────────────────────────────
+    # ── save as safetensors ───────────────────────────────────────────────────
     try:
         from safetensors.torch import save_file
     except ImportError:
         print("ERROR: safetensors not installed. Run: pip install safetensors")
         sys.exit(1)
     tensors = {}
+    seen_ptrs = {}
     for k, v in model.state_dict().items():
         if v is None or not isinstance(v, torch.Tensor):
             continue
+        v = v.cpu()
+        # BasisSharing: q/k/v_v_proj share the same storage — clone to break aliasing
+        ptr = v.data_ptr()
+        if ptr in seen_ptrs:
+            v = v.clone()
+        else:
+            seen_ptrs[ptr] = k
         if not v.is_contiguous():
             v = v.contiguous()
-        tensors[k] = v.cpu()
-
+        tensors[k] = v
     safetensors_path = os.path.join(args.output, "model.safetensors")
     print(f"Saving {len(tensors)} tensors to {safetensors_path} ...")
     save_file(tensors, safetensors_path)
