@@ -28,6 +28,13 @@ def _compat_enabled(key: str, default: bool = False) -> bool:
     return os.getenv(f'SVDLLM_COMPAT_{key.upper()}', '1' if default else '0') != '0'
 
 
+def _rank_from_keep_ratio(out_features: int, in_features: int, keep_ratio: float) -> int:
+    keep_ratio = min(1.0, max(0.0, float(keep_ratio)))
+    max_rank = max(1, min(int(out_features), int(in_features)))
+    rank = int(int(out_features) * int(in_features) * keep_ratio / (int(out_features) + int(in_features)))
+    return max(1, min(rank, max_rank))
+
+
 def _sqrtm_svd_spd(mat: torch.Tensor, eps: float) -> torch.Tensor:
     """Symmetric matrix square-root via eigendecomposition with eigenvalue clipping."""
     if mat.dim() != 2 or mat.shape[0] != mat.shape[1]:
@@ -201,7 +208,6 @@ def whitening_hetero(
     print(
         f"Start SVD decomposition after whitening (hetero): attn_ratio={attn_ratio}, mlp_ratio={mlp_ratio} ..."
     )
-    compat_ranks = _compat_enabled('ranks', False)
     compat_attn = _compat_enabled('attention', False)
     svd_time_total = 0.0
 
@@ -212,14 +218,14 @@ def whitening_hetero(
         # Replace Attn, MLP modules with different ratios
         if "llama" in model_name or "vicuna" in model_name:
             svd_attn = SVD_LlamaAttention(
-                config=model.config, ratio=attn_ratio, compat_ranks=compat_ranks, compat_attention=compat_attn
+                config=model.config, ratio=attn_ratio, compat_ranks=True, compat_attention=compat_attn
             )
             svd_mlp = SVD_LlamaMLP(
                 hidden_size=layer.hidden_size,
                 intermediate_size=model.config.intermediate_size,
                 hidden_act=model.config.hidden_act,
                 ratio=mlp_ratio,
-                compat_ranks=compat_ranks,
+                compat_ranks=True,
             )
         elif "mistral" in model_name:
             svd_attn = SVD_MistralAttention(config=model.config, ratio=attn_ratio)
@@ -258,13 +264,7 @@ def whitening_hetero(
                 local_ratio = float(ratio)
 
             local_ratio = min(1.0, max(0.0, float(local_ratio)))
-            max_rank = min(W.shape[0], W.shape[1])
-            use_official_rank = compat_ranks or ("mistral" in model_name) or ("opt" in model_name)
-            if use_official_rank:
-                num_s_after_trunc = int(W.shape[0] * W.shape[1] * local_ratio / (W.shape[0] + W.shape[1]))
-            else:
-                num_s_after_trunc = int(max_rank * local_ratio)
-            num_s_after_trunc = max(1, min(num_s_after_trunc, max_rank))
+            num_s_after_trunc = _rank_from_keep_ratio(W.shape[0], W.shape[1], local_ratio)
 
             t_svd_start = time.perf_counter()
             if svd_method == "randomized":
@@ -405,4 +405,3 @@ def whitening_hetero(
         del layer
         if str(dev).startswith("cuda"):
             torch.cuda.empty_cache()
-
