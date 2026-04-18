@@ -19,6 +19,71 @@ parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(current_path)
 
 
+def _compat_enabled(env_name: str, default: bool = False) -> bool:
+    raw = os.getenv(env_name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() not in {"0", "false", "no", "off", ""}
+
+
+def _maybe_release_guard(gpu_guard, reason: str):
+    if gpu_guard is not None:
+        gpu_guard.release_for_gpu_work(reason)
+
+
+def _maybe_reserve_guard(gpu_guard, reason: str):
+    if gpu_guard is not None:
+        gpu_guard.reserve_idle(reason)
+
+
+def _resolve_keep_ratio(
+    *,
+    keep_ratio: float | None = None,
+    reduction_ratio: float | None = None,
+    ratio: float | None = None,
+) -> float:
+    if keep_ratio is not None:
+        return float(keep_ratio)
+    if reduction_ratio is not None:
+        return 1.0 - float(reduction_ratio)
+    if ratio is not None:
+        return float(ratio)
+    raise ValueError("Expected one of keep_ratio, reduction_ratio, or ratio.")
+
+
+def _infer_runtime_seq_len(calib_loader, fallback: int) -> int:
+    for batch in calib_loader:
+        if isinstance(batch, dict) and "input_ids" in batch:
+            input_ids = batch["input_ids"]
+            if hasattr(input_ids, "shape") and len(input_ids.shape) >= 2:
+                return int(input_ids.shape[-1])
+        break
+    return int(fallback)
+
+
+def _prefer_low_resource_gpu(device_hint: str, dev: str) -> bool:
+    return str(device_hint).lower() == "gpu" and str(dev).startswith("cuda")
+
+
+def _estimate_low_resource_activation_bytes(
+    nsamples: int,
+    seq_len: int,
+    hidden_size: int,
+    dtype: torch.dtype,
+) -> int:
+    probe = torch.empty((), dtype=dtype)
+    return int(nsamples) * int(seq_len) * int(hidden_size) * int(probe.element_size())
+
+
+def _rank_from_keep_ratio(in_features: int, out_features: int, keep_ratio: float) -> int:
+    dense_params = int(in_features) * int(out_features)
+    low_rank_denominator = int(in_features) + int(out_features)
+    if low_rank_denominator <= 0:
+        raise ValueError("in_features + out_features must be positive.")
+    rank = int(dense_params * float(keep_ratio) / low_rank_denominator)
+    return max(1, rank)
+
+
 
 @torch.no_grad()
 def profle_svdllm(name, model, calib_loader, dev):
@@ -78,7 +143,17 @@ def profle_svdllm(name, model, calib_loader, dev):
         
 
 @torch.no_grad()
-def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
+def profle_svdllm_low_resource(
+    model_name,
+    model,
+    calib_loader,
+    dev,
+    *,
+    gpu_guard=None,
+    low_resource_factor_device: str = "gpu",
+    low_resource_activation_device: str = "auto",
+):
+    _maybe_release_guard(gpu_guard, "low-resource profiling")
     if "opt" in model_name:
         layers = model.model.decoder.layers
         model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
@@ -188,6 +263,7 @@ def profle_svdllm_low_resource(model_name, model, calib_loader, dev):
         profiling_mat[i] = layer_profile
         inps = outs
         torch.cuda.empty_cache()
+    _maybe_reserve_guard(gpu_guard, "low-resource profiling finished")
     return profiling_mat
      
 

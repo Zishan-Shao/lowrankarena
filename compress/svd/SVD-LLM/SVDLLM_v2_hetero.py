@@ -3,12 +3,11 @@
 Paper-derived v2-style heterogeneous reimplementation.
 
 Implementation boundary:
-- This file is a local reimplementation layered on top of `SVDLLM_v1_hetero`.
+- This file is a local reimplementation of the v2 adaptive path.
 - It is not claimed to be a line-for-line equivalent of any upstream official
   public main-branch implementation.
-- Relative to `SVDLLM_v1_hetero`, the intended v2 delta here is the profiling
-  path: use raw X^T X plus a symmetric matrix square-root instead of the
-  Cholesky-based v1 whitening path.
+- Relative to the public uniform v1 path, the intended v2 delta here is:
+  raw X^T X-style profiling plus adaptive/module-wise rank allocation.
 """
 
 import os
@@ -23,71 +22,63 @@ current_path = os.path.dirname(os.path.abspath(__file__))
 parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(current_path)
 
-from SVDLLM_v1_hetero import (  # noqa: E402
-    IMPLEMENTATION_BOUNDARY as V1_IMPLEMENTATION_BOUNDARY,
-    IMPLEMENTATION_STATUS as V1_IMPLEMENTATION_STATUS,
+from SVDLLM_adaptive_utils import (  # noqa: E402
+    IMPLEMENTATION_BOUNDARY as ADAPTIVE_UTILS_IMPLEMENTATION_BOUNDARY,
+    IMPLEMENTATION_STATUS as ADAPTIVE_UTILS_IMPLEMENTATION_STATUS,
     _get_layers,
     allocate_weight_type_keep_ratios,
     apply_module_keep_ratios,
 )
-from SVDLLM import (  # noqa: E402
-    _maybe_release_guard,
-    _maybe_reserve_guard,
-    profle_svdllm_low_resource as _profile_v1_low_resource,
-)
+from SVDLLM import _maybe_release_guard, _maybe_reserve_guard  # noqa: E402
 from utils.model_utils import find_layers  # noqa: E402
 
 
 IMPLEMENTATION_STATUS = "local_paper_derived_v2_reimplementation"
-BASELINE_IMPLEMENTATION_STATUS = V1_IMPLEMENTATION_STATUS
-BASELINE_IMPLEMENTATION_BOUNDARY = V1_IMPLEMENTATION_BOUNDARY
+BASELINE_IMPLEMENTATION_STATUS = "public_v1_uniform_baseline"
+BASELINE_IMPLEMENTATION_BOUNDARY = (
+    "The baseline reference point for this module is the public uniform "
+    "SVD-LLM v1 path rather than an adaptive v1 variant."
+)
+ADAPTIVE_UTILS_STATUS = ADAPTIVE_UTILS_IMPLEMENTATION_STATUS
+ADAPTIVE_UTILS_BOUNDARY = ADAPTIVE_UTILS_IMPLEMENTATION_BOUNDARY
 IMPLEMENTATION_BOUNDARY = (
-    "This module is a paper-derived local reimplementation built on top of "
-    "SVDLLM_v1_hetero. It is not claimed to be a line-for-line equivalent of "
+    "This module is a paper-derived local reimplementation of the adaptive "
+    "SVD-LLM v2 path. It is not claimed to be a line-for-line equivalent of "
     "an upstream official public main-branch implementation."
 )
 
 
-def _sqrtm_svd_spd(mat: torch.Tensor, eps: float) -> torch.Tensor:
+def _factorize_second_moment(mat: torch.Tensor, dev):
     if mat.dim() != 2 or mat.shape[0] != mat.shape[1]:
         raise ValueError(f"Expected square 2D matrix, got {tuple(mat.shape)}")
-    mat = (mat + mat.t()) * 0.5
-    w, Q = torch.linalg.eigh(mat)
-    w = torch.clamp(w, min=float(eps))
-    return (Q * torch.sqrt(w)) @ Q.t()
-
-
-def _svd_sqrtm_with_fallback(mat: torch.Tensor, dev) -> torch.Tensor:
+    work = (mat + mat.t()) * 0.5
     try:
-        work = mat.to(dev, dtype=torch.float64)
-        dmean = work.diag().abs().mean().item()
-        eps = 1e-6 * (dmean if dmean > 0 else 1.0)
-        return _sqrtm_svd_spd(work, eps=eps).cpu()
+        work = work.to(dev, dtype=torch.float32)
     except RuntimeError as exc:
         if "out of memory" not in str(exc).lower():
             raise
         if str(dev).startswith("cuda"):
             torch.cuda.empty_cache()
-        work = mat.to("cpu", dtype=torch.float64)
-        dmean = work.diag().abs().mean().item()
-        eps = 1e-6 * (dmean if dmean > 0 else 1.0)
-        return _sqrtm_svd_spd(work, eps=eps).cpu()
+        work = work.to("cpu", dtype=torch.float32)
 
+    eigvals, eigvecs = torch.linalg.eigh(work)
+    eigvals = torch.clamp(eigvals, min=0.0)
+    order = torch.argsort(eigvals, descending=True)
+    eigvals = eigvals.index_select(0, order)
+    eigvecs = eigvecs.index_select(1, order)
 
-def _convert_cholesky_profile_to_v2_scaling(profiling_mat, dev):
-    converted = {}
-    print("Converting Cholesky whitening factors into symmetric sqrt(X^T X) factors...")
-    for layer_idx, layer_profile in tqdm(profiling_mat.items()):
-        converted_layer = {}
-        for name, factor in layer_profile.items():
-            factor = factor.detach().to(dtype=torch.float64)
-            raw_second_moment = factor.matmul(factor.t())
-            converted_layer[name] = _svd_sqrtm_with_fallback(raw_second_moment, dev=dev)
-            del raw_second_moment
-            if str(dev).startswith("cuda"):
-                torch.cuda.empty_cache()
-        converted[layer_idx] = converted_layer
-    return converted
+    root = torch.sqrt(eigvals)
+    tol = max(1e-12, float(root.max().item()) * 1e-12 if root.numel() > 0 else 1e-12)
+    inv_root = torch.where(root > tol, torch.reciprocal(root), torch.zeros_like(root))
+    profile = {
+        "u": eigvecs.cpu(),
+        "root": root.cpu(),
+        "inv_root": inv_root.cpu(),
+    }
+    del eigvals, eigvecs, root, inv_root, work
+    if str(dev).startswith("cuda"):
+        torch.cuda.empty_cache()
+    return profile
 
 
 @torch.no_grad()
@@ -112,9 +103,9 @@ def profle_svdllm(name, model, calib_loader, dev, *, raw_xtx: bool = True, gpu_g
         pass
 
     msg = (
-        "Start obtaining the whitening matrix (raw XTX, local paper-derived path)..."
+        "Start obtaining the v2 whitening stats (raw XTX)..."
         if raw_xtx
-        else "Start obtaining the whitening matrix (centered covariance, local fallback)..."
+        else "Start obtaining the v2 whitening stats (centered covariance fallback)..."
     )
     print(msg)
 
@@ -124,7 +115,7 @@ def profle_svdllm(name, model, calib_loader, dev, *, raw_xtx: bool = True, gpu_g
             x = x.reshape(-1, x.shape[-1])
         elif x.dim() != 2:
             x = x.view(-1, x.shape[-1])
-        x = x.to(dtype=torch.float64, device=dev)
+        x = x.to(dtype=torch.float32, device=dev)
         if raw_xtx:
             module._acc += x.t().matmul(x)
         else:
@@ -140,10 +131,10 @@ def profle_svdllm(name, model, calib_loader, dev, *, raw_xtx: bool = True, gpu_g
         if isinstance(module, nn.Linear):
             in_f = module.in_features
             if raw_xtx:
-                module._acc = torch.zeros((in_f, in_f), dtype=torch.float64, device=dev)
+                module._acc = torch.zeros((in_f, in_f), dtype=torch.float32, device=dev)
             else:
-                module._second = torch.zeros((in_f, in_f), dtype=torch.float64, device=dev)
-                module._mean = torch.zeros((in_f,), dtype=torch.float64, device=dev)
+                module._second = torch.zeros((in_f, in_f), dtype=torch.float32, device=dev)
+                module._mean = torch.zeros((in_f,), dtype=torch.float32, device=dev)
                 module._count = 0
             handles.append(module.register_forward_hook(hook))
 
@@ -168,7 +159,7 @@ def profle_svdllm(name, model, calib_loader, dev, *, raw_xtx: bool = True, gpu_g
                 subset[n]._mean = subset[n]._mean.cpu()
 
     profiling_mat = {}
-    print("Start SVD sqrt factorization (no Cholesky)...")
+    print("Start factorizing second-moment matrices for v2 (no Cholesky)...")
     for i in tqdm(range(len(layers))):
         _maybe_release_guard(gpu_guard, f"v2 profiling factorization layer {i}")
         layer_profile = {}
@@ -178,9 +169,6 @@ def profle_svdllm(name, model, calib_loader, dev, *, raw_xtx: bool = True, gpu_g
                 if not hasattr(subset[n], "_acc"):
                     continue
                 mat = subset[n]._acc.to(dev)
-                dmean = mat.diag().abs().mean().item()
-                eps = 1e-6 * (dmean if dmean > 0 else 1.0)
-                scaling = _sqrtm_svd_spd(mat, eps=eps)
                 subset[n]._acc = None
             else:
                 if not hasattr(subset[n], "_second"):
@@ -188,17 +176,13 @@ def profle_svdllm(name, model, calib_loader, dev, *, raw_xtx: bool = True, gpu_g
                 second = subset[n]._second.to(dev)
                 mean = subset[n]._mean.to(dev)
                 count = max(int(subset[n]._count), 1)
-                cov = second / count - torch.outer(mean / count, mean / count)
-                cov = (cov + cov.t()) * 0.5
-                dmean = cov.diag().abs().mean().item()
-                eps = 1e-6 * (dmean if dmean > 0 else 1.0)
-                scaling = _sqrtm_svd_spd(cov, eps=eps)
+                mat = second / count - torch.outer(mean / count, mean / count)
                 subset[n]._second = None
                 subset[n]._mean = None
                 subset[n]._count = 0
 
-            layer_profile[n] = scaling.cpu()
-            del scaling
+            layer_profile[n] = _factorize_second_moment(mat, dev=dev)
+            del mat
             if str(dev).startswith("cuda"):
                 torch.cuda.empty_cache()
 
@@ -227,25 +211,147 @@ def profle_svdllm_low_resource(
     low_resource_factor_device: str = "gpu",
     low_resource_activation_device: str = "auto",
 ):
-    previous_flag = os.environ.get("SVDLLM_COMPAT_WHITENING")
-    try:
-        os.environ["SVDLLM_COMPAT_WHITENING"] = "1" if raw_xtx else "0"
-        cholesky_profile = _profile_v1_low_resource(
-            name,
-            model,
-            calib_loader,
-            dev,
-            gpu_guard=gpu_guard,
-            low_resource_factor_device=low_resource_factor_device,
-            low_resource_activation_device=low_resource_activation_device,
-        )
-    finally:
-        if previous_flag is None:
-            os.environ.pop("SVDLLM_COMPAT_WHITENING", None)
-        else:
-            os.environ["SVDLLM_COMPAT_WHITENING"] = previous_flag
+    _maybe_release_guard(gpu_guard, "v2 low-resource profiling")
+    if "opt" in name:
+        layers = model.model.decoder.layers
+        model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
+        model.model.decoder.final_layer_norm = model.model.decoder.final_layer_norm.to(dev)
+        model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(dev)
+    else:
+        layers = model.model.layers
+        model.model.embed_tokens = model.model.embed_tokens.to(dev)
+        model.model.norm = model.model.norm.to(dev)
+    layers[0] = layers[0].to(dev)
 
-    return _convert_cholesky_profile_to_v2_scaling(cholesky_profile, dev=dev)
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (len(calib_loader), model.seqlen, model.config.hidden_size),
+        dtype=dtype,
+        device=dev,
+    )
+    cache = {"i": 0, "attention_mask": None, "position_ids": None}
+
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+
+        def forward(self, inp, **kwargs):
+            inps[cache["i"]] = inp
+            cache["i"] += 1
+            if cache["attention_mask"] is None:
+                cache["attention_mask"] = kwargs["attention_mask"].detach().cpu()
+                if "opt" not in name:
+                    cache["position_ids"] = kwargs["position_ids"].detach().cpu()
+            else:
+                cache["attention_mask"] = torch.cat(
+                    (cache["attention_mask"], kwargs["attention_mask"].detach().cpu()), dim=0
+                )
+                if "opt" not in name:
+                    cache["position_ids"] = torch.cat(
+                        (cache["position_ids"], kwargs["position_ids"].detach().cpu()), dim=0
+                    )
+            raise ValueError
+
+    layers[0] = Catcher(layers[0])
+    for batch in calib_loader:
+        try:
+            batch = {k: v.to(dev) for k, v in batch.items()}
+            model(**batch)
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+    layers[0] = layers[0].cpu()
+    if "opt" in name:
+        model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
+        model.model.decoder.final_layer_norm = model.model.decoder.final_layer_norm.cpu()
+        model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu()
+    else:
+        model.model.embed_tokens = model.model.embed_tokens.cpu()
+        model.model.norm = model.model.norm.cpu()
+    torch.cuda.empty_cache()
+
+    outs = torch.zeros_like(inps)
+    attention_masks = cache["attention_mask"]
+    position_ids = None if "opt" in name else cache["position_ids"]
+    profiling_mat = {}
+    print("Start low-resource factorization for v2 (no Cholesky)...")
+    for i in tqdm(range(len(layers))):
+        _maybe_release_guard(gpu_guard, f"v2 low-resource layer {i}")
+        layer_profile = {}
+        layer = layers[i].to(dev)
+        subset = find_layers(layer)
+
+        def hook(module, input, output):
+            x = input[0].detach()
+            if x.dim() == 3:
+                x = x.reshape(-1, x.shape[-1])
+            elif x.dim() != 2:
+                x = x.view(-1, x.shape[-1])
+            x = x.to(dtype=torch.float32)
+            if raw_xtx:
+                module._acc += x.t().matmul(x)
+            else:
+                module._second += x.t().matmul(x)
+                module._mean += x.sum(dim=0)
+                module._count += x.shape[0]
+            del x, output
+            if str(dev).startswith("cuda"):
+                torch.cuda.empty_cache()
+
+        handles = []
+        for module_name, module in subset.items():
+            in_f = module.in_features
+            if raw_xtx:
+                module._acc = torch.zeros((in_f, in_f), dtype=torch.float32, device=dev)
+            else:
+                module._second = torch.zeros((in_f, in_f), dtype=torch.float32, device=dev)
+                module._mean = torch.zeros((in_f,), dtype=torch.float32, device=dev)
+                module._count = 0
+            handles.append(module.register_forward_hook(hook))
+
+        for j in range(inps.shape[0]):
+            if "opt" not in name:
+                batch_inps = inps[j].unsqueeze(0)
+                batch_position_ids = position_ids[j].unsqueeze(0).to(dev)
+                position_embeddings = model.model.rotary_emb(batch_inps, batch_position_ids)
+                outs[j] = layer(
+                    batch_inps,
+                    attention_mask=attention_masks[j].unsqueeze(0).to(dev),
+                    position_ids=batch_position_ids,
+                    position_embeddings=position_embeddings,
+                )[0]
+            else:
+                outs[j] = layer(
+                    inps[j].unsqueeze(0),
+                    attention_mask=attention_masks[j].unsqueeze(0).to(dev),
+                )[0]
+
+        for h in handles:
+            h.remove()
+
+        for module_name, module in subset.items():
+            if raw_xtx:
+                mat = module._acc
+                module._acc = None
+            else:
+                count = max(int(module._count), 1)
+                mat = module._second / count - torch.outer(module._mean / count, module._mean / count)
+                module._second = None
+                module._mean = None
+                module._count = 0
+            layer_profile[module_name] = _factorize_second_moment(mat, dev=dev)
+            del mat
+            if str(dev).startswith("cuda"):
+                torch.cuda.empty_cache()
+
+        layers[i] = layer.cpu()
+        profiling_mat[i] = layer_profile
+        inps = outs
+        _maybe_reserve_guard(gpu_guard, f"v2 low-resource layer {i} finished")
+        if str(dev).startswith("cuda"):
+            torch.cuda.empty_cache()
+    return profiling_mat
 
 
 profile_svdllm_low_resource = profle_svdllm_low_resource
