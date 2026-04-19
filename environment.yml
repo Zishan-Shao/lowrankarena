@@ -1,0 +1,9 @@
+name: lowrankarena
+channels:
+  - defaults
+dependencies:
+  # Keep Python on 3.13.x so the validated vLLM speed stack resolves cleanly.
+  - python=3.13
+  - pip
+  - pip:
+      - -r requirements.txt
