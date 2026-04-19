@@ -1,0 +1,3561 @@
+{
+  "meta": {
+    "generated_at_utc": "2026-04-19T19:31:16.780389+00:00",
+    "source_raw_json": "/home/shaoz/lowrankarena/results/survey/lowrankarena_openreview_reviewer_comments_raw.json",
+    "methodology": [
+      "Preferred OpenReview forum candidates are used when explicitly marked; otherwise the public forum with the largest reviewer-note count is selected.",
+      "AA-SVD is intentionally tied to the rejected ICLR submission because the survey wants the rejection-cycle reviewer feedback.",
+      "Concern text is built from reviewer-authored weaknesses/questions fields for official reviews and the comment field for reviewer comments.",
+      "Categories are lexicon-based and overlapping: a single note can contribute to multiple concern categories.",
+      "Paper prevalence is computed over surveyed methods with public reviewer notes, not over methods with no accessible public review text."
+    ],
+    "requested_paper_count": 19,
+    "requested_papers": [
+      "ASVD",
+      "SVD-LLM v1",
+      "SVD-LLM v2",
+      "Dobi-SVD",
+      "SAES-SVD",
+      "Basis Sharing",
+      "Dip-SVD",
+      "AdaSVD",
+      "AA-SVD",
+      "Swift-SVD",
+      "Optimal Brain Decomposition",
+      "D-Rank",
+      "ZS-SVD",
+      "DF-SVD",
+      "CPSVD",
+      "Res-SVD",
+      "MoDeGPT",
+      "Uni-SVD",
+      "GFWSVD"
+    ],
+    "public_review_paper_count": 12,
+    "public_review_papers": [
+      "ASVD",
+      "SVD-LLM v1",
+      "Dobi-SVD",
+      "SAES-SVD",
+      "Basis Sharing",
+      "AdaSVD",
+      "AA-SVD",
+      "D-Rank",
+      "DF-SVD",
+      "Res-SVD",
+      "MoDeGPT",
+      "GFWSVD"
+    ],
+    "public_review_note_count": 76,
+    "papers_without_public_reviews": [
+      "SVD-LLM v2",
+      "Dip-SVD",
+      "Swift-SVD",
+      "Optimal Brain Decomposition",
+      "ZS-SVD",
+      "CPSVD",
+      "Uni-SVD"
+    ]
+  },
+  "overall_keyword_summary": {
+    "top_unigrams": [
+      {
+        "phrase": "compression",
+        "count": 138
+      },
+      {
+        "phrase": "method",
+        "count": 76
+      },
+      {
+        "phrase": "svd-llm",
+        "count": 72
+      },
+      {
+        "phrase": "authors",
+        "count": 70
+      },
+      {
+        "phrase": "model",
+        "count": 67
+      },
+      {
+        "phrase": "rank",
+        "count": 61
+      },
+      {
+        "phrase": "svd",
+        "count": 58
+      },
+      {
+        "phrase": "methods",
+        "count": 54
+      },
+      {
+        "phrase": "models",
+        "count": 44
+      },
+      {
+        "phrase": "pruning",
+        "count": 44
+      },
+      {
+        "phrase": "results",
+        "count": 43
+      },
+      {
+        "phrase": "performance",
+        "count": 40
+      },
+      {
+        "phrase": "quantization",
+        "count": 40
+      },
+      {
+        "phrase": "like",
+        "count": 39
+      },
+      {
+        "phrase": "experiments",
+        "count": 39
+      },
+      {
+        "phrase": "also",
+        "count": 38
+      },
+      {
+        "phrase": "why",
+        "count": 36
+      },
+      {
+        "phrase": "table",
+        "count": 35
+      }
+    ],
+    "top_bigrams": [
+      {
+        "phrase": "basis sharing",
+        "count": 16
+      },
+      {
+        "phrase": "large language",
+        "count": 15
+      },
+      {
+        "phrase": "compression ratio",
+        "count": 13
+      },
+      {
+        "phrase": "compression rate",
+        "count": 12
+      },
+      {
+        "phrase": "model compression",
+        "count": 12
+      },
+      {
+        "phrase": "arxiv preprint",
+        "count": 11
+      },
+      {
+        "phrase": "preprint arxiv",
+        "count": 11
+      },
+      {
+        "phrase": "compression ratios",
+        "count": 11
+      },
+      {
+        "phrase": "language models",
+        "count": 10
+      },
+      {
+        "phrase": "memory usage",
+        "count": 10
+      },
+      {
+        "phrase": "grad a-a",
+        "count": 10
+      },
+      {
+        "phrase": "llm compression",
+        "count": 9
+      },
+      {
+        "phrase": "proposed method",
+        "count": 9
+      },
+      {
+        "phrase": "compression methods",
+        "count": 9
+      },
+      {
+        "phrase": "svd-llm basis",
+        "count": 9
+      },
+      {
+        "phrase": "time complexity",
+        "count": 8
+      }
+    ],
+    "top_trigrams": [
+      {
+        "phrase": "arxiv preprint arxiv",
+        "count": 11
+      },
+      {
+        "phrase": "svd-llm basis sharing",
+        "count": 9
+      },
+      {
+        "phrase": "time complexity memory",
+        "count": 7
+      },
+      {
+        "phrase": "complexity memory usage",
+        "count": 7
+      },
+      {
+        "phrase": "large language model",
+        "count": 6
+      },
+      {
+        "phrase": "large language models",
+        "count": 6
+      },
+      {
+        "phrase": "memory usage numerical",
+        "count": 6
+      },
+      {
+        "phrase": "svd-based llm compression",
+        "count": 5
+      },
+      {
+        "phrase": "svd-based compression methods",
+        "count": 5
+      },
+      {
+        "phrase": "cross-layer parameter sharing",
+        "count": 4
+      },
+      {
+        "phrase": "layerwise sparsity owl",
+        "count": 4
+      },
+      {
+        "phrase": "usage numerical stability",
+        "count": 4
+      }
+    ]
+  },
+  "figure_categories": [
+    {
+      "key": "strong_or_pruning_baselines",
+      "label": "Missing strong / pruning-matched baselines",
+      "description": "Reviewer requests for stronger comparison baselines, especially pruning-aligned or otherwise omitted methods.",
+      "paper_count": 9,
+      "paper_percent": 75.0,
+      "papers": [
+        "AA-SVD",
+        "ASVD",
+        "DF-SVD",
+        "Dobi-SVD",
+        "GFWSVD",
+        "MoDeGPT",
+        "Res-SVD",
+        "SAES-SVD",
+        "SVD-LLM v1"
+      ],
+      "review_count": 17,
+      "review_percent": 22.36842105263158,
+      "top_keywords": {
+        "top_unigrams": [
+          {
+            "phrase": "compression",
+            "count": 50
+          },
+          {
+            "phrase": "method",
+            "count": 29
+          },
+          {
+            "phrase": "authors",
+            "count": 24
+          },
+          {
+            "phrase": "results",
+            "count": 22
+          },
+          {
+            "phrase": "model",
+            "count": 22
+          },
+          {
+            "phrase": "methods",
+            "count": 21
+          },
+          {
+            "phrase": "svd-llm",
+            "count": 21
+          },
+          {
+            "phrase": "svd",
+            "count": 21
+          },
+          {
+            "phrase": "models",
+            "count": 20
+          },
+          {
+            "phrase": "why",
+            "count": 16
+          },
+          {
+            "phrase": "quantization",
+            "count": 16
+          },
+          {
+            "phrase": "comparison",
+            "count": 15
+          },
+          {
+            "phrase": "e.g.",
+            "count": 14
+          },
+          {
+            "phrase": "experiments",
+            "count": 14
+          },
+          {
+            "phrase": "compare",
+            "count": 14
+          },
+          {
+            "phrase": "work",
+            "count": 13
+          },
+          {
+            "phrase": "also",
+            "count": 13
+          },
+          {
+            "phrase": "like",
+            "count": 11
+          }
+        ],
+        "top_bigrams": [
+          {
+            "phrase": "compression ratios",
+            "count": 7
+          },
+          {
+            "phrase": "basis sharing",
+            "count": 7
+          },
+          {
+            "phrase": "svd-llm basis",
+            "count": 6
+          },
+          {
+            "phrase": "compare against",
+            "count": 5
+          },
+          {
+            "phrase": "compression ratio",
+            "count": 5
+          },
+          {
+            "phrase": "residual compensation",
+            "count": 5
+          },
+          {
+            "phrase": "pruning methods",
+            "count": 4
+          },
+          {
+            "phrase": "compression rate",
+            "count": 4
+          },
+          {
+            "phrase": "structured pruning",
+            "count": 4
+          },
+          {
+            "phrase": "large language",
+            "count": 4
+          },
+          {
+            "phrase": "prior work",
+            "count": 4
+          },
+          {
+            "phrase": "model compression",
+            "count": 4
+          },
+          {
+            "phrase": "language models",
+            "count": 4
+          },
+          {
+            "phrase": "llm compression",
+            "count": 4
+          },
+          {
+            "phrase": "unclear why",
+            "count": 4
+          },
+          {
+            "phrase": "svd truncation",
+            "count": 4
+          }
+        ],
+        "top_trigrams": [
+          {
+            "phrase": "svd-llm basis sharing",
+            "count": 6
+          },
+          {
+            "phrase": "arxiv preprint arxiv",
+            "count": 3
+          },
+          {
+            "phrase": "large language models",
+            "count": 3
+          },
+          {
+            "phrase": "svd-based llm compression",
+            "count": 3
+          },
+          {
+            "phrase": "svd-llm svd-llm basis",
+            "count": 3
+          },
+          {
+            "phrase": "over prior work",
+            "count": 2
+          },
+          {
+            "phrase": "best pruning methods",
+            "count": 2
+          },
+          {
+            "phrase": "post training quantization",
+            "count": 2
+          },
+          {
+            "phrase": "low rank low",
+            "count": 2
+          },
+          {
+            "phrase": "rank low precision",
+            "count": 2
+          },
+          {
+            "phrase": "standardized accuracy alone",
+            "count": 2
+          },
+          {
+            "phrase": "popular llm architectures",
+            "count": 2
+          }
+        ]
+      },
+      "trigger_counts": [
+        {
+          "key": "comparison_terms",
+          "label": "comparison request",
+          "count": 15
+        },
+        {
+          "key": "baseline_terms",
+          "label": "baseline(s)",
+          "count": 13
+        },
+        {
+          "key": "pruning_baselines",
+          "label": "pruning / strong baseline names",
+          "count": 8
+        },
+        {
+          "key": "missing_comparison",
+          "label": "missing comparison",
+          "count": 4
+        },
+        {
+          "key": "omitted_baseline",
+          "label": "omitted baseline",
+          "count": 1
+        }
+      ],
+      "matched_note_refs": [
+        {
+          "note_ref": "ASVD::HyPofygOCT::ySHApj3S17::reviewer_comment::15",
+          "paper_requested": "ASVD",
+          "forum_id": "HyPofygOCT",
+          "note_type": "reviewer_comment",
+          "note_number": 15,
+          "matched_triggers": [
+            "comparison_terms",
+            "pruning_baselines"
+          ]
+        },
+        {
+          "note_ref": "SVD-LLM v1::LNYIUouhdt::gkMfvMDkA1::official_review::3",
+          "paper_requested": "SVD-LLM v1",
+          "forum_id": "LNYIUouhdt",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "comparison_terms",
+            "missing_comparison",
+            "pruning_baselines"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::TCptBQxpYG::official_review::1",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms",
+            "missing_comparison",
+            "pruning_baselines"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::SJeudcbyVK::official_review::5",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "official_review",
+          "note_number": 5,
+          "matched_triggers": [
+            "baseline_terms",
+            "pruning_baselines"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::SMCqPaoMUF::reviewer_comment::20",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "reviewer_comment",
+          "note_number": 20,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::IdHQ7IqNYs::reviewer_comment::35",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "reviewer_comment",
+          "note_number": 35,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::BRLnO71OCC::official_review::1",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "comparison_terms",
+            "pruning_baselines"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::W5gyHz0vOA::official_review::3",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::xwq7XDcZdU::official_review::4",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms"
+          ]
+        },
+        {
+          "note_ref": "AA-SVD::fIpDd5UlFP::SgWUufKV6I::official_review::2",
+          "paper_requested": "AA-SVD",
+          "forum_id": "fIpDd5UlFP",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms",
+            "omitted_baseline"
+          ]
+        },
+        {
+          "note_ref": "DF-SVD::TuzsCiHocG::p9sKd7wXF7::official_review::1",
+          "paper_requested": "DF-SVD",
+          "forum_id": "TuzsCiHocG",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "comparison_terms",
+            "missing_comparison",
+            "pruning_baselines"
+          ]
+        },
+        {
+          "note_ref": "Res-SVD::WL4qCY0nBk::FGRPz63Qlk::official_review::2",
+          "paper_requested": "Res-SVD",
+          "forum_id": "WL4qCY0nBk",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms"
+          ]
+        },
+        {
+          "note_ref": "Res-SVD::WL4qCY0nBk::1M9xfcmofs::official_review::3",
+          "paper_requested": "Res-SVD",
+          "forum_id": "WL4qCY0nBk",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms",
+            "pruning_baselines"
+          ]
+        },
+        {
+          "note_ref": "Res-SVD::WL4qCY0nBk::QuycRoYLE4::official_review::4",
+          "paper_requested": "Res-SVD",
+          "forum_id": "WL4qCY0nBk",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms",
+            "missing_comparison"
+          ]
+        },
+        {
+          "note_ref": "MoDeGPT::8EfxjTCg2k::rJ2rfXKAAO::official_review::4",
+          "paper_requested": "MoDeGPT",
+          "forum_id": "8EfxjTCg2k",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms"
+          ]
+        },
+        {
+          "note_ref": "GFWSVD::zCe1Vh844h::k0SUdAnY8h::official_review::1",
+          "paper_requested": "GFWSVD",
+          "forum_id": "zCe1Vh844h",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "baseline_terms",
+            "pruning_baselines"
+          ]
+        },
+        {
+          "note_ref": "GFWSVD::zCe1Vh844h::57NcoPmAsB::reviewer_comment::9",
+          "paper_requested": "GFWSVD",
+          "forum_id": "zCe1Vh844h",
+          "note_type": "reviewer_comment",
+          "note_number": 9,
+          "matched_triggers": [
+            "baseline_terms",
+            "comparison_terms"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "budget_definitions",
+      "label": "Inconsistent budget definitions",
+      "description": "Reviewer concerns about fairness or semantics of compression ratios, rank budgets, or token/sample accounting.",
+      "paper_count": 9,
+      "paper_percent": 75.0,
+      "papers": [
+        "AA-SVD",
+        "ASVD",
+        "D-Rank",
+        "Dobi-SVD",
+        "GFWSVD",
+        "MoDeGPT",
+        "Res-SVD",
+        "SAES-SVD",
+        "SVD-LLM v1"
+      ],
+      "review_count": 13,
+      "review_percent": 17.105263157894736,
+      "top_keywords": {
+        "top_unigrams": [
+          {
+            "phrase": "compression",
+            "count": 48
+          },
+          {
+            "phrase": "svd",
+            "count": 19
+          },
+          {
+            "phrase": "results",
+            "count": 18
+          },
+          {
+            "phrase": "svd-llm",
+            "count": 15
+          },
+          {
+            "phrase": "method",
+            "count": 15
+          },
+          {
+            "phrase": "rank",
+            "count": 14
+          },
+          {
+            "phrase": "why",
+            "count": 14
+          },
+          {
+            "phrase": "table",
+            "count": 13
+          },
+          {
+            "phrase": "model",
+            "count": 12
+          },
+          {
+            "phrase": "layers",
+            "count": 12
+          },
+          {
+            "phrase": "has",
+            "count": 10
+          },
+          {
+            "phrase": "like",
+            "count": 10
+          },
+          {
+            "phrase": "models",
+            "count": 10
+          },
+          {
+            "phrase": "methods",
+            "count": 10
+          },
+          {
+            "phrase": "authors",
+            "count": 9
+          },
+          {
+            "phrase": "matrix",
+            "count": 8
+          },
+          {
+            "phrase": "section",
+            "count": 8
+          },
+          {
+            "phrase": "experiments",
+            "count": 8
+          }
+        ],
+        "top_bigrams": [
+          {
+            "phrase": "compression rate",
+            "count": 7
+          },
+          {
+            "phrase": "compression ratios",
+            "count": 7
+          },
+          {
+            "phrase": "basis sharing",
+            "count": 6
+          },
+          {
+            "phrase": "compression ratio",
+            "count": 5
+          },
+          {
+            "phrase": "compare against",
+            "count": 4
+          },
+          {
+            "phrase": "svd-llm basis",
+            "count": 4
+          },
+          {
+            "phrase": "residual compensation",
+            "count": 4
+          },
+          {
+            "phrase": "https openreview.net",
+            "count": 4
+          },
+          {
+            "phrase": "openreview.net pdf",
+            "count": 4
+          },
+          {
+            "phrase": "svd truncation",
+            "count": 4
+          },
+          {
+            "phrase": "pruning methods",
+            "count": 3
+          },
+          {
+            "phrase": "higher compression",
+            "count": 3
+          },
+          {
+            "phrase": "same compression",
+            "count": 3
+          },
+          {
+            "phrase": "spectral entropy",
+            "count": 3
+          },
+          {
+            "phrase": "asvd svd-llm",
+            "count": 3
+          },
+          {
+            "phrase": "unclear why",
+            "count": 3
+          }
+        ],
+        "top_trigrams": [
+          {
+            "phrase": "svd-llm basis sharing",
+            "count": 4
+          },
+          {
+            "phrase": "https openreview.net pdf",
+            "count": 4
+          },
+          {
+            "phrase": "best pruning methods",
+            "count": 2
+          },
+          {
+            "phrase": "statistics collection aces",
+            "count": 2
+          },
+          {
+            "phrase": "collection aces optimization",
+            "count": 2
+          },
+          {
+            "phrase": "svd-based compression methods",
+            "count": 2
+          },
+          {
+            "phrase": "limited novelty. core",
+            "count": 2
+          },
+          {
+            "phrase": "novelty. core contribution",
+            "count": 2
+          },
+          {
+            "phrase": "why spectral entropy",
+            "count": 2
+          },
+          {
+            "phrase": "asvd svd-llm basis",
+            "count": 2
+          },
+          {
+            "phrase": "basis sharing d-rank",
+            "count": 2
+          },
+          {
+            "phrase": "per-layer compression ratios",
+            "count": 2
+          }
+        ]
+      },
+      "trigger_counts": [
+        {
+          "key": "compression_metric",
+          "label": "compression ratio / rate",
+          "count": 9
+        },
+        {
+          "key": "fairness",
+          "label": "fairness / apples-to-oranges",
+          "count": 4
+        },
+        {
+          "key": "definition",
+          "label": "ratio / rate definition",
+          "count": 3
+        },
+        {
+          "key": "same_compression",
+          "label": "same compression",
+          "count": 3
+        },
+        {
+          "key": "budget_term",
+          "label": "budget",
+          "count": 3
+        },
+        {
+          "key": "token_accounting",
+          "label": "token / sample accounting",
+          "count": 2
+        },
+        {
+          "key": "rank_budget",
+          "label": "rank budget",
+          "count": 2
+        }
+      ],
+      "matched_note_refs": [
+        {
+          "note_ref": "ASVD::HyPofygOCT::JWRWWVtqTj::official_review::1",
+          "paper_requested": "ASVD",
+          "forum_id": "HyPofygOCT",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "token_accounting"
+          ]
+        },
+        {
+          "note_ref": "ASVD::HyPofygOCT::ySHApj3S17::reviewer_comment::15",
+          "paper_requested": "ASVD",
+          "forum_id": "HyPofygOCT",
+          "note_type": "reviewer_comment",
+          "note_number": 15,
+          "matched_triggers": [
+            "compression_metric",
+            "definition"
+          ]
+        },
+        {
+          "note_ref": "SVD-LLM v1::LNYIUouhdt::gHf0zwxSlh::official_review::2",
+          "paper_requested": "SVD-LLM v1",
+          "forum_id": "LNYIUouhdt",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "compression_metric",
+            "fairness"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::TCptBQxpYG::official_review::1",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "compression_metric",
+            "fairness"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::QuoxIPiI4P::official_review::2",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "compression_metric",
+            "same_compression"
+          ]
+        },
+        {
+          "note_ref": "AA-SVD::fIpDd5UlFP::F3UrRx6OMG::official_review::1",
+          "paper_requested": "AA-SVD",
+          "forum_id": "fIpDd5UlFP",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "budget_term",
+            "rank_budget"
+          ]
+        },
+        {
+          "note_ref": "AA-SVD::fIpDd5UlFP::SgWUufKV6I::official_review::2",
+          "paper_requested": "AA-SVD",
+          "forum_id": "fIpDd5UlFP",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "token_accounting"
+          ]
+        },
+        {
+          "note_ref": "D-Rank::qDQAiayjQI::IPKwyfnlPd::official_review::1",
+          "paper_requested": "D-Rank",
+          "forum_id": "qDQAiayjQI",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "fairness"
+          ]
+        },
+        {
+          "note_ref": "Res-SVD::WL4qCY0nBk::h7JHW2Z8d6::official_review::1",
+          "paper_requested": "Res-SVD",
+          "forum_id": "WL4qCY0nBk",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "budget_term",
+            "compression_metric",
+            "rank_budget"
+          ]
+        },
+        {
+          "note_ref": "Res-SVD::WL4qCY0nBk::FGRPz63Qlk::official_review::2",
+          "paper_requested": "Res-SVD",
+          "forum_id": "WL4qCY0nBk",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "budget_term",
+            "compression_metric",
+            "same_compression"
+          ]
+        },
+        {
+          "note_ref": "Res-SVD::WL4qCY0nBk::1M9xfcmofs::official_review::3",
+          "paper_requested": "Res-SVD",
+          "forum_id": "WL4qCY0nBk",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "compression_metric",
+            "definition",
+            "fairness"
+          ]
+        },
+        {
+          "note_ref": "MoDeGPT::8EfxjTCg2k::rJ2rfXKAAO::official_review::4",
+          "paper_requested": "MoDeGPT",
+          "forum_id": "8EfxjTCg2k",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "compression_metric",
+            "same_compression"
+          ]
+        },
+        {
+          "note_ref": "GFWSVD::zCe1Vh844h::knHtQk71TT::official_review::3",
+          "paper_requested": "GFWSVD",
+          "forum_id": "zCe1Vh844h",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "compression_metric",
+            "definition"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "mixed_precision_or_remap",
+      "label": "Mixed-precision / remapping confounds",
+      "description": "Reviewer concern that quantization, low-bit tricks, or remapping are mixed into what is nominally a pure low-rank comparison.",
+      "paper_count": 2,
+      "paper_percent": 16.666666666666668,
+      "papers": [
+        "Dobi-SVD",
+        "SAES-SVD"
+      ],
+      "review_count": 5,
+      "review_percent": 6.578947368421052,
+      "top_keywords": {
+        "top_unigrams": [
+          {
+            "phrase": "compression",
+            "count": 10
+          },
+          {
+            "phrase": "quantization",
+            "count": 10
+          },
+          {
+            "phrase": "model",
+            "count": 8
+          },
+          {
+            "phrase": "methods",
+            "count": 8
+          },
+          {
+            "phrase": "has",
+            "count": 7
+          },
+          {
+            "phrase": "results",
+            "count": 5
+          },
+          {
+            "phrase": "experiments",
+            "count": 5
+          },
+          {
+            "phrase": "method",
+            "count": 5
+          },
+          {
+            "phrase": "over",
+            "count": 5
+          },
+          {
+            "phrase": "compare",
+            "count": 5
+          },
+          {
+            "phrase": "against",
+            "count": 5
+          },
+          {
+            "phrase": "provide",
+            "count": 5
+          },
+          {
+            "phrase": "accuracy",
+            "count": 5
+          },
+          {
+            "phrase": "performance",
+            "count": 5
+          },
+          {
+            "phrase": "time",
+            "count": 5
+          },
+          {
+            "phrase": "gptq",
+            "count": 5
+          },
+          {
+            "phrase": "will",
+            "count": 5
+          },
+          {
+            "phrase": "truncation",
+            "count": 4
+          }
+        ],
+        "top_bigrams": [
+          {
+            "phrase": "compare against",
+            "count": 4
+          },
+          {
+            "phrase": "over wikitext2",
+            "count": 2
+          },
+          {
+            "phrase": "prior work",
+            "count": 2
+          },
+          {
+            "phrase": "random classification",
+            "count": 2
+          },
+          {
+            "phrase": "higher compression",
+            "count": 2
+          },
+          {
+            "phrase": "accuracy loss",
+            "count": 2
+          },
+          {
+            "phrase": "best pruning",
+            "count": 2
+          },
+          {
+            "phrase": "pruning methods",
+            "count": 2
+          },
+          {
+            "phrase": "pure gptq",
+            "count": 2
+          },
+          {
+            "phrase": "end-to-end experiments",
+            "count": 2
+          },
+          {
+            "phrase": "inner product",
+            "count": 2
+          },
+          {
+            "phrase": "statistics collection",
+            "count": 2
+          },
+          {
+            "phrase": "collection aces",
+            "count": 2
+          },
+          {
+            "phrase": "aces optimization",
+            "count": 2
+          },
+          {
+            "phrase": "baseline methods",
+            "count": 2
+          },
+          {
+            "phrase": "gptq awq",
+            "count": 2
+          }
+        ],
+        "top_trigrams": [
+          {
+            "phrase": "best pruning methods",
+            "count": 2
+          },
+          {
+            "phrase": "statistics collection aces",
+            "count": 2
+          },
+          {
+            "phrase": "collection aces optimization",
+            "count": 2
+          }
+        ]
+      },
+      "trigger_counts": [
+        {
+          "key": "quantization",
+          "label": "quantization",
+          "count": 5
+        },
+        {
+          "key": "low_bit",
+          "label": "4-bit / low-bit / GPTQ",
+          "count": 4
+        },
+        {
+          "key": "remap",
+          "label": "remap / remapping",
+          "count": 1
+        }
+      ],
+      "matched_note_refs": [
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::TCptBQxpYG::official_review::1",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "low_bit",
+            "quantization"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::eX9qPBrP9H::official_review::3",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "low_bit",
+            "quantization"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::2jKkT54GoC::reviewer_comment::36",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "reviewer_comment",
+          "note_number": 36,
+          "matched_triggers": [
+            "quantization",
+            "remap"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::QuoxIPiI4P::official_review::2",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "low_bit",
+            "quantization"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::xwq7XDcZdU::official_review::4",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "low_bit",
+            "quantization"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "model_or_benchmark_coverage",
+      "label": "Narrow model / benchmark coverage",
+      "description": "Reviewer requests for broader model families, larger scales, newer LLMs, or more representative benchmark coverage.",
+      "paper_count": 10,
+      "paper_percent": 83.33333333333333,
+      "papers": [
+        "AA-SVD",
+        "ASVD",
+        "AdaSVD",
+        "D-Rank",
+        "DF-SVD",
+        "Dobi-SVD",
+        "GFWSVD",
+        "Res-SVD",
+        "SAES-SVD",
+        "SVD-LLM v1"
+      ],
+      "review_count": 17,
+      "review_percent": 22.36842105263158,
+      "top_keywords": {
+        "top_unigrams": [
+          {
+            "phrase": "svd-llm",
+            "count": 31
+          },
+          {
+            "phrase": "method",
+            "count": 30
+          },
+          {
+            "phrase": "compression",
+            "count": 28
+          },
+          {
+            "phrase": "results",
+            "count": 26
+          },
+          {
+            "phrase": "models",
+            "count": 26
+          },
+          {
+            "phrase": "model",
+            "count": 25
+          },
+          {
+            "phrase": "accuracy",
+            "count": 15
+          },
+          {
+            "phrase": "svd",
+            "count": 14
+          },
+          {
+            "phrase": "experiments",
+            "count": 14
+          },
+          {
+            "phrase": "e.g.",
+            "count": 14
+          },
+          {
+            "phrase": "authors",
+            "count": 13
+          },
+          {
+            "phrase": "compare",
+            "count": 13
+          },
+          {
+            "phrase": "recent",
+            "count": 13
+          },
+          {
+            "phrase": "has",
+            "count": 12
+          },
+          {
+            "phrase": "also",
+            "count": 12
+          },
+          {
+            "phrase": "like",
+            "count": 10
+          },
+          {
+            "phrase": "work",
+            "count": 10
+          },
+          {
+            "phrase": "methods",
+            "count": 10
+          }
+        ],
+        "top_bigrams": [
+          {
+            "phrase": "basis sharing",
+            "count": 7
+          },
+          {
+            "phrase": "large language",
+            "count": 6
+          },
+          {
+            "phrase": "language model",
+            "count": 5
+          },
+          {
+            "phrase": "larger models",
+            "count": 5
+          },
+          {
+            "phrase": "model compression",
+            "count": 5
+          },
+          {
+            "phrase": "compare against",
+            "count": 5
+          },
+          {
+            "phrase": "compression methods",
+            "count": 5
+          },
+          {
+            "phrase": "llm compression",
+            "count": 5
+          },
+          {
+            "phrase": "svd-llm basis",
+            "count": 5
+          },
+          {
+            "phrase": "prior work",
+            "count": 4
+          },
+          {
+            "phrase": "svd-llm svd-llm",
+            "count": 4
+          },
+          {
+            "phrase": "svd-based llm",
+            "count": 4
+          },
+          {
+            "phrase": "experimental results",
+            "count": 3
+          },
+          {
+            "phrase": "calibration data",
+            "count": 3
+          },
+          {
+            "phrase": "standardized accuracy",
+            "count": 3
+          },
+          {
+            "phrase": "compression ratios",
+            "count": 3
+          }
+        ],
+        "top_trigrams": [
+          {
+            "phrase": "large language model",
+            "count": 5
+          },
+          {
+            "phrase": "svd-llm basis sharing",
+            "count": 5
+          },
+          {
+            "phrase": "language model compression",
+            "count": 4
+          },
+          {
+            "phrase": "svd-based llm compression",
+            "count": 4
+          },
+          {
+            "phrase": "svd-based compression methods",
+            "count": 3
+          },
+          {
+            "phrase": "svd-llm svd-llm basis",
+            "count": 3
+          },
+          {
+            "phrase": "over prior work",
+            "count": 2
+          },
+          {
+            "phrase": "include evaluations recent",
+            "count": 2
+          },
+          {
+            "phrase": "best pruning methods",
+            "count": 2
+          },
+          {
+            "phrase": "dear authors thank",
+            "count": 2
+          },
+          {
+            "phrase": "drops significant accuracy",
+            "count": 2
+          },
+          {
+            "phrase": "standardized accuracy alone",
+            "count": 2
+          }
+        ]
+      },
+      "trigger_counts": [
+        {
+          "key": "scale",
+          "label": "larger scales",
+          "count": 8
+        },
+        {
+          "key": "mmlu_term",
+          "label": "MMLU",
+          "count": 5
+        },
+        {
+          "key": "dataset_terms",
+          "label": "dataset(s)",
+          "count": 5
+        },
+        {
+          "key": "benchmark_terms",
+          "label": "benchmark(s)",
+          "count": 4
+        },
+        {
+          "key": "modern_models",
+          "label": "modern / newer models",
+          "count": 4
+        },
+        {
+          "key": "restricted_models",
+          "label": "restricted model family",
+          "count": 3
+        },
+        {
+          "key": "vlm_claims",
+          "label": "VLM / vision-language coverage",
+          "count": 2
+        },
+        {
+          "key": "evaluation_term",
+          "label": "evaluation on",
+          "count": 2
+        },
+        {
+          "key": "beyond_mmlu",
+          "label": "beyond MMLU",
+          "count": 1
+        },
+        {
+          "key": "benchmark_scope",
+          "label": "benchmark freshness",
+          "count": 1
+        },
+        {
+          "key": "architecture",
+          "label": "broader architectures",
+          "count": 1
+        },
+        {
+          "key": "limited_scope",
+          "label": "limited empirical scope",
+          "count": 1
+        }
+      ],
+      "matched_note_refs": [
+        {
+          "note_ref": "ASVD::HyPofygOCT::JWRWWVtqTj::official_review::1",
+          "paper_requested": "ASVD",
+          "forum_id": "HyPofygOCT",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "beyond_mmlu",
+            "mmlu_term"
+          ]
+        },
+        {
+          "note_ref": "ASVD::HyPofygOCT::Jv2Xns64nR::official_review::2",
+          "paper_requested": "ASVD",
+          "forum_id": "HyPofygOCT",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "dataset_terms",
+            "mmlu_term",
+            "restricted_models"
+          ]
+        },
+        {
+          "note_ref": "SVD-LLM v1::LNYIUouhdt::gHf0zwxSlh::official_review::2",
+          "paper_requested": "SVD-LLM v1",
+          "forum_id": "LNYIUouhdt",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "scale"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::TCptBQxpYG::official_review::1",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "dataset_terms",
+            "mmlu_term"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::6wj5kOBq4q::reviewer_comment::26",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "reviewer_comment",
+          "note_number": 26,
+          "matched_triggers": [
+            "benchmark_terms",
+            "mmlu_term",
+            "vlm_claims"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::IdHQ7IqNYs::reviewer_comment::35",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "reviewer_comment",
+          "note_number": 35,
+          "matched_triggers": [
+            "benchmark_terms",
+            "scale"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::xwq7XDcZdU::official_review::4",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "benchmark_scope",
+            "benchmark_terms",
+            "dataset_terms",
+            "modern_models",
+            "scale"
+          ]
+        },
+        {
+          "note_ref": "AdaSVD::ey7CXUBn1g::ouiGbOnPOj::official_review::2",
+          "paper_requested": "AdaSVD",
+          "forum_id": "ey7CXUBn1g",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "evaluation_term",
+            "modern_models"
+          ]
+        },
+        {
+          "note_ref": "AdaSVD::ey7CXUBn1g::TwdjmY2z68::official_review::3",
+          "paper_requested": "AdaSVD",
+          "forum_id": "ey7CXUBn1g",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "scale"
+          ]
+        },
+        {
+          "note_ref": "AA-SVD::fIpDd5UlFP::F3UrRx6OMG::official_review::1",
+          "paper_requested": "AA-SVD",
+          "forum_id": "fIpDd5UlFP",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "architecture",
+            "limited_scope",
+            "modern_models",
+            "restricted_models"
+          ]
+        },
+        {
+          "note_ref": "AA-SVD::fIpDd5UlFP::SgWUufKV6I::official_review::2",
+          "paper_requested": "AA-SVD",
+          "forum_id": "fIpDd5UlFP",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "restricted_models",
+            "scale",
+            "vlm_claims"
+          ]
+        },
+        {
+          "note_ref": "AA-SVD::fIpDd5UlFP::jRfxKvrJZ3::official_review::4",
+          "paper_requested": "AA-SVD",
+          "forum_id": "fIpDd5UlFP",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "dataset_terms",
+            "evaluation_term"
+          ]
+        },
+        {
+          "note_ref": "D-Rank::qDQAiayjQI::g39h71sABp::official_review::2",
+          "paper_requested": "D-Rank",
+          "forum_id": "qDQAiayjQI",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "scale"
+          ]
+        },
+        {
+          "note_ref": "DF-SVD::TuzsCiHocG::oaH097o42P::official_review::3",
+          "paper_requested": "DF-SVD",
+          "forum_id": "TuzsCiHocG",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "scale"
+          ]
+        },
+        {
+          "note_ref": "Res-SVD::WL4qCY0nBk::QuycRoYLE4::official_review::4",
+          "paper_requested": "Res-SVD",
+          "forum_id": "WL4qCY0nBk",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "scale"
+          ]
+        },
+        {
+          "note_ref": "GFWSVD::zCe1Vh844h::k0SUdAnY8h::official_review::1",
+          "paper_requested": "GFWSVD",
+          "forum_id": "zCe1Vh844h",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "modern_models"
+          ]
+        },
+        {
+          "note_ref": "GFWSVD::zCe1Vh844h::57NcoPmAsB::reviewer_comment::9",
+          "paper_requested": "GFWSVD",
+          "forum_id": "zCe1Vh844h",
+          "note_type": "reviewer_comment",
+          "note_number": 9,
+          "matched_triggers": [
+            "benchmark_terms",
+            "dataset_terms",
+            "mmlu_term"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "end_to_end_speed",
+      "label": "Non-end-to-end speed reporting",
+      "description": "Reviewer concerns that throughput, latency, or speedup claims are not reported end-to-end or are compared under mismatched hardware/runtime settings.",
+      "paper_count": 9,
+      "paper_percent": 75.0,
+      "papers": [
+        "AA-SVD",
+        "AdaSVD",
+        "Basis Sharing",
+        "D-Rank",
+        "Dobi-SVD",
+        "GFWSVD",
+        "MoDeGPT",
+        "SAES-SVD",
+        "SVD-LLM v1"
+      ],
+      "review_count": 16,
+      "review_percent": 21.05263157894737,
+      "top_keywords": {
+        "top_unigrams": [
+          {
+            "phrase": "compression",
+            "count": 33
+          },
+          {
+            "phrase": "model",
+            "count": 21
+          },
+          {
+            "phrase": "method",
+            "count": 20
+          },
+          {
+            "phrase": "memory",
+            "count": 20
+          },
+          {
+            "phrase": "methods",
+            "count": 20
+          },
+          {
+            "phrase": "svd-llm",
+            "count": 19
+          },
+          {
+            "phrase": "time",
+            "count": 17
+          },
+          {
+            "phrase": "svd",
+            "count": 17
+          },
+          {
+            "phrase": "rank",
+            "count": 16
+          },
+          {
+            "phrase": "drone",
+            "count": 15
+          },
+          {
+            "phrase": "quantization",
+            "count": 15
+          },
+          {
+            "phrase": "experiments",
+            "count": 14
+          },
+          {
+            "phrase": "like",
+            "count": 13
+          },
+          {
+            "phrase": "also",
+            "count": 13
+          },
+          {
+            "phrase": "see",
+            "count": 13
+          },
+          {
+            "phrase": "e.g.",
+            "count": 13
+          },
+          {
+            "phrase": "accuracy",
+            "count": 13
+          },
+          {
+            "phrase": "performance",
+            "count": 12
+          }
+        ],
+        "top_bigrams": [
+          {
+            "phrase": "memory usage",
+            "count": 10
+          },
+          {
+            "phrase": "time complexity",
+            "count": 8
+          },
+          {
+            "phrase": "complexity memory",
+            "count": 7
+          },
+          {
+            "phrase": "usage numerical",
+            "count": 6
+          },
+          {
+            "phrase": "model compression",
+            "count": 4
+          },
+          {
+            "phrase": "numerical stability",
+            "count": 4
+          },
+          {
+            "phrase": "proposed method",
+            "count": 4
+          },
+          {
+            "phrase": "compression rate",
+            "count": 4
+          },
+          {
+            "phrase": "contributions time",
+            "count": 3
+          },
+          {
+            "phrase": "compare against",
+            "count": 3
+          },
+          {
+            "phrase": "pruning methods",
+            "count": 3
+          },
+          {
+            "phrase": "remains unclear",
+            "count": 3
+          },
+          {
+            "phrase": "basis sharing",
+            "count": 3
+          },
+          {
+            "phrase": "layer-sharing svd",
+            "count": 3
+          },
+          {
+            "phrase": "effective rank",
+            "count": 3
+          },
+          {
+            "phrase": "extra finetuning",
+            "count": 2
+          }
+        ],
+        "top_trigrams": [
+          {
+            "phrase": "time complexity memory",
+            "count": 7
+          },
+          {
+            "phrase": "complexity memory usage",
+            "count": 7
+          },
+          {
+            "phrase": "memory usage numerical",
+            "count": 6
+          },
+          {
+            "phrase": "usage numerical stability",
+            "count": 4
+          },
+          {
+            "phrase": "contributions time complexity",
+            "count": 3
+          },
+          {
+            "phrase": "sincerely yours reviewer",
+            "count": 2
+          },
+          {
+            "phrase": "yours reviewer 3pxg",
+            "count": 2
+          },
+          {
+            "phrase": "model compression literature",
+            "count": 2
+          },
+          {
+            "phrase": "best pruning methods",
+            "count": 2
+          },
+          {
+            "phrase": "drops significant accuracy",
+            "count": 2
+          },
+          {
+            "phrase": "statistics collection aces",
+            "count": 2
+          },
+          {
+            "phrase": "collection aces optimization",
+            "count": 2
+          }
+        ]
+      },
+      "trigger_counts": [
+        {
+          "key": "throughput",
+          "label": "throughput",
+          "count": 7
+        },
+        {
+          "key": "latency",
+          "label": "latency",
+          "count": 5
+        },
+        {
+          "key": "end_to_end",
+          "label": "end-to-end",
+          "count": 5
+        },
+        {
+          "key": "gpu",
+          "label": "GPU-specific comparison",
+          "count": 4
+        },
+        {
+          "key": "time_complexity",
+          "label": "time complexity",
+          "count": 3
+        },
+        {
+          "key": "speedups",
+          "label": "speedup(s)",
+          "count": 3
+        },
+        {
+          "key": "cost_analysis",
+          "label": "cost / overhead analysis",
+          "count": 2
+        },
+        {
+          "key": "inference_time",
+          "label": "inference time",
+          "count": 2
+        },
+        {
+          "key": "ram_offload",
+          "label": "RAM offloading caveat",
+          "count": 1
+        },
+        {
+          "key": "compression_time",
+          "label": "compression time",
+          "count": 1
+        }
+      ],
+      "matched_note_refs": [
+        {
+          "note_ref": "SVD-LLM v1::LNYIUouhdt::gHf0zwxSlh::official_review::2",
+          "paper_requested": "SVD-LLM v1",
+          "forum_id": "LNYIUouhdt",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "throughput"
+          ]
+        },
+        {
+          "note_ref": "SVD-LLM v1::LNYIUouhdt::JhUq0jDgsY::reviewer_comment::33",
+          "paper_requested": "SVD-LLM v1",
+          "forum_id": "LNYIUouhdt",
+          "note_type": "reviewer_comment",
+          "note_number": 33,
+          "matched_triggers": [
+            "gpu",
+            "time_complexity"
+          ]
+        },
+        {
+          "note_ref": "SVD-LLM v1::LNYIUouhdt::d7GajfWI3y::reviewer_comment::37",
+          "paper_requested": "SVD-LLM v1",
+          "forum_id": "LNYIUouhdt",
+          "note_type": "reviewer_comment",
+          "note_number": 37,
+          "matched_triggers": [
+            "time_complexity"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::TCptBQxpYG::official_review::1",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "gpu",
+            "ram_offload",
+            "speedups"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::SMCqPaoMUF::reviewer_comment::20",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "reviewer_comment",
+          "note_number": 20,
+          "matched_triggers": [
+            "latency",
+            "speedups"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::6wj5kOBq4q::reviewer_comment::26",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "reviewer_comment",
+          "note_number": 26,
+          "matched_triggers": [
+            "latency",
+            "speedups",
+            "throughput"
+          ]
+        },
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::2jKkT54GoC::reviewer_comment::36",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "reviewer_comment",
+          "note_number": 36,
+          "matched_triggers": [
+            "end_to_end"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::QuoxIPiI4P::official_review::2",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "compression_time",
+            "cost_analysis"
+          ]
+        },
+        {
+          "note_ref": "Basis Sharing::gp32jvUquq::9lSNw3z5Uy::official_review::3",
+          "paper_requested": "Basis Sharing",
+          "forum_id": "gp32jvUquq",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "throughput"
+          ]
+        },
+        {
+          "note_ref": "Basis Sharing::gp32jvUquq::B0N9otCxMq::official_review::4",
+          "paper_requested": "Basis Sharing",
+          "forum_id": "gp32jvUquq",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "inference_time",
+            "throughput"
+          ]
+        },
+        {
+          "note_ref": "AdaSVD::ey7CXUBn1g::wWWKwCEJ02::official_review::4",
+          "paper_requested": "AdaSVD",
+          "forum_id": "ey7CXUBn1g",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "latency"
+          ]
+        },
+        {
+          "note_ref": "AA-SVD::fIpDd5UlFP::F3UrRx6OMG::official_review::1",
+          "paper_requested": "AA-SVD",
+          "forum_id": "fIpDd5UlFP",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "cost_analysis",
+            "end_to_end",
+            "latency",
+            "throughput"
+          ]
+        },
+        {
+          "note_ref": "D-Rank::qDQAiayjQI::1IA3eR5nhm::official_review::3",
+          "paper_requested": "D-Rank",
+          "forum_id": "qDQAiayjQI",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "end_to_end",
+            "gpu",
+            "inference_time",
+            "throughput"
+          ]
+        },
+        {
+          "note_ref": "MoDeGPT::8EfxjTCg2k::Vrs3l0rNI0::official_review::3",
+          "paper_requested": "MoDeGPT",
+          "forum_id": "8EfxjTCg2k",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "gpu",
+            "throughput"
+          ]
+        },
+        {
+          "note_ref": "GFWSVD::zCe1Vh844h::knHtQk71TT::official_review::3",
+          "paper_requested": "GFWSVD",
+          "forum_id": "zCe1Vh844h",
+          "note_type": "official_review",
+          "note_number": 3,
+          "matched_triggers": [
+            "end_to_end"
+          ]
+        },
+        {
+          "note_ref": "GFWSVD::zCe1Vh844h::s0MUSX1vpt::official_review::4",
+          "paper_requested": "GFWSVD",
+          "forum_id": "zCe1Vh844h",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "end_to_end",
+            "latency",
+            "time_complexity"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "reproducibility_or_artifacts",
+      "label": "High reproduction cost / missing artifacts",
+      "description": "Reviewer signals that reproducing the method is hard because setup details, artifacts, or implementation specifics are missing.",
+      "paper_count": 3,
+      "paper_percent": 25.0,
+      "papers": [
+        "Dobi-SVD",
+        "GFWSVD",
+        "SAES-SVD"
+      ],
+      "review_count": 4,
+      "review_percent": 5.2631578947368425,
+      "top_keywords": {
+        "top_unigrams": [
+          {
+            "phrase": "model",
+            "count": 8
+          },
+          {
+            "phrase": "experiments",
+            "count": 7
+          },
+          {
+            "phrase": "compression",
+            "count": 7
+          },
+          {
+            "phrase": "has",
+            "count": 6
+          },
+          {
+            "phrase": "used",
+            "count": 6
+          },
+          {
+            "phrase": "matrices",
+            "count": 6
+          },
+          {
+            "phrase": "already",
+            "count": 5
+          },
+          {
+            "phrase": "results",
+            "count": 5
+          },
+          {
+            "phrase": "method",
+            "count": 5
+          },
+          {
+            "phrase": "over",
+            "count": 5
+          },
+          {
+            "phrase": "against",
+            "count": 5
+          },
+          {
+            "phrase": "table",
+            "count": 5
+          },
+          {
+            "phrase": "see",
+            "count": 4
+          },
+          {
+            "phrase": "e.g.",
+            "count": 4
+          },
+          {
+            "phrase": "bit",
+            "count": 4
+          },
+          {
+            "phrase": "questions",
+            "count": 4
+          },
+          {
+            "phrase": "models",
+            "count": 4
+          },
+          {
+            "phrase": "compare",
+            "count": 4
+          }
+        ],
+        "top_bigrams": [
+          {
+            "phrase": "compare against",
+            "count": 4
+          },
+          {
+            "phrase": "over wikitext2",
+            "count": 2
+          },
+          {
+            "phrase": "prior work",
+            "count": 2
+          },
+          {
+            "phrase": "random classification",
+            "count": 2
+          },
+          {
+            "phrase": "best pruning",
+            "count": 2
+          },
+          {
+            "phrase": "pruning methods",
+            "count": 2
+          },
+          {
+            "phrase": "already imply",
+            "count": 2
+          },
+          {
+            "phrase": "few matrices",
+            "count": 2
+          },
+          {
+            "phrase": "fisher information",
+            "count": 2
+          },
+          {
+            "phrase": "used experiments",
+            "count": 2
+          },
+          {
+            "phrase": "existing works",
+            "count": 2
+          }
+        ],
+        "top_trigrams": [
+          {
+            "phrase": "best pruning methods",
+            "count": 2
+          }
+        ]
+      },
+      "trigger_counts": [
+        {
+          "key": "artifacts",
+          "label": "code / release / reproducibility",
+          "count": 2
+        },
+        {
+          "key": "appendix_details",
+          "label": "buried setup details",
+          "count": 1
+        },
+        {
+          "key": "missing_details",
+          "label": "missing key details",
+          "count": 1
+        }
+      ],
+      "matched_note_refs": [
+        {
+          "note_ref": "Dobi-SVD::kws76i5XB8::TCptBQxpYG::official_review::1",
+          "paper_requested": "Dobi-SVD",
+          "forum_id": "kws76i5XB8",
+          "note_type": "official_review",
+          "note_number": 1,
+          "matched_triggers": [
+            "appendix_details"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::xwq7XDcZdU::official_review::4",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "official_review",
+          "note_number": 4,
+          "matched_triggers": [
+            "artifacts"
+          ]
+        },
+        {
+          "note_ref": "SAES-SVD::KMAYsQO8pU::lw0kyeatol::reviewer_comment::22",
+          "paper_requested": "SAES-SVD",
+          "forum_id": "KMAYsQO8pU",
+          "note_type": "reviewer_comment",
+          "note_number": 22,
+          "matched_triggers": [
+            "artifacts"
+          ]
+        },
+        {
+          "note_ref": "GFWSVD::zCe1Vh844h::9VJKtow2IE::official_review::2",
+          "paper_requested": "GFWSVD",
+          "forum_id": "zCe1Vh844h",
+          "note_type": "official_review",
+          "note_number": 2,
+          "matched_triggers": [
+            "missing_details"
+          ]
+        }
+      ]
+    }
+  ],
+  "supplemental_themes": [
+    {
+      "key": "novelty_or_incremental_delta",
+      "label": "Limited novelty / incremental delta",
+      "description": "Reviewers questioning whether the claimed contribution is sufficiently novel.",
+      "paper_count": 6,
+      "paper_percent": 50.0,
+      "papers": [
+        "AdaSVD",
+        "D-Rank",
+        "DF-SVD",
+        "Dobi-SVD",
+        "Res-SVD",
+        "SVD-LLM v1"
+      ],
+      "review_count": 13,
+      "review_percent": 17.105263157894736,
+      "top_keywords": {
+        "top_unigrams": [
+          {
+            "phrase": "compression",
+            "count": 30
+          },
+          {
+            "phrase": "rank",
+            "count": 24
+          },
+          {
+            "phrase": "authors",
+            "count": 22
+          },
+          {
+            "phrase": "svd-llm",
+            "count": 22
+          },
+          {
+            "phrase": "method",
+            "count": 21
+          },
+          {
+            "phrase": "model",
+            "count": 17
+          },
+          {
+            "phrase": "work",
+            "count": 15
+          },
+          {
+            "phrase": "svd",
+            "count": 15
+          },
+          {
+            "phrase": "models",
+            "count": 15
+          },
+          {
+            "phrase": "results",
+            "count": 14
+          },
+          {
+            "phrase": "allocation",
+            "count": 13
+          },
+          {
+            "phrase": "has",
+            "count": 12
+          },
+          {
+            "phrase": "layers",
+            "count": 12
+          },
+          {
+            "phrase": "matrix",
+            "count": 11
+          },
+          {
+            "phrase": "methods",
+            "count": 11
+          },
+          {
+            "phrase": "performance",
+            "count": 11
+          },
+          {
+            "phrase": "without",
+            "count": 11
+          },
+          {
+            "phrase": "like",
+            "count": 11
+          }
+        ],
+        "top_bigrams": [
+          {
+            "phrase": "memory usage",
+            "count": 7
+          },
+          {
+            "phrase": "rank allocation",
+            "count": 7
+          },
+          {
+            "phrase": "compression ratio",
+            "count": 6
+          },
+          {
+            "phrase": "weight matrix",
+            "count": 5
+          },
+          {
+            "phrase": "time complexity",
+            "count": 5
+          },
+          {
+            "phrase": "complexity memory",
+            "count": 5
+          },
+          {
+            "phrase": "effective rank",
+            "count": 5
+          },
+          {
+            "phrase": "singular value",
+            "count": 4
+          },
+          {
+            "phrase": "arxiv preprint",
+            "count": 4
+          },
+          {
+            "phrase": "preprint arxiv",
+            "count": 4
+          },
+          {
+            "phrase": "model compression",
+            "count": 4
+          },
+          {
+            "phrase": "usage numerical",
+            "count": 4
+          },
+          {
+            "phrase": "numerical stability",
+            "count": 4
+          },
+          {
+            "phrase": "compare against",
+            "count": 4
+          },
+          {
+            "phrase": "language models",
+            "count": 4
+          },
+          {
+            "phrase": "limited novelty.",
+            "count": 4
+          }
+        ],
+        "top_trigrams": [
+          {
+            "phrase": "time complexity memory",
+            "count": 5
+          },
+          {
+            "phrase": "complexity memory usage",
+            "count": 5
+          },
+          {
+            "phrase": "arxiv preprint arxiv",
+            "count": 4
+          },
+          {
+            "phrase": "memory usage numerical",
+            "count": 4
+          },
+          {
+            "phrase": "usage numerical stability",
+            "count": 4
+          },
+          {
+            "phrase": "contributions time complexity",
+            "count": 3
+          },
+          {
+            "phrase": "compression ratio allocation",
+            "count": 3
+          },
+          {
+            "phrase": "svd-llm basis sharing",
+            "count": 3
+          },
+          {
+            "phrase": "advances neural information",
+            "count": 2
+          },
+          {
+            "phrase": "neural information processing",
+            "count": 2
+          },
+          {
+            "phrase": "information processing systems",
+            "count": 2
+          },
+          {
+            "phrase": "model compression literature",
+            "count": 2
+          }
+        ]
+      },
+      "trigger_counts": [
+        {
+          "key": "limited_novelty",
+          "label": "limited novelty",
+          "count": 5
+        },
+        {
+          "key": "incremental",
+          "label": "incremental",
+          "count": 4
+        },
+        {
+          "key": "straightforward",
+          "label": "straightforward / simple extension",
+          "count": 3
+        },
+        {
+          "key": "not_new",
+          "label": "not new",
+          "count": 2
+        },
+        {
+          "key": "overstates_novelty",
+          "label": "overstates novelty",
+          "count": 1
+        },
+        {
+          "key": "overlap",
+          "label": "overlap with prior work",
+          "count": 1
+        },
+        {
+          "key": "core_not_new",
+          "label": "core contribution not new",
+          "count": 1
+        },
+        {
+          "key": "heavily_builds_on",
+          "label": "heavily builds on prior work",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "key": "ablation_or_sensitivity_gaps",
+      "label": "Missing ablations / sensitivity analysis",
+      "description": "Requests for ablations, sensitivity analysis, robustness checks, or stronger validation.",
+      "paper_count": 9,
+      "paper_percent": 75.0,
+      "papers": [
+        "AA-SVD",
+        "ASVD",
+        "Basis Sharing",
+        "D-Rank",
+        "DF-SVD",
+        "GFWSVD",
+        "Res-SVD",
+        "SAES-SVD",
+        "SVD-LLM v1"
+      ],
+      "review_count": 15,
+      "review_percent": 19.736842105263158,
+      "top_keywords": {
+        "top_unigrams": [
+          {
+            "phrase": "compression",
+            "count": 39
+          },
+          {
+            "phrase": "svd-llm",
+            "count": 25
+          },
+          {
+            "phrase": "rank",
+            "count": 20
+          },
+          {
+            "phrase": "svd",
+            "count": 17
+          },
+          {
+            "phrase": "theoretical",
+            "count": 15
+          },
+          {
+            "phrase": "pruning",
+            "count": 13
+          },
+          {
+            "phrase": "experiments",
+            "count": 13
+          },
+          {
+            "phrase": "model",
+            "count": 13
+          },
+          {
+            "phrase": "methods",
+            "count": 12
+          },
+          {
+            "phrase": "method",
+            "count": 12
+          },
+          {
+            "phrase": "e.g.",
+            "count": 12
+          },
+          {
+            "phrase": "layers",
+            "count": 11
+          },
+          {
+            "phrase": "also",
+            "count": 10
+          },
+          {
+            "phrase": "authors",
+            "count": 10
+          },
+          {
+            "phrase": "performance",
+            "count": 10
+          },
+          {
+            "phrase": "llm",
+            "count": 9
+          },
+          {
+            "phrase": "asvd",
+            "count": 9
+          },
+          {
+            "phrase": "ratios",
+            "count": 9
+          }
+        ],
+        "top_bigrams": [
+          {
+            "phrase": "compression ratios",
+            "count": 8
+          },
+          {
+            "phrase": "compression rate",
+            "count": 5
+          },
+          {
+            "phrase": "basis sharing",
+            "count": 5
+          },
+          {
+            "phrase": "compression ratio",
+            "count": 5
+          },
+          {
+            "phrase": "residual compensation",
+            "count": 4
+          },
+          {
+            "phrase": "https openreview.net",
+            "count": 4
+          },
+          {
+            "phrase": "openreview.net pdf",
+            "count": 4
+          },
+          {
+            "phrase": "svd truncation",
+            "count": 4
+          },
+          {
+            "phrase": "methods like",
+            "count": 3
+          },
+          {
+            "phrase": "truncation rank",
+            "count": 3
+          },
+          {
+            "phrase": "large language",
+            "count": 3
+          },
+          {
+            "phrase": "llm compression",
+            "count": 3
+          },
+          {
+            "phrase": "language models",
+            "count": 3
+          },
+          {
+            "phrase": "theoretical justification",
+            "count": 3
+          },
+          {
+            "phrase": "across different",
+            "count": 3
+          },
+          {
+            "phrase": "rank allocation",
+            "count": 3
+          }
+        ],
+        "top_trigrams": [
+          {
+            "phrase": "https openreview.net pdf",
+            "count": 4
+          },
+          {
+            "phrase": "sensitivity-based truncation rank",
+            "count": 2
+          },
+          {
+            "phrase": "truncation rank search",
+            "count": 2
+          },
+          {
+            "phrase": "actual memory footprint",
+            "count": 2
+          },
+          {
+            "phrase": "memory footprint computation",
+            "count": 2
+          },
+          {
+            "phrase": "large language models.",
+            "count": 2
+          },
+          {
+            "phrase": "layerwise sparsity owl",
+            "count": 2
+          },
+          {
+            "phrase": "svd-based llm compression",
+            "count": 2
+          },
+          {
+            "phrase": "truncation-aware data whitening",
+            "count": 2
+          },
+          {
+            "phrase": "refer weaknesses. explain",
+            "count": 2
+          },
+          {
+            "phrase": "weaknesses. explain differences",
+            "count": 2
+          },
+          {
+            "phrase": "explain differences advantages",
+            "count": 2
+          }
+        ]
+      },
+      "trigger_counts": [
+        {
+          "key": "sensitivity",
+          "label": "sensitivity",
+          "count": 7
+        },
+        {
+          "key": "ablation",
+          "label": "ablation",
+          "count": 6
+        },
+        {
+          "key": "robustness",
+          "label": "robustness",
+          "count": 4
+        },
+        {
+          "key": "validation",
+          "label": "validation",
+          "count": 3
+        },
+        {
+          "key": "analyze_sensitivity",
+          "label": "analyze sensitivity",
+          "count": 1
+        },
+        {
+          "key": "evaluate_multiple",
+          "label": "evaluate multiple strategies",
+          "count": 1
+        },
+        {
+          "key": "correlation",
+          "label": "correlation check",
+          "count": 1
+        },
+        {
+          "key": "ground_truth",
+          "label": "ground-truth importance",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "key": "clarity_or_theory_explanation",
+      "label": "Clarity / theory explanation gaps",
+      "description": "Requests for clearer derivations, theoretical explanation, or better presentation.",
+      "paper_count": 12,
+      "paper_percent": 100.0,
+      "papers": [
+        "AA-SVD",
+        "ASVD",
+        "AdaSVD",
+        "Basis Sharing",
+        "D-Rank",
+        "DF-SVD",
+        "Dobi-SVD",
+        "GFWSVD",
+        "MoDeGPT",
+        "Res-SVD",
+        "SAES-SVD",
+        "SVD-LLM v1"
+      ],
+      "review_count": 28,
+      "review_percent": 36.8421052631579,
+      "top_keywords": {
+        "top_unigrams": [
+          {
+            "phrase": "compression",
+            "count": 58
+          },
+          {
+            "phrase": "svd-llm",
+            "count": 38
+          },
+          {
+            "phrase": "method",
+            "count": 35
+          },
+          {
+            "phrase": "rank",
+            "count": 32
+          },
+          {
+            "phrase": "model",
+            "count": 29
+          },
+          {
+            "phrase": "authors",
+            "count": 28
+          },
+          {
+            "phrase": "methods",
+            "count": 25
+          },
+          {
+            "phrase": "why",
+            "count": 24
+          },
+          {
+            "phrase": "results",
+            "count": 23
+          },
+          {
+            "phrase": "pruning",
+            "count": 23
+          },
+          {
+            "phrase": "svd",
+            "count": 22
+          },
+          {
+            "phrase": "table",
+            "count": 21
+          },
+          {
+            "phrase": "experiments",
+            "count": 20
+          },
+          {
+            "phrase": "performance",
+            "count": 20
+          },
+          {
+            "phrase": "models",
+            "count": 20
+          },
+          {
+            "phrase": "e.g.",
+            "count": 19
+          },
+          {
+            "phrase": "section",
+            "count": 19
+          },
+          {
+            "phrase": "analysis",
+            "count": 19
+          }
+        ],
+        "top_bigrams": [
+          {
+            "phrase": "basis sharing",
+            "count": 9
+          },
+          {
+            "phrase": "svd-llm basis",
+            "count": 8
+          },
+          {
+            "phrase": "rank allocation",
+            "count": 7
+          },
+          {
+            "phrase": "arxiv preprint",
+            "count": 6
+          },
+          {
+            "phrase": "preprint arxiv",
+            "count": 6
+          },
+          {
+            "phrase": "compression ratios",
+            "count": 6
+          },
+          {
+            "phrase": "explain why",
+            "count": 6
+          },
+          {
+            "phrase": "llm compression",
+            "count": 5
+          },
+          {
+            "phrase": "weight matrix",
+            "count": 5
+          },
+          {
+            "phrase": "model compression",
+            "count": 5
+          },
+          {
+            "phrase": "compare against",
+            "count": 5
+          },
+          {
+            "phrase": "grad a-a",
+            "count": 5
+          },
+          {
+            "phrase": "low rank",
+            "count": 5
+          },
+          {
+            "phrase": "remains unclear",
+            "count": 5
+          },
+          {
+            "phrase": "unclear why",
+            "count": 5
+          },
+          {
+            "phrase": "compression ratio",
+            "count": 5
+          }
+        ],
+        "top_trigrams": [
+          {
+            "phrase": "svd-llm basis sharing",
+            "count": 8
+          },
+          {
+            "phrase": "arxiv preprint arxiv",
+            "count": 6
+          },
+          {
+            "phrase": "remains unclear whether",
+            "count": 3
+          },
+          {
+            "phrase": "large language models",
+            "count": 3
+          },
+          {
+            "phrase": "svd-based llm compression",
+            "count": 3
+          },
+          {
+            "phrase": "svd-llm svd-llm basis",
+            "count": 3
+          },
+          {
+            "phrase": "best pruning methods",
+            "count": 2
+          },
+          {
+            "phrase": "a-xw delta grad",
+            "count": 2
+          },
+          {
+            "phrase": "a-xw cos grad",
+            "count": 2
+          },
+          {
+            "phrase": "cos grad a-xw",
+            "count": 2
+          },
+          {
+            "phrase": "delta grad a-a",
+            "count": 2
+          },
+          {
+            "phrase": "frac partial partial",
+            "count": 2
+          }
+        ]
+      },
+      "trigger_counts": [
+        {
+          "key": "unclear",
+          "label": "unclear",
+          "count": 10
+        },
+        {
+          "key": "explain",
+          "label": "explain / explanation",
+          "count": 9
+        },
+        {
+          "key": "theorem",
+          "label": "theorem",
+          "count": 6
+        },
+        {
+          "key": "not_clear",
+          "label": "not clear",
+          "count": 5
+        },
+        {
+          "key": "presentation",
+          "label": "presentation",
+          "count": 4
+        },
+        {
+          "key": "derivation",
+          "label": "derivation",
+          "count": 3
+        },
+        {
+          "key": "cannot_understand",
+          "label": "cannot understand",
+          "count": 2
+        },
+        {
+          "key": "what_is_meant",
+          "label": "what is meant by",
+          "count": 1
+        },
+        {
+          "key": "difficult_to_follow",
+          "label": "difficult to follow",
+          "count": 1
+        },
+        {
+          "key": "typo",
+          "label": "typo",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "per_paper_summary": [
+    {
+      "paper_requested": "ASVD",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "HyPofygOCT"
+      ],
+      "selected_forum_titles": [
+        "ASVD: Activation-aware Singular Value Decomposition for Compressing Large Language Models"
+      ],
+      "selected_forum_decisions": [
+        "Reject"
+      ],
+      "public_review_note_count": 10,
+      "matched_figure_categories": [
+        "budget_definitions",
+        "model_or_benchmark_coverage",
+        "strong_or_pruning_baselines"
+      ],
+      "matched_supplemental_themes": [
+        "ablation_or_sensitivity_gaps",
+        "clarity_or_theory_explanation"
+      ]
+    },
+    {
+      "paper_requested": "SVD-LLM v1",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "LNYIUouhdt"
+      ],
+      "selected_forum_titles": [
+        "SVD-LLM: Truncation-aware Singular Value Decomposition for Large Language Model Compression"
+      ],
+      "selected_forum_decisions": [
+        "Accept (Poster)"
+      ],
+      "public_review_note_count": 6,
+      "matched_figure_categories": [
+        "budget_definitions",
+        "end_to_end_speed",
+        "model_or_benchmark_coverage",
+        "strong_or_pruning_baselines"
+      ],
+      "matched_supplemental_themes": [
+        "ablation_or_sensitivity_gaps",
+        "clarity_or_theory_explanation",
+        "novelty_or_incremental_delta"
+      ]
+    },
+    {
+      "paper_requested": "SVD-LLM v2",
+      "status": "openreview_not_found",
+      "selected_forum_ids": [],
+      "selected_forum_titles": [],
+      "public_review_note_count": 0,
+      "matched_figure_categories": [],
+      "matched_supplemental_themes": []
+    },
+    {
+      "paper_requested": "Dobi-SVD",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "kws76i5XB8"
+      ],
+      "selected_forum_titles": [
+        "Dobi-SVD: Differentiable SVD for LLM Compression and Some New Perspectives"
+      ],
+      "selected_forum_decisions": [
+        "Accept (Poster)"
+      ],
+      "public_review_note_count": 14,
+      "matched_figure_categories": [
+        "budget_definitions",
+        "end_to_end_speed",
+        "mixed_precision_or_remap",
+        "model_or_benchmark_coverage",
+        "reproducibility_or_artifacts",
+        "strong_or_pruning_baselines"
+      ],
+      "matched_supplemental_themes": [
+        "clarity_or_theory_explanation",
+        "novelty_or_incremental_delta"
+      ]
+    },
+    {
+      "paper_requested": "SAES-SVD",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "KMAYsQO8pU"
+      ],
+      "selected_forum_titles": [
+        "SAES-SVD: Self-Adaptive Suppression of Accumulated and Local Errors for SVD-based LLM Compression"
+      ],
+      "selected_forum_decisions": [
+        "Accept (Poster)"
+      ],
+      "public_review_note_count": 6,
+      "matched_figure_categories": [
+        "budget_definitions",
+        "end_to_end_speed",
+        "mixed_precision_or_remap",
+        "model_or_benchmark_coverage",
+        "reproducibility_or_artifacts",
+        "strong_or_pruning_baselines"
+      ],
+      "matched_supplemental_themes": [
+        "ablation_or_sensitivity_gaps",
+        "clarity_or_theory_explanation"
+      ]
+    },
+    {
+      "paper_requested": "Basis Sharing",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "gp32jvUquq"
+      ],
+      "selected_forum_titles": [
+        "Basis Sharing: Cross-Layer Parameter Sharing for Large Language Model Compression"
+      ],
+      "selected_forum_decisions": [
+        "Accept (Poster)"
+      ],
+      "public_review_note_count": 7,
+      "matched_figure_categories": [
+        "end_to_end_speed"
+      ],
+      "matched_supplemental_themes": [
+        "ablation_or_sensitivity_gaps",
+        "clarity_or_theory_explanation"
+      ]
+    },
+    {
+      "paper_requested": "Dip-SVD",
+      "status": "openreview_not_found",
+      "selected_forum_ids": [],
+      "selected_forum_titles": [],
+      "public_review_note_count": 0,
+      "matched_figure_categories": [],
+      "matched_supplemental_themes": []
+    },
+    {
+      "paper_requested": "AdaSVD",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "ey7CXUBn1g"
+      ],
+      "selected_forum_titles": [
+        "AdaSVD: Adaptive Singular Value Decomposition for Large Language Models"
+      ],
+      "selected_forum_decisions": [
+        null
+      ],
+      "public_review_note_count": 4,
+      "matched_figure_categories": [
+        "end_to_end_speed",
+        "model_or_benchmark_coverage"
+      ],
+      "matched_supplemental_themes": [
+        "clarity_or_theory_explanation",
+        "novelty_or_incremental_delta"
+      ]
+    },
+    {
+      "paper_requested": "AA-SVD",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "fIpDd5UlFP"
+      ],
+      "selected_forum_titles": [
+        "AA-SVD: Anchored and Adaptive SVD for Large Model Compression"
+      ],
+      "selected_forum_decisions": [
+        "Reject"
+      ],
+      "public_review_note_count": 4,
+      "matched_figure_categories": [
+        "budget_definitions",
+        "end_to_end_speed",
+        "model_or_benchmark_coverage",
+        "strong_or_pruning_baselines"
+      ],
+      "matched_supplemental_themes": [
+        "ablation_or_sensitivity_gaps",
+        "clarity_or_theory_explanation"
+      ]
+    },
+    {
+      "paper_requested": "Swift-SVD",
+      "status": "openreview_not_found",
+      "selected_forum_ids": [],
+      "selected_forum_titles": [],
+      "public_review_note_count": 0,
+      "matched_figure_categories": [],
+      "matched_supplemental_themes": []
+    },
+    {
+      "paper_requested": "Optimal Brain Decomposition",
+      "status": "openreview_not_found",
+      "selected_forum_ids": [],
+      "selected_forum_titles": [],
+      "public_review_note_count": 0,
+      "matched_figure_categories": [],
+      "matched_supplemental_themes": []
+    },
+    {
+      "paper_requested": "D-Rank",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "qDQAiayjQI"
+      ],
+      "selected_forum_titles": [
+        "Layer-wise dynamic rank for compressing large language models"
+      ],
+      "selected_forum_decisions": [
+        "Reject"
+      ],
+      "public_review_note_count": 4,
+      "matched_figure_categories": [
+        "budget_definitions",
+        "end_to_end_speed",
+        "model_or_benchmark_coverage"
+      ],
+      "matched_supplemental_themes": [
+        "ablation_or_sensitivity_gaps",
+        "clarity_or_theory_explanation",
+        "novelty_or_incremental_delta"
+      ]
+    },
+    {
+      "paper_requested": "ZS-SVD",
+      "status": "openreview_not_found",
+      "selected_forum_ids": [],
+      "selected_forum_titles": [],
+      "public_review_note_count": 0,
+      "matched_figure_categories": [],
+      "matched_supplemental_themes": []
+    },
+    {
+      "paper_requested": "DF-SVD",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "TuzsCiHocG"
+      ],
+      "selected_forum_titles": [
+        "Accurate and Efficient Singular Value Decomposition For LLMs via Decay-aware Rank Allocation and Feature-Preserved Weight Update"
+      ],
+      "selected_forum_decisions": [
+        "Reject"
+      ],
+      "public_review_note_count": 4,
+      "matched_figure_categories": [
+        "model_or_benchmark_coverage",
+        "strong_or_pruning_baselines"
+      ],
+      "matched_supplemental_themes": [
+        "ablation_or_sensitivity_gaps",
+        "clarity_or_theory_explanation",
+        "novelty_or_incremental_delta"
+      ]
+    },
+    {
+      "paper_requested": "CPSVD",
+      "status": "openreview_not_found",
+      "selected_forum_ids": [],
+      "selected_forum_titles": [],
+      "public_review_note_count": 0,
+      "matched_figure_categories": [],
+      "matched_supplemental_themes": []
+    },
+    {
+      "paper_requested": "Res-SVD",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "WL4qCY0nBk"
+      ],
+      "selected_forum_titles": [
+        "ERC-SVD: Error-Controlled SVD for Large Language Model Compression"
+      ],
+      "selected_forum_decisions": [
+        null
+      ],
+      "public_review_note_count": 4,
+      "matched_figure_categories": [
+        "budget_definitions",
+        "model_or_benchmark_coverage",
+        "strong_or_pruning_baselines"
+      ],
+      "matched_supplemental_themes": [
+        "ablation_or_sensitivity_gaps",
+        "clarity_or_theory_explanation",
+        "novelty_or_incremental_delta"
+      ]
+    },
+    {
+      "paper_requested": "MoDeGPT",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "8EfxjTCg2k"
+      ],
+      "selected_forum_titles": [
+        "MoDeGPT: Modular Decomposition for Large Language Model Compression"
+      ],
+      "selected_forum_decisions": [
+        "Accept (Oral)"
+      ],
+      "public_review_note_count": 6,
+      "matched_figure_categories": [
+        "budget_definitions",
+        "end_to_end_speed",
+        "strong_or_pruning_baselines"
+      ],
+      "matched_supplemental_themes": [
+        "clarity_or_theory_explanation"
+      ]
+    },
+    {
+      "paper_requested": "Uni-SVD",
+      "status": "openreview_not_found_or_no_public_match",
+      "selected_forum_ids": [],
+      "selected_forum_titles": [],
+      "public_review_note_count": 0,
+      "matched_figure_categories": [],
+      "matched_supplemental_themes": []
+    },
+    {
+      "paper_requested": "GFWSVD",
+      "status": "public_reviewer_notes_found",
+      "selected_forum_ids": [
+        "zCe1Vh844h"
+      ],
+      "selected_forum_titles": [
+        "Generalized Fisher-Weighted SVD: Scalable Kronecker-Factored Fisher Approximation for Compressing Large Language Models."
+      ],
+      "selected_forum_decisions": [
+        "Reject"
+      ],
+      "public_review_note_count": 7,
+      "matched_figure_categories": [
+        "budget_definitions",
+        "end_to_end_speed",
+        "model_or_benchmark_coverage",
+        "reproducibility_or_artifacts",
+        "strong_or_pruning_baselines"
+      ],
+      "matched_supplemental_themes": [
+        "ablation_or_sensitivity_gaps",
+        "clarity_or_theory_explanation"
+      ]
+    }
+  ]
+}

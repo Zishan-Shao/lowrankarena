@@ -1,19 +1,14 @@
-# `compress/prune/`
+# Compression Code Bundle
 
-This directory contains LowRankArena wrappers for structured pruning baselines.
+This archive collects local compression-related code additions for three method repos:
+- `llm-pruner`
+- `slicegpt` (repo: `TransformerCompression`)
+- `blockpruner`
 
-As with [`compress/svd/`](../svd/README.md), the unification target is the exported artifact contract rather than a shared pruning runtime.
+Layout:
+- `<method>/README.md`: base repo, commit, and included file list
+- `<method>/files/`: repo-relative files to copy into a clean checkout
+- `<method>/patches/local_changes.patch`: tracked-file diff against the recorded commit
+- `<method>/apply_to_repo.sh`: helper to copy bundled files into the target repo
 
-## Wrappers
-
-- [`bonsai.py`](./bonsai.py): adapter for Bonsai-style structured pruning.
-- [`llm_pruner.py`](./llm_pruner.py): adapter for LLM-Pruner integration.
-- [`slicegpt.py`](./slicegpt.py): adapter for SliceGPT-style structural compression.
-- [`wanda_sp.py`](./wanda_sp.py): adapter for structured Wanda variants.
-
-## Scope
-
-- Resolve pruning-specific build requests.
-- Preserve method identity and metadata in exported manifests.
-- Keep external pruning repos optional and replaceable.
-- Keep benchmark-time loading, eval, memory, and speed out of this directory.
+This bundle excludes logs, result JSONs, caches, checkpoints, and `__pycache__` artifacts.

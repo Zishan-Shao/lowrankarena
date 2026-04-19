@@ -21,4 +21,6 @@ datasets==4.4.2
 evaluate==0.4.5
 
 # Speed
-vllm==0.18.1
+# vLLM 0.18.1 does not currently publish wheels for Python 3.14+.
+# Keep the validated speed stack on Python 3.13.x.
+vllm==0.18.1; python_version < "3.14"

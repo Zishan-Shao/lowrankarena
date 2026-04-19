@@ -28,8 +28,21 @@ Recommended environment on this machine:
 
 ```bash
 source ~/miniconda3/etc/profile.d/conda.sh
+conda env create -f environment.yml
 conda activate lowrankarena
-pip install -r requirements.txt
+python -V
+```
+
+For the full validated stack including the speed path, use Python `3.13.x`.
+`vllm==0.18.1` currently requires Python `<3.14`, so Python `3.14+` can still
+install the base runtime but will skip the `vllm` speed dependency.
+
+To refresh an existing environment in place:
+
+```bash
+source ~/miniconda3/etc/profile.d/conda.sh
+conda env update -f environment.yml --prune
+conda activate lowrankarena
 python -V
 ```
 

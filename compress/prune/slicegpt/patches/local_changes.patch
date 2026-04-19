@@ -1,0 +1,375 @@
+diff --git a/experiments/run_lm_eval.py b/experiments/run_lm_eval.py
+index 793929e..5572367 100644
+--- a/experiments/run_lm_eval.py
++++ b/experiments/run_lm_eval.py
+@@ -11,9 +11,7 @@ import torch
+ import wandb
+ from lm_eval import tasks
+ from lm_eval import utils as lm_eval_utils
+-from lm_eval.api.registry import ALL_TASKS
+ from lm_eval.models.huggingface import HFLM
+-from lm_eval.tasks import initialize_tasks
+ 
+ from slicegpt import gpu_utils, hf_utils, utils
+ from slicegpt.config import config
+@@ -38,7 +36,6 @@ TASK_METRIC_MAP = {
+ 
+ 
+ def eval_arg_parser(interactive: bool = True) -> argparse.Namespace:
+-    initialize_tasks()
+     parser = argparse.ArgumentParser()
+     parser.add_argument(
+         "--model",
+@@ -81,7 +78,6 @@ def eval_arg_parser(interactive: bool = True) -> argparse.Namespace:
+         '--tasks',
+         nargs='+',
+         default=["piqa", "hellaswag", "arc_easy", "arc_challenge", "winogrande"],
+-        choices=lm_eval_utils.MultiChoice(tasks.ALL_TASKS),
+     )
+     parser.add_argument('--num-fewshot', type=int, default=0, help="Number of fewshots for all tasks.")
+     parser.add_argument("--save-dir", type=str, default=".", help="Path to save the lm eval results")
+@@ -159,11 +155,12 @@ def eval_main(args: argparse.Namespace) -> None:
+ 
+     ### LM Eval Harness ###
+     hflm = HFLM(pretrained=model_adapter.model, tokenizer=tokenizer, batch_size=args.batch_size)
++    task_manager = tasks.TaskManager()
+ 
+     if args.tasks is None:
+-        task_names = tasks.ALL_TASKS
++        task_names = sorted(task_manager.all_tasks)
+     else:
+-        task_names = lm_eval_utils.pattern_match(args.tasks, ALL_TASKS)
++        task_names = lm_eval_utils.pattern_match(args.tasks, task_manager.all_tasks)
+ 
+     logging.info(f"Selected Tasks: {task_names}")
+ 
+@@ -173,9 +170,13 @@ def eval_main(args: argparse.Namespace) -> None:
+                 f"Please specify the metric to use for {task} in TASK_METRIC_MAP. Available info {TASK_METRIC_MAP}"
+             )
+ 
+-    results = lm_eval.simple_evaluate(hflm, tasks=task_names, num_fewshot=args.num_fewshot, batch_size=args.batch_size)[
+-        'results'
+-    ]
++    results = lm_eval.simple_evaluate(
++        hflm,
++        tasks=task_names,
++        num_fewshot=args.num_fewshot,
++        batch_size=args.batch_size,
++        task_manager=task_manager,
++    )['results']
+ 
+     logging.info(results)
+     wandb.log(results)
+diff --git a/experiments/run_slicegpt.py b/experiments/run_slicegpt.py
+index e02332c..cc107b3 100755
+--- a/experiments/run_slicegpt.py
++++ b/experiments/run_slicegpt.py
+@@ -159,20 +159,32 @@ def slicing_main(args: argparse.Namespace) -> None:
+         else:
+             model.to(config.device)
+ 
+-    dataset = data_utils.get_dataset(args.cal_dataset)
+-    train_dataset, test_dataset = dataset["train"], dataset["test"]
+-    train_loader = data_utils.prepare_dataloader(
+-        dataset=train_dataset,
+-        tokenizer=tokenizer,
+-        max_seqlen=args.cal_max_seqlen,
+-        batch_size=args.cal_batch_size,
+-        nsamples=args.cal_nsamples,
+-        varied_seqlen=args.varied_seqlen,
+-        seed=args.seed,
+-    )
+-    test_loader = data_utils.prepare_test_dataloader(
+-        dataset=test_dataset, tokenizer=tokenizer, batch_size=args.ppl_eval_batch_size
+-    )
++    if args.sliced_model_path or args.ppl_only:
++        eval_split = "validation" if args.cal_dataset == "c4" else "test"
++        test_dataset = data_utils.get_dataset_split(args.cal_dataset, eval_split)
++        test_loader = data_utils.prepare_test_dataloader(
++            dataset=test_dataset,
++            tokenizer=tokenizer,
++            seqlen=args.ppl_eval_seqlen,
++            batch_size=args.ppl_eval_batch_size,
++        )
++    else:
++        dataset = data_utils.get_dataset(args.cal_dataset)
++        train_dataset = dataset["train"]
++        eval_split = "test" if "test" in dataset else "validation"
++        test_dataset = dataset[eval_split]
++        train_loader = data_utils.prepare_dataloader(
++            dataset=train_dataset,
++            tokenizer=tokenizer,
++            max_seqlen=args.cal_max_seqlen,
++            batch_size=args.cal_batch_size,
++            nsamples=args.cal_nsamples,
++            varied_seqlen=args.varied_seqlen,
++            seed=args.seed,
++        )
++        test_loader = data_utils.prepare_test_dataloader(
++            dataset=test_dataset, tokenizer=tokenizer, seqlen=args.ppl_eval_seqlen, batch_size=args.ppl_eval_batch_size
++        )
+ 
+     # evaluate perplexity and exit if sliced model is loaded or if ppl_only is set
+     if args.sliced_model_path or args.ppl_only:
+@@ -228,7 +240,8 @@ def slicing_main(args: argparse.Namespace) -> None:
+         sliced_model_dir = pathlib.Path(args.save_dir)
+         sliced_model_dir.mkdir(parents=True, exist_ok=True)
+ 
+-        sliced_model_name = sliced_model_dir / f'{pathlib.Path(args.model).name}_{args.sparsity}.pt'
++        keep_ratio_tag = hf_utils.format_ratio_tag(1.0 - args.sparsity)
++        sliced_model_name = sliced_model_dir / f'{pathlib.Path(args.model).name}_{keep_ratio_tag}.pt'
+ 
+         # Save the sliced model
+         torch.save(model.state_dict(), sliced_model_name)
+diff --git a/src/slicegpt/adapters/llama_adapter.py b/src/slicegpt/adapters/llama_adapter.py
+index 1a7eb92..2dd645d 100644
+--- a/src/slicegpt/adapters/llama_adapter.py
++++ b/src/slicegpt/adapters/llama_adapter.py
+@@ -30,6 +30,8 @@ class CompressedLlamaDecoderLayer(LlamaDecoderLayer):
+         past_key_value: tuple[Tensor] | None = None,
+         output_attentions: bool | None = False,
+         use_cache: bool | None = False,
++        cache_position: LongTensor | None = None,
++        position_embeddings: tuple[Tensor, Tensor] | None = None,
+         **kwargs,
+     ) -> tuple:
+         """
+@@ -51,13 +53,15 @@ class CompressedLlamaDecoderLayer(LlamaDecoderLayer):
+         hidden_states = self.input_layernorm(hidden_states)
+ 
+         # Self Attention
+-        hidden_states, self_attn_weights, present_key_value = self.self_attn(
++        hidden_states, self_attn_weights = self.self_attn(
+             hidden_states=hidden_states,
+             attention_mask=attention_mask,
+             position_ids=position_ids,
+             past_key_value=past_key_value,
+             output_attentions=output_attentions,
+             use_cache=use_cache,
++            cache_position=cache_position,
++            position_embeddings=position_embeddings,
+             **kwargs,
+         )
+         if self.attn_shortcut_Q is not None:
+@@ -82,9 +86,6 @@ class CompressedLlamaDecoderLayer(LlamaDecoderLayer):
+         if output_attentions:
+             outputs += (self_attn_weights,)
+ 
+-        if use_cache:
+-            outputs += (present_key_value,)
+-
+         return outputs
+ 
+ 
+@@ -224,7 +225,7 @@ class LlamaModelAdapter(ModelAdapter):
+         local_files_only: bool = False,
+         token: str | bool | None = None,
+     ) -> ModelAdapter | None:
+-        if not (model_name.startswith("meta-llama/Llama-2") or model_name.startswith("meta-llama/Meta-Llama-3")):
++        if not cls._is_supported_llama_name(model_name):
+             return None
+ 
+         model = LlamaForCausalLM.from_pretrained(
+@@ -244,7 +245,7 @@ class LlamaModelAdapter(ModelAdapter):
+         local_files_only: bool = False,
+         token: str | bool | None = None,
+     ) -> ModelAdapter | None:
+-        if not (model_name.startswith("meta-llama/Llama-2") or model_name.startswith("meta-llama/Meta-Llama-3")):
++        if not cls._is_supported_llama_name(model_name):
+             return None
+ 
+         class UninitializedLlamaForCausalLM(LlamaForCausalLM):
+@@ -259,3 +260,13 @@ class LlamaModelAdapter(ModelAdapter):
+         model = model.to(dtype=dtype)
+ 
+         return LlamaModelAdapter(model)
++
++    @staticmethod
++    def _is_supported_llama_name(model_name: str) -> bool:
++        return model_name.startswith(
++            (
++                "meta-llama/Llama-2",
++                "meta-llama/Meta-Llama-3",
++                "meta-llama/Llama-3.1",
++            )
++        )
+diff --git a/src/slicegpt/data_utils.py b/src/slicegpt/data_utils.py
+index 09b8538..92d70fd 100755
+--- a/src/slicegpt/data_utils.py
++++ b/src/slicegpt/data_utils.py
+@@ -9,24 +9,13 @@ from torch.utils.data import DataLoader, Dataset, SubsetRandomSampler
+ from transformers import PreTrainedTokenizerBase
+ 
+ 
+-def get_dataset(name: str) -> datasets.DatasetDict:
+-    """
+-    Get the dataset from the HuggingFace datasets library.
+-
+-    Args:
+-        name: The name of the HuggingFace dataset to load. Must be one of "wikitext2", "ptb", "c4" or "alpaca".
+-
+-    Returns:
+-        The dataset.
+-    """
+-    logging.info(f"Loading dataset: {name}")
+-
++def _get_dataset_properties(name: str) -> dict:
+     ds_properties = {
+         "wikitext2": {"path": "wikitext", "config_name": "wikitext-2-raw-v1"},
+         "ptb": {"path": "ptb_text_only", "config_name": "penn_treebank"},
+         "c4": {
+             "path": "allenai/c4",
+-            "config_name": "allenai--c4",
++            "config_name": "en",
+             "data_files": {
+                 "train": "en/c4-train.00000-of-01024.json.gz",
+                 "validation": "en/c4-validation.00000-of-00008.json.gz",
+@@ -39,7 +28,22 @@ def get_dataset(name: str) -> datasets.DatasetDict:
+     if name not in ds_properties:
+         raise NotImplementedError("The provided dataset is not supported")
+ 
+-    properties = ds_properties[name]
++    return ds_properties[name]
++
++
++def get_dataset(name: str) -> datasets.DatasetDict:
++    """
++    Get the dataset from the HuggingFace datasets library.
++
++    Args:
++        name: The name of the HuggingFace dataset to load. Must be one of "wikitext2", "ptb", "c4" or "alpaca".
++
++    Returns:
++        The dataset.
++    """
++    logging.info(f"Loading dataset: {name}")
++
++    properties = _get_dataset_properties(name)
+     ds = datasets.load_dataset(
+         properties["path"], name=properties.get("config_name"), data_files=properties.get("data_files")
+     )
+@@ -59,6 +63,41 @@ def get_dataset(name: str) -> datasets.DatasetDict:
+     return ds
+ 
+ 
++def get_dataset_split(name: str, split: str) -> datasets.Dataset:
++    """
++    Load a single dataset split when only one split is required.
++
++    This is especially useful for C4 perplexity evaluation, where loading the
++    train split is unnecessarily expensive.
++    """
++    logging.info(f"Loading dataset split: {name}/{split}")
++
++    properties = _get_dataset_properties(name)
++    load_kwargs = {
++        "path": properties["path"],
++        "name": properties.get("config_name"),
++        "split": split,
++    }
++
++    if "data_files" in properties:
++        if split not in properties["data_files"]:
++            raise KeyError(f"Split {split} is not available for dataset {name}")
++        load_kwargs["data_files"] = {split: properties["data_files"][split]}
++        load_kwargs["verification_mode"] = "no_checks"
++
++    ds = datasets.load_dataset(**load_kwargs)
++
++    if "cols_to_remove" in properties:
++        ds = ds.remove_columns(properties["cols_to_remove"])
++
++    if name == "alpaca":
++        split_ds = get_dataset(name)
++        ds = split_ds[split]
++
++    logging.info("Loading dataset split done")
++    return ds
++
++
+ def prepare_test_dataloader(
+     dataset: datasets.Dataset, tokenizer: PreTrainedTokenizerBase, seqlen: int = 2048, batch_size: int = 1
+ ) -> DataLoader[dict[str, torch.Tensor]]:
+diff --git a/src/slicegpt/hf_utils.py b/src/slicegpt/hf_utils.py
+index bc4eb4e..535ada4 100755
+--- a/src/slicegpt/hf_utils.py
++++ b/src/slicegpt/hf_utils.py
+@@ -41,6 +41,36 @@ def do_not_initialize(func):
+     return wrapper
+ 
+ 
++def format_ratio_tag(value: float | None) -> str:
++    if value is None:
++        raise ValueError("ratio value must be provided")
++    return f"{value:.1f}"
++
++
++def get_sliced_artifact_names(model_name: str, sparsity: float | None) -> tuple[list[str], list[str]]:
++    """
++    Return preferred sliced artifact names.
++
++    Canonical naming uses keep ratio so that filenames align with the rest of the project.
++    For backward compatibility we also accept older sparsity-based names when loading.
++    """
++    if sparsity is None:
++        raise ValueError("sparsity must be provided when loading sliced artifacts")
++
++    model_suffix = pathlib.Path(model_name).name
++    keep_ratio = format_ratio_tag(1.0 - sparsity)
++    sparsity_ratio = format_ratio_tag(sparsity)
++
++    ordered_tags = []
++    for tag in (keep_ratio, sparsity_ratio):
++        if tag not in ordered_tags:
++            ordered_tags.append(tag)
++
++    weight_names = [f"{model_suffix}_{tag}.pt" for tag in ordered_tags]
++    config_names = [f"{model_suffix}_{tag}.json" for tag in ordered_tags]
++    return weight_names, config_names
++
++
+ @do_not_initialize
+ def get_model_and_tokenizer(
+     model_name: str,
+@@ -127,9 +157,8 @@ def load_sliced_model(
+     so that it would be possible to use it without taking a dependency on peft, when one is not required.
+     The corresponding model adapter class must be imported before calling this method.
+     """
+-    my_model_suffix = pathlib.Path(model_name).name
+-    my_sliced_model_name = f"{my_model_suffix}_{sparsity}.pt"
+-    my_sliced_model_config = f"{my_model_suffix}_{sparsity}.json"
++    weight_name_candidates, config_name_candidates = get_sliced_artifact_names(model_name, sparsity)
++    sliced_model_dir = pathlib.Path(sliced_model_path)
+ 
+     model_adapter, tokenizer = get_model_and_tokenizer(
+         model_name,
+@@ -150,9 +179,9 @@ def load_sliced_model(
+             torch.zeros(hidden_size, hidden_size).to(dtype=torch.float16)
+         )
+ 
+-    config_path = pathlib.Path(sliced_model_path) / my_sliced_model_config
++    config_path = next((sliced_model_dir / name for name in config_name_candidates if (sliced_model_dir / name).exists()), None)
+ 
+-    if config_path.exists():
++    if config_path is not None:
+         model_adapter.slicing_conf = SlicingConfig.from_json_string(config_path.read_text())
+ 
+     if model_adapter.slicing_conf is None:
+@@ -170,9 +199,15 @@ def load_sliced_model(
+ 
+         model_adapter.model = get_peft_model(model_adapter.model, lora_config)
+ 
+-    logging.info(f"Loading sliced model weights from {sliced_model_path}")
++    weight_path = next((sliced_model_dir / name for name in weight_name_candidates if (sliced_model_dir / name).exists()), None)
++    if weight_path is None:
++        raise FileNotFoundError(
++            f"Could not find sliced model weights in {sliced_model_path}. Tried: {', '.join(weight_name_candidates)}"
++        )
++
++    logging.info(f"Loading sliced model weights from {weight_path}")
+     model_adapter.model.load_state_dict(
+-        torch.load(str(pathlib.Path(sliced_model_path) / my_sliced_model_name), map_location="cpu")
++        torch.load(str(weight_path), map_location="cpu")
+     )
+     model_adapter.model.eval()
+ 
