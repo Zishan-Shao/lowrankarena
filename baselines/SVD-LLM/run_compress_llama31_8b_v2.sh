@@ -1,11 +1,10 @@
 #!/bin/bash
-# SVD-LLM V2 compression: whitening_hetero (+ optional local_update)
+# SVD-LLM V2 heterogeneous compression: adaptive rank allocation via SVDLLM_v2_hetero
 # Model: meta-llama/Llama-3.1-8B
 # Ratios: 0.2 0.3 0.4 0.5 0.6
 #
 # Usage:
-#   bash run_compress_llama31_8b_v2.sh [HF_TOKEN]          # V2 only
-#   bash run_compress_llama31_8b_v2.sh [HF_TOKEN] update   # V2 + local update
+#   bash run_compress_llama31_8b_v2.sh [HF_TOKEN]
 
 set -eo pipefail
 cd "$(dirname "$0")"
@@ -15,18 +14,14 @@ MODEL_TAG="Llama-3.1-8B"
 MODEL_PREFIX="meta_llama_Llama_3.1_8B"
 SAVE_DIR="checkpoints/svdllm/llama31_8b"
 HF_TOKEN="${1:-}"
-DO_UPDATE="${2:-}"
 SEQ_LEN=2048
 PROF_MAT="$SAVE_DIR/${MODEL_PREFIX}_profiling_wikitext2_256_0.pt"
+SUFFIX="v2hetero"
 
 mkdir -p "$SAVE_DIR" logs
 
 TOKEN_ARG=""
 [ -n "$HF_TOKEN" ] && TOKEN_ARG="--hf_token $HF_TOKEN"
-
-UPDATE_ARG=""
-SUFFIX="v2"
-[ "$DO_UPDATE" = "update" ] && UPDATE_ARG="--local_update" && SUFFIX="v2_then_update"
 
 if [ ! -f "$PROF_MAT" ]; then
     echo "ERROR: profiling_mat not found: $PROF_MAT"
@@ -51,7 +46,6 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
         --profiling_mat_path "$PROF_MAT" \
         --save_path "$SAVE_DIR" \
         --model_seq_len $SEQ_LEN \
-        $UPDATE_ARG \
         $TOKEN_ARG \
         2>&1 | tee "logs/${MODEL_TAG}_${SUFFIX}_${KEEP_DISPLAY}.log"
 done

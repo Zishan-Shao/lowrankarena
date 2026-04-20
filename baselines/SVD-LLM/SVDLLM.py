@@ -36,6 +36,24 @@ def _compat_enabled(key: str, default: bool = False) -> bool:
     return os.getenv(f'SVDLLM_COMPAT_{key.upper()}', '1' if default else '0') != '0'
 
 
+def _maybe_release_guard(gpu_guard, reason: str):
+    if gpu_guard is not None:
+        gpu_guard.release_for_gpu_work(reason)
+
+
+def _maybe_reserve_guard(gpu_guard, reason: str):
+    if gpu_guard is not None:
+        gpu_guard.reserve_idle(reason)
+
+
+def _rank_from_keep_ratio(in_features: int, out_features: int, keep_ratio: float) -> int:
+    dense_params = int(in_features) * int(out_features)
+    low_rank_denominator = int(in_features) + int(out_features)
+    if low_rank_denominator <= 0:
+        raise ValueError("in_features + out_features must be positive.")
+    return max(1, int(dense_params * float(keep_ratio) / low_rank_denominator))
+
+
 def _ensure_tokenizer(tokenizer_obj, model_id: str, hf_token: str = None):
     """Return a callable HF tokenizer. If the provided object is invalid, reload it.
 
