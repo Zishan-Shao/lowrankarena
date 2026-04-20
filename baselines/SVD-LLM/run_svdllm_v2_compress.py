@@ -13,7 +13,7 @@ from SVDLLM_v2_hetero import (
     allocate_svdllm_v2_adaptive_keep_ratios,
 )
 from SVDLLM import whitening_local_update
-from utils.data_utils import get_loaders
+from utils.data_utils import get_loaders, get_calib_train_data
 
 
 def main():
@@ -54,9 +54,9 @@ def main():
 
     if args.reprofile:
         print(f"Profiling from scratch (hetero eigendecomp, dataset={args.calib_dataset}, n={args.calib_nsamples}) ...")
-        calib_loader, _ = get_loaders(args.calib_dataset, nsamples=args.calib_nsamples,
-                                      seed=args.seed, tokenizer=tokenizer,
-                                      seqlen=args.model_seq_len)
+        calib_loader = get_calib_train_data(args.calib_dataset, tokenizer,
+                                            args.calib_nsamples, seqlen=args.model_seq_len,
+                                            seed=args.seed)
         profiling_mat = hetero_profile(model_name, model, calib_loader, dev)
         if args.save_profiling_mat:
             os.makedirs(os.path.dirname(args.save_profiling_mat) or ".", exist_ok=True)
