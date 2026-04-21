@@ -8,12 +8,11 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from SVDLLM_v2_hetero import (
-    profle_svdllm as hetero_profile,
+    profle_svdllm_low_resource as hetero_profile,
     whitening_hetero,
     allocate_svdllm_v2_adaptive_keep_ratios,
 )
-from SVDLLM import whitening_local_update
-from utils.data_utils import get_loaders, get_calib_train_data
+from utils.data_utils import get_calib_train_data
 
 
 def main():
@@ -29,9 +28,9 @@ def main():
     # Profiling options (mutually exclusive)
     prof_group = parser.add_mutually_exclusive_group(required=True)
     prof_group.add_argument("--profiling_mat_path", type=str, default=None,
-                            help="Path to existing profiling_mat (Cholesky or eigendecomp format).")
+                            help="Path to existing profiling_mat (eigendecomp format).")
     prof_group.add_argument("--reprofile", action="store_true",
-                            help="Re-profile from scratch using hetero eigendecomp profiler.")
+                            help="Re-profile from scratch using low-resource hetero eigendecomp profiler.")
     parser.add_argument("--calib_dataset", type=str, default="wikitext2")
     parser.add_argument("--calib_nsamples", type=int, default=256)
     parser.add_argument("--save_profiling_mat", type=str, default=None,
@@ -46,6 +45,7 @@ def main():
     hf_kwargs = {"trust_remote_code": True, "torch_dtype": torch.bfloat16}
     if args.hf_token:
         hf_kwargs["token"] = args.hf_token
+    # Load on CPU; SVD functions move individual weights to GPU as needed.
     model = AutoModelForCausalLM.from_pretrained(args.model, **hf_kwargs)
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True,
                                               **({"token": args.hf_token} if args.hf_token else {}))
@@ -53,7 +53,7 @@ def main():
     model.seqlen = args.model_seq_len
 
     if args.reprofile:
-        print(f"Profiling from scratch (hetero eigendecomp, dataset={args.calib_dataset}, n={args.calib_nsamples}) ...")
+        print(f"Profiling from scratch (low-resource hetero eigendecomp, dataset={args.calib_dataset}, n={args.calib_nsamples}) ...")
         calib_loader = get_calib_train_data(args.calib_dataset, tokenizer,
                                             args.calib_nsamples, seqlen=args.model_seq_len,
                                             seed=args.seed)
@@ -66,8 +66,7 @@ def main():
         print(f"Loading profiling_mat: {args.profiling_mat_path}")
         profiling_mat = torch.load(args.profiling_mat_path, weights_only=False)
 
-    model = model.to(dev)
-
+    # Model stays on CPU; allocation and whitening move weights to GPU per-module.
     module_keep_ratios = None
     if not args.no_adaptive:
         print(f"Adaptive rank allocation (target_reduction={args.ratio}) ...")
