@@ -34,6 +34,7 @@ from SVDLLM import (  # noqa: E402
 from component.svd_llama import SVD_LlamaAttention, SVD_LlamaMLP  # noqa: E402
 from component.svd_mistral import SVD_MistralAttention, SVD_MistralMLP  # noqa: E402
 from component.svd_opt import SVDOPTDecoderLayer  # noqa: E402
+from component.svd_qwen import SVD_LlamaAttention as SVD_QwenAttention, SVD_LlamaMLP as SVD_QwenMLP  # noqa: E402
 from utils.model_utils import find_layers  # noqa: E402
 
 
@@ -51,7 +52,7 @@ _MLP_NAME_HINTS = ("gate_proj", "down_proj", "up_proj", "fc1", "fc2")
 def _get_layers(model_name, model):
     if "opt" in model_name:
         return model.model.decoder.layers
-    if "llama" in model_name or "mistral" in model_name or "vicuna" in model_name:
+    if "llama" in model_name or "mistral" in model_name or "vicuna" in model_name or "qwen" in model_name.lower():
         return model.model.layers
     raise ValueError(f"Unsupported model name: {model_name}")
 
@@ -378,6 +379,14 @@ def apply_module_keep_ratios(
             svd_mlp = SVD_MistralMLP(config=model.config, ratio=1.0)
         elif "opt" in model_name:
             svd_decoder = SVDOPTDecoderLayer(model.config, ratio=1.0)
+        elif "qwen" in model_name.lower():
+            svd_attn = SVD_QwenAttention(config=model.config, ratio=1.0, base_attn=layer.self_attn)
+            svd_mlp = SVD_QwenMLP(
+                hidden_size=layer.hidden_size,
+                intermediate_size=model.config.intermediate_size,
+                hidden_act=model.config.hidden_act,
+                ratio=1.0,
+            )
         else:
             raise ValueError(f"Unsupported model name: {model_name}")
 

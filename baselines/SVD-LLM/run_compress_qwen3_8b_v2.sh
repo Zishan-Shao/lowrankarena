@@ -1,21 +1,21 @@
 #!/bin/bash
 # SVD-LLM V2 heterogeneous compression (GQA-aware)
-# Model: Qwen/Qwen3-8B-Instruct
+# Model: Qwen/Qwen3-8B
 # Ratios: 0.2 0.3 0.4 0.5 0.6
 #
 # Pipeline: compress → strip RoPE → convert to safetensors
 #
 # Usage:
-#   bash run_compress_qwen3_8b_instruct_v2.sh
+#   bash run_compress_qwen3_8b_v2.sh
 
 set -eo pipefail
 cd "$(dirname "$0")"
 
-MODEL="Qwen/Qwen3-8B-Instruct"
-MODEL_TAG="Qwen3-8B-Instruct"
-MODEL_PREFIX="Qwen_Qwen3_8B_Instruct"
-SAVE_DIR="checkpoints/svdllm/qwen3_8b_instruct"
-OUTPUT_DIR="/home/ww247/lowrankarena/hf_ckpts/LowRankArena/qwen3_8b_instruct/SVDLLMv2"
+MODEL="Qwen/Qwen3-8B"
+MODEL_TAG="Qwen3-8B"
+MODEL_PREFIX="Qwen_Qwen3_8B"
+SAVE_DIR="checkpoints/svdllm/qwen3_8b"
+OUTPUT_DIR="/home/ww247/lowrankarena/hf_ckpts/LowRankArena/qwen3_8b/SVDLLMv2"
 SEQ_LEN=2048
 SUFFIX="v2hetero"
 

@@ -191,6 +191,15 @@ def _load_svd_safetensors(ckpt_dir: Path, dtype: torch.dtype, device: str):
     sd = load_file(str(ckpt_dir / "model.safetensors"), device="cpu")
     config = AutoConfig.from_pretrained(str(ckpt_dir))
 
+    # Qwen2/Qwen3 use per-head Q/K RMSNorm (q_norm/k_norm) — must use SVD_QwenAttention
+    # so those sub-modules exist before load_state_dict.
+    _model_type = getattr(config, "model_type", "").lower()
+    _is_qwen = "qwen" in _model_type
+    if _is_qwen:
+        from component.svd_qwen import SVD_LlamaAttention as _SVDAttnCls
+    else:
+        _SVDAttnCls = SVD_LlamaAttention
+
     # Build empty model skeleton on meta device (no memory allocated for weights).
     with torch.device("meta"):
         model = AutoModelForCausalLM.from_config(config, torch_dtype=dtype)
@@ -202,7 +211,7 @@ def _load_svd_safetensors(ckpt_dir: Path, dtype: torch.dtype, device: str):
 
         # ── attention ─────────────────────────────────────────────────────────
         if f"{pfx}.self_attn.q_u_proj.weight" in sd:
-            svd_attn = SVD_LlamaAttention(config=config, ratio=1.0)
+            svd_attn = _SVDAttnCls(config=config, ratio=1.0)
             for proj in ("q", "k", "v", "o"):
                 u_key = f"{pfx}.self_attn.{proj}_u_proj.weight"
                 v_key = f"{pfx}.self_attn.{proj}_v_proj.weight"
@@ -213,6 +222,15 @@ def _load_svd_safetensors(ckpt_dir: Path, dtype: torch.dtype, device: str):
                             _nn.Linear(rank, int(u_w.shape[0]), bias=False))
                     setattr(svd_attn, f"{proj}_v_proj",
                             _nn.Linear(int(v_w.shape[1]), rank, bias=False))
+            # Pre-create q_norm/k_norm for Qwen3 so weights load correctly.
+            if _is_qwen:
+                from flashsvd_component.svd_llama import LlamaRMSNorm as _RMSNorm
+                _eps = float(getattr(config, "rms_norm_eps", 1e-6))
+                _dh = int(config.hidden_size // config.num_attention_heads)
+                for _norm_name in ("q_norm", "k_norm"):
+                    _wkey = f"{pfx}.self_attn.{_norm_name}.weight"
+                    if _wkey in sd and not hasattr(svd_attn, _norm_name):
+                        setattr(svd_attn, _norm_name, _RMSNorm(_dh, eps=_eps))
             layer.self_attn = svd_attn
 
         # ── MLP ───────────────────────────────────────────────────────────────

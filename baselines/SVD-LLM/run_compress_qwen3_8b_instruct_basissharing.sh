@@ -1,31 +1,26 @@
 #!/bin/bash
-# SVD-LLM Basis Sharing (step 5)
-# Model: meta-llama/Llama-2-7b-hf
-# Q/K/V share the same input-projection basis (V matrix).
-# MHA model: D_K == D_Q, R_shared amortised over 3 projections.
+# SVD-LLM Basis Sharing (step 5) — GQA-aware
+# Model: Qwen/Qwen3-8B-Instruct
+# Q/K/V share the same input-projection basis (V matrix), enabling FlashSVD GQA decode.
 # Reduction ratios: 0.2 0.3 0.4 0.5 0.6  (keep = 0.8 0.7 0.6 0.5 0.4)
 #
 # Pipeline: compress → strip RoPE → convert to safetensors
 #
 # Usage:
-#   bash run_compress_llama2_7b_basissharing.sh [HF_TOKEN]
+#   bash run_compress_qwen3_8b_instruct_basissharing.sh
 
 set -eo pipefail
 cd "$(dirname "$0")"
 
-MODEL="meta-llama/Llama-2-7b-hf"
-MODEL_TAG="Llama-2-7b"
-MODEL_PREFIX="meta_llama_Llama_2_7b_hf"
-SAVE_DIR="checkpoints/svdllm/llama2_7b"
-OUTPUT_DIR="/home/ww247/lowrankarena/hf_ckpts/LowRankArena/llama2_7b/BasisSharing"
-HF_TOKEN="${1:-}"
+MODEL="Qwen/Qwen3-8B-Instruct"
+MODEL_TAG="Qwen3-8B-Instruct"
+MODEL_PREFIX="Qwen_Qwen3_8B_Instruct"
+SAVE_DIR="checkpoints/svdllm/qwen3_8b_instruct"
+OUTPUT_DIR="/home/ww247/lowrankarena/hf_ckpts/LowRankArena/qwen3_8b_instruct/BasisSharing"
 SEQ_LEN=2048
 PROF_MAT="$SAVE_DIR/${MODEL_PREFIX}_profiling_wikitext2_256_0.pt"
 
 mkdir -p "$SAVE_DIR" "$OUTPUT_DIR" logs
-
-TOKEN_ARG=""
-[ -n "$HF_TOKEN" ] && TOKEN_ARG="--hf_token $HF_TOKEN"
 
 # ── Step 1: Compress ──────────────────────────────────────────────────────────
 for RATIO in 0.2 0.3 0.4 0.5 0.6; do
@@ -41,7 +36,7 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     [ -f "$PROF_MAT" ] && PROF_ARG="--profiling_mat_path $PROF_MAT"
     python SVDLLM.py --model "$MODEL" --step 5 --ratio $RATIO \
         $PROF_ARG \
-        --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN $TOKEN_ARG \
+        --save_path "$SAVE_DIR" --model_seq_len $SEQ_LEN \
         2>&1 | tee "logs/${MODEL_TAG}_bs_${KEEP}.log"
 done
 
