@@ -241,18 +241,21 @@ def profle_svdllm_low_resource(
         def forward(self, inp, **kwargs):
             inps[cache["i"]] = inp
             cache["i"] += 1
+            am = kwargs.get("attention_mask", None)
+            pid = kwargs.get("position_ids", None)
             if cache["attention_mask"] is None:
-                cache["attention_mask"] = kwargs["attention_mask"].detach().cpu()
+                cache["attention_mask"] = am.detach().cpu() if am is not None else None
                 if "opt" not in name:
-                    cache["position_ids"] = kwargs["position_ids"].detach().cpu()
+                    cache["position_ids"] = pid.detach().cpu() if pid is not None else None
             else:
-                cache["attention_mask"] = torch.cat(
-                    (cache["attention_mask"], kwargs["attention_mask"].detach().cpu()), dim=0
-                )
-                if "opt" not in name:
+                if am is not None:
+                    cache["attention_mask"] = torch.cat(
+                        (cache["attention_mask"], am.detach().cpu()), dim=0
+                    ) if cache["attention_mask"] is not None else am.detach().cpu()
+                if "opt" not in name and pid is not None:
                     cache["position_ids"] = torch.cat(
-                        (cache["position_ids"], kwargs["position_ids"].detach().cpu()), dim=0
-                    )
+                        (cache["position_ids"], pid.detach().cpu()), dim=0
+                    ) if cache["position_ids"] is not None else pid.detach().cpu()
             raise ValueError
 
     layers[0] = Catcher(layers[0])
