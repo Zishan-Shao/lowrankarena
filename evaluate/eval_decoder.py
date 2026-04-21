@@ -162,6 +162,92 @@ def _transformers_version() -> str:
 
 # ── loading ───────────────────────────────────────────────────────────────────
 
+def _load_svd_safetensors(ckpt_dir: Path, dtype: torch.dtype, device: str):
+    """Load SVD-LLM model from safetensors format.
+
+    Reconstructs the SVD module architecture (SVD_LlamaAttention / SVD_LlamaMLP)
+    by inspecting state dict key names and their shapes, then loads weights via
+    load_state_dict.  Works for any per-module rank (heterogeneous compression).
+    """
+    try:
+        from safetensors.torch import load_file
+    except ImportError:
+        raise ImportError("safetensors not installed. Run: pip install safetensors")
+
+    import sys as _sys
+    import json as _json
+    import torch.nn as _nn
+
+    root = Path(__file__).resolve().parent.parent
+    svdllm_dir = root / "baselines" / "SVD-LLM"
+    for _p in (str(svdllm_dir), str(svdllm_dir / "flashsvd_component")):
+        if _p not in _sys.path:
+            _sys.path.insert(0, _p)
+
+    from component.svd_llama import SVD_LlamaAttention, SVD_LlamaMLP
+    from transformers import AutoConfig, AutoModelForCausalLM
+
+    print(f"  [svd-safetensors] loading weights from {ckpt_dir.name}/model.safetensors")
+    sd = load_file(str(ckpt_dir / "model.safetensors"), device="cpu")
+    config = AutoConfig.from_pretrained(str(ckpt_dir))
+
+    # Build empty model skeleton on meta device (no memory allocated for weights).
+    with torch.device("meta"):
+        model = AutoModelForCausalLM.from_config(config, torch_dtype=dtype)
+    model = model.to_empty(device="cpu")
+
+    layers = model.model.layers
+    for i, layer in enumerate(layers):
+        pfx = f"model.layers.{i}"
+
+        # ── attention ─────────────────────────────────────────────────────────
+        if f"{pfx}.self_attn.q_u_proj.weight" in sd:
+            svd_attn = SVD_LlamaAttention(config=config, ratio=1.0)
+            for proj in ("q", "k", "v", "o"):
+                u_key = f"{pfx}.self_attn.{proj}_u_proj.weight"
+                v_key = f"{pfx}.self_attn.{proj}_v_proj.weight"
+                if u_key in sd and v_key in sd:
+                    u_w, v_w = sd[u_key], sd[v_key]  # u:[out,rank]  v:[rank,in]
+                    rank = int(u_w.shape[1])
+                    setattr(svd_attn, f"{proj}_u_proj",
+                            _nn.Linear(rank, int(u_w.shape[0]), bias=False))
+                    setattr(svd_attn, f"{proj}_v_proj",
+                            _nn.Linear(int(v_w.shape[1]), rank, bias=False))
+            layer.self_attn = svd_attn
+
+        # ── MLP ───────────────────────────────────────────────────────────────
+        if f"{pfx}.mlp.gate_u_proj.weight" in sd:
+            svd_mlp = SVD_LlamaMLP(
+                hidden_size=config.hidden_size,
+                intermediate_size=config.intermediate_size,
+                hidden_act=config.hidden_act,
+                ratio=1.0,
+            )
+            for proj in ("gate", "up", "down"):
+                u_key = f"{pfx}.mlp.{proj}_u_proj.weight"
+                v_key = f"{pfx}.mlp.{proj}_v_proj.weight"
+                if u_key in sd and v_key in sd:
+                    u_w, v_w = sd[u_key], sd[v_key]
+                    rank = int(u_w.shape[1])
+                    setattr(svd_mlp, f"{proj}_u_proj",
+                            _nn.Linear(rank, int(u_w.shape[0]), bias=False))
+                    setattr(svd_mlp, f"{proj}_v_proj",
+                            _nn.Linear(int(v_w.shape[1]), rank, bias=False))
+            layer.mlp = svd_mlp
+
+    missing, unexpected = model.load_state_dict(sd, strict=False)
+    # Rotary-emb buffer mismatches are expected across transformers versions — ignore.
+    _rotary_keys = {"inv_freq", "cos_cached", "sin_cached"}
+    missing = [k for k in missing if not any(r in k for r in _rotary_keys)]
+    unexpected = [k for k in unexpected if not any(r in k for r in _rotary_keys)]
+    if missing:
+        print(f"  [warn] missing keys ({len(missing)}): {missing[:3]}{'…' if len(missing) > 3 else ''}")
+    if unexpected:
+        print(f"  [warn] unexpected keys ({len(unexpected)}): {unexpected[:3]}{'…' if len(unexpected) > 3 else ''}")
+
+    return model.to(dtype=dtype).to(device)
+
+
 def _load_model_pt(pt_path: Path, dtype: torch.dtype, device: str):
     """Load a model from a model.pt file inside a checkpoint directory.
 
@@ -257,7 +343,7 @@ def _resolve_checkpoint(checkpoint: str) -> str:
     """If the checkpoint dir lacks config.json, descend to find it (handles
     nested save paths like .../outer/inner/inner where inner has the files)."""
     p = Path(checkpoint)
-    if (p / "config.json").exists() or (p / "model.pt").exists():
+    if (p / "config.json").exists() or (p / "model.pt").exists() or (p / "model.safetensors").exists():
         return checkpoint
     # BFS one level deep
     for child in sorted(p.rglob("config.json")):
@@ -284,6 +370,18 @@ def load_model(checkpoint: str, dtype: torch.dtype, device: str,
             tok_src, trust_remote_code=True, **extra
         )
         model = _load_model_pt(model_pt, dtype, device)
+        return model, tokenizer
+
+    # Directory has SVD-LLM safetensors (model.safetensors + svd_metadata.json)
+    svd_st = ckpt_path / "model.safetensors"
+    if svd_st.is_file() and (ckpt_path / "svd_metadata.json").is_file():
+        from transformers import AutoTokenizer
+        extra = {"token": hf_token} if hf_token else {}
+        tok_src = tokenizer_path or str(ckpt_path)
+        tokenizer = AutoTokenizer.from_pretrained(
+            tok_src, trust_remote_code=True, **extra
+        )
+        model = _load_svd_safetensors(ckpt_path, dtype, device)
         return model, tokenizer
 
     from transformers import AutoModelForCausalLM, AutoTokenizer

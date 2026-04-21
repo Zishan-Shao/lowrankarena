@@ -3,8 +3,7 @@
 # Model: meta-llama/Llama-2-7b-hf
 # Ratios: 0.2 0.3 0.4 0.5 0.6
 #
-# Uses hetero eigendecomp profiling + adaptive rank allocation.
-# Profiling_mat saved separately so it only runs once.
+# Pipeline: compress → strip RoPE → convert to safetensors
 #
 # Usage:
 #   bash run_compress_llama2_7b_v2.sh [HF_TOKEN]
@@ -16,19 +15,18 @@ MODEL="meta-llama/Llama-2-7b-hf"
 MODEL_TAG="Llama-2-7b"
 MODEL_PREFIX="meta_llama_Llama_2_7b_hf"
 SAVE_DIR="checkpoints/svdllm/llama2_7b"
+OUTPUT_DIR="/home/ww247/lowrankarena/hf_ckpts/LowRankArena/llama2_7b/SVDLLMv2"
 HF_TOKEN="${1:-}"
 SEQ_LEN=2048
 SUFFIX="v2hetero"
 
-# Hetero eigendecomp profiling_mat (separate from V1 Cholesky profiling_mat)
 PROF_MAT="$SAVE_DIR/${MODEL_PREFIX}_profiling_hetero_wikitext2_256_0.pt"
 
-mkdir -p "$SAVE_DIR" logs
+mkdir -p "$SAVE_DIR" "$OUTPUT_DIR" logs
 
 TOKEN_ARG=""
 [ -n "$HF_TOKEN" ] && TOKEN_ARG="--hf_token $HF_TOKEN"
 
-# Determine profiling arg: reprofile if hetero profiling_mat doesn't exist
 if [ -f "$PROF_MAT" ]; then
     echo "=== Hetero profiling_mat found, reusing: $PROF_MAT ==="
     PROF_ARG="--profiling_mat_path $PROF_MAT"
@@ -37,13 +35,13 @@ else
     PROF_ARG="--reprofile --save_profiling_mat $PROF_MAT"
 fi
 
+# ── Step 1: Compress ──────────────────────────────────────────────────────────
 for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     KEEP=$(python -c "print(1 - $RATIO)")
     CKPT="$SAVE_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}.pt"
 
     if [ -f "$CKPT" ]; then
         echo "=== checkpoint exists, skipping: $CKPT ==="
-        # After first run profiling_mat is saved, switch to reuse mode
         PROF_ARG="--profiling_mat_path $PROF_MAT"
         continue
     fi
@@ -59,22 +57,42 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
         $TOKEN_ARG \
         2>&1 | tee "logs/${MODEL_TAG}_${SUFFIX}_${KEEP_DISPLAY}.log"
 
-    # After first run (which saves profiling_mat), switch to reuse mode
     PROF_ARG="--profiling_mat_path $PROF_MAT"
 done
 
-echo ""
-echo "=== Converting to HF-dir ==="
+# Collect existing checkpoints
+CKPTS=""
 for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     KEEP=$(python -c "print(1 - $RATIO)")
     CKPT="$SAVE_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}.pt"
-    HF_DIR="$SAVE_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}"
-    if [ -f "$CKPT" ] && [ ! -f "$HF_DIR/model.pt" ]; then
+    [ -f "$CKPT" ] && CKPTS="$CKPTS $CKPT"
+done
+
+if [ -z "$CKPTS" ]; then
+    echo "No checkpoints found, exiting."
+    exit 1
+fi
+
+# ── Step 2: Strip RoPE cache ──────────────────────────────────────────────────
+echo ""
+echo "=== Stripping RoPE cache ==="
+python strip_rope_cache.py $CKPTS \
+    2>&1 | tee "logs/${MODEL_TAG}_${SUFFIX}_strip.log"
+
+# ── Step 3: Convert to safetensors ────────────────────────────────────────────
+echo ""
+echo "=== Converting to safetensors → $OUTPUT_DIR ==="
+for RATIO in 0.2 0.3 0.4 0.5 0.6; do
+    KEEP=$(python -c "print(1 - $RATIO)")
+    CKPT="$SAVE_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}.pt"
+    ST_DIR="$OUTPUT_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}"
+    [ ! -f "$CKPT" ] && continue
+    if [ ! -f "$ST_DIR/model.safetensors" ]; then
         echo "  converting: $CKPT"
-        python convert_pt_to_hf_dir.py "$CKPT" \
-            2>&1 | tee -a "logs/${MODEL_TAG}_${SUFFIX}_convert.log"
-    elif [ -f "$HF_DIR/model.pt" ]; then
-        echo "  already converted: $HF_DIR"
+        python convert_pt_to_safetensors.py "$CKPT" --output_dir "$OUTPUT_DIR" \
+            2>&1 | tee -a "logs/${MODEL_TAG}_${SUFFIX}_convert_st.log"
+    else
+        echo "  already converted: $ST_DIR/model.safetensors"
     fi
 done
 
@@ -82,6 +100,6 @@ echo ""
 echo "=== All done ==="
 for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     KEEP=$(python -c "print(1 - $RATIO)")
-    HF_DIR="$SAVE_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}"
-    [ -f "$HF_DIR/model.pt" ] && echo "  ✓ $HF_DIR" || echo "  ✗ MISSING: $HF_DIR"
+    ST_DIR="$OUTPUT_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}"
+    [ -f "$ST_DIR/model.safetensors" ] && echo "  ✓ $ST_DIR" || echo "  ✗ MISSING: $ST_DIR"
 done
