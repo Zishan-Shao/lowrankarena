@@ -239,23 +239,21 @@ def profle_svdllm_low_resource(
             self.module = module
 
         def forward(self, inp, **kwargs):
-            inps[cache["i"]] = inp
+            idx = cache["i"]
+            inps[idx] = inp
             cache["i"] += 1
             am = kwargs.get("attention_mask", None)
             pid = kwargs.get("position_ids", None)
-            if cache["attention_mask"] is None:
-                cache["attention_mask"] = am.detach().cpu() if am is not None else None
-                if "opt" not in name:
-                    cache["position_ids"] = pid.detach().cpu() if pid is not None else None
-            else:
-                if am is not None:
-                    cache["attention_mask"] = torch.cat(
-                        (cache["attention_mask"], am.detach().cpu()), dim=0
-                    ) if cache["attention_mask"] is not None else am.detach().cpu()
-                if "opt" not in name and pid is not None:
-                    cache["position_ids"] = torch.cat(
-                        (cache["position_ids"], pid.detach().cpu()), dim=0
-                    ) if cache["position_ids"] is not None else pid.detach().cpu()
+            if am is not None:
+                am_cpu = am.detach().cpu()
+                cache["attention_mask"] = am_cpu if idx == 0 else torch.cat(
+                    (cache["attention_mask"], am_cpu), dim=0
+                ) if cache["attention_mask"] is not None else am_cpu
+            if "opt" not in name and pid is not None:
+                pid_cpu = pid.detach().cpu()
+                cache["position_ids"] = pid_cpu if idx == 0 else torch.cat(
+                    (cache["position_ids"], pid_cpu), dim=0
+                ) if cache["position_ids"] is not None else pid_cpu
             raise ValueError
 
     layers[0] = Catcher(layers[0])
