@@ -274,8 +274,7 @@ def profle_svdllm_low_resource(
     else:
         model.model.embed_tokens = model.model.embed_tokens.cpu()
         model.model.norm = model.model.norm.cpu()
-        if hasattr(model.model, "rotary_emb"):
-            model.model.rotary_emb = model.model.rotary_emb.cpu()
+        # rotary_emb is kept on dev — per-layer loop at line 324 also needs it
     torch.cuda.empty_cache()
 
     outs = torch.zeros_like(inps)
@@ -358,6 +357,8 @@ def profle_svdllm_low_resource(
         _maybe_reserve_guard(gpu_guard, f"v2 low-resource layer {i} finished")
         if str(dev).startswith("cuda"):
             torch.cuda.empty_cache()
+    if hasattr(model.model, "rotary_emb"):
+        model.model.rotary_emb = model.model.rotary_emb.cpu()
     return profiling_mat
 
 
