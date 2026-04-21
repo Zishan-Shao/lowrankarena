@@ -1,6 +1,9 @@
 # Claude Code configuration and memory
 .claude/
 
+# New repo reference copy (local only, not uploaded)
+lowrankarena/
+
 # Compressed and fine-tuned model checkpoints
 compressed_models/
 pretrained/

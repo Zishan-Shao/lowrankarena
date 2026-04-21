@@ -43,7 +43,7 @@ def main():
     model_name = args.model.split("/")[-1].lower()
 
     print(f"Loading model: {args.model}")
-    hf_kwargs = {"trust_remote_code": True, "torch_dtype": torch.float16}
+    hf_kwargs = {"trust_remote_code": True, "torch_dtype": torch.bfloat16}
     if args.hf_token:
         hf_kwargs["token"] = args.hf_token
     model = AutoModelForCausalLM.from_pretrained(args.model, **hf_kwargs)

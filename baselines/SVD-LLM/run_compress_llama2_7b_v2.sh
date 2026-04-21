@@ -64,9 +64,24 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
 done
 
 echo ""
-echo "=== All done ==="
+echo "=== Converting to HF-dir ==="
 for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     KEEP=$(python -c "print(1 - $RATIO)")
     CKPT="$SAVE_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}.pt"
-    [ -f "$CKPT" ] && echo "  ✓ $CKPT" || echo "  ✗ MISSING: $CKPT"
+    HF_DIR="$SAVE_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}"
+    if [ -f "$CKPT" ] && [ ! -f "$HF_DIR/model.pt" ]; then
+        echo "  converting: $CKPT"
+        python convert_pt_to_hf_dir.py "$CKPT" \
+            2>&1 | tee -a "logs/${MODEL_TAG}_${SUFFIX}_convert.log"
+    elif [ -f "$HF_DIR/model.pt" ]; then
+        echo "  already converted: $HF_DIR"
+    fi
+done
+
+echo ""
+echo "=== All done ==="
+for RATIO in 0.2 0.3 0.4 0.5 0.6; do
+    KEEP=$(python -c "print(1 - $RATIO)")
+    HF_DIR="$SAVE_DIR/${MODEL_PREFIX}_${SUFFIX}_${KEEP}"
+    [ -f "$HF_DIR/model.pt" ] && echo "  ✓ $HF_DIR" || echo "  ✗ MISSING: $HF_DIR"
 done
