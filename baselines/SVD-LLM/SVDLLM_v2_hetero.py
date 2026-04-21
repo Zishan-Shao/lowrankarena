@@ -319,18 +319,23 @@ def profle_svdllm_low_resource(
         for j in range(inps.shape[0]):
             if "opt" not in name:
                 batch_inps = inps[j].unsqueeze(0)
-                batch_position_ids = position_ids[j].unsqueeze(0).to(dev)
-                position_embeddings = model.model.rotary_emb(batch_inps, batch_position_ids)
+                batch_position_ids = position_ids[j].unsqueeze(0).to(dev) if position_ids is not None else None
+                am_j = attention_masks[j].unsqueeze(0).to(dev) if attention_masks is not None else None
+                if hasattr(model.model, "rotary_emb") and batch_position_ids is not None:
+                    position_embeddings = model.model.rotary_emb(batch_inps, batch_position_ids)
+                else:
+                    position_embeddings = None
                 outs[j] = layer(
                     batch_inps,
-                    attention_mask=attention_masks[j].unsqueeze(0).to(dev),
+                    attention_mask=am_j,
                     position_ids=batch_position_ids,
                     position_embeddings=position_embeddings,
                 )[0]
             else:
+                am_j = attention_masks[j].unsqueeze(0).to(dev) if attention_masks is not None else None
                 outs[j] = layer(
                     inps[j].unsqueeze(0),
-                    attention_mask=attention_masks[j].unsqueeze(0).to(dev),
+                    attention_mask=am_j,
                 )[0]
 
         for h in handles:
