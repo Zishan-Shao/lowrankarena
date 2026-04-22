@@ -85,12 +85,15 @@ def _collect_svd_metadata(model) -> dict:
     return meta
 
 
-def _state_dict_to_saveable(model) -> dict[str, torch.Tensor]:
+def _state_dict_to_saveable(model, dtype=None) -> dict[str, torch.Tensor]:
     """Extract state dict, skipping None buffers and making tensors contiguous.
 
     Always clones each tensor so that basis-sharing checkpoints (where
     q_v_proj / k_v_proj / v_v_proj share the same storage) produce
     independent tensors that safetensors can serialize without error.
+
+    If dtype is given (e.g. torch.bfloat16), floating-point tensors are cast
+    to that dtype. Integer/bool tensors are left unchanged.
     """
     sd = {}
     for k, v in model.state_dict().items():
@@ -100,7 +103,10 @@ def _state_dict_to_saveable(model) -> dict[str, torch.Tensor]:
             continue
         # .clone() materialises shared-storage tensors (Basis Sharing V matrices)
         # and also ensures contiguity, so no separate .contiguous() needed.
-        sd[k] = v.detach().clone().cpu()
+        t = v.detach().clone().cpu()
+        if dtype is not None and t.is_floating_point():
+            t = t.to(dtype)
+        sd[k] = t
     return sd
 
 
@@ -122,7 +128,8 @@ def _save_tokenizer(tokenizer, out_dir: Path) -> None:
                 print(f"  [warn] tokenizer reload also failed: {e2}")
 
 
-def convert_checkpoint(pt_path: Path, output_root: Path | None = None) -> Path:
+def convert_checkpoint(pt_path: Path, output_root: Path | None = None,
+                       dtype: torch.dtype | None = None) -> Path:
     """Convert a single .pt checkpoint to a safetensors directory.
 
     Returns the output directory path.
@@ -179,8 +186,9 @@ def convert_checkpoint(pt_path: Path, output_root: Path | None = None) -> Path:
         print("  [warn] no model.config found")
 
     # Build state dict and save as safetensors
-    print("  building state dict ...", end=" ", flush=True)
-    tensors = _state_dict_to_saveable(model)
+    dtype_label = str(dtype).replace("torch.", "") if dtype is not None else "unchanged"
+    print(f"  building state dict (dtype={dtype_label}) ...", end=" ", flush=True)
+    tensors = _state_dict_to_saveable(model, dtype=dtype)
     n_params = sum(t.numel() for t in tensors.values())
     print(f"{len(tensors)} tensors, {n_params / 1e9:.2f}B params")
 
@@ -318,6 +326,9 @@ def main():
                         help="Root output directory (default: sibling directory of each .pt file)")
     parser.add_argument("--dry_run", action="store_true",
                         help="List files to convert without converting")
+    parser.add_argument("--dtype", type=str, default=None,
+                        help="Cast float tensors to this dtype (e.g. bf16, fp16, fp32). "
+                             "Integer/bool tensors are always left unchanged.")
     args = parser.parse_args()
 
     try:
@@ -347,10 +358,21 @@ def main():
             print(f"  {p}")
         return
 
+    _dtype_map = {"bf16": torch.bfloat16, "bfloat16": torch.bfloat16,
+                  "fp16": torch.float16, "float16": torch.float16,
+                  "fp32": torch.float32, "float32": torch.float32}
+    cast_dtype = None
+    if args.dtype is not None:
+        cast_dtype = _dtype_map.get(args.dtype.lower())
+        if cast_dtype is None:
+            print(f"ERROR: unknown dtype '{args.dtype}'. Choose from: bf16, fp16, fp32")
+            sys.exit(1)
+        print(f"Will cast float tensors → {cast_dtype}")
+
     output_root = Path(args.output_dir) if args.output_dir else None
     for pt in pts:
         try:
-            convert_checkpoint(pt, output_root=output_root)
+            convert_checkpoint(pt, output_root=output_root, dtype=cast_dtype)
         except Exception as e:
             print(f"  ERROR converting {pt.name}: {e}")
             import traceback

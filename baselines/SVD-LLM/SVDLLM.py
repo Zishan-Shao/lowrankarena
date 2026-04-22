@@ -1180,7 +1180,8 @@ if __name__ == '__main__':
     elif args.step == 5:
         # Step 5: whitening + basis sharing (Q/K/V share same input-projection V).
         # Enables FlashSVD packed decode for GQA models (e.g. Llama-3.1-8B).
-        model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token)
+        model, tokenizer = get_model_from_huggingface(model_id=args.model, hf_token=args.hf_token,
+                                                      torch_dtype=torch.bfloat16)
         tokenizer = _ensure_tokenizer(tokenizer, args.model, args.hf_token)
         model = model.eval()
         model.seqlen = args.model_seq_len

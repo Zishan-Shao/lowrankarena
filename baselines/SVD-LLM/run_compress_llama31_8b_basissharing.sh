@@ -72,7 +72,7 @@ for KEEP in 0.8 0.7 0.6 0.5 0.4; do
         echo "  converting: $CKPT"
         rm -rf "$ST_DIR"
         TMPDIR_ST=$(mktemp -d)
-        python convert_pt_to_safetensors.py "$CKPT" --output_dir "$TMPDIR_ST" \
+        python convert_pt_to_safetensors.py "$CKPT" --output_dir "$TMPDIR_ST" --dtype bf16 \
             2>&1 | tee -a "logs/${MODEL_TAG}_bs_convert_st.log"
         SRC="$TMPDIR_ST/${MODEL_PREFIX}_basis_sharing_${KEEP}"
         if [ -d "$SRC" ]; then
