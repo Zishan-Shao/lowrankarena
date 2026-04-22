@@ -24,9 +24,9 @@ bash run_compress_llama31_8b_v2.sh $TOKEN_ARG
 
 echo ""
 echo "========================================"
-echo "  Llama-3.1-8B  Basis Sharing"
+echo "  Llama-3.1-8B  Basis Sharing (cross-layer)"
 echo "========================================"
-bash run_compress_llama31_8b_basissharing.sh $TOKEN_ARG
+bash run_compress_llama31_8b_basissharing_cl.sh
 
 # ── Llama-3.1-8B-Instruct ─────────────────────────────────────────────────────
 echo ""
@@ -37,9 +37,9 @@ bash run_compress_llama31_8b_instruct_v2.sh $TOKEN_ARG
 
 echo ""
 echo "========================================"
-echo "  Llama-3.1-8B-Instruct  Basis Sharing"
+echo "  Llama-3.1-8B-Instruct  Basis Sharing (cross-layer)"
 echo "========================================"
-bash run_compress_llama31_8b_instruct_bs.sh $TOKEN_ARG
+bash run_compress_llama31_8b_instruct_bs_cl.sh
 
 # ── Qwen3-8B ──────────────────────────────────────────────────────────────────
 echo ""
