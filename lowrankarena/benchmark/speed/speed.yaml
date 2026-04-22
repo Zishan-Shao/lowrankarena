@@ -1,0 +1,29 @@
+name: speed
+kind: speed
+description: End-to-end evaluation-speed suite for the default paper-facing accuracy workloads.
+selection:
+  checkpoints:
+    - llama31-8b-asvd-0.4
+    - llama31-8b-dobi-0.8
+    - llama31-8b-svdllm-v1-update-0.6
+    - llama31-8b-svdllm-v2-0.6
+    - llama31-8b-basis-sharing-0.6
+    - llama-7b-svdllm-v1-update-0.5
+    - llama-7b-basis-sharing-0.5
+    - llama-7b-dobi-0.8
+  enabled_only: true
+speed:
+  backend: evaluation
+  metric_aggregation: macro_mean
+  eval_suites:
+    - accuracy/ppl
+    - accuracy/mcq
+    - accuracy/mmlu_pro
+    - accuracy/gsm8k
+  metrics:
+    - total_wall_time_seconds
+    - mean_suite_wall_time_seconds
+report:
+  result_dir: results/speed
+  output_dir: results/tables
+  filename: evaluation_speed.md

@@ -1,8 +1,14 @@
 # Claude Code configuration and memory
 .claude/
 
-# New repo reference copy (local only, not uploaded)
-lowrankarena/
+# Basis Sharing generated outputs (large, runtime-created)
+lowrankarena/compress/svd/Basis_Sharing/calib/
+lowrankarena/compress/svd/Basis_Sharing/untrained_model/
+lowrankarena/compress/svd/Basis_Sharing/updated_model/
+lowrankarena/compress/svd/Basis_Sharing/lora/
+lowrankarena/compress/svd/Basis_Sharing/logs/
+lowrankarena/checkpoints/
+lowrankarena/results/
 
 # Compressed and fine-tuned model checkpoints
 compressed_models/

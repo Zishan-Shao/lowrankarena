@@ -1,0 +1,26 @@
+# LowRankArena tested benchmark/runtime stack.
+#
+# These pins match the versions used to validate the current repo-owned flows:
+# load, eval, memory, speed, and demo.
+#
+# Vendored upstream compression baselines under compress/ may still require
+# additional method-specific packages or separate environments.
+
+# Core runtime
+torch==2.10.0
+transformers==4.57.6
+huggingface_hub==0.36.2
+PyYAML==6.0.3
+safetensors==0.5.3
+sentencepiece==0.2.1
+accelerate==1.10.1
+
+# Accuracy / evaluation
+lm_eval==0.4.11
+datasets==4.4.2
+evaluate==0.4.5
+
+# Speed
+# vLLM 0.18.1 does not currently publish wheels for Python 3.14+.
+# Keep the validated speed stack on Python 3.13.x.
+vllm==0.18.1; python_version < "3.14"
