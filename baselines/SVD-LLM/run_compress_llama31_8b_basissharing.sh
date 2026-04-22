@@ -77,6 +77,8 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
     [ ! -f "$CKPT" ] && continue
     if [ ! -f "$ST_DIR/model.safetensors" ]; then
         echo "  converting: $CKPT"
+        # Remove partial dir from any previous failed attempt so mv replaces, not nests
+        rm -rf "$ST_DIR"
         TMPDIR_ST=$(mktemp -d)
         python convert_pt_to_safetensors.py "$CKPT" --output_dir "$TMPDIR_ST" \
             2>&1 | tee -a "logs/${MODEL_TAG}_bs_convert_st.log"
