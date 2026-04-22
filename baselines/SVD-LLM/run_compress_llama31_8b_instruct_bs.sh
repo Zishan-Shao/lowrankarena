@@ -1,10 +1,8 @@
 #!/bin/bash
 # SVD-LLM Basis Sharing (step 5) — GQA-aware
 # Model: meta-llama/Llama-3.1-8B-Instruct
-# Q/K/V share the same input-projection basis (V matrix), enabling FlashSVD GQA decode.
-# Reduction ratios: 0.2 0.3 0.4 0.5 0.6  (keep = 0.8 0.7 0.6 0.5 0.4)
-#
-# Pipeline: compress → strip RoPE → convert to safetensors
+# Keep ratios: 0.8 0.7 0.6 0.5 0.4
+# SVDLLM.py saves files as _basis_sharing_{KEEP}.pt (not reduction ratio).
 #
 # Usage:
 #   bash run_compress_llama31_8b_instruct_bs.sh [HF_TOKEN]
@@ -19,7 +17,6 @@ SAVE_DIR="checkpoints/svdllm/llama31_8b_instruct"
 OUTPUT_DIR="/home/ww247/lowrankarena/hf_ckpts/LowRankArena/llama31_8b_instruct/BasisSharing"
 HF_TOKEN="${1:-}"
 SEQ_LEN=2048
-# Basis Sharing uses V1 Cholesky profiling_mat (same as whitening_only)
 PROF_MAT="$SAVE_DIR/${MODEL_PREFIX}_profiling_wikitext2_256_0.pt"
 
 mkdir -p "$SAVE_DIR" "$OUTPUT_DIR" logs
@@ -27,19 +24,16 @@ mkdir -p "$SAVE_DIR" "$OUTPUT_DIR" logs
 TOKEN_ARG=""
 [ -n "$HF_TOKEN" ] && TOKEN_ARG="--hf_token $HF_TOKEN"
 
-# SVDLLM.py step 5 saves checkpoint as: {MODEL_PREFIX}_basis_sharing_{RATIO}.pt
-# where RATIO is the reduction ratio (e.g. 0.2), NOT the keep ratio.
-
 # ── Step 1: Compress ──────────────────────────────────────────────────────────
-for RATIO in 0.2 0.3 0.4 0.5 0.6; do
-    CKPT="$SAVE_DIR/${MODEL_PREFIX}_basis_sharing_${RATIO}.pt"
+for KEEP in 0.8 0.7 0.6 0.5 0.4; do
+    CKPT="$SAVE_DIR/${MODEL_PREFIX}_basis_sharing_${KEEP}.pt"
     if [ -f "$CKPT" ]; then
         echo "=== checkpoint exists, skipping: $CKPT ==="
         continue
     fi
 
-    KEEP=$(python -c "print(round(1 - $RATIO, 1))")
-    echo "=== Compress BasisSharing ratio=$RATIO (keep=$KEEP) ==="
+    RATIO=$(python -c "print(round(1 - $KEEP, 1))")
+    echo "=== Compress BasisSharing keep=$KEEP (--ratio=$RATIO) ==="
     PROF_ARG=""
     [ -f "$PROF_MAT" ] && PROF_ARG="--profiling_mat_path $PROF_MAT"
     python SVDLLM.py --model "$MODEL" --step 5 --ratio $RATIO \
@@ -50,8 +44,8 @@ done
 
 # Collect existing checkpoints
 CKPTS=""
-for RATIO in 0.2 0.3 0.4 0.5 0.6; do
-    CKPT="$SAVE_DIR/${MODEL_PREFIX}_basis_sharing_${RATIO}.pt"
+for KEEP in 0.8 0.7 0.6 0.5 0.4; do
+    CKPT="$SAVE_DIR/${MODEL_PREFIX}_basis_sharing_${KEEP}.pt"
     [ -f "$CKPT" ] && CKPTS="$CKPTS $CKPT"
 done
 
@@ -66,12 +60,11 @@ echo "=== Stripping RoPE cache ==="
 python strip_rope_cache.py $CKPTS \
     2>&1 | tee "logs/${MODEL_TAG}_bs_strip.log"
 
-# ── Step 3: Convert to safetensors (rename dir to use keep ratio) ─────────────
+# ── Step 3: Convert to safetensors ────────────────────────────────────────────
 echo ""
 echo "=== Converting to safetensors → $OUTPUT_DIR ==="
-for RATIO in 0.2 0.3 0.4 0.5 0.6; do
-    CKPT="$SAVE_DIR/${MODEL_PREFIX}_basis_sharing_${RATIO}.pt"
-    KEEP=$(python -c "print(round(1 - $RATIO, 1))")
+for KEEP in 0.8 0.7 0.6 0.5 0.4; do
+    CKPT="$SAVE_DIR/${MODEL_PREFIX}_basis_sharing_${KEEP}.pt"
     ST_DIR="$OUTPUT_DIR/${MODEL_PREFIX}_basis_sharing_${KEEP}"
     [ ! -f "$CKPT" ] && continue
     if [ ! -f "$ST_DIR/model.safetensors" ]; then
@@ -80,8 +73,7 @@ for RATIO in 0.2 0.3 0.4 0.5 0.6; do
         TMPDIR_ST=$(mktemp -d)
         python convert_pt_to_safetensors.py "$CKPT" --output_dir "$TMPDIR_ST" \
             2>&1 | tee -a "logs/${MODEL_TAG}_bs_convert_st.log"
-        # Rename from RATIO-based name to KEEP-based name for eval compatibility
-        SRC="$TMPDIR_ST/${MODEL_PREFIX}_basis_sharing_${RATIO}"
+        SRC="$TMPDIR_ST/${MODEL_PREFIX}_basis_sharing_${KEEP}"
         if [ -d "$SRC" ]; then
             mv "$SRC" "$ST_DIR"
         else
@@ -95,8 +87,7 @@ done
 
 echo ""
 echo "=== All done ==="
-for RATIO in 0.2 0.3 0.4 0.5 0.6; do
-    KEEP=$(python -c "print(round(1 - $RATIO, 1))")
+for KEEP in 0.8 0.7 0.6 0.5 0.4; do
     ST_DIR="$OUTPUT_DIR/${MODEL_PREFIX}_basis_sharing_${KEEP}"
     [ -f "$ST_DIR/model.safetensors" ] && echo "  ✓ $ST_DIR" || echo "  ✗ MISSING: $ST_DIR"
 done
