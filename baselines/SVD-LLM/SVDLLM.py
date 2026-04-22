@@ -292,6 +292,11 @@ def profle_svdllm_low_resource(
         def __init__(self, module):
             super().__init__()
             self.module = module
+        def __getattr__(self, name):
+            try:
+                return super().__getattr__(name)
+            except AttributeError:
+                return getattr(self.module, name)
         def forward(self, inp, **kwargs):
             # Keep tensors on the same device as 'inps' (CPU-pinned if enabled)
             inps[cache['i']] = inp.to(buf_device, non_blocking=True)
@@ -811,6 +816,11 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
         def __init__(self, module):
             super().__init__()
             self.module = module
+        def __getattr__(self, name):
+            try:
+                return super().__getattr__(name)
+            except AttributeError:
+                return getattr(self.module, name)
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp.to(dev)
             cache['i'] += 1

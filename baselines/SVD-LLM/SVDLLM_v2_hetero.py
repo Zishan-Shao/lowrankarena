@@ -238,6 +238,14 @@ def profle_svdllm_low_resource(
             super().__init__()
             self.module = module
 
+        def __getattr__(self, name):
+            # Proxy attribute access to wrapped module so model.forward can
+            # read layer-level attributes (e.g. Qwen3's attention_type).
+            try:
+                return super().__getattr__(name)
+            except AttributeError:
+                return getattr(self.module, name)
+
         def forward(self, inp, **kwargs):
             idx = cache["i"]
             inps[idx] = inp
