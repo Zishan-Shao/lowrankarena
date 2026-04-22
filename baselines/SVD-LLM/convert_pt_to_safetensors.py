@@ -86,19 +86,21 @@ def _collect_svd_metadata(model) -> dict:
 
 
 def _state_dict_to_saveable(model) -> dict[str, torch.Tensor]:
-    """Extract state dict, skipping None buffers and making tensors contiguous."""
+    """Extract state dict, skipping None buffers and making tensors contiguous.
+
+    Always clones each tensor so that basis-sharing checkpoints (where
+    q_v_proj / k_v_proj / v_v_proj share the same storage) produce
+    independent tensors that safetensors can serialize without error.
+    """
     sd = {}
     for k, v in model.state_dict().items():
         if v is None:
             continue
         if not isinstance(v, torch.Tensor):
             continue
-        # safetensors requires contiguous tensors
-        if not v.is_contiguous():
-            v = v.contiguous()
-        # safetensors does not support bfloat16 on all backends; keep as-is,
-        # caller can cast if needed
-        sd[k] = v.cpu()
+        # .clone() materialises shared-storage tensors (Basis Sharing V matrices)
+        # and also ensures contiguity, so no separate .contiguous() needed.
+        sd[k] = v.detach().clone().cpu()
     return sd
 
 
@@ -160,7 +162,18 @@ def convert_checkpoint(pt_path: Path, output_root: Path | None = None) -> Path:
     # Save config
     cfg = getattr(model, "config", None)
     if cfg is not None:
-        cfg.save_pretrained(str(out_dir))
+        try:
+            cfg.save_pretrained(str(out_dir))
+        except TypeError:
+            # Newer transformers stores torch_dtype as a dtype object, not a string.
+            # Manually serialize after converting dtype objects → strings.
+            import json as _json
+            cfg_dict = cfg.to_dict()
+            for _k, _v in list(cfg_dict.items()):
+                if isinstance(_v, torch.dtype):
+                    cfg_dict[_k] = str(_v).replace("torch.", "")
+            with open(out_dir / "config.json", "w") as _f:
+                _json.dump(cfg_dict, _f, indent=2)
         print("  config saved")
     else:
         print("  [warn] no model.config found")
