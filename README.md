@@ -15,6 +15,7 @@ The current hosted checkpoint source of truth is the gated Hugging Face reposito
 - [`checkpoints/index.csv`](./checkpoints/index.csv): checkpoint registry used by all runners
 - [`checkpoints/manifests/`](./checkpoints/manifests/README.md): optional rich checkpoint metadata
 - [`benchmark/`](./benchmark/README.md): declarative suite definitions
+- [`audit/`](./audit/README.md): appendix audit configs and reproducible job planning
 - [`scripts/`](./scripts/README.md): user-facing entrypoints
 - [`src/`](./src/README.md): reusable runtime, adapters, and result normalization
 - [`results/`](./results/README.md): normalized benchmark outputs
@@ -62,6 +63,7 @@ instruct = instruct/mmlu_pro + instruct/gsm8k
 instruct_appendix = instruct/aime + instruct/ifeval
 memory = memory/active
 serving speed = speed/serve
+online serving speed = speed/serve_e2e
 evaluation speed = speed/speed
 edge speed = speed/edge
 ```
@@ -83,6 +85,7 @@ System metrics:
 
 - [`memory/active.yaml`](./benchmark/memory/active.yaml): active memory peak for one process via `torch.cuda.max_memory_allocated()`; normalized outputs record the CUDA device name/class and visible-device mapping.
 - [`speed/serve.yaml`](./benchmark/speed/serve.yaml): mainstream vLLM serving cases for prefill/decode throughput; normalized outputs record the CUDA device name/class used by the run.
+- [`speed/serve_e2e.yaml`](./benchmark/speed/serve_e2e.yaml): online serving benchmark that starts `vllm serve`, drives it with `vllm bench serve`, and records TTFT/TPOT/ITL/E2E latency plus request and output-token throughput.
 - [`speed/speed.yaml`](./benchmark/speed/speed.yaml): end-to-end evaluation-speed route over the default base eval lane.
 - [`speed/edge.yaml`](./benchmark/speed/edge.yaml): optional long-context serving cases for appendix or stress reporting.
 
@@ -99,7 +102,7 @@ python scripts/run_main.py --suites instruct --checkpoint llama31-8b-instruct --
 
 PPL is the exception: `ppl.yaml` always uses the repo-owned contiguous PPL runner, even if an aggregate command passes a vLLM backend override.
 
-All benchmark suites use `dtype: auto` by default so fp16 and bf16 checkpoints can run without editing YAML. CLI overrides accept common aliases such as `fp16`, `float`, `bf16`, and `bfloat`.
+Accuracy suites use `dtype: auto` by default so fp16 and bf16 checkpoints can run without editing YAML. Efficiency suites default to `float16` for paper-facing comparability; pass `--dtype bfloat16` when a fixed bf16 run is the intended comparison.
 
 ## Recommended Workflow
 
@@ -115,6 +118,13 @@ Optional artifact-author path:
 2. Export it into a loadable checkpoint directory.
 3. Register it in the checkpoint index or a sidecar manifest.
 4. Use the normal evaluation, memory, and speed flow.
+
+Appendix-audit path:
+
+1. Pick an audit config under [`audit/configs/`](./audit/configs/).
+2. Generate a command plan with [`audit/run_audit.py`](./audit/run_audit.py).
+3. Run the generated script or the specialized priority-1 feasibility runner.
+4. Summarize audit JSON into the appendix table/figure inputs.
 
 ## Common Commands
 
@@ -186,6 +196,13 @@ python scripts/run_speed.py \
   llama-7b-svdllm-v1-update-0.5 \
   --suite speed/speed \
   --eval-limit 1
+
+# online vLLM serving latency + throughput
+python scripts/run_speed.py \
+  llama-7b-svdllm-v1-update-0.5 \
+  --suite speed/serve_e2e \
+  --port 8000 \
+  --num-prompts 8
 ```
 
 Route smoke:

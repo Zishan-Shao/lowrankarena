@@ -37,6 +37,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-batch-size", default=None)
     parser.add_argument("--eval-limit", type=float, default=None)
     parser.add_argument("--eval-num-fewshot", type=int, default=None)
+    parser.add_argument("--host", default=None, help="Host for online vLLM bench serve suites.")
+    parser.add_argument("--port", type=int, default=None, help="Port for online vLLM bench serve suites.")
+    parser.add_argument("--request-rate", default=None, help="Requests per second for online vLLM bench serve suites.")
+    parser.add_argument("--num-prompts", type=int, default=None, help="Number of prompts per online serving profile.")
+    parser.add_argument("--max-concurrency", type=int, default=None, help="Maximum concurrent online benchmark requests.")
+    parser.add_argument("--ready-check-timeout-seconds", type=int, default=None)
     parser.add_argument("--run-label", default="ad_hoc")
     parser.add_argument("--strict-validation", action="store_true")
     return parser.parse_args()
@@ -67,6 +73,12 @@ def main() -> None:
             eval_batch_size=args.eval_batch_size,
             eval_limit=args.eval_limit,
             eval_num_fewshot=args.eval_num_fewshot,
+            host=args.host,
+            port=args.port,
+            request_rate=args.request_rate,
+            num_prompts=args.num_prompts,
+            max_concurrency=args.max_concurrency,
+            ready_check_timeout_seconds=args.ready_check_timeout_seconds,
             verbose_backend=args.verbose_backend,
             show_progress=True,
             run_label=args.run_label,

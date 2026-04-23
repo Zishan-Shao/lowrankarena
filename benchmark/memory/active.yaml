@@ -5,7 +5,7 @@ selection:
   enabled_only: true
 memory:
   backend: transformers
-  dtype: auto
+  dtype: float16
   batch_size: 1
   prompt_length: 512
   generation_length: 128

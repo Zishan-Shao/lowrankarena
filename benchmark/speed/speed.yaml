@@ -6,6 +6,7 @@ selection:
 speed:
   backend: evaluation
   model_backend: vllm
+  dtype: float16
   metric_aggregation: macro_mean
   eval_suites:
     - ppl

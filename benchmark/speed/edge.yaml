@@ -35,7 +35,7 @@ speed:
   warmup: 1
   tensor_parallel_size: 1
   gpu_memory_utilization: 0.6
-  dtype: auto
+  dtype: float16
   max_model_len: 16384
   enforce_eager: false
   metrics:

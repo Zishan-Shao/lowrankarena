@@ -42,7 +42,7 @@ full = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["src*"]
+include = ["src*", "audit*"]
 namespaces = true
 
 [tool.pytest.ini_options]

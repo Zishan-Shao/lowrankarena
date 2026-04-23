@@ -12,9 +12,11 @@ The current test suite is intentionally pragmatic. It focuses on schema, layout,
 - [`test_load.py`](./test_load.py): validate checkpoint loading helpers.
 - [`test_eval.py`](./test_eval.py): validate small eval-runner helper behavior.
 - [`test_memory.py`](./test_memory.py): validate memory-runner helper behavior.
+- [`test_speed_runner.py`](./test_speed_runner.py): validate speed-suite dispatch and normalization helpers.
 - [`test_result_schema.py`](./test_result_schema.py): validate the shared normalized result shape.
 - [`test_vllm_adapter.py`](./test_vllm_adapter.py): validate the stable adapter contract for vLLM-prepared checkpoints.
 - [`test_compress.py`](./test_compress.py): validate compression-planning scaffolding.
+- [`test_audit.py`](./test_audit.py): validate appendix audit plan generation and priority-1 dry-run output.
 - [`test_benchmark_configs.py`](./test_benchmark_configs.py): verify benchmark configs stay aligned with exact `lm-eval` task names.
 
 ## Scope

@@ -154,7 +154,7 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     assert memory["kind"] == "memory"
     assert memory["selection"] == {"enabled_only": True}
     assert memory["memory"]["backend"] == "transformers"
-    assert memory["memory"]["dtype"] == "auto"
+    assert memory["memory"]["dtype"] == "float16"
     assert memory["memory"]["batch_size"] == 1
     assert memory["memory"]["prompt_length"] == 512
     assert memory["memory"]["generation_length"] == 128
@@ -201,7 +201,7 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     assert sorted({case["generation_length"] for case in serve["speed"]["cases"]}) == [128, 512]
     assert serve["speed"]["repeat"] == 7
     assert serve["speed"]["gpu_memory_utilization"] == 0.35
-    assert serve["speed"]["dtype"] == "auto"
+    assert serve["speed"]["dtype"] == "float16"
     assert serve["speed"]["max_model_len"] == 3072
 
     edge = load_yaml(PROJECT_ROOT / "benchmark" / "speed" / "edge.yaml")
@@ -219,12 +219,13 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     assert sorted({case["generation_length"] for case in edge["speed"]["cases"]}) == [128, 512]
     assert edge["speed"]["repeat"] == 7
     assert edge["speed"]["gpu_memory_utilization"] == 0.6
-    assert edge["speed"]["dtype"] == "auto"
+    assert edge["speed"]["dtype"] == "float16"
     assert edge["speed"]["max_model_len"] == 16384
 
     eval_speed = load_yaml(PROJECT_ROOT / "benchmark" / "speed" / "speed.yaml")
     assert eval_speed["speed"]["backend"] == "evaluation"
     assert eval_speed["speed"]["model_backend"] == "vllm"
+    assert eval_speed["speed"]["dtype"] == "float16"
     assert eval_speed["speed"]["metric_aggregation"] == "macro_mean"
     assert eval_speed["selection"] == {"enabled_only": True}
     assert eval_speed["speed"]["eval_suites"] == [
@@ -236,6 +237,27 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
         "total_wall_time_seconds",
         "mean_suite_wall_time_seconds",
     ]
+
+    serve_e2e = load_yaml(PROJECT_ROOT / "benchmark" / "speed" / "serve_e2e.yaml")
+    assert serve_e2e["speed"]["backend"] == "vllm_bench_serve"
+    assert serve_e2e["selection"] == {"enabled_only": True}
+    assert [profile["name"] for profile in serve_e2e["speed"]["profiles"]] == [
+        "prefill_heavy_4k_to_32",
+        "balanced_2k_to_128",
+        "decode_heavy_512_to_512",
+    ]
+    assert [(profile["input_length"], profile["output_length"]) for profile in serve_e2e["speed"]["profiles"]] == [
+        (4096, 32),
+        (2048, 128),
+        (512, 512),
+    ]
+    assert serve_e2e["speed"]["request_rate"] == 1.0
+    assert serve_e2e["speed"]["num_prompts"] == 64
+    assert serve_e2e["speed"]["max_concurrency"] == 16
+    assert serve_e2e["speed"]["metric_percentiles"] == [50, 95, 99]
+    assert serve_e2e["speed"]["gpu_memory_utilization"] == 0.6
+    assert serve_e2e["speed"]["dtype"] == "float16"
+    assert serve_e2e["speed"]["max_model_len"] == 4608
 
 
 def test_aggregate_selection_override_supports_variant_lanes(tmp_path: Path) -> None:

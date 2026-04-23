@@ -50,6 +50,7 @@ There is intentionally no catch-all `main.yaml`. Paper accuracy/perplexity table
 ```text
 memory = memory/active
 serving speed = speed/serve
+online serving speed = speed/serve_e2e
 evaluation speed = speed/speed
 edge speed = speed/edge
 ```
@@ -58,7 +59,7 @@ edge speed = speed/edge
 
 Suite membership and task selection are version-controlled in YAML. For `lm_eval_harness` suites, the concrete task IDs live under each suite's `eval.tasks`.
 
-Suites use `dtype: auto` by default so fp16 and bf16 checkpoints can run without editing YAML. Override from the CLI when a run needs a fixed precision, for example `--dtype bf16` on `scripts/run_eval.py`, `--dtype bf16` on `scripts/run_memory.py`, `--dtype bf16` on `scripts/run_speed.py`, or `--eval-dtype bf16` on `scripts/run_main.py`.
+Accuracy suites use `dtype: auto` by default so fp16 and bf16 checkpoints can run without editing YAML. Efficiency suites default to `float16` for comparable system measurements; override from the CLI when a run needs fixed bf16, for example `--dtype bf16` on `scripts/run_memory.py` or `scripts/run_speed.py`, or `--eval-dtype bf16` on `scripts/run_main.py`.
 
 The paper-facing `lm_eval_harness` suites for base MCQ, base math, MMLU-Pro, GSM8K, AIME, and IFEval default to `model_backend: vllm` so full leaderboard runs do not crawl through the Transformers backend. Use `--model-backend hf` on `scripts/run_eval.py` or `--eval-model-backend hf` on `scripts/run_main.py` when you need a direct HF comparison. `ppl.yaml` stays on the project-owned contiguous PPL runner and ignores vLLM backend overrides.
 
@@ -95,6 +96,7 @@ python scripts/run_main.py --suites base --checkpoint llama31-8b-svdllm-v1-updat
 # Dedicated system metrics
 python scripts/run_memory.py llama31-8b-svdllm-v1-update-0.6 --suite memory/active
 python scripts/run_speed.py llama31-8b-svdllm-v1-update-0.6 --suite speed/serve
+python scripts/run_speed.py llama31-8b-svdllm-v1-update-0.6 --suite speed/serve_e2e
 
 # Single lane-specific suites
 python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite base/base_math --limit 1
