@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.registry import CheckpointRecord, filter_checkpoints, load_checkpoint_index
+from src.registry import CheckpointRecord, load_checkpoint_index
 from src.utils import load_yaml, project_path
 
 
@@ -52,12 +52,43 @@ def suite_output_name(config_path: str | Path, root: str | Path = BENCHMARK_ROOT
     return "__".join(relative_parts)
 
 
-def select_checkpoints_for_suite(config: dict, index_path: str | Path) -> list[CheckpointRecord]:
+def _selection_items(selection: dict, key: str) -> list[str]:
+    return [str(item) for item in selection.get(key, []) if str(item).strip()]
+
+
+def _matches_selection(record: CheckpointRecord, selection: dict, *, enabled_only: bool) -> bool:
+    if enabled_only and not record.enabled:
+        return False
+
+    benchmarks = _selection_items(selection, "benchmarks")
+    if benchmarks and not any(benchmark in record.benchmarks for benchmark in benchmarks):
+        return False
+
+    variants = _selection_items(selection, "variants")
+    if variants and record.variant not in variants:
+        return False
+
+    model_families = _selection_items(selection, "model_families")
+    if model_families and record.model_family not in model_families:
+        return False
+
+    methods = _selection_items(selection, "methods")
+    if methods and record.method not in methods:
+        return False
+
+    return True
+
+
+def select_checkpoints_for_suite(
+    config: dict,
+    index_path: str | Path,
+    *,
+    selection_override: dict | None = None,
+) -> list[CheckpointRecord]:
     records = load_checkpoint_index(index_path)
-    selection = config.get("selection", {})
+    selection = selection_override if selection_override is not None else config.get("selection", {})
     enabled_only = bool(selection.get("enabled_only", True))
-    benchmarks = selection.get("benchmarks", [])
-    explicit_names = [str(item) for item in selection.get("checkpoints", []) if str(item).strip()]
+    explicit_names = _selection_items(selection, "checkpoints")
 
     if explicit_names:
         by_name = {record.name: record for record in records}
@@ -75,14 +106,8 @@ def select_checkpoints_for_suite(config: dict, index_path: str | Path) -> list[C
             raise KeyError(f"Unknown checkpoints in suite selection: {', '.join(missing)}")
         return selected
 
-    if not benchmarks:
-        return [record for record in records if record.enabled or not enabled_only]
-
-    selected: list[CheckpointRecord] = []
-    for benchmark in benchmarks:
-        selected.extend(filter_checkpoints(records, benchmark=benchmark, enabled_only=enabled_only))
-
-    deduped: dict[str, CheckpointRecord] = {}
-    for record in selected:
-        deduped[record.name] = record
-    return list(deduped.values())
+    return [
+        record
+        for record in records
+        if _matches_selection(record, selection, enabled_only=enabled_only)
+    ]

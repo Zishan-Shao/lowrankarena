@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from src.dtype_utils import normalize_config_torch_dtype_name
+
 
 WRAPPER_METADATA_NAME = "vllm_wrapper_meta.json"
 
@@ -60,6 +62,7 @@ PASSTHROUGH_NAMES = [
     "tokenizer.json",
     "tokenizer_config.json",
     "pytorch_model.bin.index.json",
+    "model.safetensors.index.json",
 ]
 
 
@@ -109,6 +112,8 @@ def symlink_file(src: Path, dst: Path) -> None:
 
 def build_config(source_config: dict[str, Any]) -> dict[str, Any]:
     config = dict(source_config)
+    if "torch_dtype" in config and config.get("torch_dtype") is not None:
+        config["torch_dtype"] = normalize_config_torch_dtype_name(config.get("torch_dtype"))
     auto_map = dict(config.get("auto_map") or {})
     auto_map["AutoConfig"] = "configuration_svdllm_llama.SVDLLMLlamaConfig"
     auto_map["AutoModel"] = "modeling_svdllm_llama.SVDLLMLlamaModel"
@@ -163,6 +168,10 @@ def _looks_like_compatible_wrapper(output_dir: Path) -> tuple[bool, dict[str, An
         and list(config.get("architectures") or []) == ["TransformersForCausalLM"]
         and auto_map.get("AutoModel") == "modeling_svdllm_llama.SVDLLMLlamaModel"
         and auto_map.get("AutoModelForCausalLM") == "modeling_svdllm_llama.SVDLLMLlamaForCausalLM"
+        and (
+            (output_dir / "pytorch_model.bin.index.json").exists()
+            or (output_dir / "model.safetensors.index.json").exists()
+        )
     )
     if not is_compatible:
         return False, None
@@ -208,6 +217,8 @@ def materialize_svdllm_llama_wrapper(
             symlink_file(src, output_dir / name)
 
     for shard in sorted(source_model.glob("pytorch_model-*.bin")):
+        symlink_file(shard, output_dir / shard.name)
+    for shard in sorted(source_model.glob("model-*.safetensors")):
         symlink_file(shard, output_dir / shard.name)
 
     config_src = source_model / "configuration_svdllm_llama.py"

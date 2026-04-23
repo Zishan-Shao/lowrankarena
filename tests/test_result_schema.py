@@ -16,7 +16,7 @@ def sample_record() -> CheckpointRecord:
         repo_id="Duke-CEI-SVD/LowRankArena",
         revision="main",
         subpath="llama31_8b/SVDLLMv1/hf_whitening_then_update_0.6",
-        benchmarks=["main", "speed"],
+        benchmarks=["base", "speed"],
         enabled=True,
         notes="test row",
     )

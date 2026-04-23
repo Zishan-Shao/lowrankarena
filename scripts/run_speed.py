@@ -32,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--enforce-eager", action="store_true")
     parser.add_argument("--verbose-backend", action="store_true", help="Show raw vLLM logs.")
     parser.add_argument("--lm-eval-bin", default=None, help="lm-eval executable path for evaluation-speed suites.")
+    parser.add_argument("--eval-model-backend", default=None, help="Model backend for evaluation-speed suites, e.g. hf or vllm.")
     parser.add_argument("--eval-device", default=None)
     parser.add_argument("--eval-batch-size", default=None)
     parser.add_argument("--eval-limit", type=float, default=None)
@@ -61,6 +62,7 @@ def main() -> None:
             max_model_len=args.max_model_len,
             enforce_eager=True if args.enforce_eager else None,
             lm_eval_bin=args.lm_eval_bin,
+            eval_model_backend=args.eval_model_backend,
             eval_device=args.eval_device,
             eval_batch_size=args.eval_batch_size,
             eval_limit=args.eval_limit,

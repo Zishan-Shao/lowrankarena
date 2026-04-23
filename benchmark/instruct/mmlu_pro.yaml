@@ -1,0 +1,25 @@
+name: mmlu_pro
+kind: eval
+description: Direct-answer MMLU-Pro multiple-choice protocol through the lm-eval leaderboard_mmlu_pro task; no Chain-of-Thought generation.
+selection:
+  variants:
+    - instruct
+  enabled_only: true
+eval:
+  backend: lm_eval_harness
+  model_backend: vllm
+  version: 0.4.11
+  dataset: lm_eval_harness
+  dtype: auto
+  metric: acc
+  tracked_metrics:
+    - acc
+  metric_aggregation: macro_mean
+  batch_size: auto
+  num_fewshot: 5
+  tasks:
+    - leaderboard_mmlu_pro
+report:
+  result_dir: results/leaderboard/eval
+  output_dir: results/tables
+  filename: mmlu_pro.md

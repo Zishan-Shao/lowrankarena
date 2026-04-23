@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,6 +10,7 @@ import torch
 import torch.nn.functional as F
 
 from src.benchmarking import suite_output_name
+from src.dtype_utils import normalize_dtype_name
 from src.inference_adapter import prepare_model_for_inference
 from src.load import load_checkpoint
 from src.memory_runner import resolve_dtype
@@ -23,6 +25,10 @@ except ImportError:  # pragma: no cover - optional until eval dependencies are i
 
 
 DEFAULT_C4_STREAM_MAX_EVAL_TOKENS = 262144
+DEFAULT_C4_DATASET_PATH = "allenai/c4"
+DEFAULT_C4_DATASET_NAME = "en"
+DEFAULT_WIKITEXT_DATASET_PATH = "wikitext"
+DEFAULT_WIKITEXT_DATASET_NAME = "wikitext-2-raw-v1"
 
 
 @dataclass(slots=True)
@@ -72,10 +78,29 @@ def _build_contiguous_blocks(token_ids: list[int], *, max_length: int) -> torch.
     return torch.tensor(token_ids[:usable_tokens], dtype=torch.long).view(-1, max_length)
 
 
-def _load_wikitext2_token_ids(tokenizer: Any, *, split: str, cache_dir: str | None = None) -> list[int]:
+def _hash_token_ids(token_ids: list[int]) -> str:
+    digest = hashlib.sha256()
+    for token_id in token_ids:
+        digest.update(int(token_id).to_bytes(8, byteorder="little", signed=False))
+    return digest.hexdigest()
+
+
+def _load_wikitext2_token_ids(
+    tokenizer: Any,
+    *,
+    split: str,
+    cache_dir: str | None = None,
+    revision: str | None = None,
+) -> list[int]:
     if load_dataset is None:
         raise RuntimeError("datasets is required for contiguous perplexity evaluation.")
-    dataset = load_dataset("wikitext", "wikitext-2-raw-v1", split=split, cache_dir=cache_dir)
+    dataset = load_dataset(
+        DEFAULT_WIKITEXT_DATASET_PATH,
+        DEFAULT_WIKITEXT_DATASET_NAME,
+        split=split,
+        cache_dir=cache_dir,
+        revision=revision,
+    )
     return _encode_text(tokenizer, "\n\n".join(str(item) for item in dataset["text"]))
 
 
@@ -86,6 +111,10 @@ def _load_c4_stream_token_ids(
     max_eval_tokens: int,
     max_length: int,
     cache_dir: str | None = None,
+    revision: str | None = None,
+    dataset_path: str = DEFAULT_C4_DATASET_PATH,
+    dataset_name: str = DEFAULT_C4_DATASET_NAME,
+    document_offset: int = 0,
 ) -> tuple[list[int], int]:
     if load_dataset is None:
         raise RuntimeError("datasets is required for contiguous perplexity evaluation.")
@@ -97,18 +126,25 @@ def _load_c4_stream_token_ids(
 
     separator_tokens = _encode_text(tokenizer, "\n\n")
     docs_scanned = 0
+    docs_skipped = 0
     token_ids: list[int] = []
     last_doc_had_content = False
 
-    dataset_attempts = [
-        ("allenai/c4", "en"),
-        ("c4", "en"),
-    ]
+    dataset_attempts = [(dataset_path, dataset_name)]
+    if revision is None and dataset_path == DEFAULT_C4_DATASET_PATH and dataset_name == DEFAULT_C4_DATASET_NAME:
+        dataset_attempts.append(("c4", DEFAULT_C4_DATASET_NAME))
     last_error: Exception | None = None
     stream = None
     for path, name in dataset_attempts:
         try:
-            stream = load_dataset(path, name, split=split, streaming=True, cache_dir=cache_dir)
+            stream = load_dataset(
+                path,
+                name,
+                split=split,
+                streaming=True,
+                cache_dir=cache_dir,
+                revision=revision,
+            )
             break
         except Exception as exc:  # pragma: no cover - depends on dataset availability.
             last_error = exc
@@ -118,6 +154,9 @@ def _load_c4_stream_token_ids(
     for item in stream:
         text = str(item.get("text", "") or "")
         if not text.strip():
+            continue
+        if docs_skipped < document_offset:
+            docs_skipped += 1
             continue
         doc_tokens = _encode_text(tokenizer, text)
         if not doc_tokens:
@@ -147,22 +186,44 @@ def _dataset_token_ids(
     dataset_kind = str(dataset_config.get("kind") or dataset_config.get("name") or "").strip().lower()
     split = str(dataset_config.get("split", "test"))
     cache_dir = str(dataset_config.get("cache_dir", default_cache_dir)) if dataset_config.get("cache_dir", default_cache_dir) else None
+    revision = str(dataset_config.get("revision")).strip() if dataset_config.get("revision") else None
 
     if dataset_kind == "wikitext2":
-        token_ids = _load_wikitext2_token_ids(tokenizer, split=split, cache_dir=cache_dir)
-        return token_ids, {"split": split}
+        token_ids = _load_wikitext2_token_ids(
+            tokenizer,
+            split=split,
+            cache_dir=cache_dir,
+            revision=revision,
+        )
+        return token_ids, {
+            "split": split,
+            "dataset_path": DEFAULT_WIKITEXT_DATASET_PATH,
+            "dataset_config_name": DEFAULT_WIKITEXT_DATASET_NAME,
+            "dataset_revision": revision,
+        }
 
     if dataset_kind == "c4_stream":
         max_eval_tokens = int(dataset_config.get("max_eval_tokens", DEFAULT_C4_STREAM_MAX_EVAL_TOKENS))
+        dataset_path = str(dataset_config.get("path") or dataset_config.get("dataset_path") or DEFAULT_C4_DATASET_PATH)
+        dataset_name = str(dataset_config.get("config_name") or dataset_config.get("dataset_name") or DEFAULT_C4_DATASET_NAME)
+        document_offset = int(dataset_config.get("document_offset", 0))
         token_ids, docs_scanned = _load_c4_stream_token_ids(
             tokenizer,
             split=split,
             max_eval_tokens=max_eval_tokens,
             max_length=max_length,
             cache_dir=cache_dir,
+            revision=revision,
+            dataset_path=dataset_path,
+            dataset_name=dataset_name,
+            document_offset=document_offset,
         )
         return token_ids, {
             "split": split,
+            "dataset_path": dataset_path,
+            "dataset_config_name": dataset_name,
+            "dataset_revision": revision,
+            "document_offset": document_offset,
             "max_eval_tokens": max_eval_tokens,
             "docs_scanned": docs_scanned,
         }
@@ -224,7 +285,10 @@ def run_contiguous_ppl_suite(request: Any, *, suite_path: Path, suite_config: di
     requested_device = request.device if request.device is not None else eval_config.get("device")
     device = torch.device(str(requested_device or ("cuda:0" if torch.cuda.is_available() else "cpu")))
 
-    dtype = resolve_dtype(str(eval_config.get("dtype", "auto")))
+    effective_dtype_name = normalize_dtype_name(
+        request.extra_model_args.get("dtype", eval_config.get("dtype", "auto"))
+    )
+    dtype = resolve_dtype(effective_dtype_name)
     if device.type == "cpu" and dtype in {torch.float16, torch.bfloat16}:
         dtype = torch.float32
 
@@ -273,6 +337,7 @@ def run_contiguous_ppl_suite(request: Any, *, suite_path: Path, suite_config: di
             batch_size=batch_size,
             device=device,
         )
+        scored_token_ids = blocks.reshape(-1).tolist()
         ppl = math.exp(total_nll / float(total_tokens))
         task_results.append(
             {
@@ -280,6 +345,8 @@ def run_contiguous_ppl_suite(request: Any, *, suite_path: Path, suite_config: di
                 "ppl": ppl,
                 "negative_log_likelihood_sum": total_nll,
                 "token_count": total_tokens,
+                "loaded_token_count": len(token_ids),
+                "scored_token_sha256": _hash_token_ids(scored_token_ids),
                 "block_count": int(blocks.shape[0]),
                 "max_length": max_length,
                 **dataset_meta,
@@ -305,9 +372,10 @@ def run_contiguous_ppl_suite(request: Any, *, suite_path: Path, suite_config: di
         suite_name=str(suite_config.get("name", suite_path.stem)),
         config={
             "datasets": [str(item.get("name") or item.get("kind") or "") for item in dataset_configs],
+            "dataset_configs": dataset_configs,
             "metric": str(eval_config.get("metric", "ppl")),
             "metric_aggregation": aggregation,
-            "dtype": str(eval_config.get("dtype", "auto")),
+            "dtype": str(dtype).replace("torch.", "") if dtype != "auto" else effective_dtype_name,
             "device": str(device),
             "batch_size": batch_size,
             "max_length": max_length,

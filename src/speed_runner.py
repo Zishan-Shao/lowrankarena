@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from src.benchmarking import resolve_suite_path, suite_id, suite_output_name
+from src.dtype_utils import normalize_dtype_name
 from src.load import load_checkpoint
 from src.lm_eval_runner import DEFAULT_LM_EVAL_BIN, LmEvalRequest, run_lm_eval_suite
 from src.result_schema import build_result_payload
@@ -36,6 +37,7 @@ class VllmSpeedRequest:
     max_model_len: int | None = None
     enforce_eager: bool | None = None
     lm_eval_bin: str | None = None
+    eval_model_backend: str | None = None
     eval_device: str | None = None
     eval_batch_size: str | int | None = None
     eval_limit: float | int | None = None
@@ -273,7 +275,7 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         if request.gpu_memory_utilization is not None
         else speed_config.get("gpu_memory_utilization", 0.9)
     )
-    dtype = request.dtype or speed_config.get("dtype", "auto")
+    dtype = normalize_dtype_name(request.dtype or speed_config.get("dtype", "auto"))
     max_model_len = (
         int(request.max_model_len)
         if request.max_model_len is not None
@@ -447,10 +449,22 @@ def run_evaluation_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
     aggregation = str(speed_config.get("metric_aggregation", "macro_mean"))
     eval_output_root, eval_raw_output_root = _nested_eval_roots(request)
     lm_eval_bin = request.lm_eval_bin or str(speed_config.get("lm_eval_bin", DEFAULT_LM_EVAL_BIN))
+    eval_model_backend = request.eval_model_backend if request.eval_model_backend is not None else speed_config.get("model_backend")
     eval_device = request.eval_device if request.eval_device is not None else speed_config.get("device")
     eval_batch_size = request.eval_batch_size if request.eval_batch_size is not None else speed_config.get("batch_size")
     eval_limit = request.eval_limit if request.eval_limit is not None else speed_config.get("limit")
     eval_num_fewshot = request.eval_num_fewshot if request.eval_num_fewshot is not None else speed_config.get("num_fewshot")
+    eval_dtype = normalize_dtype_name(request.dtype) if request.dtype is not None else None
+    eval_tensor_parallel_size = (
+        request.tensor_parallel_size if request.tensor_parallel_size is not None else speed_config.get("tensor_parallel_size")
+    )
+    eval_gpu_memory_utilization = (
+        request.gpu_memory_utilization
+        if request.gpu_memory_utilization is not None
+        else speed_config.get("gpu_memory_utilization")
+    )
+    eval_max_model_len = request.max_model_len if request.max_model_len is not None else speed_config.get("max_model_len")
+    eval_enforce_eager = request.enforce_eager if request.enforce_eager is not None else speed_config.get("enforce_eager")
 
     loaded = load_checkpoint(
         request.checkpoint_name,
@@ -472,10 +486,16 @@ def run_evaluation_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
                 output_dir=eval_output_root,
                 raw_output_root=eval_raw_output_root,
                 lm_eval_bin=lm_eval_bin,
+                model_backend=eval_model_backend,
                 device=eval_device,
                 batch_size=eval_batch_size,
                 limit=eval_limit,
                 num_fewshot=eval_num_fewshot,
+                tensor_parallel_size=eval_tensor_parallel_size,
+                gpu_memory_utilization=eval_gpu_memory_utilization,
+                max_model_len=eval_max_model_len,
+                enforce_eager=eval_enforce_eager,
+                extra_model_args={"dtype": eval_dtype} if eval_dtype is not None else {},
                 trust_remote_code=request.trust_remote_code,
                 local_files_only=request.local_files_only,
                 run_label=request.run_label,
@@ -505,10 +525,16 @@ def run_evaluation_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
             "eval_suites": [suite_id(path) for path in eval_suite_paths],
             "metric_aggregation": aggregation,
             "lm_eval_bin": lm_eval_bin,
+            "model_backend": eval_model_backend,
             "device": eval_device,
             "batch_size": eval_batch_size,
             "limit": eval_limit,
             "num_fewshot": eval_num_fewshot,
+            "dtype": eval_dtype,
+            "tensor_parallel_size": eval_tensor_parallel_size,
+            "gpu_memory_utilization": eval_gpu_memory_utilization,
+            "max_model_len": eval_max_model_len,
+            "enforce_eager": eval_enforce_eager,
             "trust_remote_code": request.trust_remote_code,
             "local_files_only": request.local_files_only,
         },

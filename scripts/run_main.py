@@ -10,42 +10,80 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.benchmarking import load_suite_config, select_checkpoints_for_suite, suite_id
+from src.dtype_utils import normalize_dtype_name
 from src.lm_eval_runner import LmEvalRequest, run_lm_eval_suite
-from src.memory_runner import MemoryRequest, run_memory_measurement
-from src.speed_runner import VllmSpeedRequest, run_speed_suite
 from src.utils import dump_json, ensure_dir, load_json
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run aggregate benchmark suites from benchmark/**/*.yaml.")
-    parser.add_argument("--suites", nargs="*", default=["main"], help="Suite names such as main, accuracy/mcq, or speed/serve.")
+    parser = argparse.ArgumentParser(description="Run evaluation lanes or eval suites from benchmark/**/*.yaml.")
+    parser.add_argument(
+        "--suites",
+        nargs="*",
+        default=["base"],
+        help="Evaluation suite names such as base, instruct, mcq, ppl, or base/base_math.",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        action="append",
+        default=[],
+        help="Checkpoint name from the index. Repeat to run multiple explicit checkpoints and bypass suite selection filters.",
+    )
+    parser.add_argument(
+        "--checkpoints",
+        nargs="+",
+        default=[],
+        help="Checkpoint names from the index. Bypasses suite selection filters.",
+    )
     parser.add_argument("--index", default=str(ROOT / "checkpoints" / "index.csv"))
     parser.add_argument("--limit", type=float, default=None, help="Optional lm-eval limit override for smoke runs.")
     parser.add_argument("--lm-eval-bin", default="lm-eval")
+    parser.add_argument(
+        "--eval-model-backend",
+        default=None,
+        help="Override suite model backend for lm-eval suites, e.g. hf or vllm. PPL uses its native runner.",
+    )
     parser.add_argument("--eval-device", default=None)
-    parser.add_argument("--speed-repeat", type=int, default=None)
-    parser.add_argument("--speed-warmup", type=int, default=None)
-    parser.add_argument("--speed-batch-size", type=int, action="append", default=None)
-    parser.add_argument("--speed-prompt-length", type=int, action="append", default=None)
-    parser.add_argument("--speed-generation-length", type=int, action="append", default=None)
-    parser.add_argument("--speed-tensor-parallel-size", type=int, default=None)
-    parser.add_argument("--speed-gpu-memory-utilization", type=float, default=None)
-    parser.add_argument("--speed-dtype", default=None)
-    parser.add_argument("--speed-max-model-len", type=int, default=None)
-    parser.add_argument("--speed-enforce-eager", action="store_true")
-    parser.add_argument("--memory-device", default="cuda:0")
-    parser.add_argument("--memory-dtype", default=None)
-    parser.add_argument("--memory-batch-size", type=int, default=None)
-    parser.add_argument("--memory-prompt-length", type=int, default=None)
-    parser.add_argument("--memory-generation-length", type=int, default=None)
-    parser.add_argument("--memory-attn-implementation", default=None)
+    parser.add_argument("--eval-dtype", default=None, help="Override eval suite dtype, e.g. auto, float16, fp16, bfloat16, or bf16.")
+    parser.add_argument("--eval-tensor-parallel-size", type=int, default=None, help="vLLM tensor_parallel_size override.")
+    parser.add_argument("--eval-gpu-memory-utilization", type=float, default=None, help="vLLM gpu_memory_utilization override.")
+    parser.add_argument("--eval-max-model-len", type=int, default=None, help="vLLM max_model_len override.")
+    parser.add_argument("--eval-enforce-eager", action="store_true", help="Pass enforce_eager=True to vLLM eval suites.")
     return parser.parse_args()
+
+
+def _checkpoint_selection_override(args: argparse.Namespace) -> dict | None:
+    names: list[str] = []
+    for item in [*args.checkpoint, *args.checkpoints]:
+        names.extend(part.strip() for part in str(item).split(",") if part.strip())
+    if not names:
+        return None
+    return {
+        "checkpoints": names,
+        "enabled_only": False,
+    }
 
 
 def _normalize_precision(value: object) -> str | None:
     if value is None:
         return None
-    return str(value).replace("torch.", "").strip().lower()
+    try:
+        return normalize_dtype_name(value)
+    except ValueError:
+        return str(value).replace("torch.", "").strip().lower()
+
+
+def _runtime_precision(config: dict, precision: dict, factor_dtypes: list[str]) -> str | None:
+    requested = _normalize_precision(config.get("dtype"))
+    if requested and requested != "auto":
+        return requested
+    reference = _normalize_precision(precision.get("reference_torch_dtype"))
+    if reference:
+        return reference
+    unique_factor_dtypes = sorted(set(factor_dtypes))
+    if len(unique_factor_dtypes) == 1:
+        return unique_factor_dtypes[0]
+    return requested
 
 
 def _precision_audit_path(suite_names: list[str]) -> Path:
@@ -65,9 +103,9 @@ def _write_precision_audit(summary: list[dict[str, str]], suite_names: list[str]
         config = payload.get("config", {})
         validation = payload.get("validation", {})
         precision = validation.get("precision", {})
-        runtime_precision = _normalize_precision(config.get("dtype"))
         factor_dtypes = [_normalize_precision(value) for value in precision.get("low_rank_factor_dtypes", []) if value is not None]
         factor_dtypes = [value for value in factor_dtypes if value]
+        runtime_precision = _runtime_precision(config, precision, factor_dtypes)
         if runtime_precision is None:
             missing_runtime_precision.append(item["output_path"])
         else:
@@ -90,19 +128,13 @@ def _write_precision_audit(summary: list[dict[str, str]], suite_names: list[str]
 
     audit = {
         "suite_names": suite_names,
-        "passed": not missing_runtime_precision and len(runtime_precisions) <= 1 and not mixed_checkpoint_precision,
+        "passed": not mixed_checkpoint_precision,
         "runtime_precisions": sorted(runtime_precisions),
         "missing_runtime_precision": missing_runtime_precision,
         "mixed_checkpoint_precision": mixed_checkpoint_precision,
         "records": records,
     }
     dump_json(audit, _precision_audit_path(suite_names))
-    if missing_runtime_precision:
-        raise RuntimeError("Leaderboard precision audit found results without an explicit runtime dtype.")
-    if len(runtime_precisions) > 1:
-        raise RuntimeError(
-            "Leaderboard precision audit found mixed runtime dtypes: " + ", ".join(sorted(runtime_precisions))
-        )
     if mixed_checkpoint_precision:
         raise RuntimeError(
             "Leaderboard precision audit found checkpoints with mixed low-rank factor dtypes: "
@@ -111,73 +143,57 @@ def _write_precision_audit(summary: list[dict[str, str]], suite_names: list[str]
     return audit
 
 
-def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> list[dict[str, str]]:
+def run_suite(
+    suite_name: str,
+    index_path: str,
+    args: argparse.Namespace,
+    *,
+    selection_override: dict | None = None,
+) -> list[dict[str, str]]:
     config_path, config = load_suite_config(suite_name)
     kind = config.get("kind", "eval")
     suite_name_resolved = suite_id(config_path)
 
     if kind == "aggregate":
         outputs: list[dict[str, str]] = []
+        child_selection = selection_override if selection_override is not None else config.get("selection")
         for included in config.get("includes", []):
-            outputs.extend(run_suite(str(included), index_path=index_path, args=args))
+            outputs.extend(
+                run_suite(
+                    str(included),
+                    index_path=index_path,
+                    args=args,
+                    selection_override=child_selection,
+                )
+            )
         return outputs
 
     outputs: list[dict[str, str]] = []
-    for record in select_checkpoints_for_suite(config, index_path=index_path):
-        if kind == "speed":
-            result = run_speed_suite(
-                VllmSpeedRequest(
-                    checkpoint_name=record.name,
-                    suite_path=config_path,
-                    index_path=index_path,
-                    batch_sizes=args.speed_batch_size,
-                    prompt_lengths=args.speed_prompt_length,
-                    generation_lengths=args.speed_generation_length,
-                    repeat=args.speed_repeat,
-                    warmup=args.speed_warmup,
-                    tensor_parallel_size=args.speed_tensor_parallel_size,
-                    gpu_memory_utilization=args.speed_gpu_memory_utilization,
-                    dtype=args.speed_dtype,
-                    max_model_len=args.speed_max_model_len,
-                    enforce_eager=True if args.speed_enforce_eager else None,
-                    lm_eval_bin=args.lm_eval_bin,
-                    eval_device=args.eval_device,
-                    eval_limit=args.limit,
-                    show_progress=True,
-                    run_label="leaderboard",
-                    strict_validation=True,
-                )
+    for record in select_checkpoints_for_suite(config, index_path=index_path, selection_override=selection_override):
+        if kind not in {"eval", None}:
+            raise ValueError(
+                f"Suite '{suite_name_resolved}' has kind '{kind}'. "
+                "Use scripts/run_speed.py for speed suites and scripts/run_memory.py for memory suites."
             )
-        elif kind == "memory":
-            memory_config = config.get("memory", {})
-            result = run_memory_measurement(
-                MemoryRequest(
-                    checkpoint_name=record.name,
-                    index_path=index_path,
-                    device=args.memory_device,
-                    dtype=args.memory_dtype or memory_config.get("dtype", "float16"),
-                    batch_size=args.memory_batch_size or int(memory_config.get("batch_size", 1)),
-                    prompt_length=args.memory_prompt_length or int(memory_config.get("prompt_length", 512)),
-                    generation_length=args.memory_generation_length
-                    or int(memory_config.get("generation_length", 128)),
-                    attn_implementation=args.memory_attn_implementation or memory_config.get("attn_implementation"),
-                    run_label="leaderboard",
-                    strict_validation=True,
-                )
+        extra_model_args = {"dtype": args.eval_dtype} if args.eval_dtype is not None else {}
+        result = run_lm_eval_suite(
+            LmEvalRequest(
+                checkpoint_name=record.name,
+                suite_path=config_path,
+                index_path=index_path,
+                lm_eval_bin=args.lm_eval_bin,
+                model_backend=args.eval_model_backend,
+                device=args.eval_device,
+                limit=args.limit,
+                tensor_parallel_size=args.eval_tensor_parallel_size,
+                gpu_memory_utilization=args.eval_gpu_memory_utilization,
+                max_model_len=args.eval_max_model_len,
+                enforce_eager=True if args.eval_enforce_eager else None,
+                extra_model_args=extra_model_args,
+                run_label="leaderboard",
+                strict_validation=True,
             )
-        else:
-            result = run_lm_eval_suite(
-                LmEvalRequest(
-                    checkpoint_name=record.name,
-                    suite_path=config_path,
-                    index_path=index_path,
-                    lm_eval_bin=args.lm_eval_bin,
-                    device=args.eval_device,
-                    limit=args.limit,
-                    run_label="leaderboard",
-                    strict_validation=True,
-                )
-            )
+        )
         outputs.append(
             {
                 "suite": suite_name_resolved,
@@ -191,9 +207,17 @@ def run_suite(suite_name: str, index_path: str, args: argparse.Namespace) -> lis
 
 def main() -> None:
     args = parse_args()
+    selection_override = _checkpoint_selection_override(args)
     summary: list[dict[str, str]] = []
     for suite_name in args.suites:
-        summary.extend(run_suite(suite_name, index_path=args.index, args=args))
+        summary.extend(
+            run_suite(
+                suite_name,
+                index_path=args.index,
+                args=args,
+                selection_override=selection_override,
+            )
+        )
     _write_precision_audit(summary, args.suites)
     print(json.dumps(summary, indent=2, sort_keys=True))
 

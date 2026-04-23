@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import SimpleNamespace
 
 from compress.common import CompressionRequest, get_baseline_spec, prepare_baseline
 from compress.svd.asvd import build as build_asvd
 from src.utils import load_json
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_prepare_baseline_resolves_existing_asvd_snapshot() -> None:
@@ -35,6 +40,39 @@ def test_build_asvd_writes_manifest(tmp_path: Path) -> None:
     assert payload["ratio"] == 0.5
     assert payload["ready_for_load"] is False
     assert payload["baseline"]["name"] == "ASVD"
+
+
+def test_asvd_rank_calculation_clamps_to_gqa_kv_matrix_rank() -> None:
+    module_path = PROJECT_ROOT / "compress" / "svd" / "ASVD" / "modules" / "svd_linear.py"
+    spec = spec_from_file_location("asvd_svd_linear", module_path)
+    module = module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    assert module.compute_svd_rank(4096, 1024, 2.0, rank_align=256) == 1024
+    assert module.compressed_param_count(4096, 1024, 2.0, rank_align=256) == 1024 * (4096 + 1024)
+
+
+def test_basis_sharing_weight_info_uses_gqa_kv_width() -> None:
+    module_path = PROJECT_ROOT / "compress" / "svd" / "Basis_Sharing" / "config.py"
+    spec = spec_from_file_location("basis_sharing_config", module_path)
+    module = module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    hf_config = SimpleNamespace(
+        model_type="llama",
+        hidden_size=16,
+        intermediate_size=32,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        head_dim=4,
+    )
+    weight_info = module.ShareConfig.resolve_weight_info("unlisted-gqa-llama", hf_config)
+
+    assert weight_info["self_attn.q_proj"] == (16, 16)
+    assert weight_info["self_attn.k_proj"] == (16, 8)
+    assert weight_info["self_attn.v_proj"] == (16, 8)
 
 
 def test_quant_rtn_has_no_git_repo() -> None:

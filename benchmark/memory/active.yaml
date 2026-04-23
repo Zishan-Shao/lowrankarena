@@ -1,0 +1,15 @@
+name: active_memory
+kind: memory
+description: Active GPU memory measurement workload for one checkpoint.
+selection:
+  enabled_only: true
+memory:
+  backend: transformers
+  dtype: auto
+  batch_size: 1
+  prompt_length: 512
+  generation_length: 128
+report:
+  result_dir: results/leaderboard/memory
+  output_dir: results/tables
+  filename: active_memory.md

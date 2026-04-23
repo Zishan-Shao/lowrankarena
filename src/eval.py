@@ -11,7 +11,7 @@ from src.lm_eval_runner import LmEvalRequest, run_lm_eval_suite
 @dataclass(slots=True)
 class EvalRequest:
     checkpoint_name: str
-    suite: str = "accuracy/mcq"
+    suite: str = "mcq"
     dataset: str = "lm_eval_harness"
     output_dir: str | Path | None = None
     limit: float | int | None = None
@@ -42,9 +42,14 @@ def run_eval(request: EvalRequest, index_path: str | None = None) -> EvalResult:
             suite_path=suite_path,
             index_path=index_path,
             output_dir=request.output_dir,
+            model_backend=request.extra.get("model_backend"),
             device=request.device,
             batch_size=request.batch_size,
             limit=request.limit,
+            tensor_parallel_size=request.extra.get("tensor_parallel_size"),
+            gpu_memory_utilization=request.extra.get("gpu_memory_utilization"),
+            max_model_len=request.extra.get("max_model_len"),
+            enforce_eager=request.extra.get("enforce_eager"),
             extra_model_args=request.extra.get("model_args", {}),
         )
     )
@@ -59,7 +64,7 @@ def run_eval(request: EvalRequest, index_path: str | None = None) -> EvalResult:
 
 def evaluate_checkpoint(
     checkpoint_name: str,
-    suite: str = "accuracy/mcq",
+    suite: str = "mcq",
     dataset: str = "lm_eval_harness",
     output_dir: str | Path | None = None,
     index_path: str | None = None,

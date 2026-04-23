@@ -16,9 +16,11 @@ class ASVDLlamaModel(LlamaModel):
 
     def __init__(self, config):
         super().__init__(config)
+        truncation_ranks = dict(getattr(config, "truncation_ranks", {}) or {})
+        truncation_ranks.pop("lm_head", None)
         self.replaced_low_rank_modules, self.missing_low_rank_modules = apply_low_rank_replacements(
             self,
-            getattr(config, "truncation_ranks", {}) or {},
+            truncation_ranks,
             strict=True,
         )
 

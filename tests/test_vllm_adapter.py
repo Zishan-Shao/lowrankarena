@@ -38,6 +38,7 @@ def write_ready_wrapper(path: Path) -> Path:
     (path / "config.json").write_text(json.dumps(config), encoding="utf-8")
     (path / "modeling_svdllm_llama.py").write_text("# test\n", encoding="utf-8")
     (path / "configuration_svdllm_llama.py").write_text("# test\n", encoding="utf-8")
+    (path / "model.safetensors.index.json").write_text(json.dumps({"weight_map": {}}), encoding="utf-8")
     (path / WRAPPER_METADATA_NAME).write_text(json.dumps({"ok": True}), encoding="utf-8")
     return path
 
@@ -95,6 +96,32 @@ def test_prepare_model_for_vllm_direct_path_for_non_svd_model(tmp_path: Path) ->
     assert prepared.preparation_kind == "direct"
     assert prepared.model_path == str(model_dir)
     assert prepared.tokenizer_mode == "auto"
+
+
+def test_prepare_model_for_vllm_normalizes_torch_dtype_config(tmp_path: Path) -> None:
+    model_dir = tmp_path / "model"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    (model_dir / "config.json").write_text(
+        json.dumps({"model_type": "llama", "torch_dtype": "torch.float16"}),
+        encoding="utf-8",
+    )
+    (model_dir / "tokenizer.json").write_text("{}", encoding="utf-8")
+    loaded = LoadedCheckpoint(
+        record=sample_record(),
+        locator=str(model_dir),
+        loader="local",
+        local_path=str(model_dir),
+        metadata={},
+    )
+
+    prepared = prepare_model_for_vllm(loaded, wrapper_cache_root=tmp_path / "cache")
+
+    prepared_config = json.loads((Path(prepared.model_path) / "config.json").read_text(encoding="utf-8"))
+    assert prepared.preparation_kind == "config_torch_dtype_wrapper"
+    assert prepared.model_path != str(model_dir)
+    assert prepared.source_model_path == str(model_dir)
+    assert prepared_config["torch_dtype"] == "float16"
+    assert (Path(prepared.model_path) / "tokenizer.json").exists()
 
 
 def test_prepare_model_for_vllm_uses_transformers_backend_for_dobi_checkpoint(tmp_path: Path) -> None:

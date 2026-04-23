@@ -4,13 +4,26 @@ from types import SimpleNamespace
 
 import torch
 
+from src.dtype_utils import normalize_config_torch_dtype_name
 from src.memory_runner import estimate_dense_kv_bytes, pick_filler_token_id, resolve_dtype
 
 
 def test_resolve_dtype_maps_expected_aliases() -> None:
     assert resolve_dtype("float16") is torch.float16
+    assert resolve_dtype("fp16") is torch.float16
+    assert resolve_dtype("float") is torch.float16
     assert resolve_dtype("bf16") is torch.bfloat16
+    assert resolve_dtype("bfloat") is torch.bfloat16
+    assert resolve_dtype("bfloat16") is torch.bfloat16
+    assert resolve_dtype("fp32") is torch.float32
     assert resolve_dtype("auto") == "auto"
+
+
+def test_normalize_config_torch_dtype_strips_torch_prefix_without_retyping_float() -> None:
+    assert normalize_config_torch_dtype_name("torch.float16") == "float16"
+    assert normalize_config_torch_dtype_name("torch.bfloat16") == "bfloat16"
+    assert normalize_config_torch_dtype_name("torch.float") == "float32"
+    assert normalize_config_torch_dtype_name("float") == "float32"
 
 
 def test_pick_filler_token_id_prefers_configured_special_tokens() -> None:

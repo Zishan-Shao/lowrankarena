@@ -11,6 +11,8 @@ import torch
 from safetensors import safe_open
 from safetensors.torch import save_file
 
+from src.dtype_utils import normalize_config_torch_dtype_name
+
 
 WRAPPER_METADATA_NAME = "inference_wrapper_meta.json"
 LM_HEAD_DENSE_SHARD_NAME = "model-lm_head.safetensors"
@@ -135,6 +137,17 @@ def _build_wrapper_metadata(*, wrapper_kind: str, source_model: Path, source_con
     }
 
 
+def _with_normalized_config_torch_dtype(config: dict[str, Any]) -> dict[str, Any]:
+    if "torch_dtype" not in config or config.get("torch_dtype") is None:
+        return config
+    normalized = normalize_config_torch_dtype_name(config.get("torch_dtype"))
+    if config.get("torch_dtype") == normalized:
+        return config
+    updated = dict(config)
+    updated["torch_dtype"] = normalized
+    return updated
+
+
 def _build_init_file(symbols: list[str], config_module: str, modeling_module: str) -> str:
     config_symbol = symbols[0]
     model_symbols = ", ".join(symbols[1:])
@@ -149,7 +162,7 @@ def _build_init_file(symbols: list[str], config_module: str, modeling_module: st
 
 
 def _basis_sharing_config_from(source_config: dict[str, Any]) -> dict[str, Any]:
-    config = dict(source_config)
+    config = _with_normalized_config_torch_dtype(dict(source_config))
     config["model_type"] = "basis_sharing_llama"
     config["architectures"] = ["TransformersForCausalLM"]
     config["auto_map"] = {
@@ -225,7 +238,7 @@ def _build_asvd_vllm_weight_index(
 
 
 def _asvd_vllm_config_from(source_config: dict[str, Any]) -> dict[str, Any]:
-    config = dict(source_config)
+    config = _with_normalized_config_torch_dtype(dict(source_config))
     truncation_ranks = dict(config.get("truncation_ranks") or {})
     truncation_ranks.pop("lm_head", None)
     config["truncation_ranks"] = truncation_ranks

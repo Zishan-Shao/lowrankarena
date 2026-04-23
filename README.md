@@ -1,26 +1,26 @@
 # LowRankArena
 
-LowRankArena is a benchmark scaffold for low-rank and compression checkpoints.
+LowRankArena is the benchmark scaffold for low-rank and compression checkpoints. The normal path is: register a checkpoint, choose a benchmark lane, run the suite, and consume normalized JSON results. Re-running compression is optional and lives under `compress/`.
 
-The repository is organized around three benchmark paths:
+The repository has three paper-facing runtime surfaces:
 
-- accuracy via `lm-eval-harness`
-- active GPU memory measurement via plain `transformers`
-- speed via `vLLM`
-
-`compress/` is the optional artifact-generation layer. The normal benchmark path does not depend on re-running compression.
-
-## Scope
-
-- Benchmark registry: [`checkpoints/index.csv`](./checkpoints/index.csv)
-- Optional rich checkpoint metadata: [`checkpoints/manifests/`](./checkpoints/manifests/README.md)
-- vLLM-compatible wrapper checkpoints: [`checkpoints/vllm/`](./checkpoints/vllm/README.md)
-- Benchmark outputs: [`results/`](./results/README.md)
-- Reusable runtime code: [`src/`](./src/README.md)
-- User-facing entrypoints: [`scripts/`](./scripts/README.md)
-- Declarative benchmark suites: [`benchmark/`](./benchmark/README.md)
+- evaluation through standardized base and instruct lanes
+- active GPU memory measurement through plain `transformers`
+- serving and evaluation-speed measurement through `vLLM`
 
 The current hosted checkpoint source of truth is the gated Hugging Face repository `Duke-CEI-SVD/LowRankArena`.
+
+## Quick Map
+
+- [`checkpoints/index.csv`](./checkpoints/index.csv): checkpoint registry used by all runners
+- [`checkpoints/manifests/`](./checkpoints/manifests/README.md): optional rich checkpoint metadata
+- [`benchmark/`](./benchmark/README.md): declarative suite definitions
+- [`scripts/`](./scripts/README.md): user-facing entrypoints
+- [`src/`](./src/README.md): reusable runtime, adapters, and result normalization
+- [`results/`](./results/README.md): normalized benchmark outputs
+- [`compress/`](./compress/README.md): optional artifact-generation layer
+
+Benchmark YAML files describe the workload for one checkpoint. Checkpoint fan-out is controlled by registry selection, aggregate lane selection, or explicit `--checkpoint` overrides.
 
 ## Environment
 
@@ -33,11 +33,7 @@ conda activate lowrankarena
 python -V
 ```
 
-For the full validated stack including the speed path, use Python `3.13.x`.
-`vllm==0.18.1` currently requires Python `<3.14`, so Python `3.14+` can still
-install the base runtime but will skip the `vllm` speed dependency.
-
-To refresh an existing environment in place:
+To refresh an existing environment:
 
 ```bash
 source ~/miniconda3/etc/profile.d/conda.sh
@@ -46,58 +42,163 @@ conda activate lowrankarena
 python -V
 ```
 
-Observed stack in the active environment:
+Validated stack:
 
 - Python `3.13.5`
 - PyTorch `2.10.0+cu128`
 - Transformers `4.57.6`
 - vLLM `0.18.1`
 - LM-Eval-Harness `0.4.11`
-- `requirements.txt` now pins the validated benchmark/runtime stack used for the repo-owned flows
 
-## Layout
+`vllm==0.18.1` requires Python `<3.14`, so Python `3.14+` can install the base runtime but will skip the vLLM speed dependency.
+
+## Current Benchmark Lanes
+
+There is intentionally no catch-all `benchmark/main.yaml`. Use explicit lanes for evaluation, and dedicated entries for system metrics.
 
 ```text
-lowrankarena/
-├── README.md
-├── TODO.md
-├── benchmark/
-├── checkpoints/
-├── compress/
-├── results/
-├── scripts/
-├── src/
-└── tests/
+base = ppl + mcq + base/base_math
+instruct = instruct/mmlu_pro + instruct/gsm8k
+memory = memory/active
+serving speed = speed/serve
+evaluation speed = speed/speed
+edge speed = speed/edge
 ```
 
-Key subtrees:
+Base/Universal evaluation:
 
-- [`benchmark/`](./benchmark/README.md): version-controlled suite definitions
-- [`checkpoints/`](./checkpoints/README.md): runnable checkpoint registry and wrapper checkpoint storage
-- [`compress/`](./compress/README.md): optional artifact-generation wrappers and vendored baselines
-- [`results/`](./results/README.md): normalized benchmark outputs
-- [`scripts/`](./scripts/README.md): CLI entrypoints
-- [`src/`](./src/README.md): reusable runtime and adapters
-- [`tests/`](./tests/README.md): lightweight regression checks
+- [`ppl.yaml`](./benchmark/ppl.yaml): WikiText-2 test PPL and C4 validation-stream PPL through the repo-owned contiguous runner. It uses raw text, `add_special_tokens=False`, non-overlapping blocks, and `max_length=2048`.
+- [`mcq.yaml`](./benchmark/mcq.yaml): 0-shot BoolQ, HellaSwag, WinoGrande, PIQA, ARC-Easy, ARC-Challenge, and OpenBookQA through `lm-eval-harness`.
+- [`base/base_math.yaml`](./benchmark/base/base_math.yaml): 0-shot base-safe math with local `lra_mathqa` plus upstream `mmlu_stem`, using MCQ/loglikelihood-style scoring. No CoT, no chat template, no free-form generation.
 
-Root-level helper:
+Instruct evaluation:
 
-- [`demo.py`](./demo.py): small end-to-end smoke pass over checkpoint loading plus eval, memory, and speed.
+- [`instruct/mmlu_pro.yaml`](./benchmark/instruct/mmlu_pro.yaml): `leaderboard_mmlu_pro`, 5-shot direct-answer multiple choice, non-CoT, metric `acc`.
+- [`instruct/gsm8k.yaml`](./benchmark/instruct/gsm8k.yaml): upstream `gsm8k_cot`, 8-shot CoT, greedy/default extraction, no self-consistency and no extra generation-length override in our YAML.
+
+System metrics:
+
+- [`memory/active.yaml`](./benchmark/memory/active.yaml): active memory peak for one process via `torch.cuda.max_memory_allocated()`.
+- [`speed/serve.yaml`](./benchmark/speed/serve.yaml): mainstream vLLM serving cases for prefill/decode throughput.
+- [`speed/speed.yaml`](./benchmark/speed/speed.yaml): end-to-end evaluation-speed route over the default base eval lane.
+- [`speed/edge.yaml`](./benchmark/speed/edge.yaml): optional long-context serving cases for appendix or stress reporting.
+
+## Backend Policy
+
+The paper-facing `lm-eval-harness` suites default to `model_backend: vllm` so full runs do not crawl through the Transformers backend. The vLLM path reuses the project adapter in [`src/vllm/`](./src/vllm/README.md), including wrapper preparation for checkpoints that need it.
+
+Use HF/Transformers only when you explicitly want a comparison or a local debug run:
+
+```bash
+python scripts/run_eval.py llama31-8b-instruct --suite instruct/mmlu_pro --model-backend hf --limit 1
+python scripts/run_main.py --suites instruct --checkpoint llama31-8b-instruct --eval-model-backend hf --limit 1
+```
+
+PPL is the exception: `ppl.yaml` always uses the repo-owned contiguous PPL runner, even if an aggregate command passes a vLLM backend override.
+
+All benchmark suites use `dtype: auto` by default so fp16 and bf16 checkpoints can run without editing YAML. CLI overrides accept common aliases such as `fp16`, `float`, `bf16`, and `bfloat`.
 
 ## Recommended Workflow
 
-1. Register or select a checkpoint from [`checkpoints/index.csv`](./checkpoints/index.csv).
-2. Run accuracy with [`scripts/run_eval.py`](./scripts/run_eval.py).
-3. Run memory with [`scripts/run_memory.py`](./scripts/run_memory.py).
-4. Run speed with [`scripts/run_speed.py`](./scripts/run_speed.py).
-5. Consume normalized outputs from [`results/`](./results/README.md).
+1. Select or register the checkpoint in [`checkpoints/index.csv`](./checkpoints/index.csv). For aggregate lanes, make sure its `variant` is `base` or `instruct`.
+2. Run the right evaluation lane with [`scripts/run_main.py`](./scripts/run_main.py), or run one suite with [`scripts/run_eval.py`](./scripts/run_eval.py).
+3. Run active memory separately with [`scripts/run_memory.py`](./scripts/run_memory.py).
+4. Run serving or evaluation-speed separately with [`scripts/run_speed.py`](./scripts/run_speed.py).
+5. Consume normalized outputs under [`results/`](./results/README.md). All `eval`, `memory`, and `speed` outputs share the project-owned schema from [`src/result_schema.py`](./src/result_schema.py).
 
-Optional author path:
+Optional artifact-author path:
 
 1. Build or plan an artifact through [`scripts/run_compress.py`](./scripts/run_compress.py).
 2. Export it into a loadable checkpoint directory.
-3. Register it in [`checkpoints/index.csv`](./checkpoints/index.csv) or a sidecar manifest.
-4. Use the normal eval, memory, and speed flow.
+3. Register it in the checkpoint index or a sidecar manifest.
+4. Use the normal evaluation, memory, and speed flow.
+
+## Common Commands
+
+Base lane:
+
+```bash
+# run all enabled base checkpoints selected by benchmark/base.yaml
+python scripts/run_main.py --suites base
+
+# smoke one explicit base checkpoint
+python scripts/run_main.py \
+  --suites base \
+  --checkpoint llama31-8b-svdllm-v1-update-0.6 \
+  --limit 1 \
+  --eval-tensor-parallel-size 1
+```
+
+Instruct lane:
+
+```bash
+# run all enabled instruct checkpoints selected by benchmark/instruct.yaml
+python scripts/run_main.py --suites instruct
+
+# smoke one explicit instruct checkpoint
+python scripts/run_main.py \
+  --suites instruct \
+  --checkpoint llama31-8b-instruct \
+  --limit 1 \
+  --eval-tensor-parallel-size 1
+```
+
+Single suites:
+
+```bash
+python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite mcq --limit 1
+python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite base/base_math --limit 1
+python scripts/run_eval.py llama31-8b-instruct --suite instruct/mmlu_pro --limit 1
+python scripts/run_eval.py llama31-8b-instruct --suite instruct/gsm8k --limit 1
+```
+
+System metrics:
+
+```bash
+# active memory
+python scripts/run_memory.py \
+  llama-7b-svdllm-v1-update-0.5 \
+  --suite memory/active \
+  --batch-size 1 \
+  --prompt-length 32 \
+  --generation-length 8
+
+# serving speed
+python scripts/run_speed.py \
+  llama-7b-svdllm-v1-update-0.5 \
+  --suite speed/serve \
+  --batch-size 1 \
+  --prompt-length 32 \
+  --generation-length 8 \
+  --repeat 1 \
+  --warmup 0
+
+# evaluation speed over the default base eval route
+python scripts/run_speed.py \
+  llama-7b-svdllm-v1-update-0.5 \
+  --suite speed/speed \
+  --eval-limit 1
+```
+
+Route smoke:
+
+```bash
+# demo.py checks load + eval + memory + serving-speed plumbing with tiny defaults.
+# Its eval smoke intentionally uses the HF backend and --eval-limit=1.
+CUDA_VISIBLE_DEVICES=0 python demo.py llama31-8b-svdllm-v1-update-0.6 --device cuda:0
+
+# system-only smoke for a checkpoint family
+CUDA_VISIBLE_DEVICES=0 python demo.py llama-7b-svdllm-v1-update-0.5 \
+  --skip-eval \
+  --device cuda:0 \
+  --memory-prompt-length 16 \
+  --memory-generation-length 4 \
+  --speed-prompt-length 16 \
+  --speed-generation-length 4 \
+  --speed-repeat 1 \
+  --speed-warmup 0 \
+  --speed-gpu-memory-utilization 0.2
+```
 
 ## Programmatic API
 
@@ -109,139 +210,16 @@ from src import Arena
 arena = Arena()
 
 for row in arena.list(enabled_only=False):
-    print(row["id"], row["method"])
+    print(row["id"], row["method"], row["variant"])
 
-print(arena.describe("llama31-8b-svdllm-0.6")["subpath"])
+print(arena.describe("llama31-8b-svdllm-v1-update-0.6")["subpath"])
 ```
 
-`Arena` wraps the current registry, loader, eval, memory, speed, and reporting modules without introducing a second object model.
-
-## Benchmark Surfaces
-
-- [`benchmark/accuracy/`](./benchmark/accuracy/README.md): accuracy suites backed by `lm-eval-harness`
-- [`benchmark/speed/`](./benchmark/speed/README.md): speed suites backed by `vLLM`
-- memory currently runs through [`scripts/run_memory.py`](./scripts/run_memory.py) and [`src/memory_runner.py`](./src/memory_runner.py); it does not yet have a YAML suite tree
-
-The benchmark outputs for `eval`, `memory`, and `speed` now share one project-owned top-level JSON schema. See [`src/result_schema.py`](./src/result_schema.py).
-
-## Common Commands
-
-```bash
-# accuracy
-python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite accuracy/mcq --limit 1
-
-# active memory
-python scripts/run_memory.py \
-  llama-7b-svdllm-v1-update-0.5 \
-  --batch-size 1 \
-  --prompt-length 32 \
-  --generation-length 8
-
-# vLLM speed
-python scripts/run_speed.py \
-  llama-7b-svdllm-v1-update-0.5 \
-  --batch-size 1 \
-  --prompt-length 32 \
-  --generation-length 8 \
-  --repeat 1 \
-  --warmup 0
-
-# quick smoke: load + eval(limit=1) + memory + speed
-CUDA_VISIBLE_DEVICES=7 python demo.py llama31-8b-svdllm-v1-update-0.6 --device cuda:0
-
-# more stable eval sanity check
-CUDA_VISIBLE_DEVICES=7 python demo.py llama31-8b-svdllm-v1-update-0.6 --device cuda:0 --eval-limit 200
-```
-
-Verified low-overhead smoke commands for the currently supported checkpoint families:
-
-```bash
-# SVD-LLM v1
-CUDA_VISIBLE_DEVICES=0 python demo.py llama-7b-svdllm-v1-update-0.5 \
-  --skip-eval \
-  --device cuda:0 \
-  --memory-prompt-length 16 \
-  --memory-generation-length 4 \
-  --speed-prompt-length 16 \
-  --speed-generation-length 4 \
-  --speed-repeat 1 \
-  --speed-warmup 0 \
-  --speed-gpu-memory-utilization 0.2
-
-# SVD-LLM v2 on Llama-3.1 / GQA
-CUDA_VISIBLE_DEVICES=4 python demo.py llama31-8b-svdllm-v2-0.6 \
-  --skip-eval \
-  --device cuda:0 \
-  --memory-prompt-length 16 \
-  --memory-generation-length 4 \
-  --speed-prompt-length 16 \
-  --speed-generation-length 4 \
-  --speed-repeat 1 \
-  --speed-warmup 0 \
-  --speed-gpu-memory-utilization 0.35
-
-# ASVD on Llama-3.1 / GQA
-CUDA_VISIBLE_DEVICES=5 python demo.py llama31-8b-asvd-0.4 \
-  --skip-eval \
-  --device cuda:0 \
-  --memory-prompt-length 16 \
-  --memory-generation-length 4 \
-  --speed-prompt-length 16 \
-  --speed-generation-length 4 \
-  --speed-repeat 1 \
-  --speed-warmup 0 \
-  --speed-gpu-memory-utilization 0.25
-
-# Basis sharing
-CUDA_VISIBLE_DEVICES=3 python demo.py llama-7b-basis-sharing-0.5 \
-  --skip-eval \
-  --device cuda:0 \
-  --memory-prompt-length 16 \
-  --memory-generation-length 4 \
-  --speed-prompt-length 16 \
-  --speed-generation-length 4 \
-  --speed-repeat 1 \
-  --speed-warmup 0 \
-  --speed-gpu-memory-utilization 0.2
-
-CUDA_VISIBLE_DEVICES=4 python demo.py llama31-8b-basis-sharing-0.6 \
-  --skip-eval \
-  --device cuda:0 \
-  --memory-prompt-length 16 \
-  --memory-generation-length 4 \
-  --speed-prompt-length 16 \
-  --speed-generation-length 4 \
-  --speed-repeat 1 \
-  --speed-warmup 0 \
-  --speed-gpu-memory-utilization 0.35
-
-# DoBi
-CUDA_VISIBLE_DEVICES=5 python demo.py llama31-8b-dobi-0.8 \
-  --skip-eval \
-  --device cuda:0 \
-  --memory-prompt-length 16 \
-  --memory-generation-length 4 \
-  --speed-prompt-length 16 \
-  --speed-generation-length 4 \
-  --speed-repeat 1 \
-  --speed-warmup 0 \
-  --speed-gpu-memory-utilization 0.25
-
-CUDA_VISIBLE_DEVICES=5 python demo.py llama-7b-dobi-0.8 \
-  --skip-eval \
-  --device cuda:0 \
-  --memory-prompt-length 16 \
-  --memory-generation-length 4 \
-  --speed-prompt-length 16 \
-  --speed-generation-length 4 \
-  --speed-repeat 1 \
-  --speed-warmup 0 \
-  --speed-gpu-memory-utilization 0.2
-```
+`Arena` wraps the registry, loader, eval, memory, speed, and reporting modules without introducing a second object model.
 
 ## Notes
 
-- `scripts/run_memory.py` reports this process's active GPU memory peak via `torch.cuda.max_memory_allocated()`. It is intentionally separate from vLLM's reserve-oriented KV-cache logs.
-- `scripts/run_speed.py` uses the `src.vllm` adapter layer to prepare incompatible checkpoints before calling `vllm.LLM(...)`.
+- `run_main.py` is evaluation-only and defaults to `--suites base`.
+- Memory and speed use dedicated scripts because their runtime, metrics, and failure modes differ from accuracy evaluation.
 - Materialized vLLM wrapper checkpoints belong in [`checkpoints/vllm/`](./checkpoints/vllm/README.md), not under `src/vllm/`.
-- `demo.py` defaults to `--eval-limit 1` so the eval step stays lightweight. That default is only for route checking. Use `--eval-limit 200` or run [`scripts/run_eval.py`](./scripts/run_eval.py) directly when you want a more stable accuracy sanity check.
+- Benchmark outputs live under `results/`; generated smoke or leaderboard artifacts should not be committed unless intentionally curated.

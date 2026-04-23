@@ -7,6 +7,8 @@ from typing import Any
 
 import torch
 
+from src.benchmarking import suite_output_name
+from src.dtype_utils import normalize_dtype_name
 from src.inference_adapter import prepare_model_for_inference
 from src.load import load_checkpoint
 from src.result_schema import build_result_payload
@@ -17,12 +19,8 @@ from src.validation import validate_checkpoint_layout
 DTYPE_MAP: dict[str, torch.dtype | str] = {
     "auto": "auto",
     "float16": torch.float16,
-    "fp16": torch.float16,
-    "half": torch.float16,
     "bfloat16": torch.bfloat16,
-    "bf16": torch.bfloat16,
     "float32": torch.float32,
-    "fp32": torch.float32,
 }
 
 
@@ -30,9 +28,11 @@ DTYPE_MAP: dict[str, torch.dtype | str] = {
 class MemoryRequest:
     checkpoint_name: str
     index_path: str | Path
+    suite_path: str | Path | None = None
+    suite_name: str = "memory"
     output_dir: str | Path | None = None
     device: str = "cuda:0"
-    dtype: str = "float16"
+    dtype: str = "auto"
     batch_size: int = 1
     prompt_length: int = 32
     generation_length: int = 8
@@ -54,10 +54,7 @@ class MemoryResult:
 
 
 def resolve_dtype(name: str) -> torch.dtype | str:
-    key = name.strip().lower()
-    if key not in DTYPE_MAP:
-        supported = ", ".join(sorted(DTYPE_MAP))
-        raise ValueError(f"Unsupported dtype {name!r}. Expected one of: {supported}")
+    key = normalize_dtype_name(name)
     return DTYPE_MAP[key]
 
 
@@ -155,7 +152,8 @@ def _load_model(
 def _result_path_for(request: MemoryRequest) -> Path:
     output_root = Path(request.output_dir) if request.output_dir else run_results_root("memory", request.run_label)
     ensure_dir(output_root)
-    return output_root / f"memory__{request.checkpoint_name}.json"
+    suite_name = suite_output_name(request.suite_path) if request.suite_path is not None else "memory"
+    return output_root / f"{suite_name}__{request.checkpoint_name}.json"
 
 
 def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
@@ -284,8 +282,8 @@ def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
         locator=loaded.locator,
         backend_name="transformers",
         backend_version=None,
-        suite_path=None,
-        suite_name="memory",
+        suite_path=Path(request.suite_path) if request.suite_path is not None else None,
+        suite_name=request.suite_name,
         config={
             "device": str(device),
             "dtype": str(parameter_dtype),
@@ -338,7 +336,7 @@ def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
     output_path = dump_json(payload, _result_path_for(request))
     return MemoryResult(
         checkpoint_name=request.checkpoint_name,
-        suite="memory",
+        suite=suite_output_name(request.suite_path) if request.suite_path is not None else "memory",
         status="completed",
         output_path=str(output_path),
         metrics=metrics,

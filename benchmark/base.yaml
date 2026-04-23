@@ -1,0 +1,11 @@
+name: base
+kind: aggregate
+description: Base-model evaluation lane. Shared suites measure language-model retention; base-only suites avoid instruction-following and long-form generation contracts.
+selection:
+  variants:
+    - base
+  enabled_only: true
+includes:
+  - ppl
+  - mcq
+  - base/base_math

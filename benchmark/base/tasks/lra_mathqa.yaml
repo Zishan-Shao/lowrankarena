@@ -1,0 +1,26 @@
+tag:
+  - math_word_problems
+task: lra_mathqa
+task_alias: MathQA
+custom_dataset: !function utils.load_mathqa_dataset
+dataset_kwargs:
+  url: https://math-qa.github.io/math-QA/data/MathQA.zip
+  sha256: 7344f30456a7aef3176d4866cc953b35b41bec44eda6b00cdbcfde2876b2f07a
+output_type: multiple_choice
+training_split: train
+validation_split: validation
+test_split: test
+doc_to_text: "Question: {{Problem}}\nAnswer:"
+doc_to_target: !function utils.doc_to_target
+doc_to_choice: !function utils.doc_to_choice
+should_decontaminate: true
+doc_to_decontamination_query: "Question: {{Problem}}\nAnswer:"
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: acc_norm
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0

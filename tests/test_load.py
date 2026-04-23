@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.load import build_hf_kwargs, load_checkpoint
+from src.load import _cached_snapshot_with_subpath, build_hf_kwargs, load_checkpoint
 from src.registry import load_checkpoint_index
 
 
@@ -11,7 +11,7 @@ def write_index(path: Path) -> Path:
         "\n".join(
             [
                 "name,model_family,variant,method,source,repo_id,revision,subpath,benchmarks,enabled,notes",
-                "demo,qwen3,base,pending,huggingface,Duke-CEI-SVD/LowRankArena,main,Qwen3-8b,main|speed,true,test row",
+                "demo,qwen3,base,pending,huggingface,Duke-CEI-SVD/LowRankArena,main,Qwen3-8b,base|speed,true,test row",
             ]
         )
         + "\n",
@@ -34,6 +34,16 @@ def test_load_checkpoint_builds_hf_locator(tmp_path: Path) -> None:
     assert loaded.loader == "huggingface"
     assert loaded.locator == "hf://Duke-CEI-SVD/LowRankArena@main/Qwen3-8b"
     assert loaded.metadata["status"] == "resolved"
+
+
+def test_cached_snapshot_with_subpath_falls_back_to_existing_partial_snapshot(tmp_path: Path) -> None:
+    snapshots_root = tmp_path / "snapshots"
+    current = snapshots_root / "newer"
+    older = snapshots_root / "older"
+    current.mkdir(parents=True)
+    (older / "llama_7b" / "ASVD" / "demo").mkdir(parents=True)
+
+    assert _cached_snapshot_with_subpath(current, "llama_7b/ASVD/demo") == older
 
 
 def test_build_hf_kwargs_includes_subfolder() -> None:

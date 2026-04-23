@@ -1,16 +1,7 @@
 name: serve_speed
 kind: speed
-description: Frozen vLLM speed suite for paper-facing mainstream serving workloads.
+description: vLLM speed suite for paper-facing mainstream serving workloads.
 selection:
-  checkpoints:
-    - llama31-8b-asvd-0.4
-    - llama31-8b-dobi-0.8
-    - llama31-8b-svdllm-v1-update-0.6
-    - llama31-8b-svdllm-v2-0.6
-    - llama31-8b-basis-sharing-0.6
-    - llama-7b-svdllm-v1-update-0.5
-    - llama-7b-basis-sharing-0.5
-    - llama-7b-dobi-0.8
   enabled_only: true
 speed:
   backend: vllm
@@ -48,7 +39,7 @@ speed:
   warmup: 1
   tensor_parallel_size: 1
   gpu_memory_utilization: 0.35
-  dtype: float16
+  dtype: auto
   max_model_len: 3072
   enforce_eager: false
   metrics:

@@ -51,6 +51,7 @@ def run_speed(request: SpeedRequest, index_path: str | None = None) -> SpeedResu
             dtype=request.extra.get("dtype"),
             enforce_eager=request.extra.get("enforce_eager"),
             lm_eval_bin=request.extra.get("lm_eval_bin"),
+            eval_model_backend=request.extra.get("eval_model_backend"),
             eval_device=request.extra.get("eval_device"),
             eval_batch_size=request.extra.get("eval_batch_size"),
             eval_limit=request.extra.get("eval_limit"),

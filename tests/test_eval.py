@@ -25,6 +25,53 @@ def test_build_model_args_for_hf_checkpoint(tmp_path: Path) -> None:
     }
 
 
+def test_build_model_args_normalizes_dtype_aliases(tmp_path: Path) -> None:
+    prepared = PreparedInferenceModel(
+        model_path=str(tmp_path / "model"),
+        tokenizer_path=str(tmp_path / "model"),
+        tokenizer_mode="auto",
+        preparation_kind="direct",
+        source_model_path=str(tmp_path / "model"),
+    )
+
+    assert _build_model_args(prepared, extra_model_args={"dtype": "bf16"})["dtype"] == "bfloat16"
+    assert _build_model_args(prepared, extra_model_args={"dtype": "bfloat"})["dtype"] == "bfloat16"
+    assert _build_model_args(prepared, extra_model_args={"dtype": "float"})["dtype"] == "float16"
+
+
+def test_build_model_args_for_vllm_checkpoint(tmp_path: Path) -> None:
+    prepared = PreparedInferenceModel(
+        model_path=str(tmp_path / "model"),
+        tokenizer_path=str(tmp_path / "tokenizer"),
+        tokenizer_mode="slow",
+        preparation_kind="direct",
+        source_model_path=str(tmp_path / "model"),
+    )
+
+    model_args = _build_model_args(
+        prepared,
+        extra_model_args={"dtype": "bf16"},
+        model_backend="vllm",
+        trust_remote_code=True,
+        tensor_parallel_size=2,
+        gpu_memory_utilization=0.75,
+        max_model_len=4096,
+        enforce_eager=True,
+    )
+
+    assert model_args == {
+        "pretrained": str(tmp_path / "model"),
+        "tokenizer": str(tmp_path / "tokenizer"),
+        "tokenizer_mode": "slow",
+        "trust_remote_code": True,
+        "tensor_parallel_size": 2,
+        "gpu_memory_utilization": 0.75,
+        "max_model_len": 4096,
+        "enforce_eager": True,
+        "dtype": "bfloat16",
+    }
+
+
 def test_build_command_includes_suite_level_lm_eval_contract_flags(tmp_path: Path) -> None:
     suite_path = tmp_path / "custom.yaml"
     suite_path.write_text("name: placeholder\n", encoding="utf-8")
@@ -63,6 +110,42 @@ def test_build_command_includes_suite_level_lm_eval_contract_flags(tmp_path: Pat
     assert "--fewshot_as_multiturn" in command
     assert "False" in command
     assert "--apply_chat_template" not in command
+
+
+def test_build_command_uses_suite_default_vllm_model_backend(tmp_path: Path) -> None:
+    suite_path = tmp_path / "vllm.yaml"
+    suite_path.write_text("name: placeholder\n", encoding="utf-8")
+    request = LmEvalRequest(
+        checkpoint_name="demo",
+        suite_path=suite_path,
+        index_path=str(tmp_path / "index.csv"),
+        lm_eval_bin="lm-eval",
+        tensor_parallel_size=2,
+    )
+    prepared = PreparedInferenceModel(
+        model_path="/tmp/model",
+        tokenizer_path="/tmp/model",
+        tokenizer_mode="auto",
+        preparation_kind="direct",
+        source_model_path="/tmp/model",
+    )
+    suite_config = {
+        "eval": {
+            "tasks": ["leaderboard_mmlu_pro"],
+            "model_backend": "vllm",
+            "dtype": "auto",
+        }
+    }
+
+    command = _build_command(request, suite_config, tmp_path / "raw", prepared)
+
+    assert command[command.index("--model") + 1] == "vllm"
+    assert "--model_args" in command
+    assert "pretrained=/tmp/model" in command
+    assert "tokenizer=/tmp/model" in command
+    assert "tokenizer_mode=auto" in command
+    assert "trust_remote_code=True" in command
+    assert "tensor_parallel_size=2" in command
 
 
 def test_build_command_clamps_max_gen_toks_to_model_context_window(tmp_path: Path) -> None:

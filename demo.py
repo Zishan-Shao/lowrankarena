@@ -56,19 +56,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-memory", action="store_true")
     parser.add_argument("--skip-speed", action="store_true")
 
-    parser.add_argument("--eval-suite", default="accuracy/mcq")
+    parser.add_argument("--eval-suite", default="mcq")
     parser.add_argument("--eval-limit", type=float, default=1.0)
     parser.add_argument("--eval-batch-size", default="1")
     parser.add_argument("--eval-num-fewshot", type=int, default=0)
     parser.add_argument("--lm-eval-bin", default="lm-eval")
 
-    parser.add_argument("--memory-dtype", default="float16")
+    parser.add_argument("--memory-dtype", default="auto")
     parser.add_argument("--memory-batch-size", type=int, default=1)
     parser.add_argument("--memory-prompt-length", type=int, default=32)
     parser.add_argument("--memory-generation-length", type=int, default=8)
     parser.add_argument("--memory-attn-implementation", default=None)
 
-    parser.add_argument("--speed-suite", default="speed/speed")
+    parser.add_argument("--speed-suite", default="speed/serve")
     parser.add_argument("--speed-batch-size", type=int, default=1)
     parser.add_argument("--speed-prompt-length", type=int, default=32)
     parser.add_argument("--speed-generation-length", type=int, default=8)

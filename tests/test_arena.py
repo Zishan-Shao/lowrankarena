@@ -12,7 +12,7 @@ def write_index(path: Path) -> Path:
         "\n".join(
             [
                 "name,model_family,variant,method,source,repo_id,revision,subpath,benchmarks,enabled,notes",
-                "demo,llama3.1,base,pending,huggingface,Duke-CEI-SVD/LowRankArena,main,llama31_8b,main|speed,true,test row",
+                "demo,llama3.1,base,pending,huggingface,Duke-CEI-SVD/LowRankArena,main,llama31_8b,base|speed,true,test row",
             ]
         )
         + "\n",
@@ -33,7 +33,7 @@ def test_arena_register_keeps_overlay_metadata(tmp_path: Path) -> None:
         model_family="llama3.1",
         variant="base",
         method="custom",
-        benchmarks=["main"],
+        benchmarks=["base"],
         enabled=False,
         family="svd",
         ratio=0.5,

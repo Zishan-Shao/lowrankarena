@@ -68,6 +68,22 @@ def _resolve_hf_token(explicit_token: str | None = None) -> str | None:
     return HfFolder.get_token()
 
 
+def _cached_snapshot_with_subpath(snapshot_path: Path, subpath: str) -> Path | None:
+    snapshots_root = snapshot_path.parent
+    if not snapshots_root.exists():
+        return None
+
+    candidates = sorted(
+        (item for item in snapshots_root.iterdir() if item.is_dir()),
+        key=lambda item: item.stat().st_mtime,
+        reverse=True,
+    )
+    for candidate in candidates:
+        if (candidate / subpath).exists():
+            return candidate
+    return None
+
+
 def download_hf_snapshot(
     record: CheckpointRecord,
     *,
@@ -94,7 +110,12 @@ def download_hf_snapshot(
         cache_dir=str(cache_dir) if cache_dir else None,
         local_files_only=local_files_only,
     )
-    return Path(snapshot_path)
+    resolved_snapshot_path = Path(snapshot_path)
+    if record.subpath and local_files_only and not (resolved_snapshot_path / record.subpath).exists():
+        cached_snapshot_path = _cached_snapshot_with_subpath(resolved_snapshot_path, record.subpath)
+        if cached_snapshot_path is not None:
+            return cached_snapshot_path
+    return resolved_snapshot_path
 
 
 def load_from_record(

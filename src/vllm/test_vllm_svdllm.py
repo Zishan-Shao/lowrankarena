@@ -13,7 +13,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt", default="Hello, my name is", help="Prompt text.")
     parser.add_argument("--max-tokens", type=int, default=8, help="Number of generated tokens.")
     parser.add_argument("--max-model-len", type=int, default=2048, help="vLLM max model len.")
-    parser.add_argument("--dtype", default="float16", help="vLLM dtype.")
+    parser.add_argument("--dtype", default="auto", help="vLLM dtype.")
     parser.add_argument(
         "--gpu-memory-utilization",
         type=float,

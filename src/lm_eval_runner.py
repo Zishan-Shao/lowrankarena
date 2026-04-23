@@ -10,12 +10,14 @@ from pathlib import Path
 from typing import Any
 
 from src.benchmarking import suite_output_name
+from src.dtype_utils import normalize_dtype_name
 from src.inference_adapter import PreparedInferenceModel, prepare_model_for_inference
 from src.load import load_checkpoint
 from src.result_schema import build_result_payload
 from src.scoring import normalize_lm_eval_tasks
 from src.utils import dump_json, ensure_dir, load_json, load_yaml, project_path, run_results_root
 from src.validation import validate_checkpoint_layout
+from src.vllm.vllm_adapter import prepare_model_for_vllm
 
 
 DEFAULT_LM_EVAL_BIN = os.environ.get("LRA_LM_EVAL_BIN", "lm-eval")
@@ -31,11 +33,15 @@ class LmEvalRequest:
     output_dir: str | Path | None = None
     raw_output_root: str | Path | None = None
     lm_eval_bin: str = DEFAULT_LM_EVAL_BIN
-    model_backend: str = "hf"
+    model_backend: str | None = None
     device: str | None = None
     batch_size: str | int | None = None
     limit: float | int | None = None
     num_fewshot: int | None = None
+    tensor_parallel_size: int | None = None
+    gpu_memory_utilization: float | None = None
+    max_model_len: int | None = None
+    enforce_eager: bool | None = None
     log_samples: bool = False
     use_cache: str | None = None
     trust_remote_code: bool = True
@@ -67,19 +73,72 @@ def _serialize_cli_pairs(payload: dict[str, Any]) -> list[str]:
     return [f"{key}={_serialize_cli_value(value)}" for key, value in payload.items()]
 
 
+def _normalize_model_backend(model_backend: str | None) -> str:
+    value = str(model_backend or "hf").strip()
+    if not value:
+        return "hf"
+    normalized = value.lower()
+    if normalized in {"hf", "huggingface", "transformers"}:
+        return "hf"
+    if normalized == "vllm":
+        return "vllm"
+    return value
+
+
+def _effective_model_backend(request: LmEvalRequest, suite_config: dict[str, Any]) -> str:
+    eval_config = suite_config.get("eval", {}) or {}
+    return _normalize_model_backend(request.model_backend or eval_config.get("model_backend") or "hf")
+
+
+def _prepare_model_for_backend(loaded: Any, model_backend: str) -> Any:
+    if _normalize_model_backend(model_backend).lower() == "vllm":
+        return prepare_model_for_vllm(loaded)
+    return prepare_model_for_inference(loaded)
+
+
 def _build_model_args(
-    prepared: PreparedInferenceModel,
+    prepared: Any,
     extra_model_args: dict[str, Any],
     *,
     default_dtype: str = "auto",
+    model_backend: str | None = "hf",
+    trust_remote_code: bool = True,
+    tensor_parallel_size: int | None = None,
+    gpu_memory_utilization: float | None = None,
+    max_model_len: int | None = None,
+    enforce_eager: bool | None = None,
 ) -> dict[str, Any]:
     model_args: dict[str, Any] = {"pretrained": prepared.model_path}
-    model_args.setdefault("dtype", default_dtype)
-    if prepared.tokenizer_path != prepared.model_path:
+    model_args.setdefault("dtype", normalize_dtype_name(default_dtype))
+
+    backend = _normalize_model_backend(model_backend).lower()
+    if backend == "vllm":
         model_args["tokenizer"] = prepared.tokenizer_path
-    if prepared.tokenizer_mode == "slow":
-        model_args["use_fast_tokenizer"] = False
+        model_args["tokenizer_mode"] = prepared.tokenizer_mode
+        model_args["trust_remote_code"] = trust_remote_code
+        model_impl = getattr(prepared, "model_impl", None)
+        if model_impl is not None:
+            model_args["model_impl"] = model_impl
+        extra_llm_kwargs = getattr(prepared, "extra_llm_kwargs", None)
+        if extra_llm_kwargs:
+            model_args.update(extra_llm_kwargs)
+        if tensor_parallel_size is not None:
+            model_args["tensor_parallel_size"] = int(tensor_parallel_size)
+        if gpu_memory_utilization is not None:
+            model_args["gpu_memory_utilization"] = float(gpu_memory_utilization)
+        if max_model_len is not None:
+            model_args["max_model_len"] = int(max_model_len)
+        if enforce_eager is not None:
+            model_args["enforce_eager"] = bool(enforce_eager)
+    else:
+        if prepared.tokenizer_path != prepared.model_path:
+            model_args["tokenizer"] = prepared.tokenizer_path
+        if prepared.tokenizer_mode == "slow":
+            model_args["use_fast_tokenizer"] = False
+
     model_args.update(extra_model_args)
+    if "dtype" in model_args:
+        model_args["dtype"] = normalize_dtype_name(model_args["dtype"])
     return model_args
 
 
@@ -204,23 +263,30 @@ def _build_command(
     request: LmEvalRequest,
     suite_config: dict[str, Any],
     raw_output_dir: Path,
-    prepared: PreparedInferenceModel,
+    prepared: Any,
 ) -> list[str]:
     eval_config = suite_config.get("eval", {})
     tasks = [str(task) for task in eval_config.get("tasks", [])]
     if not tasks:
         raise ValueError(f"No lm-eval tasks configured in {request.suite_path}.")
 
+    model_backend = _effective_model_backend(request, suite_config)
     model_args = _build_model_args(
         prepared,
         request.extra_model_args,
         default_dtype=str(eval_config.get("dtype", "auto")),
+        model_backend=model_backend,
+        trust_remote_code=request.trust_remote_code,
+        tensor_parallel_size=request.tensor_parallel_size,
+        gpu_memory_utilization=request.gpu_memory_utilization,
+        max_model_len=request.max_model_len,
+        enforce_eager=request.enforce_eager,
     )
     command: list[str] = [
         request.lm_eval_bin,
         "run",
         "--model",
-        request.model_backend,
+        model_backend,
         "--model_args",
         *_serialize_cli_pairs(model_args),
         "--tasks",
@@ -310,6 +376,11 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
         raise ValueError(f"Suite {suite_path} is not an eval suite.")
     backend_name = str((suite_config.get("eval") or {}).get("backend", "lm_eval_harness"))
     if backend_name == "contiguous_ppl":
+        if _effective_model_backend(request, suite_config).lower() == "vllm":
+            eval_logger.warning(
+                "Suite %s uses the project-owned contiguous_ppl backend; ignoring model_backend=vllm.",
+                suite_path,
+            )
         from src.ppl_runner import run_contiguous_ppl_suite
 
         return run_contiguous_ppl_suite(request, suite_path=suite_path, suite_config=suite_config)
@@ -323,7 +394,8 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
         local_files_only=request.local_files_only,
         trust_remote_code=request.trust_remote_code,
     )
-    prepared = prepare_model_for_inference(loaded)
+    model_backend = _effective_model_backend(request, suite_config)
+    prepared = _prepare_model_for_backend(loaded, model_backend)
     validation_summary = validate_checkpoint_layout(
         prepared.model_path,
         strict=request.strict_validation,
@@ -332,6 +404,17 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
     ensure_dir(raw_output_dir)
 
     command = _build_command(request, suite_config, raw_output_dir, prepared)
+    effective_dtype = _build_model_args(
+        prepared,
+        request.extra_model_args,
+        default_dtype=str((suite_config.get("eval") or {}).get("dtype", "auto")),
+        model_backend=model_backend,
+        trust_remote_code=request.trust_remote_code,
+        tensor_parallel_size=request.tensor_parallel_size,
+        gpu_memory_utilization=request.gpu_memory_utilization,
+        max_model_len=request.max_model_len,
+        enforce_eager=request.enforce_eager,
+    ).get("dtype", "auto")
     subprocess.run(command, check=True, cwd=project_path())
 
     raw_result_path = _find_raw_result_path(raw_output_dir)
@@ -419,12 +502,16 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
             "metric_fallbacks": [str(item) for item in eval_config.get("metric_fallbacks", [])],
             "tracked_metrics": tracked_metrics,
             "metric_aggregation": aggregation,
-            "dtype": str(eval_config.get("dtype", "auto")),
+            "dtype": str(effective_dtype),
             "device": request.device if request.device is not None else eval_config.get("device"),
             "batch_size": request.batch_size if request.batch_size is not None else eval_config.get("batch_size"),
             "limit": request.limit if request.limit is not None else eval_config.get("limit"),
             "num_fewshot": request.num_fewshot if request.num_fewshot is not None else eval_config.get("num_fewshot"),
-            "model_backend": request.model_backend,
+            "model_backend": model_backend,
+            "tensor_parallel_size": request.tensor_parallel_size,
+            "gpu_memory_utilization": request.gpu_memory_utilization,
+            "max_model_len": request.max_model_len,
+            "enforce_eager": request.enforce_eager,
             "gen_kwargs": effective_gen_kwargs,
             "include_paths": [str(path) for path in _resolve_include_paths(suite_path, eval_config.get("include_paths"))],
             "apply_chat_template": eval_config.get("apply_chat_template", False),
@@ -444,6 +531,7 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
             "model_path": prepared.model_path,
             "tokenizer_path": prepared.tokenizer_path,
             "tokenizer_mode": prepared.tokenizer_mode,
+            "model_impl": getattr(prepared, "model_impl", None),
             "preparation_kind": prepared.preparation_kind,
             "source_model_path": prepared.source_model_path,
             "preparation_notes": prepared.notes,

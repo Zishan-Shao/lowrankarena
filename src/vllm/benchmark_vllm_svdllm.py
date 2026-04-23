@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repeat", type=int, default=5, help="Number of timed runs.")
     parser.add_argument("--warmup", type=int, default=1, help="Number of warmup runs.")
     parser.add_argument("--max-model-len", type=int, default=2048, help="vLLM max model len.")
-    parser.add_argument("--dtype", default="float16", help="vLLM dtype.")
+    parser.add_argument("--dtype", default="auto", help="vLLM dtype.")
     parser.add_argument("--tokenizer-mode", default="slow", help="Tokenizer mode.")
     parser.add_argument(
         "--gpu-memory-utilization",

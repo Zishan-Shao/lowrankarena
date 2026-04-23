@@ -7,6 +7,7 @@ from typing import Any
 
 import torch
 
+from src.dtype_utils import normalize_config_torch_dtype_name, normalize_dtype_name
 from src.utils import dump_json, load_json, project_path
 
 try:
@@ -16,7 +17,7 @@ except ImportError:  # pragma: no cover - optional until dependencies are instal
 
 
 DEFAULT_VALIDATION_ROOT = project_path("results", "validation")
-VALIDATION_SCHEMA_VERSION = "1.0"
+VALIDATION_SCHEMA_VERSION = "1.2"
 
 _LLAMA_LINEAR_SUFFIXES = [
     "self_attn.q_proj",
@@ -70,7 +71,19 @@ def _dtype_name(tensor: torch.Tensor) -> str:
 def _normalize_dtype_name(value: Any) -> str | None:
     if value is None:
         return None
-    return str(value).replace("torch.", "").strip().lower()
+    try:
+        return normalize_dtype_name(value)
+    except ValueError:
+        return str(value).replace("torch.", "").strip().lower()
+
+
+def _normalize_config_dtype_name(value: Any) -> str | None:
+    if value is None:
+        return None
+    try:
+        return normalize_config_torch_dtype_name(value)
+    except ValueError:
+        return str(value).replace("torch.", "").strip().lower()
 
 
 def _canonical_llama_modules(num_layers: int) -> list[str]:
@@ -132,6 +145,11 @@ def _is_basis_sharing_config(config: dict[str, Any]) -> bool:
     return config.get("model_type") == "basis_sharing_llama" or "ShareLlamaForCausalLM" in architectures or auto_map.get(
         "AutoModelForCausalLM", ""
     ).endswith("BasisSharingLlamaForCausalLM")
+
+
+def _is_low_rank_config(config: dict[str, Any]) -> bool:
+    low_rank_modules = config.get("low_rank_modules")
+    return isinstance(low_rank_modules, dict) and bool(low_rank_modules)
 
 
 def _extract_expected_rank(spec: Any) -> int:
@@ -204,7 +222,7 @@ def _validate_factorized_layout(
     observed_factor_layouts: dict[str, str] = {}
     expected_dense_shapes: dict[str, list[int]] = {}
     observed_dense_shapes: dict[str, list[int]] = {}
-    reference_torch_dtype = _normalize_dtype_name(config.get("torch_dtype"))
+    reference_torch_dtype = _normalize_config_dtype_name(config.get("torch_dtype"))
 
     for module_name in expected_modules:
         left_name = f"{module_name}{left_suffix}"
@@ -357,9 +375,11 @@ def _validate_basis_sharing_layout(model_path: Path, config: dict[str, Any], wei
         "model_type": config.get("model_type"),
         "coverage": coverage,
         "precision": {
-            "reference_torch_dtype": _normalize_dtype_name(config.get("torch_dtype")),
+            "reference_torch_dtype": _normalize_config_dtype_name(config.get("torch_dtype")),
             "uniform_low_rank_precision": True,
-            "low_rank_factor_dtypes": [_normalize_dtype_name(config.get("torch_dtype"))] if config.get("torch_dtype") else [],
+            "low_rank_factor_dtypes": [_normalize_config_dtype_name(config.get("torch_dtype"))]
+            if config.get("torch_dtype")
+            else [],
             "matches_reference_torch_dtype": True,
         },
         "passed": not issues,
@@ -374,7 +394,7 @@ def _validate_dense_layout(config: dict[str, Any], weight_map: dict[str, str]) -
         "model_type": config.get("model_type"),
         "parameter_tensor_count": len(weight_map),
         "precision": {
-            "reference_torch_dtype": _normalize_dtype_name(config.get("torch_dtype")),
+            "reference_torch_dtype": _normalize_config_dtype_name(config.get("torch_dtype")),
             "uniform_low_rank_precision": True,
             "low_rank_factor_dtypes": [],
             "matches_reference_torch_dtype": True,
@@ -424,6 +444,17 @@ def _summary_for_model_path(model_path: Path) -> dict[str, Any]:
         )
     elif _is_basis_sharing_config(config):
         summary = _validate_basis_sharing_layout(model_path, config, weight_map)
+    elif _is_low_rank_config(config):
+        method = str(config.get("low_rank_method") or "lowrank").replace("-", "_")
+        summary = _validate_factorized_layout(
+            model_path=model_path,
+            config=config,
+            expected_specs=dict(config.get("low_rank_modules") or {}),
+            weight_map=weight_map,
+            left_suffix=".ALinear.weight",
+            right_suffix=".BLinear.weight",
+            layout_kind=f"{method}_factorized",
+        )
     else:
         summary = _validate_dense_layout(config, weight_map)
 

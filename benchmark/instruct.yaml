@@ -1,0 +1,10 @@
+name: instruct
+kind: aggregate
+description: Instruct-model leaderboard lane for direct-answer MMLU-Pro and GSM8K CoT generation.
+selection:
+  variants:
+    - instruct
+  enabled_only: true
+includes:
+  - instruct/mmlu_pro
+  - instruct/gsm8k

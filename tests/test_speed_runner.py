@@ -110,7 +110,7 @@ def test_run_speed_suite_supports_evaluation_backend() -> None:
         output_root = tmp_root / "eval_outputs"
         original_runner = speed_runner.run_lm_eval_suite
         original_perf_counter = speed_runner.time.perf_counter
-        perf_values = iter([0.0, 10.0, 10.0, 22.0, 22.0, 34.0, 34.0, 40.0])
+        perf_values = iter([0.0, 10.0, 10.0, 22.0, 22.0, 34.0])
 
         def fake_perf_counter() -> float:
             return next(perf_values)
@@ -138,8 +138,7 @@ def test_run_speed_suite_supports_evaluation_backend() -> None:
             else:
                 sample_counts = {
                     "mcq": {"boolq": 10, "piqa": 20},
-                    "mmlu_pro": {"mmlu_pro": 15},
-                    "gsm8k": {"gsm8k": 25},
+                    "base_math": {"lra_mathqa": 15, "mmlu_stem": 15},
                 }[suite_id]
                 raw_payload = {
                     "total_evaluation_time_seconds": 5.0,
@@ -183,13 +182,12 @@ def test_run_speed_suite_supports_evaluation_backend() -> None:
 
         payload = json.loads(Path(result.output_path).read_text(encoding="utf-8"))
         assert payload["backend"]["name"] == "evaluation"
-        assert payload["metrics"]["suite_count"] == 4
-        assert payload["metrics"]["total_wall_time_seconds"] == 40.0
+        assert payload["metrics"]["suite_count"] == 3
+        assert payload["metrics"]["total_wall_time_seconds"] == 34.0
         assert payload["metrics"]["by_work_unit"]["tokens"]["total_count"] == 6144
-        assert payload["metrics"]["by_work_unit"]["examples"]["total_count"] == 70
+        assert payload["metrics"]["by_work_unit"]["examples"]["total_count"] == 60
         assert [item["suite"] for item in payload["details"]["suites"]] == [
-            "accuracy/ppl",
-            "accuracy/mcq",
-            "accuracy/mmlu_pro",
-            "accuracy/gsm8k",
+            "ppl",
+            "mcq",
+            "base/base_math",
         ]

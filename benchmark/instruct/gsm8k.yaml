@@ -1,0 +1,25 @@
+name: gsm8k
+kind: eval
+description: GSM8K 8-shot Chain-of-Thought exact match through the upstream lm-eval-harness gsm8k_cot task.
+selection:
+  variants:
+    - instruct
+  enabled_only: true
+eval:
+  backend: lm_eval_harness
+  model_backend: vllm
+  version: 0.4.11
+  dataset: lm_eval_harness
+  dtype: auto
+  metric: exact_match
+  tracked_metrics:
+    - exact_match
+  metric_aggregation: macro_mean
+  batch_size: auto
+  num_fewshot: 8
+  tasks:
+    - gsm8k_cot
+report:
+  result_dir: results/leaderboard/eval
+  output_dir: results/tables
+  filename: gsm8k.md

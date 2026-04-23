@@ -2,21 +2,12 @@ name: ppl
 kind: eval
 description: Project-owned contiguous-block perplexity suite with fixed tokenization and sequence-length rules.
 selection:
-  checkpoints:
-    - llama31-8b-asvd-0.4
-    - llama31-8b-dobi-0.8
-    - llama31-8b-svdllm-v1-update-0.6
-    - llama31-8b-svdllm-v2-0.6
-    - llama31-8b-basis-sharing-0.6
-    - llama-7b-svdllm-v1-update-0.5
-    - llama-7b-basis-sharing-0.5
-    - llama-7b-dobi-0.8
   enabled_only: true
 eval:
   backend: contiguous_ppl
   version: "1.0"
   dataset: local_contiguous_text
-  dtype: float16
+  dtype: auto
   metric: ppl
   metric_aggregation: macro_mean
   batch_size: 1
@@ -25,16 +16,22 @@ eval:
     - name: wikitext2
       kind: wikitext2
       split: test
+      revision: b08601e04326c79dfdd32d625aee71d232d685c3
     - name: c4_stream
       kind: c4_stream
+      path: allenai/c4
+      config_name: en
       split: validation
+      revision: 1588ec454efa1a09f29cd18ddd04fe05fc8653a2
+      document_offset: 0
       max_eval_tokens: 262144
   notes:
     - Do not apply a chat template.
     - Tokenize raw text with the checkpoint tokenizer and add_special_tokens=False.
     - Evaluate contiguous non-overlapping blocks with one fixed max_length.
     - Report only evaluation-split perplexity.
-    - c4_stream uses the public validation stream and a fixed 262144-token budget so runtime stays comparable to WikiText-2 test.
+    - Dataset revisions, splits, and C4 document_offset are pinned so repeated runs consume the same ordered text stream.
+    - c4_stream uses the public validation stream from document_offset=0 and a fixed 262144-token budget so runtime stays comparable to WikiText-2 test.
 report:
   result_dir: results/leaderboard/eval
   output_dir: results/tables

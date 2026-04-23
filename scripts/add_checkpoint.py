@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-id", default="Duke-CEI-SVD/LowRankArena")
     parser.add_argument("--revision", default="main")
     parser.add_argument("--subpath", default="")
-    parser.add_argument("--benchmarks", nargs="*", default=["main"])
+    parser.add_argument("--benchmarks", nargs="*", default=["base"])
     parser.add_argument("--enabled", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--notes", default="")
     parser.add_argument("--index", default=str(ROOT / "checkpoints" / "index.csv"))
