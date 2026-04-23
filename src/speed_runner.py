@@ -9,6 +9,7 @@ from typing import Any
 
 from src.benchmarking import resolve_suite_path, suite_id, suite_output_name
 from src.dtype_utils import normalize_dtype_name
+from src.hardware import describe_cuda_runtime
 from src.load import load_checkpoint
 from src.lm_eval_runner import DEFAULT_LM_EVAL_BIN, LmEvalRequest, run_lm_eval_suite
 from src.result_schema import build_result_payload
@@ -282,6 +283,7 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         else (int(speed_config["max_model_len"]) if speed_config.get("max_model_len") is not None else None)
     )
     enforce_eager = bool(request.enforce_eager if request.enforce_eager is not None else speed_config.get("enforce_eager", False))
+    cuda_runtime = describe_cuda_runtime(limit=tensor_parallel_size)
 
     progress.step(2, "Preparing checkpoint for vLLM")
     loaded = load_checkpoint(
@@ -410,6 +412,7 @@ def run_vllm_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
             "model_path": prepared.model_path,
             "tokenizer_path": prepared.tokenizer_path,
             "tokenizer_mode": prepared.tokenizer_mode,
+            "cuda_runtime": cuda_runtime,
             "model_impl": prepared.model_impl,
             "preparation_kind": prepared.preparation_kind,
             "source_model_path": prepared.source_model_path,
@@ -465,6 +468,7 @@ def run_evaluation_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
     )
     eval_max_model_len = request.max_model_len if request.max_model_len is not None else speed_config.get("max_model_len")
     eval_enforce_eager = request.enforce_eager if request.enforce_eager is not None else speed_config.get("enforce_eager")
+    cuda_runtime = describe_cuda_runtime(limit=eval_tensor_parallel_size)
 
     loaded = load_checkpoint(
         request.checkpoint_name,
@@ -545,6 +549,7 @@ def run_evaluation_speed_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
         },
         runtime={
             "suite_count": len(eval_suite_paths),
+            "cuda_runtime": cuda_runtime,
         },
         validation={
             "suite_count": len(validations),

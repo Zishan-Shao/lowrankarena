@@ -64,6 +64,8 @@ The paper-facing `lm_eval_harness` suites for base MCQ, base math, MMLU-Pro, GSM
 
 `ppl.yaml` is different because it uses the project-owned `contiguous_ppl` backend. Its concrete evaluation text is defined under `eval.datasets`: `WikiText-2` uses a pinned dataset revision plus the full `test` split, while `c4_stream` uses a pinned `allenai/c4` revision, `validation` split, `config_name: en`, `document_offset: 0`, and a fixed token budget. The runner records the scored token SHA-256 hash for each dataset so repeated runs can verify they evaluated the same token sequence.
 
+Efficiency outputs record the CUDA runtime metadata under `runtime.cuda_runtime`, including each visible/selected device's name, compute capability, and total memory. Compare memory and speed numbers only within the same GPU class.
+
 ## Placement Rules
 
 - Put suites that are valid for both pretrained/base and instruction-tuned checkpoints at the root of `benchmark/`.

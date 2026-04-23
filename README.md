@@ -81,8 +81,8 @@ Instruct evaluation:
 
 System metrics:
 
-- [`memory/active.yaml`](./benchmark/memory/active.yaml): active memory peak for one process via `torch.cuda.max_memory_allocated()`.
-- [`speed/serve.yaml`](./benchmark/speed/serve.yaml): mainstream vLLM serving cases for prefill/decode throughput.
+- [`memory/active.yaml`](./benchmark/memory/active.yaml): active memory peak for one process via `torch.cuda.max_memory_allocated()`; normalized outputs record the CUDA device name/class and visible-device mapping.
+- [`speed/serve.yaml`](./benchmark/speed/serve.yaml): mainstream vLLM serving cases for prefill/decode throughput; normalized outputs record the CUDA device name/class used by the run.
 - [`speed/speed.yaml`](./benchmark/speed/speed.yaml): end-to-end evaluation-speed route over the default base eval lane.
 - [`speed/edge.yaml`](./benchmark/speed/edge.yaml): optional long-context serving cases for appendix or stress reporting.
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import torch
 
 from src.dtype_utils import normalize_config_torch_dtype_name
+from src.hardware import describe_cuda_runtime
 from src.memory_runner import estimate_dense_kv_bytes, pick_filler_token_id, resolve_dtype
 
 
@@ -50,3 +52,25 @@ def test_estimate_dense_kv_bytes_matches_llama_7b_fp16_shape() -> None:
     assert estimate["bytes_per_token"] == 524288
     assert estimate["cached_tokens_at_peak"] == 39
     assert estimate["estimated_peak_kv_bytes"] == 524288 * 39
+
+
+def test_describe_cuda_runtime_records_gpu_model_metadata() -> None:
+    props = SimpleNamespace(
+        name="Fake A100",
+        major=8,
+        minor=0,
+        multi_processor_count=108,
+        total_memory=80 * 1024**3,
+    )
+    with (
+        patch("torch.cuda.is_available", return_value=True),
+        patch("torch.cuda.device_count", return_value=1),
+        patch("torch.cuda.get_device_properties", return_value=props),
+    ):
+        runtime = describe_cuda_runtime(limit=1)
+
+    assert runtime["available"] is True
+    assert runtime["device_count"] == 1
+    assert runtime["devices"][0]["name"] == "Fake A100"
+    assert runtime["devices"][0]["compute_capability"] == "8.0"
+    assert runtime["devices"][0]["total_memory_gib"] == 80.0

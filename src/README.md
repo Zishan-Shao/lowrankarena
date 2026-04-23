@@ -18,6 +18,7 @@ The guiding rule is simple: benchmark policy lives in [`benchmark/`](../benchmar
 - [`ppl_runner.py`](./ppl_runner.py): project-owned contiguous-block perplexity runner for unified local PPL evaluation.
 - [`memory_runner.py`](./memory_runner.py): Transformers-based active-memory measurement runner.
 - [`speed_runner.py`](./speed_runner.py): suite-selected speed runner for both vLLM serving workloads and evaluation-speed workloads.
+- [`hardware.py`](./hardware.py): CUDA device metadata helpers used to record GPU model/class in efficiency outputs.
 - [`scoring.py`](./scoring.py): task-level metric selection and summary reduction helpers.
 - [`report.py`](./report.py): lightweight result discovery and table generation.
 - [`eval.py`](./eval.py): compatibility wrapper that forwards eval requests to the real runner.

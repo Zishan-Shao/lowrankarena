@@ -186,6 +186,8 @@ def test_run_speed_suite_supports_evaluation_backend() -> None:
         assert payload["metrics"]["total_wall_time_seconds"] == 34.0
         assert payload["metrics"]["by_work_unit"]["tokens"]["total_count"] == 6144
         assert payload["metrics"]["by_work_unit"]["examples"]["total_count"] == 60
+        assert "cuda_runtime" in payload["runtime"]
+        assert "devices" in payload["runtime"]["cuda_runtime"]
         assert [item["suite"] for item in payload["details"]["suites"]] == [
             "ppl",
             "mcq",

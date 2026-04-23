@@ -9,6 +9,7 @@ import torch
 
 from src.benchmarking import suite_output_name
 from src.dtype_utils import normalize_dtype_name
+from src.hardware import describe_cuda_runtime
 from src.inference_adapter import prepare_model_for_inference
 from src.load import load_checkpoint
 from src.result_schema import build_result_payload
@@ -169,6 +170,7 @@ def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
     device = torch.device(request.device)
     if device.type != "cuda":
         raise ValueError(f"device must be a CUDA device, got {request.device!r}")
+    cuda_runtime = describe_cuda_runtime(devices=[device])
 
     _configure_backend_logging(verbose_backend=request.verbose_backend)
     dtype = resolve_dtype(request.dtype)
@@ -301,6 +303,7 @@ def run_memory_measurement(request: MemoryRequest) -> MemoryResult:
             "model_path": model_path,
             "tokenizer_path": prepared.tokenizer_path,
             "tokenizer_mode": prepared.tokenizer_mode,
+            "cuda_runtime": cuda_runtime,
             "preparation_kind": prepared.preparation_kind,
             "source_model_path": prepared.source_model_path,
             "preparation_notes": prepared.notes,

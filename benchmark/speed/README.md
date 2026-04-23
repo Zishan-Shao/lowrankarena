@@ -17,5 +17,6 @@ Speed suites are intentionally separate from accuracy suites because their runti
 - Split mainstream serving and edge-case long-context workloads into separate suites so the serving leaderboard stays interpretable while edge behavior remains reproducible.
 - Keep evaluation-speed separate from serving-speed: `speed.yaml` measures the benchmark pipeline, not `prefill/decode` microstructure. Its PPL child still uses the native contiguous runner; its `lm-eval` children default to `model_backend: vllm`.
 - Keep the config focused on workload definition; device-specific tuning belongs in CLI overrides.
+- Normalized speed outputs record `runtime.cuda_runtime` with selected GPU names, compute capability, total memory, and `CUDA_VISIBLE_DEVICES`; compare efficiency rows only within one GPU class.
 - The `serve` defaults intentionally stay conservative enough to run on a partially occupied cluster. The `edge` suite assumes a less crowded GPU budget and therefore uses a higher default `gpu_memory_utilization`.
 - Use CLI overrides on `scripts/run_speed.py` when you need to shrink or expand the sweep; serving suites accept batch/prompt/generation overrides, while evaluation-speed accepts `lm-eval` runtime overrides such as device, limit, or `--eval-model-backend hf`.
