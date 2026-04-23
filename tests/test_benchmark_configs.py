@@ -25,8 +25,11 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     base_math = load_yaml(PROJECT_ROOT / "benchmark" / "base" / "base_math.yaml")
     mmlu_pro = load_yaml(PROJECT_ROOT / "benchmark" / "instruct" / "mmlu_pro.yaml")
     gsm8k = load_yaml(PROJECT_ROOT / "benchmark" / "instruct" / "gsm8k.yaml")
+    aime = load_yaml(PROJECT_ROOT / "benchmark" / "instruct" / "aime.yaml")
+    ifeval = load_yaml(PROJECT_ROOT / "benchmark" / "instruct" / "ifeval.yaml")
     base = load_yaml(PROJECT_ROOT / "benchmark" / "base.yaml")
     instruct = load_yaml(PROJECT_ROOT / "benchmark" / "instruct.yaml")
+    instruct_appendix = load_yaml(PROJECT_ROOT / "benchmark" / "instruct_appendix.yaml")
     memory = load_yaml(PROJECT_ROOT / "benchmark" / "memory" / "active.yaml")
 
     assert mcq["eval"]["backend"] == "lm_eval_harness"
@@ -117,6 +120,36 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     assert "include_paths" not in gsm8k["eval"]
     assert gsm8k["eval"]["tasks"] == ["gsm8k_cot"]
 
+    assert aime["eval"]["backend"] == "lm_eval_harness"
+    assert aime["eval"]["model_backend"] == "vllm"
+    assert aime["eval"]["version"] == "0.4.11"
+    assert aime["eval"]["dtype"] == "auto"
+    assert aime["eval"]["metric"] == "exact_match"
+    assert aime["eval"]["tracked_metrics"] == ["exact_match"]
+    assert aime["eval"]["num_fewshot"] == 0
+    assert aime["eval"]["summary_source"] == "results"
+    assert aime["eval"]["summary_entity"] == "aime24"
+    assert aime["eval"]["solved_count_metric"] == "exact_match"
+    assert "apply_chat_template" not in aime["eval"]
+    assert "gen_kwargs" not in aime["eval"]
+    assert aime["eval"]["tasks"] == ["aime24"]
+
+    assert ifeval["eval"]["backend"] == "lm_eval_harness"
+    assert ifeval["eval"]["model_backend"] == "vllm"
+    assert ifeval["eval"]["version"] == "0.4.11"
+    assert ifeval["eval"]["dtype"] == "auto"
+    assert ifeval["eval"]["metric"] == "prompt_level_strict_acc"
+    assert ifeval["eval"]["tracked_metrics"] == [
+        "prompt_level_strict_acc",
+        "inst_level_strict_acc",
+        "prompt_level_loose_acc",
+        "inst_level_loose_acc",
+    ]
+    assert ifeval["eval"]["num_fewshot"] == 0
+    assert ifeval["eval"]["apply_chat_template"] is True
+    assert "gen_kwargs" not in ifeval["eval"]
+    assert ifeval["eval"]["tasks"] == ["ifeval"]
+
     assert memory["name"] == "active_memory"
     assert memory["kind"] == "memory"
     assert memory["selection"] == {"enabled_only": True}
@@ -126,7 +159,7 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     assert memory["memory"]["prompt_length"] == 512
     assert memory["memory"]["generation_length"] == 128
 
-    for suite in [mcq, ppl, mmlu, base_math, base, instruct, memory]:
+    for suite in [mcq, ppl, mmlu, base_math, mmlu_pro, gsm8k, aime, ifeval, base, instruct, instruct_appendix, memory]:
         assert "checkpoints" not in suite.get("selection", {})
 
     assert base["selection"]["variants"] == ["base"]
@@ -142,6 +175,13 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     assert instruct["includes"] == [
         "instruct/mmlu_pro",
         "instruct/gsm8k",
+    ]
+    assert aime["selection"]["variants"] == ["instruct"]
+    assert ifeval["selection"]["variants"] == ["instruct"]
+    assert instruct_appendix["selection"]["variants"] == ["instruct"]
+    assert instruct_appendix["includes"] == [
+        "instruct/aime",
+        "instruct/ifeval",
     ]
 
     serve = load_yaml(PROJECT_ROOT / "benchmark" / "speed" / "serve.yaml")

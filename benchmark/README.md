@@ -7,12 +7,13 @@ It contains declarative suite specifications only. Execution logic lives in [`sc
 ## Structure
 
 - [`base.yaml`](./base.yaml): paper-facing Base/Universal evaluation lane. It runs shared retention suites plus base-only tasks from [`base/`](./base/README.md).
-- [`instruct.yaml`](./instruct.yaml): instruct-model leaderboard lane for [`instruct/`](./instruct/README.md) tasks.
+- [`instruct.yaml`](./instruct.yaml): instruct-model main leaderboard lane for [`instruct/`](./instruct/README.md) tasks.
+- [`instruct_appendix.yaml`](./instruct_appendix.yaml): instruct-only appendix/sanity lane for hard math and instruction-following stress tests.
 - [`ppl.yaml`](./ppl.yaml): shared contiguous-block perplexity suite over `WikiText-2` test and a fixed-budget `C4` validation stream.
 - [`mcq.yaml`](./mcq.yaml): shared multi-task multiple-choice suite for headline commonsense QA reporting.
 - [`mmlu.yaml`](./mmlu.yaml): shared dedicated MMLU suite using the official `mmlu` group.
 - [`base/`](./base/README.md): base-only suites that should not depend on chat formatting or long-form generation behavior.
-- [`instruct/`](./instruct/README.md): instruct-only suites for direct-answer MMLU-Pro and GSM8K CoT generation.
+- [`instruct/`](./instruct/README.md): instruct-only suites for direct-answer MMLU-Pro, GSM8K CoT generation, AIME, and IFEval.
 - [`memory/active.yaml`](./memory/active.yaml): dedicated active GPU memory workload parameters for one checkpoint.
 - [`speed/`](./speed/README.md): dedicated speed suites backed by vLLM plus an evaluation-speed suite that measures end-to-end benchmark runtime.
 
@@ -33,13 +34,16 @@ base = ppl + mcq + base/base_math
 
 It measures language-model retention, multiple-choice accuracy, and base-safe math without relying on chat templates or long Chain-of-Thought generation. `base/base_math` uses a local script-free `lra_mathqa` wrapper plus the upstream `mmlu_stem` MCQ group.
 
-The current instruct lane is:
+The current instruct-related lanes are:
 
 ```text
 instruct = instruct/mmlu_pro + instruct/gsm8k
+instruct_appendix = instruct/aime + instruct/ifeval
 ```
 
 It contains only the Instruct leaderboard tasks: direct-answer MMLU-Pro plus GSM8K Chain-of-Thought generation for chat/instruction-tuned checkpoints. Shared retention/MCQ probes can still be run explicitly, but they are not part of the Instruct table entrypoint.
+
+The appendix lane keeps slower or more protocol-sensitive instruct-only checks separate from the main table. `instruct/aime` uses `aime24` with upstream exact-match extraction and records both accuracy and solved count. `instruct/ifeval` uses upstream IFEval metrics, applies the tokenizer chat template consistently across models, and reports the strict prompt-level metric as the headline while preserving strict/loose prompt- and instruction-level metrics.
 
 There is intentionally no catch-all `main.yaml`. Paper accuracy/perplexity tables should use the explicit `base` or `instruct` lanes, while system metrics use their own dedicated entries:
 
@@ -56,7 +60,7 @@ Suite membership and task selection are version-controlled in YAML. For `lm_eval
 
 Suites use `dtype: auto` by default so fp16 and bf16 checkpoints can run without editing YAML. Override from the CLI when a run needs a fixed precision, for example `--dtype bf16` on `scripts/run_eval.py`, `--dtype bf16` on `scripts/run_memory.py`, `--dtype bf16` on `scripts/run_speed.py`, or `--eval-dtype bf16` on `scripts/run_main.py`.
 
-The paper-facing `lm_eval_harness` suites for base MCQ, base math, MMLU-Pro, and GSM8K default to `model_backend: vllm` so full leaderboard runs do not crawl through the Transformers backend. Use `--model-backend hf` on `scripts/run_eval.py` or `--eval-model-backend hf` on `scripts/run_main.py` when you need a direct HF comparison. `ppl.yaml` stays on the project-owned contiguous PPL runner and ignores vLLM backend overrides.
+The paper-facing `lm_eval_harness` suites for base MCQ, base math, MMLU-Pro, GSM8K, AIME, and IFEval default to `model_backend: vllm` so full leaderboard runs do not crawl through the Transformers backend. Use `--model-backend hf` on `scripts/run_eval.py` or `--eval-model-backend hf` on `scripts/run_main.py` when you need a direct HF comparison. `ppl.yaml` stays on the project-owned contiguous PPL runner and ignores vLLM backend overrides.
 
 `ppl.yaml` is different because it uses the project-owned `contiguous_ppl` backend. Its concrete evaluation text is defined under `eval.datasets`: `WikiText-2` uses a pinned dataset revision plus the full `test` split, while `c4_stream` uses a pinned `allenai/c4` revision, `validation` split, `config_name: en`, `document_offset: 0`, and a fixed token budget. The runner records the scored token SHA-256 hash for each dataset so repeated runs can verify they evaluated the same token sequence.
 
@@ -80,6 +84,9 @@ python scripts/run_main.py --suites base --limit 1
 # Instruct lane
 python scripts/run_main.py --suites instruct --limit 1
 
+# Instruct appendix lane
+python scripts/run_main.py --suites instruct_appendix --limit 1
+
 # Explicit checkpoint override
 python scripts/run_main.py --suites base --checkpoint llama31-8b-svdllm-v1-update-0.6 --limit 1
 
@@ -90,6 +97,8 @@ python scripts/run_speed.py llama31-8b-svdllm-v1-update-0.6 --suite speed/serve
 # Single lane-specific suites
 python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite base/base_math --limit 1
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/mmlu_pro --limit 1
+python scripts/run_eval.py llama31-8b-instruct --suite instruct/aime --limit 1
+python scripts/run_eval.py llama31-8b-instruct --suite instruct/ifeval --limit 1
 
 # HF fallback for comparison/debugging
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/mmlu_pro --model-backend hf --limit 1

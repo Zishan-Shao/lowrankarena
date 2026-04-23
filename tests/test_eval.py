@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.inference_adapter import PreparedInferenceModel
-from src.lm_eval_runner import LmEvalRequest, _build_command, _build_model_args
+from src.lm_eval_runner import LmEvalRequest, _build_command, _build_counted_metric_summary, _build_model_args
 from src.utils import project_path
 
 
@@ -110,6 +110,29 @@ def test_build_command_includes_suite_level_lm_eval_contract_flags(tmp_path: Pat
     assert "--fewshot_as_multiturn" in command
     assert "False" in command
     assert "--apply_chat_template" not in command
+
+
+def test_counted_metric_summary_derives_solved_count_from_lm_eval_samples() -> None:
+    counted = _build_counted_metric_summary(
+        {
+            "aime24": {
+                "tracked_metrics": {
+                    "exact_match": {
+                        "value": 0.4,
+                    }
+                }
+            }
+        },
+        {"n-samples": {"aime24": {"original": 30, "effective": 30}}},
+        metric_name="exact_match",
+        entities=["aime24"],
+    )
+
+    assert counted is not None
+    assert counted["sample_count"] == 30
+    assert counted["solved_count"] == 12
+    assert counted["accuracy"] == 0.4
+    assert counted["by_entity"]["aime24"]["solved_count"] == 12
 
 
 def test_build_command_uses_suite_default_vllm_model_backend(tmp_path: Path) -> None:

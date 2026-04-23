@@ -59,6 +59,7 @@ There is intentionally no catch-all `benchmark/main.yaml`. Use explicit lanes fo
 ```text
 base = ppl + mcq + base/base_math
 instruct = instruct/mmlu_pro + instruct/gsm8k
+instruct_appendix = instruct/aime + instruct/ifeval
 memory = memory/active
 serving speed = speed/serve
 evaluation speed = speed/speed
@@ -75,6 +76,8 @@ Instruct evaluation:
 
 - [`instruct/mmlu_pro.yaml`](./benchmark/instruct/mmlu_pro.yaml): `leaderboard_mmlu_pro`, 5-shot direct-answer multiple choice, non-CoT, metric `acc`.
 - [`instruct/gsm8k.yaml`](./benchmark/instruct/gsm8k.yaml): upstream `gsm8k_cot`, 8-shot CoT, greedy/default extraction, no self-consistency and no extra generation-length override in our YAML.
+- [`instruct/aime.yaml`](./benchmark/instruct/aime.yaml): upstream `aime24`, 0-shot greedy generation, fixed exact-match extraction, and normalized solved count plus accuracy for appendix hard-math reporting.
+- [`instruct/ifeval.yaml`](./benchmark/instruct/ifeval.yaml): upstream `ifeval`, chat-template protocol enabled, fixed upstream `max_gen_toks: 1280`, and strict/loose prompt-/instruction-level metrics.
 
 System metrics:
 
@@ -135,6 +138,9 @@ Instruct lane:
 # run all enabled instruct checkpoints selected by benchmark/instruct.yaml
 python scripts/run_main.py --suites instruct
 
+# run appendix-only instruct checks selected by benchmark/instruct_appendix.yaml
+python scripts/run_main.py --suites instruct_appendix
+
 # smoke one explicit instruct checkpoint
 python scripts/run_main.py \
   --suites instruct \
@@ -150,6 +156,8 @@ python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite mcq --limit 1
 python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite base/base_math --limit 1
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/mmlu_pro --limit 1
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/gsm8k --limit 1
+python scripts/run_eval.py llama31-8b-instruct --suite instruct/aime --limit 1
+python scripts/run_eval.py llama31-8b-instruct --suite instruct/ifeval --limit 1
 ```
 
 System metrics:

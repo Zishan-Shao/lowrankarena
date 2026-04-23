@@ -1,0 +1,10 @@
+name: instruct_appendix
+kind: aggregate
+description: Instruct-only appendix/sanity lane for hard math and instruction-following stress tests.
+selection:
+  variants:
+    - instruct
+  enabled_only: true
+includes:
+  - instruct/aime
+  - instruct/ifeval

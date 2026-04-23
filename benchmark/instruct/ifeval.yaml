@@ -1,0 +1,29 @@
+name: ifeval
+kind: eval
+description: IFEval instruction-following sanity suite for instruct checkpoints with a unified chat-template protocol.
+selection:
+  variants:
+    - instruct
+  enabled_only: true
+eval:
+  backend: lm_eval_harness
+  model_backend: vllm
+  version: 0.4.11
+  dataset: lm_eval_harness_ifeval
+  dtype: auto
+  metric: prompt_level_strict_acc
+  tracked_metrics:
+    - prompt_level_strict_acc
+    - inst_level_strict_acc
+    - prompt_level_loose_acc
+    - inst_level_loose_acc
+  metric_aggregation: macro_mean
+  batch_size: auto
+  num_fewshot: 0
+  apply_chat_template: true
+  tasks:
+    - ifeval
+report:
+  result_dir: results/leaderboard/eval
+  output_dir: results/tables
+  filename: ifeval.md

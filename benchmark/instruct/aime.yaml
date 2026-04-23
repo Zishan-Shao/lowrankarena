@@ -1,0 +1,28 @@
+name: aime
+kind: eval
+description: AIME 2024 hard-math stress test for instruct checkpoints; greedy single-sample generation with upstream fixed answer extraction.
+selection:
+  variants:
+    - instruct
+  enabled_only: true
+eval:
+  backend: lm_eval_harness
+  model_backend: vllm
+  version: 0.4.11
+  dataset: lm_eval_harness_aime24
+  dtype: auto
+  metric: exact_match
+  tracked_metrics:
+    - exact_match
+  metric_aggregation: macro_mean
+  batch_size: auto
+  num_fewshot: 0
+  summary_source: results
+  summary_entity: aime24
+  solved_count_metric: exact_match
+  tasks:
+    - aime24
+report:
+  result_dir: results/leaderboard/eval
+  output_dir: results/tables
+  filename: aime.md

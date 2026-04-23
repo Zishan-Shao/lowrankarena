@@ -259,6 +259,76 @@ def _normalize_summary_entries(
     )
 
 
+def _coerce_sample_count(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        for key in ("effective", "original", "n_samples", "samples"):
+            if key in value:
+                coerced = _coerce_sample_count(value.get(key))
+                if coerced is not None:
+                    return coerced
+        return None
+    if isinstance(value, (int, float)):
+        coerced = int(value)
+        if coerced < 0:
+            return None
+        return coerced
+    return None
+
+
+def _sample_count_for_entity(raw_payload: dict[str, Any], entity: str) -> int | None:
+    sample_counts = raw_payload.get("n-samples", {})
+    if not isinstance(sample_counts, dict):
+        return None
+    return _coerce_sample_count(sample_counts.get(entity))
+
+
+def _build_counted_metric_summary(
+    normalized_entries: dict[str, dict[str, Any]],
+    raw_payload: dict[str, Any],
+    *,
+    metric_name: str,
+    entities: list[str],
+) -> dict[str, Any] | None:
+    by_entity: dict[str, dict[str, Any]] = {}
+    total_samples = 0
+    total_successes = 0.0
+
+    for entity in entities:
+        entry = normalized_entries.get(entity, {})
+        tracked = entry.get("tracked_metrics", {})
+        metric_payload = tracked.get(metric_name, {})
+        value = metric_payload.get("value")
+        sample_count = _sample_count_for_entity(raw_payload, entity)
+        if value is None or sample_count is None:
+            continue
+
+        accuracy = float(value)
+        successes = accuracy * sample_count
+        by_entity[entity] = {
+            "metric": metric_name,
+            "accuracy": accuracy,
+            "sample_count": sample_count,
+            "solved_count": int(round(successes)),
+            "solved_count_float": successes,
+        }
+        total_samples += sample_count
+        total_successes += successes
+
+    if not by_entity:
+        return None
+
+    return {
+        "metric": metric_name,
+        "accuracy": total_successes / total_samples if total_samples else None,
+        "sample_count": total_samples,
+        "solved_count": int(round(total_successes)),
+        "solved_count_float": total_successes,
+        "by_entity": by_entity,
+    }
+
+
 def _build_command(
     request: LmEvalRequest,
     suite_config: dict[str, Any],
@@ -487,6 +557,21 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
         "summary_source": summary_source,
         "summary_entity": summary_entity,
     }
+    counted_metric: dict[str, Any] | None = None
+    solved_count_metric = str(eval_config.get("solved_count_metric", "")).strip()
+    if solved_count_metric:
+        count_entities = [summary_entity] if summary_entity else list(raw_results)
+        counted_metric = _build_counted_metric_summary(
+            tasks,
+            raw_payload,
+            metric_name=solved_count_metric,
+            entities=[str(entity) for entity in count_entities if str(entity).strip()],
+        )
+        if counted_metric is not None:
+            metrics["solved_count_metric"] = solved_count_metric
+            metrics["solved_count"] = counted_metric["solved_count"]
+            metrics["sample_count"] = counted_metric["sample_count"]
+            metrics["solved_accuracy"] = counted_metric["accuracy"]
 
     payload = build_result_payload(
         kind="eval",
@@ -519,6 +604,7 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
             "system_instruction": eval_config.get("system_instruction"),
             "summary_source": summary_source,
             "summary_entity": summary_entity,
+            "solved_count_metric": solved_count_metric or None,
         },
         metrics=metrics,
         artifacts={
@@ -541,6 +627,7 @@ def run_lm_eval_suite(request: LmEvalRequest) -> LmEvalResult:
             "summary": summary,
             "task_summary": task_summary,
             "group_summary": group_summary,
+            "counted_metric": counted_metric,
             "groups": groups,
             "tasks": tasks,
         },
