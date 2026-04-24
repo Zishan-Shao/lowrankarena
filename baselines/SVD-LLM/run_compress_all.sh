@@ -50,9 +50,9 @@ bash run_compress_qwen3_8b_v2.sh
 
 echo ""
 echo "========================================"
-echo "  Qwen3-8B  Basis Sharing"
+echo "  Qwen3-8B  Basis Sharing (ABLinear)"
 echo "========================================"
-bash run_compress_qwen3_8b_basissharing.sh
+bash run_compress_qwen3_8b_basissharing_ab.sh
 
 # ── Qwen3-8B-Base ─────────────────────────────────────────────────────────
 echo ""
@@ -63,9 +63,9 @@ bash run_compress_qwen3_8b_instruct_v2.sh
 
 echo ""
 echo "========================================"
-echo "  Qwen3-8B-Base  Basis Sharing"
+echo "  Qwen3-8B-Base  Basis Sharing (ABLinear)"
 echo "========================================"
-bash run_compress_qwen3_8b_instruct_basissharing.sh
+bash run_compress_qwen3_8b_base_basissharing_ab.sh
 
 echo ""
 echo "======================================== ALL DONE ========================================"
