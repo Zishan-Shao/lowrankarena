@@ -10,7 +10,7 @@
 set -eo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-LRA_DIR="$REPO_ROOT/lowrankarena/lowrankarena"
+LRA_DIR="$REPO_ROOT/lowrankarena"
 MODEL="Qwen/Qwen3-8B-Base"
 MODEL_TAG="Qwen3-8B-Base"
 OUTPUT_DIR="/home/ww247/lowrankarena/hf_ckpts/LowRankArena/qwen3_8b_base/BasisSharingAB"
