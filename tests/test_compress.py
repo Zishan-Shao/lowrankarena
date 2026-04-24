@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 from compress.common import CompressionRequest, get_baseline_spec, prepare_baseline
 from compress.svd.asvd import build as build_asvd
+from compress.svd.basis_sharing import build as build_basis_sharing
 from src.utils import load_json
 
 
@@ -73,6 +74,85 @@ def test_basis_sharing_weight_info_uses_gqa_kv_width() -> None:
     assert weight_info["self_attn.q_proj"] == (16, 16)
     assert weight_info["self_attn.k_proj"] == (16, 8)
     assert weight_info["self_attn.v_proj"] == (16, 8)
+
+
+def test_build_basis_sharing_qwen3_command_for_instruct(tmp_path: Path) -> None:
+    request = CompressionRequest(
+        family="svd",
+        method="basis_sharing",
+        model="Qwen/Qwen3-8B",
+        ratio=0.8,
+        output_root=tmp_path / "artifacts",
+        calibration="wikitext2",
+        seed=7,
+    )
+
+    artifact = build_basis_sharing(request)
+    command = artifact.manifest["command"]
+
+    assert command[1].endswith("scripts/compress_qwen3_lowrank.py")
+    assert command[command.index("--model-id") + 1] == "Qwen/Qwen3-8B"
+    assert command[command.index("--method") + 1] == "basis_sharing"
+    assert command[command.index("--keep-ratio") + 1] == "0.8"
+    assert command[command.index("--basis-group-size") + 1] == "2"
+    assert command[command.index("--output-dir") + 1].endswith("qwen3-8b_basis-sharing_r80/weights")
+    assert artifact.manifest["ready_for_load"] is False
+
+
+def test_build_basis_sharing_qwen3_command_for_base(tmp_path: Path) -> None:
+    request = CompressionRequest(
+        family="svd",
+        method="basis_sharing",
+        model="Qwen/Qwen3-8B-Base",
+        ratio=0.6,
+        output_root=tmp_path / "artifacts",
+        extra={"basis_group_size": 4, "device": "cpu"},
+    )
+
+    artifact = build_basis_sharing(request)
+    command = artifact.manifest["command"]
+
+    assert command[command.index("--model-id") + 1] == "Qwen/Qwen3-8B-Base"
+    assert command[command.index("--basis-group-size") + 1] == "4"
+    assert command[command.index("--device") + 1] == "cpu"
+    assert command[command.index("--output-dir") + 1].endswith("qwen3-8b-base_basis-sharing_r60/weights")
+
+
+def test_build_basis_sharing_qwen3_execute_marks_artifact_ready(tmp_path: Path) -> None:
+    request = CompressionRequest(
+        family="svd",
+        method="basis_sharing",
+        model="Qwen/Qwen3-8B",
+        ratio=0.5,
+        output_root=tmp_path / "artifacts",
+        execute=True,
+    )
+
+    import compress.svd.basis_sharing as basis_sharing_module
+
+    original_run = basis_sharing_module.subprocess.run
+    original_validate = basis_sharing_module.validate_checkpoint_layout
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):  # type: ignore[no-untyped-def]
+        captured["command"] = command
+        captured["cwd"] = kwargs.get("cwd")
+        return SimpleNamespace(returncode=0)
+
+    basis_sharing_module.subprocess.run = fake_run
+    basis_sharing_module.validate_checkpoint_layout = lambda *args, **kwargs: {"layout_kind": "basis_sharing_factorized"}
+    try:
+        artifact = build_basis_sharing(request)
+    finally:
+        basis_sharing_module.subprocess.run = original_run
+        basis_sharing_module.validate_checkpoint_layout = original_validate
+
+    assert artifact.manifest["status"] == "completed"
+    assert artifact.manifest["ready_for_load"] is True
+    assert captured["cwd"] == str(PROJECT_ROOT)
+    executed = captured["command"]
+    assert isinstance(executed, list)
+    assert executed[executed.index("--output-dir") + 1].endswith("qwen3-8b_basis-sharing_r50")
 
 
 def test_quant_rtn_has_no_git_repo() -> None:

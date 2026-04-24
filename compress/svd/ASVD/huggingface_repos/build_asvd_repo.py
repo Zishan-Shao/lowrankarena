@@ -67,7 +67,9 @@ def main(args):
     for name, module in model.named_modules():
         if isinstance(module, SVDLinear):
             config["truncation_ranks"][name] = module.truncation_rank
-    if "opt" in model_id:
+    model_type = str(getattr(model.config, "model_type", "")).lower()
+    model_id_lower = model_id.lower()
+    if model_type == "opt" or "opt" in model_id_lower:
         config["auto_map"] = {
             "AutoConfig": "configuration_asvd_opt.ASVDOPTConfig",
             "AutoModelForCausalLM": "modeling_asvd_opt.ASVDOPTForCausalLM",
@@ -77,9 +79,11 @@ def main(args):
             "cp ./huggingface_repos/configuration_asvd_opt.py ./huggingface_repos/modeling_asvd_opt.py ./"
             + save_path
         )
-    elif "llama" in model_id:
+    elif model_type == "llama" or "llama" in model_id_lower:
+        config["model_type"] = "asvd_llama"
         config["auto_map"] = {
             "AutoConfig": "configuration_asvd_llama.ASVDLlamaConfig",
+            "AutoModel": "modeling_asvd_llama.ASVDLlamaModel",
             "AutoModelForCausalLM": "modeling_asvd_llama.ASVDLlamaForCausalLM",
         }
         config["architectures"] = ["ASVDLlamaForCausalLM"]
@@ -87,6 +91,8 @@ def main(args):
             "cp ./huggingface_repos/configuration_asvd_llama.py ./huggingface_repos/modeling_asvd_llama.py ./"
             + save_path
         )
+    else:
+        raise ValueError(f"Unsupported ASVD export model_type={model_type!r} model_id={model_id!r}")
     import json
 
     json.dump(config, open(save_path + "/config.json", "w"), indent=2)

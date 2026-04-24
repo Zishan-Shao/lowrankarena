@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 from evaluate_utils import evaluate_model, evaluate_perplexity
-from modules.svd_linear import SVDLinear, GradSVDLinear
+from modules.svd_linear import SVDLinear, GradSVDLinear, compressed_param_count
 from tqdm import tqdm
 import time
 
@@ -66,17 +66,28 @@ def binary_search_truncation_rank(model, sensitivity_dict, calib_loader, args):
             for layername, param_ratio in layers_min_ratio.items():
                 raw_linear = module_dict[layername]
                 info = linear_info[raw_linear]
-                svd_linear = SVDLinear.from_linear(
-                    raw_linear,
-                    param_ratio=param_ratio,
-                    alpha=args.alpha,
-                    act_aware=args.act_aware,
-                    sigma_fuse=args.sigma_fuse,
-                    rank_align=args.rank_align,
-                )
+                if param_ratio == default_param_ratio:
+                    svd_linear = raw_linear
+                else:
+                    svd_linear = SVDLinear.from_linear(
+                        raw_linear,
+                        param_ratio=param_ratio,
+                        alpha=args.alpha,
+                        act_aware=args.act_aware,
+                        sigma_fuse=args.sigma_fuse,
+                        rank_align=args.rank_align,
+                    )
                 setattr(info["father"], info["name"], svd_linear)
                 tot_params += raw_linear.weight.numel()
-                compress_params += raw_linear.weight.numel() * param_ratio
+                if param_ratio == default_param_ratio:
+                    compress_params += raw_linear.weight.numel() * default_param_ratio
+                else:
+                    compress_params += compressed_param_count(
+                        raw_linear.in_features,
+                        raw_linear.out_features,
+                        param_ratio,
+                        rank_align=args.rank_align,
+                    )
             ppl = evaluate_perplexity(model, input_ids, args.n_calib_samples)
             param_ratio = compress_params / tot_params
             msg = f"low={low} mid={mid}, high={high}, ppl={ppl}, param_ratio={param_ratio}"
@@ -89,7 +100,15 @@ def binary_search_truncation_rank(model, sensitivity_dict, calib_loader, args):
             for layername, param_ratio in layers_min_ratio.items():
                 raw_linear = module_dict[layername]
                 tot_params += raw_linear.weight.numel()
-                compress_params += raw_linear.weight.numel() * param_ratio
+                if param_ratio == default_param_ratio:
+                    compress_params += raw_linear.weight.numel() * default_param_ratio
+                else:
+                    compress_params += compressed_param_count(
+                        raw_linear.in_features,
+                        raw_linear.out_features,
+                        param_ratio,
+                        rank_align=args.rank_align,
+                    )
             now_ratio = compress_params / tot_params
             if args.compress_kv_cache:
                 # because param ratio is the params for ALinear+BLienar, so the rank ratio is param ratio/2

@@ -1,0 +1,10 @@
+{
+    "typeCheckingMode": "off",
+    // "reportIndexIssue": "none",
+    // "reportAttributeAccessIssue": "none",
+    // "reportGeneralTypeIssues": "warning",
+    // "reportUnknownMemberType": "none",
+    // "reportUnknownArgumentType": "none",
+    // "reportArgumentType": "none",
+    // "reportReturnType": "none"
+}

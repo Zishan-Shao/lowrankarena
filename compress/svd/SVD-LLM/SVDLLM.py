@@ -169,22 +169,31 @@ def profle_svdllm_low_resource(
     inps = torch.zeros(
         (len(calib_loader), model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
     )
-    cache = {'i': 0, 'attention_mask': None, "position_ids": None}
+    cache = {'i': 0, 'attention_mask': None, "has_attention_mask": False, "position_ids": None}
     class Catcher(nn.Module):
         def __init__(self, module):
             super().__init__()
             self.module = module
+            if hasattr(module, "attention_type"):
+                self.attention_type = module.attention_type
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp.cpu()
             cache['i'] += 1
-            if cache['attention_mask'] is None:
-                cache['attention_mask'] = kwargs['attention_mask'].cpu()
-                if "opt" not in model_name:
-                    cache['position_ids'] = kwargs['position_ids'].cpu()
-            else:
-                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask'].cpu()), dim=0)
-                if "opt" not in model_name:
-                    cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids'].cpu()), dim=0)
+            attention_mask = kwargs.get('attention_mask')
+            if attention_mask is not None:
+                if not cache['has_attention_mask']:
+                    cache['attention_mask'] = attention_mask.cpu()
+                    cache['has_attention_mask'] = True
+                else:
+                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attention_mask.cpu()), dim=0)
+            if "opt" not in model_name:
+                position_ids = kwargs.get('position_ids')
+                if position_ids is None:
+                    position_ids = torch.arange(inp.shape[1], device=inp.device).unsqueeze(0)
+                if cache['position_ids'] is None:
+                    cache['position_ids'] = position_ids.cpu()
+                else:
+                    cache['position_ids'] = torch.cat((cache['position_ids'], position_ids.cpu()), dim=0)
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in calib_loader:
@@ -204,7 +213,7 @@ def profle_svdllm_low_resource(
         model.model.norm = model.model.norm.cpu()
     torch.cuda.empty_cache()
     outs = torch.zeros_like(inps)
-    attention_masks = cache['attention_mask']
+    attention_masks = cache['attention_mask'] if cache['has_attention_mask'] else None
     if "opt" not in model_name:
         position_ids = cache['position_ids']
     profiling_mat = {}
@@ -229,15 +238,17 @@ def profle_svdllm_low_resource(
             if "opt" not in model_name:
                 batch_inps = inps[j].unsqueeze(0)
                 batch_position_ids = position_ids[j].unsqueeze(0).to(dev)
+                batch_attention_mask = None if attention_masks is None else attention_masks[j].unsqueeze(0).to(dev)
                 position_embeddings = model.model.rotary_emb(batch_inps, batch_position_ids)
                 outs[j] = layer(
                     batch_inps,
-                    attention_mask=attention_masks[j].unsqueeze(0).to(dev),
+                    attention_mask=batch_attention_mask,
                     position_ids=batch_position_ids,
                     position_embeddings=position_embeddings,
                 )[0]
             else:
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_masks[j].unsqueeze(0).to(dev))[0]
+                batch_attention_mask = None if attention_masks is None else attention_masks[j].unsqueeze(0).to(dev)
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=batch_attention_mask)[0]
         for h in handles:
             h.remove()
         layer = layer.cpu()
@@ -390,22 +401,31 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
     inps = torch.zeros(
         (len(dataloader), model.seqlen, model.config.hidden_size), dtype=dtype
     )
-    cache = {'i': 0, 'attention_mask': None, "position_ids": None}
+    cache = {'i': 0, 'attention_mask': None, "has_attention_mask": False, "position_ids": None}
     class Catcher(nn.Module):
         def __init__(self, module):
             super().__init__()
             self.module = module
+            if hasattr(module, "attention_type"):
+                self.attention_type = module.attention_type
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp.cpu()
             cache['i'] += 1
-            if cache['attention_mask'] is None:
-                cache['attention_mask'] = kwargs['attention_mask'].cpu()
-                if "opt" not in model_name:
-                    cache['position_ids'] = kwargs['position_ids'].cpu()
-            else:
-                cache['attention_mask'] = torch.cat((cache['attention_mask'], kwargs['attention_mask'].cpu()), dim=0)
-                if "opt" not in model_name:
-                    cache['position_ids'] = torch.cat((cache['position_ids'], kwargs['position_ids'].cpu()), dim=0)
+            attention_mask = kwargs.get('attention_mask')
+            if attention_mask is not None:
+                if not cache['has_attention_mask']:
+                    cache['attention_mask'] = attention_mask.cpu()
+                    cache['has_attention_mask'] = True
+                else:
+                    cache['attention_mask'] = torch.cat((cache['attention_mask'], attention_mask.cpu()), dim=0)
+            if "opt" not in model_name:
+                position_ids = kwargs.get('position_ids')
+                if position_ids is None:
+                    position_ids = torch.arange(inp.shape[1], device=inp.device).unsqueeze(0)
+                if cache['position_ids'] is None:
+                    cache['position_ids'] = position_ids.cpu()
+                else:
+                    cache['position_ids'] = torch.cat((cache['position_ids'], position_ids.cpu()), dim=0)
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
@@ -419,7 +439,7 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
     model.model.norm = model.model.norm.cpu()
     torch.cuda.empty_cache()
     outs = torch.zeros_like(inps)
-    attention_masks = cache['attention_mask']
+    attention_masks = cache['attention_mask'] if cache['has_attention_mask'] else None
     if "opt" not in model_name:
         position_ids = cache['position_ids']
     update_batch_size = max(1, min(int(update_batch_size), len(dataloader)))
@@ -454,7 +474,7 @@ def whitening_local_update(model_name, model, dataloader, profiling_mat, ratio, 
             batch_inps = inps[start:end].to(dev)
             if "opt" not in model_name:
                 batch_position_ids = position_ids[start:end].to(dev)
-                batch_attention_masks = attention_masks[start:end].to(dev)
+                batch_attention_masks = None if attention_masks is None else attention_masks[start:end].to(dev)
                 position_embeddings = model.model.rotary_emb(batch_inps, batch_position_ids)
                 batch_outs = layer(
                     batch_inps,

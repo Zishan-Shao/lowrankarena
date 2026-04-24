@@ -51,7 +51,12 @@ _MLP_NAME_HINTS = ("gate_proj", "down_proj", "up_proj", "fc1", "fc2")
 def _get_layers(model_name, model):
     if "opt" in model_name:
         return model.model.decoder.layers
-    if "llama" in model_name or "mistral" in model_name or "vicuna" in model_name:
+    if (
+        "llama" in model_name
+        or "mistral" in model_name
+        or "vicuna" in model_name
+        or "qwen" in model_name
+    ):
         return model.model.layers
     raise ValueError(f"Unsupported model name: {model_name}")
 

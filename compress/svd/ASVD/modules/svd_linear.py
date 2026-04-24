@@ -4,6 +4,37 @@ import torch.nn.functional as F
 import numpy as np
 
 
+def compute_svd_rank(
+    in_features: int,
+    out_features: int,
+    param_ratio: float,
+    *,
+    rank_align: int = 1,
+) -> int:
+    n_params = int(in_features) * int(out_features)
+    compressed_params = int(n_params * float(param_ratio))
+    rank = compressed_params // (int(in_features) + int(out_features))
+    rank_align = max(1, int(rank_align))
+    rank = int(np.ceil(rank / rank_align) * rank_align)
+    return max(1, min(rank, int(in_features), int(out_features)))
+
+
+def compressed_param_count(
+    in_features: int,
+    out_features: int,
+    param_ratio: float,
+    *,
+    rank_align: int = 1,
+) -> int:
+    rank = compute_svd_rank(
+        in_features,
+        out_features,
+        param_ratio,
+        rank_align=rank_align,
+    )
+    return rank * (int(in_features) + int(out_features))
+
+
 class SVDLinear(nn.Module):
     def __init__(self, U, S, V, bias=None, sigma_fuse="UV") -> None:
         super().__init__()
@@ -36,12 +67,13 @@ class SVDLinear(nn.Module):
     ):
         # if param_ratio >= 1:
         #     return linear
-        n_params = linear.weight.numel()
-        compressed_params = int(n_params * param_ratio)
         assert ic_split == 1 or oc_split == 1
-        rank = compressed_params // (linear.in_features + linear.out_features)
-        # rank align
-        rank = int(np.ceil(rank / rank_align) * rank_align)
+        rank = compute_svd_rank(
+            linear.in_features,
+            linear.out_features,
+            param_ratio,
+            rank_align=rank_align,
+        )
 
         # print("rank", rank)
         w = linear.weight.data.float()
@@ -123,10 +155,8 @@ class GradSVDLinear(nn.Module):
     ):
         if param_ratio >= 1:
             return linear
-        n_params = linear.weight.numel()
-        compressed_params = int(n_params * param_ratio)
         assert ic_split == 1 or oc_split == 1
-        rank = compressed_params // (linear.in_features + linear.out_features)
+        rank = compute_svd_rank(linear.in_features, linear.out_features, param_ratio)
         # print("rank", rank)
         w = linear.weight.data.float()
         if act_aware:

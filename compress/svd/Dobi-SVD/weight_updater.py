@@ -26,6 +26,10 @@ from modules.module import SVDTransformLayer
 from modules.remapping import DOBI_quantize
 
 
+def svd_rank_blocks(module, seq_len):
+    return max(1, int(min(module.in_features, module.out_features) / seq_len))
+
+
 
 
 
@@ -176,7 +180,7 @@ def main(args):
             m,n =module.weight.shape
             
             cut = min(module.in_features, module.out_features)/SEQ_LEN
-            module.Ngamma = int(cut)
+            module.Ngamma = svd_rank_blocks(module, SEQ_LEN)
             if cut>1:
                 real_gamma = min(m,n, max(1,cut*math.ceil(gamma)))
             else:
@@ -254,14 +258,15 @@ def main(args):
         mapping_info = {}
         for name, module in tqdm(model.named_modules(), desc="Remapping weights"):
             if isinstance(module, nn.Linear) and all(x not in name for x in ['lm_head']):
-                cut = min(module.in_features, module.out_features)/2048
+                cut = min(module.in_features, module.out_features)/SEQ_LEN
                 if cut>1:
                     gamma = cut * torch.tensor(gamma_json[name], dtype=computeSVD_dtype)
                 else:
                     gamma = torch.tensor(gamma_json[name], dtype=computeSVD_dtype)
                     
                 W=module.weight.data.detach()
-                us_quan, vt_quan, us_absmax, vt_absmax, tuple_info = DOBI_quantize(W, int(gamma), code = None)
+                gamma = max(1, min(W.shape[0], W.shape[1], int(gamma)))
+                us_quan, vt_quan, us_absmax, vt_absmax, tuple_info = DOBI_quantize(W, gamma, code = None)
                 mapping_info[name] ={}
                 mapping_info[name]["us_quan"]=us_quan
                 mapping_info[name]["vt_quan"]=vt_quan

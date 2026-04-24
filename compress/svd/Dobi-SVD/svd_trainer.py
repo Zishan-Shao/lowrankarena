@@ -25,6 +25,10 @@ from evaluate import evaluate_perplexity
 from modules.stable_svd import stable_lowrank_SVD, SVDTransformLayer
 
 
+def svd_rank_blocks(module, seq_len):
+    return max(1, int(min(module.in_features, module.out_features) / seq_len))
+
+
 '''
 CUDA_VISIBLE_DEVICES=0,1,2,3 python svd_trainer.py \
   --model_id meta-llama/Llama-2-7b-hf \
@@ -156,7 +160,7 @@ def main(args):
                 parent = dict(model.named_modules())[parent_name]
             else:
                 parent = model
-            RANK_RATIO = int(min(module.in_features, module.out_features)/SEQ_LEN)
+            RANK_RATIO = svd_rank_blocks(module, SEQ_LEN)
             
             if remapping:
                 gamma_init = (1/RANK_RATIO)*target_compression_ratio*min(module.in_features, module.out_features)
