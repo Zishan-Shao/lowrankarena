@@ -1,20 +1,20 @@
 #!/bin/bash
 # SVD-LLM Basis Sharing (step 5) — GQA-aware
-# Model: Qwen/Qwen3-8B-Instruct
+# Model: Qwen/Qwen3-8B-Base
 # Keep ratios: 0.8 0.7 0.6 0.5 0.4
 # SVDLLM.py saves files as _basis_sharing_{KEEP}.pt (not reduction ratio).
 #
 # Usage:
-#   bash run_compress_qwen3_8b_instruct_basissharing.sh
+#   bash run_compress_qwen3_8b_base_basissharing.sh
 
 set -eo pipefail
 cd "$(dirname "$0")"
 
-MODEL="Qwen/Qwen3-8B-Instruct"
-MODEL_TAG="Qwen3-8B-Instruct"
-MODEL_PREFIX="Qwen_Qwen3_8B_Instruct"
-SAVE_DIR="checkpoints/svdllm/qwen3_8b_instruct"
-OUTPUT_DIR="/home/ww247/lowrankarena/hf_ckpts/LowRankArena/qwen3_8b_instruct/BasisSharing"
+MODEL="Qwen/Qwen3-8B-Base"
+MODEL_TAG="Qwen3-8B-Base"
+MODEL_PREFIX="Qwen_Qwen3_8B_Base"
+SAVE_DIR="checkpoints/svdllm/qwen3_8b_base"
+OUTPUT_DIR="/home/ww247/lowrankarena/hf_ckpts/LowRankArena/qwen3_8b_base/BasisSharing"
 SEQ_LEN=2048
 PROF_MAT="$SAVE_DIR/${MODEL_PREFIX}_profiling_wikitext2_256_0.pt"
 

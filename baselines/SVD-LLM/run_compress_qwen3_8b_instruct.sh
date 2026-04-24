@@ -1,20 +1,20 @@
 #!/bin/bash
 # SVD-LLM V1 (whitening only) + V2 (whitening + local update)
-# Model: Qwen/Qwen3-8B-Instruct
+# Model: Qwen/Qwen3-8B-Base
 # Ratios: 0.2 0.3 0.4 0.5 0.6
 #
 # Usage:
-#   bash run_compress_qwen3_8b_instruct.sh
+#   bash run_compress_qwen3_8b_base.sh
 #
-# Results CSV: checkpoints/svdllm/qwen3_8b_instruct/results.csv
+# Results CSV: checkpoints/svdllm/qwen3_8b_base/results.csv
 
 set -eo pipefail
 cd "$(dirname "$0")"
 
-MODEL="Qwen/Qwen3-8B-Instruct"
-MODEL_TAG="Qwen3-8B-Instruct"
-MODEL_PREFIX="Qwen_Qwen3_8B_Instruct"
-SAVE_DIR="checkpoints/svdllm/qwen3_8b_instruct"
+MODEL="Qwen/Qwen3-8B-Base"
+MODEL_TAG="Qwen3-8B-Base"
+MODEL_PREFIX="Qwen_Qwen3_8B_Base"
+SAVE_DIR="checkpoints/svdllm/qwen3_8b_base"
 SEQ_LEN=2048
 EVAL_BS=2
 CSV="$SAVE_DIR/results.csv"

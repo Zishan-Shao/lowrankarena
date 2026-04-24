@@ -1,6 +1,6 @@
 #!/bin/bash
 # One-click SVD-LLM V2 heterogeneous compression for all models.
-# Runs sequentially: Llama-3.1-8B → Llama-3.1-8B-Instruct → Qwen3-8B → Qwen3-8B-Instruct
+# Runs sequentially: Llama-3.1-8B → Llama-3.1-8B-Instruct → Qwen3-8B → Qwen3-8B-Base
 #
 # Usage:
 #   bash run_compress_all_v2.sh [HF_TOKEN]
@@ -34,7 +34,7 @@ bash run_compress_qwen3_8b_v2.sh
 
 echo ""
 echo "========================================"
-echo "  Qwen3-8B-Instruct  V2 hetero"
+echo "  Qwen3-8B-Base  V2 hetero"
 echo "========================================"
 bash run_compress_qwen3_8b_instruct_v2.sh
 
