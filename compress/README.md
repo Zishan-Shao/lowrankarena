@@ -90,24 +90,25 @@ So quantization remains a first-class local path even if some pruning and SVD ba
 
 ## Environment Strategy
 
-We do **not** assume that all compression methods can share one perfect environment.
+LowRankArena keeps benchmark evaluation and artifact generation in separate environments:
 
-Current expectation:
+- `lowrankarena`: loading, eval, memory, speed, and reporting.
+- `compress`: compression, export, repair, and upload jobs.
 
-- `svd/` methods may need per-method or per-baseline environments because many upstream repos pin incompatible `torch`, `transformers`, `lm_eval`, or `flash-attn` versions.
-- `prune/` methods may also need separate environments for the same reason, especially older research repos.
-- `quant/` methods are the most likely to run directly inside the main `lowrankarena` environment.
+The compression environment is defined in [`../envs/compress.yml`](../envs/compress.yml) and can be created with:
 
-This means LowRankArena should converge toward:
+```bash
+bash scripts/env/create_compress_env.sh
+```
 
-- one stable benchmark environment for loading, eval, speed, and reporting
-- optional method-specific compression environments for artifact generation
+Compression Slurm scripts default to `COMPRESS_CONDA_ENV=compress`. Evaluation Slurm scripts keep using `lowrankarena`; mixed compression scripts that run a quick PPL smoke invoke `LOWRANK_EVAL_CONDA_ENV=lowrankarena` for that step.
 
-In other words:
+We still do **not** assume that every historical baseline can share one perfect runtime. The `compress` environment is the default supported runtime for the current SVD-LLM, Basis Sharing, and MoDeGPT artifact paths. Older upstream baselines may still need method-specific repair:
 
-> shared benchmark runtime, conditional compression runtimes
+- ASVD compression/export imports under `compress`; its upstream direct eval path still expects the legacy `lm_eval.base` API.
+- Dobi-SVD's restored source imports under `compress`, but its upstream pins were older than the shared stack, so large GPU matrix reruns should start with a smoke job.
 
-That separation keeps the main benchmark path simple while still making compression-time code transparent.
+The unification target remains the exported artifact format, with `lowrankarena` as the stable benchmark runtime.
 
 ## Current Layout
 

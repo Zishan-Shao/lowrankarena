@@ -1,13 +1,14 @@
 import os
 import torch
 import torch.nn as nn
-from evaluate_utils import evaluate_model, evaluate_perplexity
 from modules.svd_linear import SVDLinear, GradSVDLinear, compressed_param_count
 from tqdm import tqdm
 import time
 
 
 def binary_search_truncation_rank(model, sensitivity_dict, calib_loader, args):
+    from evaluate_utils import evaluate_perplexity
+
     module_dict = {name: module for name, module in model.named_modules()}
     full_name_dict = {module: name for name, module in model.named_modules()}
     linear_info = {}
@@ -151,6 +152,8 @@ def binary_search_truncation_rank(model, sensitivity_dict, calib_loader, args):
 
 
 def binary_search_truncation_rank_optimize_scale(model, sensitivity_dict, calib_loader, args):
+    from evaluate_utils import evaluate_perplexity
+
     module_dict = {name: module for name, module in model.named_modules()}
     full_name_dict = {module: name for name, module in model.named_modules()}
     linear_info = {}

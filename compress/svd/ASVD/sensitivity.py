@@ -2,13 +2,14 @@ import os
 import torch
 import torch.nn as nn
 from modules.svd_linear import SVDLinear
-from evaluate_utils import evaluate_model, evaluate_perplexity
 from tqdm import tqdm
 import numpy as np
 
 
 @torch.no_grad()
 def calib_sensitivity_ppl(model, calib_loader, args, use_cache=True):
+    from evaluate_utils import evaluate_perplexity
+
     model_id = model.config._name_or_path
     cache_file = f"cache/{model_id.replace('/','_')}_sensitivity_{args.scaling_method}_{args.alpha}_{args.n_calib_samples}_{args.calib_dataset}.pt"
     if os.path.exists(cache_file) and use_cache:

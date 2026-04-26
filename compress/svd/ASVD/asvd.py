@@ -2,7 +2,6 @@ import argparse
 import torch
 import os
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from evaluate_utils import evaluate_model
 from datautils import get_calib_data
 from act_aware_utils import calib_input_distribution, calib_fisher_info
 from sensitivity import calib_sensitivity_ppl, calib_sensitivity_stable_rank
@@ -57,22 +56,24 @@ def main(args):
             elif args.weight_quant == "awq_int4":
                 model = awq_quant_sequential(model, tokenizer, 4)
 
-    # evaluate
-    result = evaluate_model(
-        model,
-        tokenizer,
-        args.model_id,
-        "mmlu" if args.eval_mmlu else args.eval_tasks,
-        eval_ppl=args.eval_ppl,
-        limit=-1,
-        use_bos=args.use_bos,
-    )
-    print(result)
-    if not os.path.exists("output"):
-        os.makedirs("output")
-    with open("output/result.txt", "a+") as f:
-        f.write(f"{args}\n")
-        f.write(f"{result}\n")
+    if not args.skip_eval:
+        from evaluate_utils import evaluate_model
+
+        result = evaluate_model(
+            model,
+            tokenizer,
+            args.model_id,
+            "mmlu" if args.eval_mmlu else args.eval_tasks,
+            eval_ppl=args.eval_ppl,
+            limit=-1,
+            use_bos=args.use_bos,
+        )
+        print(result)
+        if not os.path.exists("output"):
+            os.makedirs("output")
+        with open("output/result.txt", "a+") as f:
+            f.write(f"{args}\n")
+            f.write(f"{result}\n")
 
     # finished
 
@@ -151,6 +152,11 @@ if __name__ == "__main__":
         "--eval_mmlu",
         action="store_true",
         help="evaluate mmlu",
+    )
+    parser.add_argument(
+        "--skip_eval",
+        action="store_true",
+        help="skip the legacy lm_eval-based evaluation step",
     )
     parser.add_argument(
         "--eval_ppl",

@@ -27,3 +27,14 @@ Several upstream low-rank projects are vendored or mirrored here as reference ba
 - Build or plan low-rank artifacts.
 - Emit uniform metadata through [`compress/save.py`](../save.py).
 - Avoid owning evaluation or reporting logic.
+
+## Runtime
+
+Use the repo-level `compress` environment for low-rank artifact generation:
+
+```bash
+bash scripts/env/create_compress_env.sh
+conda activate compress
+```
+
+SVD-LLM, Basis Sharing, MoDeGPT, Dobi-SVD, and ASVD compression/export imports are covered by this environment. ASVD's upstream direct eval path still expects the legacy `lm_eval.base` API, so run benchmark evaluation through LowRankArena instead.

@@ -248,3 +248,35 @@ print(arena.describe("llama31-8b-svdllm-v1-update-0.6")["subpath"])
 - Memory and speed use dedicated scripts because their runtime, metrics, and failure modes differ from accuracy evaluation.
 - Materialized vLLM wrapper checkpoints belong in [`checkpoints/vllm/`](./checkpoints/vllm/README.md), not under `src/vllm/`.
 - Benchmark outputs live under `results/`; generated smoke or leaderboard artifacts should not be committed unless intentionally curated.
+
+
+
+# Environments
+
+LowRankArena uses two repo-level environments:
+
+- `lowrankarena`: benchmark loading, eval, memory, speed, and reporting. This is defined by [`../environment.yml`](../environment.yml).
+- `compress`: compression, export, repair, and upload jobs. This is defined by [`compress.yml`](./compress.yml).
+
+Create or update the compression environment with:
+
+```bash
+bash scripts/env/create_compress_env.sh
+```
+
+Then smoke-check it with:
+
+```bash
+conda run --no-capture-output -n compress \
+  python scripts/env/check_compress_env.py --repo-root "$PWD"
+```
+
+Compression Slurm scripts default to `COMPRESS_CONDA_ENV=compress`. Evaluation Slurm scripts continue to activate `lowrankarena`; compression scripts that run a quick PPL smoke call `conda run -n ${LOWRANK_EVAL_CONDA_ENV:-lowrankarena}` for that evaluation step.
+
+## Method Status
+
+- SVD-LLM v1/v2: supported by `compress`.
+- Basis Sharing: supported by `compress` for the current Qwen/GQA export path.
+- MoDeGPT: supported by `compress`; the older `modegpt` env can stay as a fallback by setting `COMPRESS_CONDA_ENV=modegpt`.
+- ASVD: compression/export imports under `compress`; the upstream direct eval path still expects the old `lm_eval.base` API, so use LowRankArena for benchmark evaluation.
+- Dobi-SVD: source modules are restored for local compression/import checks. Its upstream dependency pins were older than the shared `compress` stack, so full GPU matrix reruns should still start with a smoke job before launching a large sweep.
