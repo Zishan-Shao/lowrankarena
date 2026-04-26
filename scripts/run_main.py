@@ -45,6 +45,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--eval-device", default=None)
     parser.add_argument("--eval-dtype", default=None, help="Override eval suite dtype, e.g. auto, float16, fp16, bfloat16, or bf16.")
+    parser.add_argument("--eval-batch-size", default=None, help="Override eval suite batch size, e.g. auto, 1, 2, or 8.")
     parser.add_argument("--eval-tensor-parallel-size", type=int, default=None, help="vLLM tensor_parallel_size override.")
     parser.add_argument("--eval-gpu-memory-utilization", type=float, default=None, help="vLLM gpu_memory_utilization override.")
     parser.add_argument("--eval-max-model-len", type=int, default=None, help="vLLM max_model_len override.")
@@ -184,6 +185,7 @@ def run_suite(
                 lm_eval_bin=args.lm_eval_bin,
                 model_backend=args.eval_model_backend,
                 device=args.eval_device,
+                batch_size=args.eval_batch_size,
                 limit=args.limit,
                 tensor_parallel_size=args.eval_tensor_parallel_size,
                 gpu_memory_utilization=args.eval_gpu_memory_utilization,

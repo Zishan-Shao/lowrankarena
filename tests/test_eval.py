@@ -143,6 +143,7 @@ def test_build_command_uses_suite_default_vllm_model_backend(tmp_path: Path) -> 
         suite_path=suite_path,
         index_path=str(tmp_path / "index.csv"),
         lm_eval_bin="lm-eval",
+        batch_size=2,
         tensor_parallel_size=2,
     )
     prepared = PreparedInferenceModel(
@@ -169,6 +170,7 @@ def test_build_command_uses_suite_default_vllm_model_backend(tmp_path: Path) -> 
     assert "tokenizer_mode=auto" in command
     assert "trust_remote_code=True" in command
     assert "tensor_parallel_size=2" in command
+    assert command[command.index("--batch_size") + 1] == "2"
 
 
 def test_build_command_clamps_max_gen_toks_to_model_context_window(tmp_path: Path) -> None:

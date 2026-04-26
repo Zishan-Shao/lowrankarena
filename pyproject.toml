@@ -27,6 +27,7 @@ eval = [
   "lm_eval==0.4.11",
   "datasets==4.4.2",
   "evaluate==0.4.5",
+  "ray==2.55.1; python_version < '3.14'",
 ]
 speed = [
   "vllm==0.18.1; python_version < '3.14'",
@@ -35,6 +36,7 @@ full = [
   "lm_eval==0.4.11",
   "datasets==4.4.2",
   "evaluate==0.4.5",
+  "ray==2.55.1; python_version < '3.14'",
   "vllm==0.18.1; python_version < '3.14'",
 ]
 

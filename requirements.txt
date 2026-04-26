@@ -19,6 +19,8 @@ accelerate==1.10.1
 lm_eval==0.4.11
 datasets==4.4.2
 evaluate==0.4.5
+# lm_eval's vLLM model adapter imports Ray when --model vllm is used.
+ray==2.55.1; python_version < "3.14"
 
 # Speed
 # vLLM 0.18.1 does not currently publish wheels for Python 3.14+.
