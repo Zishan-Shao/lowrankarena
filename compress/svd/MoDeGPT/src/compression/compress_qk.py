@@ -3,7 +3,7 @@ import logging
 import torch
 from torch.types import Tensor
 
-from src.compression_utils import sqrt_M
+from src.compression_utils import bounded_rank_from_keep_ratio, sqrt_M
 from src.model_utils import dtype_p, d1, d2
 
 from src.adapters.model_adapter import ModelAdapter
@@ -33,8 +33,10 @@ def compress_qk_svd(
     for layer in range(n_layers):
         # try:
         keep_ratio = keep_ratios[layer]
-        rank_i = int(head_dim * keep_ratio) if rank is None else rank
-        rank_i = max(1, min(rank_i, head_dim))
+        if rank is None:
+            rank_i = bounded_rank_from_keep_ratio(head_dim, keep_ratio)
+        else:
+            rank_i = bounded_rank_from_keep_ratio(head_dim, float(rank) / head_dim)
 
         C = cov_x[layer].to(device="cuda", dtype=dtype_p)
         sqrt_C = sqrt_M(C, debug="QK covs:")
@@ -173,13 +175,13 @@ def compress_qk(
     rotary_masks = []
     for i in target_layers:
         # try:
-        keep_ratio = keep_ratios[i]
-        rank_i = int(head_dim * keep_ratio) if rank is None else rank
-        rank_i = max(1, min(rank_i, head_dim))
-
-        if arch == "llama" or "qwen" in arch:
-            rank_i = rank_i - (rank_i % 2)
-            rank_i = max(2, min(rank_i, head_dim))
+        keep_ratio = keep_ratios[i] if rank is None else float(rank) / head_dim
+        rank_i = bounded_rank_from_keep_ratio(
+            head_dim,
+            keep_ratio,
+            min_rank=2 if arch == "llama" or "qwen" in arch else 1,
+            even=arch == "llama" or "qwen" in arch,
+        )
 
         compress_layer(
             adapter,

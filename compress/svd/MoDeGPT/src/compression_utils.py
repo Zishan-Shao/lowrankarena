@@ -1,5 +1,6 @@
 import logging
 import types
+import math
 
 import torch
 from torch.types import Tensor
@@ -10,6 +11,33 @@ logger = logging.getLogger("MoDeGPT")
 from src.model_utils import d1, d2, dtype_p
 
 from torch.nn.functional import softmax
+
+
+def bounded_rank_from_keep_ratio(
+    dim: int,
+    keep_ratio: float,
+    *,
+    min_rank: int = 1,
+    even: bool = False,
+) -> int:
+    if dim <= 0:
+        raise ValueError(f"dim must be positive, got {dim}")
+
+    ratio = float(keep_ratio)
+    if not math.isfinite(ratio):
+        raise ValueError(f"keep_ratio must be finite, got {keep_ratio}")
+
+    ratio = min(1.0, max(0.0, ratio))
+    min_rank = min(max(1, int(min_rank)), dim)
+    rank = max(min_rank, min(int(dim * ratio), dim))
+
+    if even and dim >= 2:
+        rank -= rank % 2
+        rank = max(2, rank)
+        if rank > dim:
+            rank = dim - (dim % 2)
+
+    return rank
 
 
 @torch.no_grad
@@ -89,11 +117,24 @@ def allocate_global_sparsity(
         adapter.metrics["smoothing"] = smoothing
 
     n_layers = len(bi_scores)
+    if n_layers == 0:
+        raise ValueError("bi_scores must be non-empty")
 
-    L = n_layers
+    compression_ratio = float(compression_ratio)
+    smoothing = float(smoothing)
+    max_sparsity = float(max_sparsity)
+    if not math.isfinite(compression_ratio) or not 0.0 <= compression_ratio <= 1.0:
+        raise ValueError(f"compression_ratio must be finite and in [0, 1], got {compression_ratio}")
+    if not math.isfinite(smoothing) or smoothing <= 0:
+        raise ValueError(f"smoothing must be finite and positive, got {smoothing}")
+    if not math.isfinite(max_sparsity) or not 0.0 <= max_sparsity <= 1.0:
+        raise ValueError(f"max_sparsity must be finite and in [0, 1], got {max_sparsity}")
+
     epsilon = smoothing
 
     s = torch.tensor(bi_scores).to(dtype_p)
+    if not torch.isfinite(s).all():
+        raise ValueError("bi_scores contains NaN or Inf")
     if invert:
         s = -s
 
@@ -101,24 +142,58 @@ def allocate_global_sparsity(
     # the -s flips when using the CKA (higher score more compression)
     total_budget = n_layers * compression_ratio
     softmax_weights = softmax(-s / epsilon, dim=0)
-    sparsities = softmax_weights * total_budget
+    initial_sparsities = softmax_weights * total_budget
 
-    logger.info(f"Max Layer Sparsity: {sparsities.max().item()}, Avg = {sparsities.mean().item()}")
+    logger.info(
+        f"Max Layer Sparsity: {initial_sparsities.max().item()}, Avg = {initial_sparsities.mean().item()}"
+    )
     if adapter:
-        adapter.metrics["max_layer_sparsity"] = sparsities.max().item()
+        adapter.metrics["max_layer_sparsity"] = initial_sparsities.max().item()
 
-    while True:
-        clamped = sparsities > max_sparsity
+    max_budget = n_layers * max_sparsity
+    if total_budget > max_budget:
+        logger.warning(
+            f"Requested sparsity budget {total_budget} exceeds cap capacity {max_budget}; "
+            "clamping to max capacity."
+        )
+        total_budget = max_budget
 
-        if not clamped.any():
+    sparsities = torch.zeros_like(softmax_weights)
+    active = torch.ones_like(softmax_weights, dtype=torch.bool)
+    remaining_budget = torch.as_tensor(total_budget, dtype=softmax_weights.dtype, device=softmax_weights.device)
+
+    for _ in range(n_layers):
+        if not bool(active.any().item()) or float(remaining_budget.item()) <= 0:
             break
 
-        excess = (sparsities[clamped] - max_sparsity).sum()
-        sparsities[clamped] = max_sparsity
+        active_idx = active.nonzero(as_tuple=True)[0]
+        active_weights = softmax_weights[active]
+        active_weight_sum = active_weights.sum()
+        if float(active_weight_sum.item()) <= 0:
+            proposed = remaining_budget / active_idx.numel()
+            proposed_sparsities = torch.full_like(active_weights, proposed)
+        else:
+            proposed_sparsities = remaining_budget * active_weights / active_weight_sum
 
-        free = ~clamped
-        if free.any():
-            # Redistribute proportionally among the non-capped experts
-            sparsities[free] += excess * (softmax_weights[free] / softmax_weights[free].sum())
+        over_cap = proposed_sparsities > max_sparsity
+        if not bool(over_cap.any().item()):
+            sparsities[active_idx] = proposed_sparsities
+            remaining_budget = remaining_budget - proposed_sparsities.sum()
+            break
 
-    return (1 - sparsities).tolist()
+        capped_idx = active_idx[over_cap]
+        sparsities[capped_idx] = max_sparsity
+        remaining_budget = remaining_budget - (max_sparsity * capped_idx.numel())
+        active[capped_idx] = False
+
+    remaining = float(remaining_budget.item())
+    if remaining > 1e-3:
+        logger.warning(f"Unallocated sparsity budget after capping: {remaining}")
+
+    sparsities = sparsities.clamp(min=0.0, max=max_sparsity)
+    logger.info(
+        f"Capped Layer Sparsity: {sparsities.max().item()}, Avg = {sparsities.mean().item()}"
+    )
+
+    keep_ratios = (1 - sparsities).clamp(min=0.0, max=1.0)
+    return keep_ratios.tolist()

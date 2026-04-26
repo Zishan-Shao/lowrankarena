@@ -25,13 +25,21 @@ from modules.module import *
 from modules.remapping import DOBI_dequantize
 from modelutils import load_remapping_model, load_unremapping_model
 
+
+def get_model_device(model):
+    if hasattr(model, "device"):
+        return model.device
+    if hasattr(model, "module") and hasattr(model.module, "device"):
+        return model.module.device
+    return next(model.parameters()).device
+
+
 def evaluate_perplexity(model, dataset, limit):
     """
     dataset: input ids tensor of shape [batch, sequence length]
     """
     nsamples, seqlen = dataset.size()
 
-    # Collect per-token NLLs in float32 to avoid fp16 overflow when summing many tokens.
     nlls = []
 
     for i in tqdm(range(nsamples), desc="evaluate"):
@@ -39,11 +47,10 @@ def evaluate_perplexity(model, dataset, limit):
             break
          
         with torch.no_grad():
-            input_ids = dataset[i:i+1,:-1].to(model.device)
+            input_ids = dataset[i:i+1,:-1].to(get_model_device(model))
             labels = dataset[i:i+1,1:].contiguous()
             # print(input_ids)
-            out = model(input_ids=input_ids, use_cache=False)
-            logits = out[0] if isinstance(out, (tuple, list)) else out.logits
+            logits = model(input_ids=input_ids, use_cache=False)[0]
             if torch.isfinite(logits).all():
                 shift_logits = logits[:, :-1, :].contiguous()
                 # shift_labels = labels.to(model.device)
@@ -55,14 +62,10 @@ def evaluate_perplexity(model, dataset, limit):
                 )
                 # neg_log_likelihood = loss.float() * seqlen
                 # nlls.append(neg_log_likelihood)
-                nlls.append(loss.detach().float())
+                nlls.append(loss)
             # torch.cuda.empty_cache() 
-    if not nlls:
-        torch.cuda.empty_cache()
-        return float("inf")
-    # Average NLL over all collected tokens, then exponentiate in float64 for safety.
-    avg_nll = torch.cat(nlls, dim=0).mean().double()
-    ppl = torch.exp(avg_nll)
+    ppl = torch.exp(torch.stack(nlls).sum() / (len(nlls) * seqlen))
+    # ppl = torch.exp(torch.cat(nlls,dim=-1).mean())
     torch.cuda.empty_cache() 
     return ppl.item()
 

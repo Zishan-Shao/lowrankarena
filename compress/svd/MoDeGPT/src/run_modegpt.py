@@ -71,6 +71,13 @@ def _debug_load_param(*args, **kwargs):
 tm._load_parameter_into_model = _debug_load_param
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 @torch.no_grad()
 def main(trial: optuna.Trial = None, config: CompressionConfig | None = None):
 
@@ -78,7 +85,8 @@ def main(trial: optuna.Trial = None, config: CompressionConfig | None = None):
     torch.cuda.empty_cache()
 
     adapter = None
-    start_memory_usage_worker()
+    if not _env_flag("MODEGPT_DISABLE_MEM_WORKER"):
+        start_memory_usage_worker()
 
     if not config:
         config = CompressionConfig.from_args()
@@ -94,15 +102,22 @@ def main(trial: optuna.Trial = None, config: CompressionConfig | None = None):
     ppl_batch_size = int(os.environ.get("MODEGPT_PPL_BS", "4"))
     logger.info(f"Using perplexity batch size: {ppl_batch_size}")
 
-    baseline_ppl = compute_perplexity(
-        model,
-        tokenizer,
-        bs=ppl_batch_size,
-        dataset=adapter.config.dataset,
-        adapter=adapter,
-    )
+    skip_all_ppl = _env_flag("MODEGPT_SKIP_PPL")
+    skip_baseline_ppl = skip_all_ppl or _env_flag("MODEGPT_SKIP_BASELINE_PPL")
+    skip_compressed_ppl = skip_all_ppl or _env_flag("MODEGPT_SKIP_COMPRESSED_PPL")
 
-    logger.info(f"Baseline ppl: {baseline_ppl}")
+    if skip_baseline_ppl:
+        baseline_ppl = None
+        logger.info("Skipping baseline PPL because MODEGPT_SKIP_PPL/MODEGPT_SKIP_BASELINE_PPL is set.")
+    else:
+        baseline_ppl = compute_perplexity(
+            model,
+            tokenizer,
+            bs=ppl_batch_size,
+            dataset=adapter.config.dataset,
+            adapter=adapter,
+        )
+        logger.info(f"Baseline ppl: {baseline_ppl}")
     adapter.metrics["baseline-ppl"] = baseline_ppl
 
     torch.cuda.empty_cache()
@@ -183,23 +198,24 @@ def main(trial: optuna.Trial = None, config: CompressionConfig | None = None):
 
     gc.collect()
 
-    model, tokenizer = reload_compressed_model(save_dir)
-
-    adapter.model = model
-    adapter.tokenizer = tokenizer
-
-    compressed_ppl = compute_perplexity(
-        model,
-        tokenizer,
-        bs=ppl_batch_size,
-        dataset=adapter.config.dataset,
-        adapter=adapter,
-    )
+    if skip_compressed_ppl:
+        compressed_ppl = None
+        logger.info("Skipping compressed PPL because MODEGPT_SKIP_PPL/MODEGPT_SKIP_COMPRESSED_PPL is set.")
+    else:
+        model, tokenizer = reload_compressed_model(save_dir)
+        adapter.model = model
+        adapter.tokenizer = tokenizer
+        compressed_ppl = compute_perplexity(
+            model,
+            tokenizer,
+            bs=ppl_batch_size,
+            dataset=adapter.config.dataset,
+            adapter=adapter,
+        )
+        logger.info(f"Compressed (PPL): {compressed_ppl}")
 
     adapter.metrics[f"ppl-{adapter.config.dataset}"] = compressed_ppl
     adapter.save_metrics()
-
-    logger.info(f"Compressed (PPL): {compressed_ppl}")
 
     return compressed_ppl
 

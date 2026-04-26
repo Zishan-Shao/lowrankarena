@@ -3,7 +3,7 @@ import logging
 import torch
 from torch.types import Tensor
 
-from src.compression_utils import sqrt_M
+from src.compression_utils import bounded_rank_from_keep_ratio, sqrt_M
 from src.model_utils import dtype_p, d1, d2
 from src.adapters.model_adapter import ModelAdapter
 
@@ -33,12 +33,12 @@ def compress_vo(
 
     for layer in target_layers:
         keep_ratio = keep_ratios[layer]
-        rank_i = int(head_dim * keep_ratio)
-        rank_i = max(1, rank_i)
-
-        if arch == "llama" or "qwen" in arch:
-            rank_i = rank_i - (rank_i % 2)
-            rank_i = max(2, rank_i)
+        rank_i = bounded_rank_from_keep_ratio(
+            head_dim,
+            keep_ratio,
+            min_rank=2 if arch == "llama" or "qwen" in arch else 1,
+            even=arch == "llama" or "qwen" in arch,
+        )
 
         C = cov[layer].to(device=d2)
         sqrt_C = sqrt_M(C, ridge_lambda=adapter.config.ridge_vo, debug="Type 3 VO cov:")

@@ -1,4 +1,5 @@
 import argparse
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -112,7 +113,22 @@ def _build_low_rank_specs(model) -> dict[str, dict[str, int]]:
             )
     return specs
 
-def _remap_state_dict(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+def _resolve_output_dtype(dtype_name: str) -> torch.dtype | None:
+    if dtype_name == "source":
+        return None
+    dtype_map = {
+        "float32": torch.float32,
+        "float16": torch.float16,
+        "bfloat16": torch.bfloat16,
+    }
+    return dtype_map[dtype_name]
+
+
+def _remap_state_dict(
+    state_dict: dict[str, torch.Tensor],
+    *,
+    output_dtype: torch.dtype | None = None,
+) -> dict[str, torch.Tensor]:
     remapped = {}
     for key, value in state_dict.items():
         if ".rotary_emb." in key:
@@ -127,7 +143,10 @@ def _remap_state_dict(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Te
         if "_u_proj" in new_key or "_v_proj" in new_key:
             raise ValueError(f"Unmapped low-rank key remains: {new_key}")
 
-        remapped[new_key] = value.detach().cpu().contiguous()
+        tensor = value.detach().cpu().contiguous()
+        if output_dtype is not None and torch.is_floating_point(tensor):
+            tensor = tensor.to(output_dtype)
+        remapped[new_key] = tensor
     return remapped
 
 
@@ -241,7 +260,13 @@ def _select_model_spec(source_model):
     raise ValueError(f"Unsupported base model_type for low-rank export: {model_type}")
 
 
-def _build_config(source_model, low_rank_specs: dict[str, dict[str, int]], method_label: str):
+def _build_config(
+    source_model,
+    low_rank_specs: dict[str, dict[str, int]],
+    method_label: str,
+    *,
+    output_dtype: torch.dtype | None = None,
+):
     spec = _select_model_spec(source_model)
     raw_config = _jsonify(source_model.config.to_dict())
     config = spec["config_cls"].from_dict(raw_config)
@@ -251,7 +276,20 @@ def _build_config(source_model, low_rank_specs: dict[str, dict[str, int]], metho
     config.low_rank_format_version = 1
     config.auto_map = spec["auto_map"]
     config.architectures = spec["architectures"]
+    if output_dtype is not None:
+        config.torch_dtype = _jsonify(output_dtype)
     return config, spec
+
+
+def _ensure_saved_config_dtype(output_dir: Path, output_dtype: torch.dtype | None):
+    if output_dtype is None:
+        return
+    config_path = output_dir / "config.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    dtype_name = _jsonify(output_dtype)
+    payload["torch_dtype"] = dtype_name
+    payload["dtype"] = dtype_name
+    config_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def main():
@@ -280,6 +318,12 @@ def main():
         help="Shard size passed to Hugging Face state-dict serialization.",
     )
     parser.add_argument(
+        "--output-dtype",
+        choices=("source", "float32", "float16", "bfloat16"),
+        default="source",
+        help="Optional dtype to cast floating tensors to before writing safetensors.",
+    )
+    parser.add_argument(
         "--unsafe-overwrite",
         action="store_true",
         help="Allow writing into a non-empty output directory.",
@@ -304,13 +348,20 @@ def main():
     payload = _load_checkpoint(checkpoint_path)
     source_model = payload["model"]
     tokenizer = payload.get("tokenizer")
+    output_dtype = _resolve_output_dtype(args.output_dtype)
 
     low_rank_specs = _build_low_rank_specs(source_model)
-    remapped_state_dict = _remap_state_dict(source_model.state_dict())
-    config, model_spec = _build_config(source_model, low_rank_specs, method_label=args.method_label)
+    remapped_state_dict = _remap_state_dict(source_model.state_dict(), output_dtype=output_dtype)
+    config, model_spec = _build_config(
+        source_model,
+        low_rank_specs,
+        method_label=args.method_label,
+        output_dtype=output_dtype,
+    )
 
     print("[export] saving config and model code", flush=True)
     config.save_pretrained(output_dir)
+    _ensure_saved_config_dtype(output_dir, output_dtype)
     _copy_model_code(output_dir, source_dir=model_spec["source_dir"], filenames=model_spec["copy_files"])
     _save_tokenizer(tokenizer, output_dir, tokenizer_id=args.tokenizer_id or getattr(config, "_name_or_path", None))
 

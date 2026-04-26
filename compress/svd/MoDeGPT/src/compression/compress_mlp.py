@@ -2,6 +2,7 @@ import logging
 
 from torch import Tensor
 import torch
+from src.compression_utils import bounded_rank_from_keep_ratio
 from src.model_utils import dtype_p, d2
 from src.adapters.model_adapter import MLPComponents, ModelAdapter
 
@@ -34,7 +35,7 @@ def compress_weights(
 
     ridge_scores = get_ridge_scores(C, layer_idx=layer_idx, ridge_lambda=ridge_lambda)
 
-    rank = int(C.shape[0] * keep_ratio)
+    rank = bounded_rank_from_keep_ratio(C.shape[0], keep_ratio)
 
     W_u = comps.up_proj.weight.to(device=d2, dtype=dtype_p)  # [D_int, D_h]
     W_g = comps.gate_proj.weight.to(device=d2, dtype=dtype_p)

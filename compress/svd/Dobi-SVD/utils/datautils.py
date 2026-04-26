@@ -3,6 +3,13 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, DataCollatorWithPadding
 import random
 from tqdm import tqdm
+import re
+
+
+def _tokenizer_cache_key(tokenizer):
+    name = getattr(tokenizer, "name_or_path", "") or tokenizer.__class__.__name__
+    tail = str(name).rstrip("/").split("/")[-1]
+    return re.sub(r"[^A-Za-z0-9]+", "_", tail).strip("_") or "tokenizer"
 
 def prepare_train_loaders(tokenizer, DATASET_NAME, data_cache_dir, dataset_cache_dir, args):
     traindata_cache_file = dataset_cache_dir / f"traindata.pt"
@@ -41,8 +48,9 @@ def prepare_train_loaders(tokenizer, DATASET_NAME, data_cache_dir, dataset_cache
     print("Training and validation has been loaded!")
     
     
-    tokenized_traindata_cache_file = data_cache_dir / f"traindata_{DATASET_NAME}_{NSAMPLES_train}_{SEQ_LEN}.pt"
-    tokenized_valdata_cache_file = data_cache_dir / f"valdata_{DATASET_NAME}_{NSAMPLES_val}_{SEQ_LEN}.pt"
+    tok_key = _tokenizer_cache_key(tokenizer)
+    tokenized_traindata_cache_file = data_cache_dir / f"traindata_{DATASET_NAME}_{tok_key}_{NSAMPLES_train}_{SEQ_LEN}.pt"
+    tokenized_valdata_cache_file = data_cache_dir / f"valdata_{DATASET_NAME}_{tok_key}_{NSAMPLES_val}_{SEQ_LEN}.pt"
     LOAD = tokenized_traindata_cache_file.exists() and tokenized_valdata_cache_file.exists()
     
     if LOAD and not args.RECREATE:

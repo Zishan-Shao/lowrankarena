@@ -1,6 +1,7 @@
 import logging
 import torch
 import torch.nn as nn
+from pathlib import Path
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
 
@@ -51,6 +52,11 @@ def load_remapping_model(updated_model_path):
 
 
 def load_unremapping_model(model_id):
-    pruned_dict = torch.load(f"{model_id}/DobiSVD_Model.pt") #, map_location='cuda'
+    model_path = Path(model_id)
+    if model_path.is_dir():
+        ckpt_path = model_path / "DobiSVD_Model.pt"
+    else:
+        ckpt_path = model_path
+    pruned_dict = torch.load(str(ckpt_path), map_location="cpu")
     tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
-    return model, tokenizer
+    return model, tokenizer    

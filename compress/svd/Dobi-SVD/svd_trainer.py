@@ -1,5 +1,4 @@
 import argparse
-import inspect
 import os
 import torch
 import torch.nn as nn
@@ -19,36 +18,16 @@ from pathlib import Path
 import gc
 import json    
 from datetime import datetime
+import inspect
 
 from utils.datautils import prepare_train_loaders
 from evaluate import evaluate_perplexity
 from modules.stable_svd import stable_lowrank_SVD, SVDTransformLayer
 
 
-def svd_rank_blocks(module, seq_len):
-    return max(1, int(min(module.in_features, module.out_features) / seq_len))
+def unwrap_model(model):
+    return model.module if hasattr(model, "module") else model
 
-
-'''
-CUDA_VISIBLE_DEVICES=0,1,2,3 python svd_trainer.py \
-  --model_id meta-llama/Llama-2-7b-hf \
-  --target_ratio 0.4 \
-  --seq_len 2048 \
-  --training_dataset wikitext2 \
-  --n_train_epochs 20 \
-  --n_train_samples 256
-
-CUDA_VISIBLE_DEVICES=0,1,2,3 python svd_trainer.py \
-  --model_id meta-llama/Llama-2-7b-hf \
-  --target_ratio 0.4 \
-  --seq_len 2048 \
-  --training_dataset wikitext2 \
-  --n_train_epochs 20 \
-  --n_train_samples 256 \
-  --remapping
-
-
-'''
 
 def main(args):
     # setting random seed of numpy and torch
@@ -110,11 +89,15 @@ def main(args):
     
     model_no_svd_layer_dic = {}
     lower_id = model_id.split('/')[-1]
-    
+
     if "llama" in lower_id or "Llama" in lower_id:
         model_no_svd_layer_dic[lower_id] = ['lm_head']
     elif "opt" in lower_id:
         model_no_svd_layer_dic[lower_id] = ['project_out', 'project_in']
+    else:
+        # Most decoder-only LMs should keep lm_head untouched.
+        model_no_svd_layer_dic[lower_id] = ['lm_head']
+    no_svd_layers = model_no_svd_layer_dic[lower_id]
         
     model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=model_load_dtype)
     tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -153,19 +136,27 @@ def main(args):
     # transform model 
     model_ori_weight_size = torch.tensor(0)
     for name, module in tqdm(model.named_modules(), desc="Add SVD attribute to modules"):
-        if isinstance(module, nn.Linear) and all(x not in name for x in model_no_svd_layer_dic[lower_id]):
+        if isinstance(module, nn.Linear) and all(x not in name for x in no_svd_layers):
             parent_name = name.rsplit('.', 1)[0] if '.' in name else '' # split from right 1 time
             attr_name = name.rsplit('.', 1)[-1]
             if parent_name != '':
                 parent = dict(model.named_modules())[parent_name]
             else:
                 parent = model
-            RANK_RATIO = svd_rank_blocks(module, SEQ_LEN)
-            
+            min_dim = min(module.in_features, module.out_features)
+            # Keep rank ratio continuous; floor-to-int can become 0 for small heads (e.g. GQA k/v projections).
+            rank_ratio = min_dim / SEQ_LEN
+            safe_rank_ratio = max(rank_ratio, 1e-12)
             if remapping:
-                gamma_init = (1/RANK_RATIO)*target_compression_ratio*min(module.in_features, module.out_features)
+                gamma_init = target_compression_ratio * min_dim / safe_rank_ratio
             else:
-                gamma_init =(1/RANK_RATIO)*target_compression_ratio*module.in_features*module.out_features/(module.in_features+module.out_features)
+                gamma_init = (
+                    target_compression_ratio
+                    * module.in_features
+                    * module.out_features
+                    / ((module.in_features + module.out_features) * safe_rank_ratio)
+                )
+            gamma_init = float(min(min_dim, max(1.0, gamma_init)))
                 
             weight_size = torch.tensor(module.in_features * module.out_features)
             model_ori_weight_size += weight_size
@@ -214,13 +205,15 @@ def main(args):
                 size_ori = module.ori_weight_size
                 size_new = torch.where(size_now < size_ori, size_now, size_ori) + size_new
                 
-        compression_ratio = size_new / model.module.ori_weight_size
+        base_model = unwrap_model(model)
+        compression_ratio = size_new / base_model.ori_weight_size
         
         compression_loss = abs(compression_ratio - torch.tensor(target_compression_ratio,device=compression_ratio.device))
         return lambda_reg * compression_loss, compression_ratio
     
     def Wrong_value_loss(model):
-        penalty = torch.tensor(0.,device=model.module.device)
+        base_model = unwrap_model(model)
+        penalty = torch.tensor(0., device=next(base_model.parameters()).device)
         
         for name, module in model.named_modules():
             if isinstance(module, SVDTransformLayer):
@@ -248,8 +241,9 @@ def main(args):
             
             cur_lr = self.optimizer.param_groups[0]['lr']
     
-            model.module.epoch_cnt += 1
-            if model.module.epoch_cnt % save_epoch_num == 0:
+            model_ref = unwrap_model(model)
+            model_ref.epoch_cnt += 1
+            if model_ref.epoch_cnt % save_epoch_num == 0:
                 k_dict = {}
                 for name, module in self.model.named_modules():
                     if isinstance(module, SVDTransformLayer):
@@ -257,15 +251,15 @@ def main(args):
                 k_dict['ppl']=ppl.detach().tolist()
                 k_dict['compression_ratio']=compression_ratio.detach().tolist()
                 k_dict['lr']=cur_lr
-                output_json_path = str(TA_tarined_model_output_dir/'k_dict_{:05d}.json'.format(model.module.epoch_cnt))
+                output_json_path = str(TA_tarined_model_output_dir/'k_dict_{:05d}.json'.format(model_ref.epoch_cnt))
                 with open(output_json_path, 'w') as json_file:
                     json.dump(k_dict, json_file, indent=4)
-    
+
                 
-                BEST_loss = model.module.BEST_loss
+                BEST_loss = model_ref.BEST_loss
                 CURR_loss = total_loss.mean().item()
                 if CURR_loss < BEST_loss:
-                    model.module.BEST_loss = torch.tensor(CURR_loss, device = model.module.BEST_loss.device)
+                    model_ref.BEST_loss = torch.tensor(CURR_loss, device=model_ref.BEST_loss.device)
                     k_dict["PPL_ORIG"] = orig_PPL
                     output_json_path = str(TA_tarined_model_output_dir/'best_gamma.json')
                     with open(output_json_path, 'w') as json_file:
@@ -292,8 +286,7 @@ def main(args):
    # training
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     from transformers import TrainingArguments
-    _ta_sig = inspect.signature(TrainingArguments.__init__)
-    _ta_kwargs = {
+    training_args_kwargs = {
         "output_dir": TA_tarined_model_output_dir,
         "num_train_epochs": TA_num_train_epochs,
         "per_device_train_batch_size": 1,
@@ -302,21 +295,20 @@ def main(args):
         "lr_scheduler_type": "cosine",
         "seed": args.seed,
         "gradient_accumulation_steps": TA_gradient_accumulation_steps,
-        # "load_best_model_at_end": True,
         "save_strategy": "no",
         "save_steps": 1000,
         "save_total_limit": 2,
         "remove_unused_columns": False,
-        # "deepspeed": deepspeed_config,
     }
-    # Handle transformers version differences
-    if "evaluation_strategy" in _ta_sig.parameters:
-        _ta_kwargs["evaluation_strategy"] = "epoch"
-    elif "eval_strategy" in _ta_sig.parameters:
-        _ta_kwargs["eval_strategy"] = "epoch"
-    # Filter unsupported args for older transformers
-    _ta_kwargs = {k: v for k, v in _ta_kwargs.items() if k in _ta_sig.parameters}
-    training_args = TrainingArguments(**_ta_kwargs)
+    # transformers API changed in newer versions: evaluation_strategy -> eval_strategy.
+    ta_params = inspect.signature(TrainingArguments.__init__).parameters
+    if "report_to" in ta_params:
+        training_args_kwargs["report_to"] = "none"
+    if "evaluation_strategy" in ta_params:
+        training_args_kwargs["evaluation_strategy"] = "epoch"
+    else:
+        training_args_kwargs["eval_strategy"] = "epoch"
+    training_args = TrainingArguments(**training_args_kwargs)
    
     trainer = SVDTrainer(
         model=model,
@@ -367,7 +359,7 @@ def main(args):
             "model_load_dtype": "f16",
             "computeSVD_dtype": "f32"
         },
-        "no_svd_layer": model_no_svd_layer_dic[lower_id],
+        "no_svd_layer": no_svd_layers,
     }
     with open(output_json_path, "w") as json_file:
         json.dump(data, json_file, indent=4)

@@ -2,7 +2,7 @@ import logging
 import os
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, LlamaTokenizer
 
 
 logger = logging.getLogger("MoDeGPT")
@@ -45,6 +45,34 @@ d2 = "cuda:1" if parallel else "cuda:0"
 calib_device = os.environ.get("MODEGPT_CALIB_DEVICE", "cuda:1" if parallel else "cuda:0")
 
 
+def _load_tokenizer(tokenizer_source: str):
+    def _valid(tokenizer):
+        return tokenizer is not None and tokenizer is not False and hasattr(tokenizer, "pad_token") and callable(tokenizer)
+
+    if os.path.exists(os.path.join(str(tokenizer_source), "tokenizer.model")):
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_source, use_fast=False)
+        if _valid(tokenizer):
+            return tokenizer
+
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_source, use_fast=False)
+        if _valid(tokenizer):
+            return tokenizer
+        logger.warning("Loaded invalid tokenizer %r from %s; retrying LlamaTokenizer.", tokenizer, tokenizer_source)
+    except ValueError as exc:
+        message = str(exc)
+        if "Converting from SentencePiece and Tiktoken failed" not in message:
+            raise
+        logger.warning(
+            "AutoTokenizer fast conversion failed for %s; retrying with LlamaTokenizer.",
+            tokenizer_source,
+        )
+    tokenizer = LlamaTokenizer.from_pretrained(tokenizer_source, use_fast=False)
+    if not _valid(tokenizer):
+        raise TypeError(f"Loaded invalid tokenizer {type(tokenizer)!r} from {tokenizer_source}")
+    return tokenizer
+
+
 def start_memory_usage_worker():
 
     import psutil
@@ -83,7 +111,7 @@ def load_model(model_name: str, device: int = 0):
     Loads the official model.
     """
     logger.info(f"Loading model from: {model_name}")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = _load_tokenizer(model_name)
     model = AutoModelForCausalLM.from_pretrained(
         model_name, device_map="auto", trust_remote_code=True, torch_dtype="auto"
     )
@@ -159,7 +187,7 @@ def reload_compressed_model(model_dir: str, device="cuda:0", tokenizer_source: s
         else:
             tokenizer_source = model_dir
 
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_source)
+    tokenizer = _load_tokenizer(tokenizer_source)
     # from transformers import LlamaTokenizer
 
     # tokenizer = LlamaTokenizer.from_pretrained(tokenizer_source)

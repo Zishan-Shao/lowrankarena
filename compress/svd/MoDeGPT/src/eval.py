@@ -1,5 +1,6 @@
 import logging
 import math
+import os
 import time
 
 import numpy as np
@@ -161,6 +162,12 @@ def compute_perplexity(
     seqlen = 2048
 
     nsamples = min(testenc.numel() // seqlen, 512)
+    max_samples_raw = os.environ.get("MODEGPT_PPL_MAX_SAMPLES", "").strip()
+    if max_samples_raw:
+        max_samples = int(max_samples_raw)
+        if max_samples <= 0:
+            raise ValueError(f"MODEGPT_PPL_MAX_SAMPLES must be positive, got {max_samples}")
+        nsamples = min(nsamples, max_samples)
 
     nlls = []
     total_tokens_processed = 0
@@ -200,6 +207,7 @@ def compute_perplexity(
         nlls.append(neg_log_likelihood)
 
         total_tokens_processed += (j - i) * seqlen
+        del inputs, lm_logits, shift_logits, shift_labels, loss, neg_log_likelihood
 
     torch.cuda.synchronize()
     t_end = time.perf_counter()
