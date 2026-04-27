@@ -376,6 +376,7 @@ def allocate_svdllm_v2_adaptive_keep_ratios(
     target_reduction_ratio: float,
     dev,
     strict_paper_formula: bool = True,
+    min_keep_ratio: float = 0.0,
 ):
     return allocate_weight_type_keep_ratios(
         model_name=model_name,
@@ -385,6 +386,7 @@ def allocate_svdllm_v2_adaptive_keep_ratios(
         dev=dev,
         strict_formula=strict_paper_formula,
         implementation_label="v2_hetero",
+        min_keep_ratio=min_keep_ratio,
     )
 
 
@@ -438,6 +440,7 @@ def compress_model_adaptive(
     low_resource_factor_device: str = "gpu",
     low_resource_activation_device: str = "auto",
     gpu_guard=None,
+    min_keep_ratio: float = 0.0,
 ):
     """One-shot helper for the local v2-style heterogeneous path."""
     if low_resource_profile:
@@ -460,6 +463,7 @@ def compress_model_adaptive(
         target_reduction_ratio=target_reduction_ratio,
         dev=dev,
         strict_paper_formula=strict_paper_formula,
+        min_keep_ratio=min_keep_ratio,
     )
     whitening_hetero(
         model_name=model_name,

@@ -233,7 +233,8 @@ def _improve_rank_budget_to_target(module_entries, target_budget: int):
     else:
         heap = []
         for idx, entry in enumerate(module_entries):
-            if int(entry["rank"]) > 1:
+            min_rank = int(entry.get("min_rank", 1))
+            if int(entry["rank"]) > min_rank:
                 lost = float(entry["singular_values"][int(entry["rank"]) - 1].item() ** 2) / float(entry["cost"])
                 heapq.heappush(heap, (lost, idx, int(entry["rank"])))
         while heap:
@@ -244,9 +245,10 @@ def _improve_rank_budget_to_target(module_entries, target_budget: int):
             next_budget = current_budget - int(entry["cost"])
             if abs(next_budget - target_budget) >= abs(current_budget - target_budget):
                 continue
+            min_rank = int(entry.get("min_rank", 1))
             entry["rank"] -= 1
             current_budget = next_budget
-            if int(entry["rank"]) > 1:
+            if int(entry["rank"]) > min_rank:
                 lost = float(entry["singular_values"][int(entry["rank"]) - 1].item() ** 2) / float(entry["cost"])
                 heapq.heappush(heap, (lost, idx, int(entry["rank"])))
 
@@ -260,6 +262,7 @@ def allocate_weight_type_keep_ratios(
     dev,
     strict_formula: bool = True,
     implementation_label: str = "adaptive",
+    min_keep_ratio: float = 0.0,
 ):
     layers = _get_layers(model_name, model)
     target_keep_ratio = 1.0 - float(target_reduction_ratio)
@@ -283,6 +286,13 @@ def allocate_weight_type_keep_ratios(
                 _module_max_param_rank(module),
                 _module_rank_budget(module, target_keep_ratio),
             )
+            min_rank = 1
+            if float(min_keep_ratio) > 0.0:
+                min_rank = min(
+                    int(singular_values.numel()),
+                    _module_max_param_rank(module),
+                    _module_rank_budget(module, float(min_keep_ratio)),
+                )
             lmin = _tail_fro_loss(singular_values, base_rank)
             target_budget += int(base_rank) * _module_param_cost(module)
 
@@ -293,6 +303,7 @@ def allocate_weight_type_keep_ratios(
                 "singular_values": singular_values,
                 "cost": _module_param_cost(module),
                 "rank": base_rank,
+                "min_rank": min_rank,
                 "max_rank": min(int(singular_values.numel()), _module_max_param_rank(module)),
                 "lmin": lmin,
             }
@@ -313,9 +324,12 @@ def allocate_weight_type_keep_ratios(
         for entry, score in zip(group_entries, scores):
             reduce_ratio = float(group_size) * float(target_reduction_ratio) * float(score) / float(score_sum)
             keep_ratio = min(1.0, max(0.0, 1.0 - reduce_ratio))
-            entry["rank"] = min(
-                int(entry["max_rank"]),
-                _module_rank_budget(entry["module"], keep_ratio),
+            entry["rank"] = max(
+                int(entry["min_rank"]),
+                min(
+                    int(entry["max_rank"]),
+                    _module_rank_budget(entry["module"], keep_ratio),
+                ),
             )
 
     _improve_rank_budget_to_target(module_entries, target_budget)
