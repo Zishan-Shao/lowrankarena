@@ -2,7 +2,7 @@
 
 This directory contains the shared low-rank runtime used by registered arena artifacts.
 
-The key design choice is that runtime support is grouped by supported base-model family, not by compression method. Method-specific code belongs in [`compress/`](../../compress/README.md); once an artifact is exported into the arena low-rank schema, execution should route through one of the shared family runtimes here.
+The key design choice is that runtime support is grouped by supported base-model family, not by compression method. Once an artifact is exported into the arena low-rank schema, execution should route through one of the shared family runtimes here.
 
 ## Layout
 

@@ -14,9 +14,3 @@ checkpoints/inference/*
 !checkpoints/inference/README.md
 checkpoints/vllm/*
 !checkpoints/vllm/README.md
-
-compress/svd/Basis_Sharing/__pycache__/
-compress/svd/Basis_Sharing/models/__pycache__/
-compress/svd/Basis_Sharing/calib/
-compress/svd/Basis_Sharing/lora/
-compress/svd/Basis_Sharing/untrained_model/

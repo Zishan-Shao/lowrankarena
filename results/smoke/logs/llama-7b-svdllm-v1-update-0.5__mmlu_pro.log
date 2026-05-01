@@ -1,122 +1,0 @@
-Fetching 12 files:   0%|          | 0/12 [00:00<?, ?it/s]Fetching 12 files: 100%|██████████| 12/12 [00:00<00:00, 123969.58it/s]
-2026-04-16:00:19:06 WARNING  [config.evaluate_config:281] --limit SHOULD ONLY BE USED FOR TESTING. REAL METRICS SHOULD NOT BE COMPUTED USING LIMIT.
-2026-04-16:00:19:11 INFO     [_cli.run:376] Selected Tasks: ['mmlu_pro']
-2026-04-16:00:19:11 INFO     [evaluator:211] Setting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234 | Setting fewshot manual seed to 1234
-2026-04-16:00:19:11 WARNING  [evaluator:223] generation_kwargs: {'max_gen_toks': 256} specified through cli, these settings will update set parameters in yaml tasks. Ensure 'do_sample=True' for non-greedy decoding!
-2026-04-16:00:19:11 INFO     [evaluator:236] Initializing hf model, with arguments: {'pretrained': '/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama_7b/SVDLLM/jeffwan_llama_7b_hf_whitening_then_update_keep50_hf', 'dtype': 'float16', 'use_fast_tokenizer': False, 'trust_remote_code': True}
-2026-04-16:00:19:15 INFO     [models.huggingface:161] Using device 'cuda:0'
-2026-04-16:00:19:15 INFO     [models.huggingface:548] Model type cannot be determined. Using default model type 'causal'
-2026-04-16:00:19:15 INFO     [models.huggingface:423] Model parallel was set to False, max memory was not set, and device map was set to {'': 'cuda:0'}
-Loading checkpoint shards:   0%|                         | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|████████▌        | 1/2 [00:01<00:01,  1.45s/it]Loading checkpoint shards: 100%|█████████████████| 2/2 [00:01<00:00,  1.15it/s]Loading checkpoint shards: 100%|█████████████████| 2/2 [00:01<00:00,  1.04it/s]
-2026-04-16:00:19:23 INFO     [tasks:700] Selected tasks:
-2026-04-16:00:19:23 INFO     [tasks:703] Group: mmlu_pro
-2026-04-16:00:19:23 INFO     [tasks:726] ConfigurableGroup(group=mmlu_pro,group_alias=None): {'mmlu_pro_biology': ConfigurableTask(task_name=mmlu_pro_biology,output_type=generate_until,num_fewshot=5,num_samples=717), 'mmlu_pro_business': ConfigurableTask(task_name=mmlu_pro_business,output_type=generate_until,num_fewshot=5,num_samples=789), 'mmlu_pro_chemistry': ConfigurableTask(task_name=mmlu_pro_chemistry,output_type=generate_until,num_fewshot=5,num_samples=1132), 'mmlu_pro_computer_science': ConfigurableTask(task_name=mmlu_pro_computer_science,output_type=generate_until,num_fewshot=5,num_samples=410), 'mmlu_pro_economics': ConfigurableTask(task_name=mmlu_pro_economics,output_type=generate_until,num_fewshot=5,num_samples=844), 'mmlu_pro_engineering': ConfigurableTask(task_name=mmlu_pro_engineering,output_type=generate_until,num_fewshot=5,num_samples=969), 'mmlu_pro_health': ConfigurableTask(task_name=mmlu_pro_health,output_type=generate_until,num_fewshot=5,num_samples=818), 'mmlu_pro_history': ConfigurableTask(task_name=mmlu_pro_history,output_type=generate_until,num_fewshot=5,num_samples=381), 'mmlu_pro_law': ConfigurableTask(task_name=mmlu_pro_law,output_type=generate_until,num_fewshot=5,num_samples=1101), 'mmlu_pro_math': ConfigurableTask(task_name=mmlu_pro_math,output_type=generate_until,num_fewshot=5,num_samples=1351), 'mmlu_pro_other': ConfigurableTask(task_name=mmlu_pro_other,output_type=generate_until,num_fewshot=5,num_samples=924), 'mmlu_pro_philosophy': ConfigurableTask(task_name=mmlu_pro_philosophy,output_type=generate_until,num_fewshot=5,num_samples=499), 'mmlu_pro_physics': ConfigurableTask(task_name=mmlu_pro_physics,output_type=generate_until,num_fewshot=5,num_samples=1299), 'mmlu_pro_psychology': ConfigurableTask(task_name=mmlu_pro_psychology,output_type=generate_until,num_fewshot=5,num_samples=798)}
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_biology: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_biology from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_business: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_business from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_chemistry: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_chemistry from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_computer_science: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_computer_science from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_economics: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_economics from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_engineering: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_engineering from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_health: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_health from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_history: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_history from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_law: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_law from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_math: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_math from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_other: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_other from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_philosophy: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_philosophy from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_physics: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_physics from 5 to 5
-2026-04-16:00:19:23 INFO     [evaluator:314] mmlu_pro_psychology: Using gen_kwargs: {'until': ['Question:'], 'max_gen_toks': 256, 'do_sample': False, 'temperature': 0.0}
-2026-04-16:00:19:23 WARNING  [evaluator:333] Overwriting default num_fewshot of mmlu_pro_psychology from 5 to 5
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_biology on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 391.52it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_business on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 816.01it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_chemistry on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 820.00it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_computer_science on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 811.91it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_economics on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 813.32it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_engineering on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 832.53it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_health on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 822.74it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_history on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 831.38it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_law on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 839.87it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_math on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 837.02it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_other on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 841.72it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_philosophy on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 825.16it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_physics on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 832.53it/s]
-2026-04-16:00:19:23 INFO     [api.task:311] Building contexts for mmlu_pro_psychology on rank 0...
-  0%|                                                    | 0/1 [00:00<?, ?it/s]100%|███████████████████████████████████████████| 1/1 [00:00<00:00, 819.68it/s]
-2026-04-16:00:19:23 INFO     [evaluator:584] Running generate_until requests
-Running generate_until requests:   0%|                  | 0/14 [00:00<?, ?it/s]2026-04-16:00:19:23 WARNING  [models.huggingface:914] Left truncation applied. Original sequence length was 2248, truncating to last 1792 tokens. Some content will be lost.
-Running generate_until requests:   7%|▋         | 1/14 [00:21<04:39, 21.53s/it]2026-04-16:00:19:44 WARNING  [models.huggingface:914] Left truncation applied. Original sequence length was 1867, truncating to last 1792 tokens. Some content will be lost.
-Running generate_until requests:  14%|█▍        | 2/14 [00:41<04:07, 20.60s/it]Running generate_until requests:  21%|██▏       | 3/14 [01:01<03:41, 20.15s/it]Running generate_until requests:  29%|██▊       | 4/14 [01:21<03:22, 20.25s/it]Running generate_until requests:  36%|███▌      | 5/14 [01:42<03:03, 20.40s/it]Running generate_until requests:  43%|████▎     | 6/14 [02:03<02:44, 20.57s/it]Running generate_until requests:  50%|█████     | 7/14 [02:23<02:23, 20.55s/it]Running generate_until requests:  57%|█████▋    | 8/14 [02:43<02:02, 20.36s/it]Running generate_until requests:  64%|██████▍   | 9/14 [03:02<01:38, 19.78s/it]Running generate_until requests:  71%|██████▍  | 10/14 [03:22<01:19, 19.93s/it]Running generate_until requests:  79%|███████  | 11/14 [03:42<00:59, 19.93s/it]Running generate_until requests:  86%|███████▋ | 12/14 [03:58<00:37, 18.94s/it]Running generate_until requests:  93%|████████▎| 13/14 [04:19<00:19, 19.37s/it]Running generate_until requests: 100%|█████████| 14/14 [04:35<00:00, 18.50s/it]Running generate_until requests: 100%|█████████| 14/14 [04:35<00:00, 19.70s/it]
-2026-04-16:00:24:07 INFO     [loggers.evaluation_tracker:247] Saving results aggregated
-hf ({'pretrained': '/home/zs89/.cache/huggingface/hub/models--Duke-CEI-SVD--LowRankArena/snapshots/6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6/llama_7b/SVDLLM/jeffwan_llama_7b_hf_whitening_then_update_keep50_hf', 'dtype': 'float16', 'use_fast_tokenizer': False}), gen_kwargs: ({'max_gen_toks': 256}), limit: 1.0, num_fewshot: 5, batch_size: 1
-|       Tasks       |Version|    Filter    |n-shot|  Metric   |   |Value|   |Stderr|
-|-------------------|------:|--------------|-----:|-----------|---|----:|---|------|
-|mmlu_pro           |      2|custom-extract|      |exact_match|↑  |    0|±  |   N/A|
-| - biology         |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - business        |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - chemistry       |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - computer_science|      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - economics       |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - engineering     |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - health          |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - history         |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - law             |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - math            |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - other           |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - philosophy      |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - physics         |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-| - psychology      |      3|custom-extract|     5|exact_match|↑  |    0|±  |   N/A|
-
-| Groups |Version|    Filter    |n-shot|  Metric   |   |Value|   |Stderr|
-|--------|------:|--------------|------|-----------|---|----:|---|------|
-|mmlu_pro|      2|custom-extract|      |exact_match|↑  |    0|±  |   N/A|
-
-{
-  "checkpoint_name": "llama-7b-svdllm-v1-update-0.5",
-  "metrics": {
-    "aggregation": "macro_mean",
-    "by_metric": {
-      "exact_match": {
-        "mean": 0.0,
-        "scored_task_count": 1
-      }
-    },
-    "mean": 0.0,
-    "primary_metric": "exact_match",
-    "scored_task_count": 1,
-    "summary_entity": "mmlu_pro",
-    "summary_source": "groups",
-    "task_count": 1,
-    "tracked_metrics": [
-      "exact_match"
-    ]
-  },
-  "output_path": "/home/zs89/lowrankarena/results/smoke/eval/accuracy__mmlu_pro__llama-7b-svdllm-v1-update-0.5.json",
-  "raw_output_path": "/home/zs89/lowrankarena/results/smoke/eval/raw/accuracy__mmlu_pro/llama-7b-svdllm-v1-update-0.5/__home__zs89__.cache__huggingface__hub__models--Duke-CEI-SVD--LowRankArena__snapshots__6ce37f6e157cc9c689221fd1545a3c0c3c0efbf6__llama_7b__SVDLLM__jeffwan_llama_7b_hf_whitening_then_update_keep50_hf/results_2026-04-16T00-24-07.261507.json",
-  "status": "completed",
-  "suite": "accuracy__mmlu_pro"
-}

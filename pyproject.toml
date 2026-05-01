@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "lowrankarena"
 version = "0.1.0"
-description = "Scaffold for LowRankArena benchmark and checkpoint management."
+description = "Anonymous benchmark-only scaffold for low-rank checkpoint evaluation."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-  { name = "LowRankArena" },
+  { name = "Anonymous Authors" },
 ]
 dependencies = [
   "torch==2.10.0",
@@ -44,7 +44,7 @@ full = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["src*", "audit*"]
+include = ["src*"]
 namespaces = true
 
 [tool.pytest.ini_options]

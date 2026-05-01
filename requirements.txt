@@ -3,8 +3,7 @@
 # These pins match the versions used to validate the current repo-owned flows:
 # load, eval, memory, speed, and demo.
 #
-# Vendored upstream compression baselines under compress/ may still require
-# additional method-specific packages or separate environments.
+# This branch intentionally contains only benchmark/runtime dependencies.
 
 # Core runtime
 torch==2.10.0

@@ -1,27 +1,0 @@
-Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files:  60%|██████    | 6/10 [00:00<00:00, 43.87it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 62.43it/s]
-`torch_dtype` is deprecated! Use `dtype` instead!
-Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:18<00:18, 18.37s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:24<00:00, 11.19s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:24<00:00, 12.27s/it]
-Traceback (most recent call last):
-  File "/home/zs89/lowrankarena/scripts/run_eval.py", line 73, in <module>
-    main()
-    ~~~~^^
-  File "/home/zs89/lowrankarena/scripts/run_eval.py", line 50, in main
-    result = run_lm_eval_suite(
-        LmEvalRequest(
-    ...<15 lines>...
-        )
-    )
-  File "/home/zs89/lowrankarena/src/lm_eval_runner.py", line 315, in run_lm_eval_suite
-    return run_contiguous_ppl_suite(request, suite_path=suite_path, suite_config=suite_config)
-  File "/home/zs89/lowrankarena/src/ppl_runner.py", line 296, in run_contiguous_ppl_suite
-    raw_output_path = dump_json(raw_output, _raw_output_path_for(request, suite_path))
-                                            ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
-  File "/home/zs89/lowrankarena/src/ppl_runner.py", line 50, in _raw_output_path_for
-    raw_dir = ensure_dir(raw_root / suite_output_name(suite_path) / request.checkpoint_name)
-                                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
-  File "/home/zs89/lowrankarena/src/benchmarking.py", line 49, in suite_output_name
-    relative_parts = list(Path(config_path).resolve().relative_to(Path(root).resolve()).with_suffix("").parts)
-                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/zs89/miniconda3/envs/lowrankarena/lib/python3.13/pathlib/_local.py", line 385, in relative_to
-    raise ValueError(f"{str(self)!r} is not in the subpath of {str(other)!r}")
-ValueError: '/tmp/lowrankarena_ppl_smoke.yaml' is not in the subpath of '/home/zs89/lowrankarena/benchmark'

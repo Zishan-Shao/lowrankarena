@@ -2,7 +2,7 @@
 
 Shared low-rank runtime for Llama-family checkpoints.
 
-These files define the arena-owned config and model wrappers for artifacts whose dense base model is a Llama variant and whose compressed layers have already been exported into the arena `ABLinear` schema. They are the family-level runtime that exported checkpoints rely on after method-specific preprocessing is finished.
+These files define the arena-owned config and model wrappers for artifacts whose dense base model is a Llama variant and whose compressed layers have already been exported into the arena `ABLinear` schema. They are the family-level runtime that exported checkpoints rely on after preprocessing is finished.
 
 ## Files
 
@@ -13,4 +13,4 @@ These files define the arena-owned config and model wrappers for artifacts whose
 
 - Exported checkpoints should already be in the shared arena low-rank schema before they depend on this runtime.
 - These files are part of the remote-code boundary copied into loadable Hugging Face artifacts.
-- Method-specific preprocessing and vLLM compatibility preparation do not belong here. Those concerns live in [`compress/`](../../../compress/README.md) and [`src/vllm/`](../../vllm/README.md).
+- Method-specific preprocessing and vLLM compatibility preparation do not belong here. vLLM preparation lives in [`src/vllm/`](../../vllm/README.md).

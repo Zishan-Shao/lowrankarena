@@ -15,4 +15,4 @@ This folder groups family-specific wrappers for supported Qwen lines while keepi
 
 - Keep this folder family-scoped rather than method-scoped.
 - Treat these files as the remote-code boundary for exported Qwen-family arena artifacts.
-- Keep export-time method logic in [`compress/`](../../../compress/README.md), and keep vLLM preparation logic in [`src/vllm/`](../../vllm/README.md).
+- Keep export-time method logic outside this runtime, and keep vLLM preparation logic in [`src/vllm/`](../../vllm/README.md).

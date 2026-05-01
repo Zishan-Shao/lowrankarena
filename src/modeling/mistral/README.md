@@ -2,7 +2,7 @@
 
 Shared low-rank runtime for Mistral-family checkpoints.
 
-This folder groups the arena-owned config and model wrappers for Mistral variants whose compressed linear layers have already been exported into the shared `ABLinear` schema. Method-specific preprocessing still belongs in [`compress/`](../../../compress/README.md); the files here are only the family-level runtime used after export.
+This folder groups the arena-owned config and model wrappers for Mistral variants whose compressed linear layers have already been exported into the shared `ABLinear` schema. The files here are only the family-level runtime used after export.
 
 ## Files
 
@@ -13,4 +13,4 @@ This folder groups the arena-owned config and model wrappers for Mistral variant
 
 - Keep this folder family-scoped rather than method-scoped.
 - Treat these files as the remote-code boundary for exported Mistral-family arena artifacts.
-- Keep export-time method logic in [`compress/`](../../../compress/README.md), and keep vLLM preparation logic in [`src/vllm/`](../../vllm/README.md).
+- Keep export-time method logic outside this runtime, and keep vLLM preparation logic in [`src/vllm/`](../../vllm/README.md).

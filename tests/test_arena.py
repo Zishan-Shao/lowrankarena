@@ -12,7 +12,7 @@ def write_index(path: Path) -> Path:
         "\n".join(
             [
                 "name,model_family,variant,method,source,repo_id,revision,subpath,benchmarks,enabled,notes",
-                "demo,llama3.1,base,pending,huggingface,Duke-CEI-SVD/LowRankArena,main,llama31_8b,base|speed,true,test row",
+                "demo,llama3.1,base,pending,huggingface,anonymous/lowrankarena-checkpoints,main,llama31_8b,base|speed,true,test row",
             ]
         )
         + "\n",
