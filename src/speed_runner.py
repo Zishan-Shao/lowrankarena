@@ -861,7 +861,7 @@ def run_vllm_bench_serve_suite(request: VllmSpeedRequest) -> VllmSpeedResult:
     )
 
     progress.step(3, "Starting vLLM OpenAI-compatible server")
-    safe_cwd = Path(__file__).resolve().parent
+    safe_cwd = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
     server_stdout = server_stdout_path.open("w", encoding="utf-8")
     server_stderr = server_stderr_path.open("w", encoding="utf-8")
