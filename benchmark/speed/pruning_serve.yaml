@@ -1,0 +1,36 @@
+name: pruning_serve_speed
+kind: speed
+description: Conservative vLLM serving suite for directly loadable pruning checkpoints.
+selection:
+  enabled_only: true
+speed:
+  backend: vllm
+  metric_aggregation: macro_mean
+  cases:
+    - name: pruning_interactive
+      batch_size: 1
+      prompt_length: 512
+      generation_length: 128
+    - name: pruning_decode_heavy
+      batch_size: 1
+      prompt_length: 512
+      generation_length: 512
+    - name: pruning_balanced
+      batch_size: 2
+      prompt_length: 1024
+      generation_length: 128
+  repeat: 5
+  warmup: 1
+  tensor_parallel_size: 1
+  gpu_memory_utilization: 0.5
+  dtype: float16
+  max_model_len: 2048
+  enforce_eager: false
+  metrics:
+    - prefill_tokens_per_second
+    - decode_tokens_per_second
+    - end_to_end_tokens_per_second
+report:
+  result_dir: results/leaderboard/speed
+  output_dir: results/tables
+  filename: pruning_serve_speed.md

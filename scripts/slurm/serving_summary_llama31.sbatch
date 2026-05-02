@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=qwen_serve
+#SBATCH --job-name=l31_serve
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100_80
@@ -12,11 +12,11 @@
 set -uo pipefail
 
 REPO_ROOT="${LRA_REPO_ROOT:-/home/shaoz/lowrankarena}"
-INDEX_PATH="${SERVING_INDEX_PATH:-$REPO_ROOT/benchmark/speed/serving_summary_qwen_index.csv}"
+INDEX_PATH="${SERVING_INDEX_PATH:-$REPO_ROOT/benchmark/speed/serving_summary_llama31_index.csv}"
 SUITE="${SERVING_SUITE:-speed/serve_e2e}"
-RUN_LABEL="${SERVING_RUN_LABEL:-serving_summary_qwen_a100}"
-OUTPUT_DIR="${SERVING_OUTPUT_DIR:-$REPO_ROOT/results/leaderboard/serving_summary/qwen_a100_0p6_${SLURM_JOB_ID:-manual}}"
-PORT="${SERVING_PORT:-8010}"
+RUN_LABEL="${SERVING_RUN_LABEL:-serving_summary_llama31_a100}"
+OUTPUT_DIR="${SERVING_OUTPUT_DIR:-$REPO_ROOT/results/leaderboard/serving_summary/llama31_8b_a100_0p6_${SLURM_JOB_ID:-manual}}"
+PORT="${SERVING_PORT:-8000}"
 DTYPE="${SERVING_DTYPE:-float16}"
 GPU_MEMORY_UTILIZATION="${SERVING_GPU_MEMORY_UTILIZATION:-0.6}"
 NUM_PROMPTS="${SERVING_NUM_PROMPTS:-64}"
@@ -28,7 +28,7 @@ PROMPT_LENGTHS="${SERVING_PROMPT_LENGTHS:-${SERVING_PROMPT_LENGTH:-}}"
 GENERATION_LENGTHS="${SERVING_GENERATION_LENGTHS:-${SERVING_GENERATION_LENGTH:-}}"
 ENFORCE_EAGER="${SERVING_ENFORCE_EAGER:-0}"
 
-CHECKPOINTS="${SERVING_CHECKPOINTS:-qwen3-8b-dense-fp qwen3-8b-asvd-0.6-serving qwen3-8b-svdllm-v1-update-0.6-serving qwen3-8b-svdllm-v2-0.6-serving qwen3-8b-dobi-0.6-serving qwen3-8b-basis-sharing-0.6-serving qwen3-8b-modegpt-0.6-serving qwen3-8b-base-dense-fp qwen3-8b-base-asvd-0.6-serving qwen3-8b-base-svdllm-v1-update-0.6-serving qwen3-8b-base-svdllm-v2-0.6-serving qwen3-8b-base-dobi-0.6-serving qwen3-8b-base-basis-sharing-0.6-serving qwen3-8b-base-modegpt-0.6-serving}"
+CHECKPOINTS="${SERVING_CHECKPOINTS:-llama31-8b-dense-fp llama31-8b-asvd-0.6-serving llama31-8b-svdllm-v1-update-0.6-serving llama31-8b-svdllm-v2-0.6-serving llama31-8b-dobi-0.6-serving llama31-8b-basis-sharing-0.6-serving llama31-8b-modegpt-0.6-serving}"
 
 LOG_DIR="$OUTPUT_DIR/logs"
 STATUS_FILE="$OUTPUT_DIR/status.tsv"
@@ -113,12 +113,21 @@ output_dir = Path(sys.argv[1])
 summary_tsv = Path(sys.argv[2])
 summary_tex = Path(sys.argv[3])
 checkpoints = sys.argv[4:]
+
+label_by_checkpoint = {
+    "llama31-8b-dense-fp": "Dense FP",
+    "llama31-8b-asvd-0.6-serving": "ASVD",
+    "llama31-8b-svdllm-v1-update-0.6-serving": "\\textsc{SVD-LLM} v1",
+    "llama31-8b-svdllm-v2-0.6-serving": "\\textsc{SVD-LLM} v2",
+    "llama31-8b-dobi-0.6-serving": "DoBi-SVD",
+    "llama31-8b-basis-sharing-0.6-serving": "Basis Sharing",
+    "llama31-8b-modegpt-0.6-serving": "MoDeGPT",
+}
 profiles = [
     "prefill_heavy_4k_to_32",
     "balanced_2k_to_128",
     "decode_heavy_512_to_512",
 ]
-
 
 def fmt(value: object, digits: int = 1) -> str:
     if value is None:
@@ -131,14 +140,13 @@ def fmt(value: object, digits: int = 1) -> str:
         return "--"
     return f"{numeric:.{digits}f}"
 
-
 def profile_map(payload: dict) -> dict[str, dict]:
     items = payload.get("details", {}).get("profiles", [])
     return {str(item.get("name")): item for item in items if isinstance(item, dict)}
 
-
 rows = []
 for checkpoint in checkpoints:
+    method = label_by_checkpoint.get(checkpoint, checkpoint)
     result_path = output_dir / f"speed__serve_e2e__{checkpoint}.json"
     legacy_result_path = output_dir / f"serve_e2e__{checkpoint}.json"
     if not result_path.exists() and legacy_result_path.exists():
@@ -147,7 +155,7 @@ for checkpoint in checkpoints:
     if result_path.exists():
         payload = json.loads(result_path.read_text(encoding="utf-8"))
         profile_payloads = profile_map(payload)
-    row = {"checkpoint": checkpoint, "result_path": str(result_path) if result_path.exists() else ""}
+    row = {"method": method, "checkpoint": checkpoint, "result_path": str(result_path) if result_path.exists() else ""}
     for profile in profiles:
         item = profile_payloads.get(profile, {})
         wall_time = float(item.get("wall_time_seconds") or 0.0)
@@ -160,7 +168,7 @@ for checkpoint in checkpoints:
         row[f"{profile}:output_tokens_per_second"] = item.get("output_tokens_per_second")
     rows.append(row)
 
-fieldnames = ["checkpoint", "result_path"]
+fieldnames = ["method", "checkpoint", "result_path"]
 for profile in profiles:
     fieldnames += [
         f"{profile}:ttft_ms_mean",
@@ -175,7 +183,7 @@ with summary_tsv.open("w", encoding="utf-8", newline="") as handle:
 
 lines = []
 for row in rows:
-    cells = [row["checkpoint"]]
+    cells = [row["method"]]
     for profile in profiles:
         cells.extend(
             [
@@ -192,4 +200,4 @@ print(f"[summary] wrote {summary_tsv}", flush=True)
 print(f"[summary] wrote {summary_tex}", flush=True)
 PY
 
-echo "[done] Qwen serving summary run finished"
+echo "[done] serving summary run finished"
