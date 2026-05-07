@@ -95,4 +95,10 @@ def test_default_checkpoint_manifest_is_anonymized() -> None:
     records = load_checkpoint_index(PROJECT_ROOT / "checkpoints" / "index.csv")
     assert len(records) >= 8
     assert any(record.name == "llama31-8b-svdllm-0.6" for record in records)
+    assert any(
+        record.name == "lowrank-demo"
+        and record.repo_id == "neurips-ed2026-anon-checkpoints/submission-checkpoints"
+        and record.subpath == "full_checkpoint_zoo/llama2_7b/svdllm_v2/keep0p6"
+        for record in records
+    )
     assert all(record.repo_id != "private/hosted-checkpoints" for record in records)

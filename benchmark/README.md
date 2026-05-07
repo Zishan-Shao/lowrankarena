@@ -78,9 +78,14 @@ Efficiency outputs record the CUDA runtime metadata under `runtime.cuda_runtime`
 
 ## Running
 
+The top-level README includes a CPU-only anonymous PPL smoke command that runs
+directly from this branch. The examples below assume the named checkpoint rows
+are present and accessible; `lowrank-demo` is included for explicit smoke
+commands, while full base and speed runs need a GPU.
+
 ```bash
 # One shared suite
-python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite mcq --limit 1
+python scripts/run_eval.py lowrank-demo --suite ppl_smoke --device cpu --batch-size 1
 
 # Base lane
 python scripts/run_main.py --suites base --limit 1
@@ -92,16 +97,17 @@ python scripts/run_main.py --suites instruct --limit 1
 python scripts/run_main.py --suites instruct_appendix --limit 1
 
 # Explicit checkpoint override
-python scripts/run_main.py --suites base --checkpoint llama31-8b-svdllm-v1-update-0.6 --limit 1
+python scripts/run_main.py --suites base --checkpoint lowrank-demo --limit 1
 
 # Dedicated system metrics
-python scripts/run_memory.py llama31-8b-svdllm-v1-update-0.6 --suite memory/active
-python scripts/run_speed.py llama31-8b-svdllm-v1-update-0.6 --suite speed/serve
-python scripts/run_speed.py llama31-8b-svdllm-v1-update-0.6 --suite speed/serve_e2e
+python scripts/run_memory.py lowrank-demo --suite memory/active
+python scripts/run_speed.py lowrank-demo --suite speed/serve
+python scripts/run_speed.py lowrank-demo --suite speed/serve_e2e
 
 # Single lane-specific suites
-python scripts/run_eval.py llama31-8b-svdllm-v1-update-0.6 --suite base/base_math --limit 1
+python scripts/run_eval.py lowrank-demo --suite base/base_math --limit 1
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/mmlu_pro --limit 1
+python scripts/run_eval.py llama31-8b-instruct --suite instruct/gsm8k --limit 1
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/aime --limit 1
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/ifeval --limit 1
 

@@ -90,10 +90,11 @@ System metrics:
 
 ## Checkpoints
 
-The included registry contains public dense-model examples and anonymized
-low-rank checkpoint placeholders. Before running low-rank rows, update
-`checkpoints/index.csv` so each row points to your anonymous Hugging Face model
-repository or to a local exported checkpoint directory.
+The included registry contains public dense-model examples, a runnable anonymous
+`lowrank-demo` row, and disabled low-rank checkpoint placeholders. Before
+running other low-rank rows, update `checkpoints/index.csv` so each row points
+to your anonymous Hugging Face model repository or to a local exported
+checkpoint directory.
 
 For local artifacts:
 
@@ -113,35 +114,21 @@ For anonymous hosted artifacts:
 ```bash
 python scripts/add_checkpoint.py lowrank-demo \
   --source huggingface \
-  --repo-id anonymous/lowrankarena-checkpoints \
-  --revision main \
-  --model-family llama3.1 \
-  --variant base \
-  --method custom_lowrank \
-  --subpath exports/lowrank-demo \
-  --benchmarks base speed
-```
-
-## Common Commands
-
-One-command anonymous smoke check:
-
-```bash
-tmp_index=$(mktemp) && \
-cp checkpoints/index.csv "$tmp_index" && \
-python scripts/add_checkpoint.py anon-ppl-smoke \
-  --index "$tmp_index" \
-  --source huggingface \
   --repo-id neurips-ed2026-anon-checkpoints/submission-checkpoints \
   --revision main \
   --model-family llama2 \
   --variant base \
   --method svdllm_v2 \
   --subpath full_checkpoint_zoo/llama2_7b/svdllm_v2/keep0p6 \
-  --benchmarks base \
-  --notes "anonymous SVD-LLM v2 keep0.6 PPL smoke" && \
-python scripts/run_eval.py anon-ppl-smoke \
-  --index "$tmp_index" \
+  --benchmarks base speed
+```
+
+## Common Commands
+
+One-command anonymous PPL smoke check:
+
+```bash
+python scripts/run_eval.py lowrank-demo \
   --suite ppl_smoke \
   --device cpu \
   --batch-size 1 \
@@ -154,6 +141,12 @@ downloads the checkpoint shards; subsequent runs reuse the Hugging Face cache.
 The `ppl_smoke` suite is intentionally tiny and should not be reported as a
 benchmark metric.
 
+The remaining examples assume the named checkpoint rows are present and
+accessible. `lowrank-demo` is included for explicit smoke commands; full base
+and speed runs need a GPU. The instruction-tuned examples use the public
+`llama31-8b-instruct` row, which requires access to the upstream gated model, or
+can be replaced with a local instruction-tuned row.
+
 Base lane:
 
 ```bash
@@ -161,7 +154,7 @@ python scripts/run_main.py --suites base --limit 1
 
 python scripts/run_main.py \
   --suites base \
-  --checkpoint llama31-8b-svdllm-0.6 \
+  --checkpoint lowrank-demo \
   --limit 1 \
   --eval-tensor-parallel-size 1
 ```
@@ -176,8 +169,9 @@ python scripts/run_main.py --suites instruct_appendix --limit 1
 Single suites:
 
 ```bash
-python scripts/run_eval.py llama31-8b-svdllm-0.6 --suite mcq --limit 1
-python scripts/run_eval.py llama31-8b-svdllm-0.6 --suite base/base_math --limit 1
+python scripts/run_eval.py lowrank-demo --suite ppl_smoke --device cpu --batch-size 1
+python scripts/run_eval.py lowrank-demo --suite mcq --limit 1
+python scripts/run_eval.py lowrank-demo --suite base/base_math --limit 1
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/mmlu_pro --limit 1
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/gsm8k --limit 1
 python scripts/run_eval.py llama31-8b-instruct --suite instruct/aime --limit 1
@@ -187,9 +181,9 @@ python scripts/run_eval.py llama31-8b-instruct --suite instruct/ifeval --limit 1
 System metrics:
 
 ```bash
-python scripts/run_memory.py llama31-8b-svdllm-0.6 --suite memory/active
+python scripts/run_memory.py lowrank-demo --suite memory/active
 
-python scripts/run_speed.py llama31-8b-svdllm-0.6 \
+python scripts/run_speed.py lowrank-demo \
   --suite speed/serve \
   --batch-size 1 \
   --prompt-length 32 \
@@ -197,7 +191,7 @@ python scripts/run_speed.py llama31-8b-svdllm-0.6 \
   --repeat 1 \
   --warmup 0
 
-python scripts/run_speed.py llama31-8b-svdllm-0.6 \
+python scripts/run_speed.py lowrank-demo \
   --suite speed/serve_e2e \
   --port 8000 \
   --num-prompts 8
@@ -206,7 +200,7 @@ python scripts/run_speed.py llama31-8b-svdllm-0.6 \
 Route smoke:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python demo.py llama31-8b-svdllm-0.6 \
+CUDA_VISIBLE_DEVICES=0 python demo.py lowrank-demo \
   --device cuda:0 \
   --memory-prompt-length 16 \
   --memory-generation-length 4 \
@@ -225,7 +219,7 @@ arena = Arena()
 for row in arena.list(enabled_only=False):
     print(row["id"], row["method"], row["variant"])
 
-print(arena.describe("llama31-8b-svdllm-0.6")["subpath"])
+print(arena.describe("llama31-8b-dense")["subpath"])
 ```
 
 ## Notes For Anonymous Review
