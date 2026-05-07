@@ -32,7 +32,7 @@ The current base lane is intentionally conservative:
 base = ppl + mcq + base/base_math
 ```
 
-It measures language-model retention, multiple-choice accuracy, and base-safe math without relying on chat templates or long Chain-of-Thought generation. `base/base_math` uses a local script-free `lra_mathqa` wrapper plus the upstream `mmlu_stem` MCQ group.
+It measures language-model retention, multiple-choice accuracy, and base-safe math without relying on chat templates or long Chain-of-Thought generation. `base/base_math` uses a local script-free 0-shot `lra_mathqa` wrapper plus a local 5-shot `MMLU_Math` MCQ group.
 
 The current instruct-related lanes are:
 

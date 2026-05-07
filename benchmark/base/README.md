@@ -6,7 +6,7 @@ These suites should avoid chat templates, instruction-following assumptions, and
 
 ## Files
 
-- [`base_math.yaml`](./base_math.yaml): base-model math suite using `lra_mathqa` plus upstream `mmlu_stem`, both through MCQ/loglikelihood-style `lm-eval-harness` protocols suitable for non-instruct checkpoints.
+- [`base_math.yaml`](./base_math.yaml): base-model math suite using 0-shot `lra_mathqa` plus local 5-shot `MMLU_Math`, both through MCQ/loglikelihood-style `lm-eval-harness` protocols suitable for non-instruct checkpoints.
 
 ## Contract
 
@@ -20,6 +20,6 @@ The pinned `lm_eval==0.4.11` installation exposes an upstream `mathqa` task, but
 
 LowRankArena therefore defines `lra_mathqa` under [`tasks/`](./tasks/lra_mathqa.yaml). It downloads the official `MathQA.zip` archive, verifies its SHA-256 checksum, and exposes train/dev/test splits through a local custom dataset function. `base_math.yaml` includes this task through `eval.include_paths`.
 
-## MMLU-STEM
+## MMLU_Math
 
-`base_math.yaml` uses the upstream `mmlu_stem` group from `lm-eval-harness==0.4.11`. This group expands to the official STEM subset of MMLU multiple-choice tasks and deliberately uses the default MCQ/loglikelihood protocol instead of a generative prompt, so it remains suitable for base checkpoints.
+`base_math.yaml` uses the local `mmlu_math` group under [`tasks/`](./tasks/mmlu_math.yaml). This group expands to the MMLU math subjects with 5-shot multiple-choice/loglikelihood scoring and deliberately avoids generative prompts, so it remains suitable for base checkpoints.

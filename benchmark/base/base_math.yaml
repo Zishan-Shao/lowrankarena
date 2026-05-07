@@ -1,6 +1,6 @@
 name: base_math
 kind: eval
-description: Base-model math suite using MathQA plus upstream MMLU-STEM MCQ/loglikelihood tasks suitable for non-instruct checkpoints.
+description: Base-model math suite using MathQA plus a local MMLU_Math MCQ/loglikelihood group suitable for non-instruct checkpoints.
 selection:
   variants:
     - base
@@ -9,7 +9,7 @@ eval:
   backend: lm_eval_harness
   model_backend: vllm
   version: 0.4.11
-  dataset: lm_eval_harness_with_local_mathqa_and_mmlu_stem
+  dataset: lm_eval_harness_with_local_mathqa_and_local_mmlu_math
   dtype: auto
   metric: acc_norm
   metric_fallbacks:
@@ -19,12 +19,11 @@ eval:
     - acc_norm
   metric_aggregation: macro_mean
   batch_size: auto
-  num_fewshot: 0
   include_paths:
     - benchmark/base/tasks
   tasks:
     - lra_mathqa
-    - mmlu_stem
+    - mmlu_math
 report:
   result_dir: results/leaderboard/eval
   output_dir: results/tables

@@ -1,0 +1,18 @@
+group: mmlu_math
+group_alias: MMLU_Math
+task:
+  - task: mmlu_abstract_algebra
+    num_fewshot: 5
+  - task: mmlu_college_mathematics
+    num_fewshot: 5
+  - task: mmlu_elementary_mathematics
+    num_fewshot: 5
+  - task: mmlu_high_school_mathematics
+    num_fewshot: 5
+  - task: mmlu_high_school_statistics
+    num_fewshot: 5
+aggregate_metric_list:
+  - metric: acc
+    weight_by_size: true
+metadata:
+  version: 1

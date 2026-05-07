@@ -198,7 +198,7 @@ def test_run_speed_suite_supports_evaluation_backend() -> None:
             else:
                 sample_counts = {
                     "mcq": {"boolq": 10, "piqa": 20},
-                    "base_math": {"lra_mathqa": 15, "mmlu_stem": 15},
+                    "base_math": {"lra_mathqa": 15, "mmlu_math": 15},
                 }[suite_id]
                 raw_payload = {
                     "total_evaluation_time_seconds": 5.0,

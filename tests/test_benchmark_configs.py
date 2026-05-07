@@ -93,7 +93,8 @@ def test_accuracy_suites_keep_expected_backends_and_task_configs() -> None:
     assert base_math["eval"]["tracked_metrics"] == ["acc", "acc_norm"]
     assert base_math["eval"]["metric_aggregation"] == "macro_mean"
     assert base_math["eval"]["include_paths"] == ["benchmark/base/tasks"]
-    assert base_math["eval"]["tasks"] == ["lra_mathqa", "mmlu_stem"]
+    assert "num_fewshot" not in base_math["eval"]
+    assert base_math["eval"]["tasks"] == ["lra_mathqa", "mmlu_math"]
 
     assert mmlu_pro["eval"]["backend"] == "lm_eval_harness"
     assert mmlu_pro["eval"]["model_backend"] == "vllm"

@@ -71,7 +71,7 @@ Base evaluation:
 
 - [`ppl.yaml`](./benchmark/ppl.yaml): WikiText-2 test PPL and C4 validation-stream PPL through the contiguous runner.
 - [`mcq.yaml`](./benchmark/mcq.yaml): 0-shot BoolQ, HellaSwag, WinoGrande, PIQA, ARC-Easy, ARC-Challenge, and OpenBookQA through `lm-eval-harness`.
-- [`base/base_math.yaml`](./benchmark/base/base_math.yaml): 0-shot base-safe math with local `lra_mathqa` plus upstream `mmlu_stem`.
+- [`base/base_math.yaml`](./benchmark/base/base_math.yaml): base-safe math with 0-shot local `lra_mathqa` plus local 5-shot `MMLU_Math`.
 
 Instruction-tuned evaluation:
 
