@@ -4,7 +4,7 @@ This branch is an anonymous, benchmark-only artifact for double-blind review.
 It keeps the benchmark definitions, runners, checkpoint registry schema, low-rank
 runtime adapters, and result normalization code. It intentionally omits method
 implementation code, generated benchmark outputs, paper figures, audit notes,
-and hosted checkpoint repository identifiers.
+and non-anonymous checkpoint repository identifiers.
 
 ## What Is Included
 
@@ -123,6 +123,36 @@ python scripts/add_checkpoint.py lowrank-demo \
 ```
 
 ## Common Commands
+
+One-command anonymous smoke check:
+
+```bash
+tmp_index=$(mktemp) && \
+cp checkpoints/index.csv "$tmp_index" && \
+python scripts/add_checkpoint.py anon-ppl-smoke \
+  --index "$tmp_index" \
+  --source huggingface \
+  --repo-id neurips-ed2026-anon-checkpoints/submission-checkpoints \
+  --revision main \
+  --model-family llama2 \
+  --variant base \
+  --method svdllm_v2 \
+  --subpath full_checkpoint_zoo/llama2_7b/svdllm_v2/keep0p6 \
+  --benchmarks base \
+  --notes "anonymous SVD-LLM v2 keep0.6 PPL smoke" && \
+python scripts/run_eval.py anon-ppl-smoke \
+  --index "$tmp_index" \
+  --suite ppl_smoke \
+  --device cpu \
+  --batch-size 1 \
+  --run-label smoke_ppl
+```
+
+This downloads an anonymous SVD-LLM checkpoint, runs a tiny contiguous PPL
+route check, and writes normalized JSON under `results/eval/`. The first run
+downloads the checkpoint shards; subsequent runs reuse the Hugging Face cache.
+The `ppl_smoke` suite is intentionally tiny and should not be reported as a
+benchmark metric.
 
 Base lane:
 

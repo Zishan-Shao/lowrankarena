@@ -1,0 +1,30 @@
+name: ppl_smoke
+kind: eval
+description: Tiny contiguous-block perplexity smoke suite for artifact validation, not benchmark reporting.
+selection:
+  enabled_only: true
+eval:
+  backend: contiguous_ppl
+  version: "1.0"
+  dataset: local_contiguous_text
+  dtype: auto
+  metric: ppl
+  metric_aggregation: macro_mean
+  batch_size: 1
+  max_length: 32
+  datasets:
+    - name: c4_stream_smoke
+      kind: c4_stream
+      path: allenai/c4
+      config_name: en
+      split: validation
+      revision: 1588ec454efa1a09f29cd18ddd04fe05fc8653a2
+      document_offset: 0
+      max_eval_tokens: 64
+  notes:
+    - Smoke-only route check for checkpoint download, tokenizer loading, model loading, contiguous tokenization, and normalized PPL output.
+    - Do not report this suite as a benchmark metric.
+report:
+  result_dir: results/leaderboard/eval
+  output_dir: results/tables
+  filename: ppl_smoke.md

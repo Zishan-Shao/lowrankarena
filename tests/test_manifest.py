@@ -21,6 +21,7 @@ def test_expected_benchmark_only_layout_exists() -> None:
         "benchmark/mcq.yaml",
         "benchmark/mmlu.yaml",
         "benchmark/ppl.yaml",
+        "benchmark/ppl_smoke.yaml",
         "benchmark/base/base_math.yaml",
         "benchmark/base/tasks/lra_mathqa.yaml",
         "benchmark/base/tasks/mmlu_math.yaml",

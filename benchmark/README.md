@@ -10,6 +10,7 @@ It contains declarative suite specifications only. Execution logic lives in [`sc
 - [`instruct.yaml`](./instruct.yaml): instruct-model main leaderboard lane for [`instruct/`](./instruct/README.md) tasks.
 - [`instruct_appendix.yaml`](./instruct_appendix.yaml): instruct-only appendix/sanity lane for hard math and instruction-following stress tests.
 - [`ppl.yaml`](./ppl.yaml): shared contiguous-block perplexity suite over `WikiText-2` test and a fixed-budget `C4` validation stream.
+- [`ppl_smoke.yaml`](./ppl_smoke.yaml): tiny contiguous-block PPL smoke suite for checking that an artifact can download, load, tokenize, score, and write normalized outputs.
 - [`mcq.yaml`](./mcq.yaml): shared multi-task multiple-choice suite for headline commonsense QA reporting.
 - [`mmlu.yaml`](./mmlu.yaml): shared dedicated MMLU suite using the official `mmlu` group.
 - [`base/`](./base/README.md): base-only suites that should not depend on chat formatting or long-form generation behavior.
