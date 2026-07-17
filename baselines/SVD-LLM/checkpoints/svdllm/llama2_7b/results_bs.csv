@@ -1,7 +1,0 @@
-model,method,keep_ratio,wikitext2_ppl,baseline_ms,flashsvd_ms,speedup
-Llama-2-7b,baseline,1.0,11.047426898954253,N/A,N/A,N/A
-Llama-2-7b,BasisSharing,0.8,96.71561267577214,28.141,24.300,1.158
-Llama-2-7b,BasisSharing,0.7,343.0021791150706,34.128,24.454,1.396
-Llama-2-7b,BasisSharing,0.6,2459.338160519221,32.565,24.685,1.319
-Llama-2-7b,BasisSharing,0.5,8191.5874388394195,30.874,23.952,1.289
-Llama-2-7b,BasisSharing,0.4,13044.588462656066,26.923,24.243,1.111
