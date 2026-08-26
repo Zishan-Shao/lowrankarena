@@ -377,3 +377,14 @@ CUDA_VISIBLE_DEVICES=5 python demo.py llama-7b-dobi-0.8 \
 - `scripts/run_speed.py` uses the `src.vllm` adapter layer to prepare incompatible checkpoints before calling `vllm.LLM(...)`.
 - Materialized vLLM wrapper checkpoints belong in [`checkpoints/vllm/`](./checkpoints/vllm/README.md), not under `src/vllm/`.
 - `demo.py` defaults to `--eval-limit 1` so the eval step stays lightweight. That default is only for route checking. Use `--eval-limit 200` or run [`scripts/run_eval.py`](./scripts/run_eval.py) directly when you want a more stable accuracy sanity check.
+
+## License
+
+LowRankArena-authored code is released under the [MIT License](./LICENSE).
+Vendored third-party implementations retain their original licenses and
+notices. Model checkpoints hosted in the Hugging Face artifact repository are
+not relicensed under MIT: each checkpoint remains subject to its upstream base
+model license, acceptable-use policy, access conditions, and any applicable
+method-specific terms. See the
+[Hugging Face license matrix](https://huggingface.co/Duke-CEI-SVD/LowRankArena/blob/main/metadata/LICENSE_MATRIX.csv)
+before downloading or redistributing checkpoint artifacts.
