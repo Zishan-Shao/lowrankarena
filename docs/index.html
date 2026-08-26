@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f9fb">
+    <meta
+      name="description"
+      content="LowRankArena is a standardized evaluation platform and leaderboard for SVD-based LLM compression."
+    >
+    <meta property="og:title" content="LowRankArena">
+    <meta
+      property="og:description"
+      content="Matched accuracy, memory, and inference evaluation for low-rank LLM checkpoints."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://zishan-shao.github.io/lowrankarena/">
+    <title>LowRankArena</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="data.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="LowRankArena home">
+        <span class="brand-mark" aria-hidden="true">LR</span>
+        <span>LowRankArena</span>
+      </a>
+      <nav aria-label="Project navigation">
+        <a href="#overview">Overview</a>
+        <a href="#leaderboard">Leaderboard</a>
+        <a href="#comparison">Comparison</a>
+        <a href="#serving">Serving</a>
+        <a href="#reproduce">Reproduce</a>
+        <a href="#citation">Citation</a>
+      </nav>
+    </header>
+
+    <main id="main-content">
+      <section id="top" class="hero">
+        <div class="wrap hero-copy">
+          <p class="venue">Open benchmark · 2026 preprint</p>
+          <h1>LowRankArena: A Standardized Evaluation Platform for SVD-Based LLM Compression</h1>
+
+          <p class="authors">
+            Zishan Shao<sup>1,*</sup>, Lixun Zhang<sup>1,*</sup>,
+            Kangning Cui<sup>2,*</sup>, Wenhao Wu<sup>1,*</sup>,
+            Jinhee Kim<sup>1</sup>, Yixiao Wang<sup>1</sup>,
+            Ting Jiang<sup>1</sup>, Hancheng Ye<sup>1</sup>,
+            Qinsi Wang<sup>1</sup>, Fan Yang<sup>2</sup>,
+            Danyang Zhuo<sup>1</sup>, Yiran Chen<sup>1</sup>,
+            Hai Li<sup>1</sup>
+          </p>
+          <p class="affiliations">
+            <sup>1</sup>Duke University &nbsp; <sup>2</sup>Wake Forest University
+            &nbsp; <sup>*</sup>Equal contribution
+          </p>
+
+          <div class="actions" aria-label="Project links">
+            <a class="button primary" href="https://github.com/Zishan-Shao/lowrankarena">Code</a>
+            <a class="button" href="https://huggingface.co/Duke-CEI-SVD/LowRankArena">Checkpoints &amp; Results</a>
+            <a class="button" href="#reproduce">Reproduce</a>
+          </div>
+
+          <p class="tldr">
+            LowRankArena aligns models, tasks, keep-ratio budgets, precision, and
+            serving protocols so low-rank compression methods can be compared on
+            the same ground.
+          </p>
+        </div>
+
+        <div class="wrap protocol-visual" aria-label="LowRankArena benchmark flow">
+          <div class="protocol-input">
+            <span class="protocol-kicker">Released artifacts</span>
+            <strong>Low-rank checkpoints</strong>
+            <small>ASVD · SVD-LLM · DoBi-SVD · Basis Sharing · MoDeGPT</small>
+          </div>
+          <div class="protocol-arrow" aria-hidden="true">→</div>
+          <div class="protocol-core">
+            <span class="protocol-kicker">Matched protocol</span>
+            <strong>LowRankArena</strong>
+            <div class="protocol-tags">
+              <span>Same tasks</span><span>Same budgets</span><span>Same stack</span>
+            </div>
+          </div>
+          <div class="protocol-arrow" aria-hidden="true">→</div>
+          <div class="protocol-output">
+            <article><span>01</span><strong>Accuracy</strong></article>
+            <article><span>02</span><strong>Memory</strong></article>
+            <article><span>03</span><strong>Serving</strong></article>
+          </div>
+        </div>
+
+        <div class="wrap stat-grid" aria-label="Benchmark summary">
+          <article><strong>3</strong><span>anchor backbones</span></article>
+          <article><strong>5</strong><span>open SVD methods</span></article>
+          <article><strong>3</strong><span>benchmark paths</span></article>
+          <article><strong>3+ TiB</strong><span>hosted artifacts</span></article>
+        </div>
+      </section>
+
+      <section id="overview" class="section">
+        <div class="wrap two-col">
+          <div>
+            <p class="eyebrow">Why LowRankArena</p>
+            <h2>Compression claims need a shared coordinate system.</h2>
+            <p>
+              Low-rank studies often differ in model vintage, task versions,
+              budget definitions, precision, and inference setup. LowRankArena
+              fixes those axes and releases the checkpoints and normalized
+              outputs needed to audit each comparison.
+            </p>
+            <p class="muted">
+              The primary leaderboard focuses on uniform-precision SVD. Hybrid,
+              remapping, runtime-adaptive, and structured-pruning results are
+              separated into clearly labeled comparison or audit tracks.
+            </p>
+          </div>
+
+          <div class="takeaway-list">
+            <article>
+              <span class="card-index">01</span>
+              <h3>Matched quality</h3>
+              <p>Fixed task versions, scripts, aggregation rules, and dense references.</p>
+            </article>
+            <article>
+              <span class="card-index">02</span>
+              <h3>Matched efficiency</h3>
+              <p>Active-memory and end-to-end vLLM measurements, beyond nominal FLOPs.</p>
+            </article>
+            <article>
+              <span class="card-index">03</span>
+              <h3>Released evidence</h3>
+              <p>Hosted checkpoints, normalized results, manifests, and small audit reproductions.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="leaderboard" class="section alt">
+        <div class="wrap wide-wrap">
+          <p class="eyebrow">Standardized results</p>
+          <div class="section-heading-row">
+            <div>
+              <h2>Main quality leaderboard</h2>
+              <p class="section-lead">
+                Compare within the shared LowRankArena protocol. Perplexity is
+                lower-is-better; accuracy and dense-normalized quality retention
+                are higher-is-better.
+              </p>
+            </div>
+            <div class="legend" aria-label="Table legend">
+              <span><i class="legend-dense"></i>Dense reference</span>
+              <span><i class="legend-best"></i>Best compressed result</span>
+            </div>
+          </div>
+
+          <div class="table-controls" aria-label="Leaderboard controls">
+            <div>
+              <span class="control-label">Backbone</span>
+              <div id="model-tabs" class="segmented" role="tablist" aria-label="Backbone"></div>
+            </div>
+            <div>
+              <span class="control-label">Keep ratio</span>
+              <div class="segmented" role="group" aria-label="Keep ratio">
+                <button class="is-active" type="button" data-keep="all" aria-pressed="true">All</button>
+                <button type="button" data-keep="80%" aria-pressed="false">80%</button>
+                <button type="button" data-keep="60%" aria-pressed="false">60%</button>
+              </div>
+            </div>
+            <div>
+              <span class="control-label">Columns</span>
+              <div class="segmented" role="group" aria-label="Column detail">
+                <button class="is-active" type="button" data-view="summary" aria-pressed="true">Summary</button>
+                <button type="button" data-view="full" aria-pressed="false">Full metrics</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-card">
+            <div class="table-scroll" tabindex="0" aria-label="Scrollable quality leaderboard">
+              <table id="accuracy-table" class="data-table"></table>
+            </div>
+            <div class="table-note">
+              <p id="accuracy-status" aria-live="polite"></p>
+              <p>
+                MCQ Avg. is the unweighted mean over BoolQ, ARC-Easy,
+                ARC-Challenge, WinoGrande, PIQA, HellaSwag, and OpenBookQA.
+                Q. Ret. averages dense-normalized retention on WT2 PPL, C4 PPL,
+                MCQ Avg., MathQA, and MMLU-Math.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="comparison" class="section">
+        <div class="wrap wide-wrap">
+          <div class="section-heading-row align-end">
+            <div>
+              <p class="eyebrow">Matched compression families</p>
+              <h2>Structured pruning vs. low-rank compression</h2>
+              <p class="section-lead">
+                Llama-3.1-8B under matched keep ratios without expensive
+                retraining. Accuracy can remain competitive while perplexity
+                reveals a sharper language-modeling capability cliff.
+              </p>
+            </div>
+            <div>
+              <span class="control-label">Metric</span>
+              <div class="segmented" role="group" aria-label="Comparison metric">
+                <button class="is-active" type="button" data-comparison="mcq" aria-pressed="true">MCQ Avg.</button>
+                <button type="button" data-comparison="c4" aria-pressed="false">C4 PPL</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-card">
+            <div class="table-scroll" tabindex="0" aria-label="Scrollable compression-family comparison">
+              <table id="comparison-table" class="data-table comparison-table"></table>
+            </div>
+            <div class="table-note split-note">
+              <p id="comparison-status" aria-live="polite"></p>
+              <p>Best compressed or pruned result at each keep ratio is highlighted.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="serving" class="section alt">
+        <div class="wrap wide-wrap">
+          <p class="eyebrow">End-to-end inference</p>
+          <h2>Serving gains depend on the workload phase.</h2>
+          <p class="section-lead">
+            A100 serving results for Llama-3.1-8B at 80% keep in BF16. Each SVD
+            row uses the same vLLM request profile and scheduler settings as the
+            dense reference.
+          </p>
+
+          <div id="profile-tabs" class="profile-grid" role="tablist" aria-label="Serving profile"></div>
+
+          <div class="table-card serving-card">
+            <div class="table-scroll" tabindex="0" aria-label="Scrollable serving results">
+              <table id="serving-table" class="data-table serving-table"></table>
+            </div>
+            <div class="table-note">
+              <p id="serving-status" aria-live="polite"></p>
+              <p>
+                TTFT and E2E report p50 milliseconds. Throughput is tokens per
+                second. †Pruning rows come from a separate recovered-artifact,
+                batch-size-1 feasibility audit and are not directly comparable
+                with the dense/SVD full-sweep rows.
+              </p>
+            </div>
+          </div>
+
+          <div class="evidence-grid">
+            <article>
+              <p class="eyebrow">Quality</p>
+              <h3>Rankings are conditional.</h3>
+              <p>Backbone, compression budget, and metric group can each change which recipe looks strongest.</p>
+            </article>
+            <article>
+              <p class="eyebrow">Stability</p>
+              <h3>MCQ can hide perplexity collapse.</h3>
+              <p>Answer-selection accuracy may remain plausible after the model's generative distribution degrades sharply.</p>
+            </article>
+            <article>
+              <p class="eyebrow">Systems</p>
+              <h3>Nominal savings are not endpoint speed.</h3>
+              <p>Factorized operators help some compute-bound stages but can lose ground once decode and backend overhead dominate.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="reproduce" class="section">
+        <div class="wrap two-col reproduce-grid">
+          <div>
+            <p class="eyebrow">Reproduce</p>
+            <h2>Start with a registered checkpoint, then run one shared path.</h2>
+            <p>
+              The repository exposes separate accuracy, active-memory, and vLLM
+              serving entrypoints. Normalized outputs share one project-owned
+              top-level schema.
+            </p>
+            <div class="artifact-links">
+              <a href="https://github.com/Zishan-Shao/lowrankarena/tree/main/checkpoints">Checkpoint registry <span>↗</span></a>
+              <a href="https://github.com/Zishan-Shao/lowrankarena/tree/main/results">Result schema <span>↗</span></a>
+              <a href="https://github.com/Zishan-Shao/lowrankarena/tree/main/audits">Audit reproductions <span>↗</span></a>
+            </div>
+          </div>
+
+          <div class="code-panel">
+            <div class="code-title"><span></span><span></span><span></span><small>quick start</small></div>
+            <pre><code>conda env create -f environment.yml
+conda activate lowrankarena
+
+# Accuracy
+python scripts/run_eval.py \
+  llama31-8b-svdllm-v1-update-0.6 \
+  --suite accuracy/mcq
+
+# Active GPU memory
+python scripts/run_memory.py \
+  llama31-8b-svdllm-v1-update-0.6
+
+# vLLM speed
+python scripts/run_speed.py \
+  llama31-8b-svdllm-v1-update-0.6</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="citation" class="section citation-section">
+        <div class="wrap">
+          <div class="citation-heading">
+            <div>
+              <p class="eyebrow">Citation</p>
+              <h2>Cite LowRankArena</h2>
+            </div>
+            <button id="copy-citation" class="button copy-button" type="button">Copy BibTeX</button>
+          </div>
+          <pre class="citation"><code id="citation-code">@misc{shao2026lowrankarena,
+  title        = {LowRankArena: A Standardized Evaluation Platform for SVD-Based LLM Compression},
+  author       = {Shao, Zishan and Zhang, Lixun and Cui, Kangning and Wu, Wenhao and Kim, Jinhee and Wang, Yixiao and Jiang, Ting and Ye, Hancheng and Wang, Qinsi and Yang, Fan and Zhuo, Danyang and Chen, Yiran and Li, Hai},
+  year         = {2026},
+  note         = {Preprint}
+}</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap footer-inner">
+        <p>LowRankArena · Standardized low-rank evaluation</p>
+        <div>
+          <a href="https://github.com/Zishan-Shao/lowrankarena">GitHub</a>
+          <a href="https://huggingface.co/Duke-CEI-SVD/LowRankArena">Hugging Face</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

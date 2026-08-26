@@ -1,5 +1,6 @@
 # LowRankArena
 
+**[Project page](https://zishan-shao.github.io/lowrankarena/)** ·
 **[🤗 Hugging Face: checkpoints, results, and audits](https://huggingface.co/Duke-CEI-SVD/LowRankArena)**
 
 [Checkpoints](https://huggingface.co/Duke-CEI-SVD/LowRankArena/tree/main/checkpoints) ·
@@ -377,6 +378,17 @@ CUDA_VISIBLE_DEVICES=5 python demo.py llama-7b-dobi-0.8 \
 - `scripts/run_speed.py` uses the `src.vllm` adapter layer to prepare incompatible checkpoints before calling `vllm.LLM(...)`.
 - Materialized vLLM wrapper checkpoints belong in [`checkpoints/vllm/`](./checkpoints/vllm/README.md), not under `src/vllm/`.
 - `demo.py` defaults to `--eval-limit 1` so the eval step stays lightweight. That default is only for route checking. Use `--eval-limit 200` or run [`scripts/run_eval.py`](./scripts/run_eval.py) directly when you want a more stable accuracy sanity check.
+
+## Citation
+
+```bibtex
+@misc{shao2026lowrankarena,
+  title        = {LowRankArena: A Standardized Evaluation Platform for SVD-Based LLM Compression},
+  author       = {Shao, Zishan and Zhang, Lixun and Cui, Kangning and Wu, Wenhao and Kim, Jinhee and Wang, Yixiao and Jiang, Ting and Ye, Hancheng and Wang, Qinsi and Yang, Fan and Zhuo, Danyang and Chen, Yiran and Li, Hai},
+  year         = {2026},
+  note         = {Preprint}
+}
+```
 
 ## License
 
