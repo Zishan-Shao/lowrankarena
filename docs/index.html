@@ -16,9 +16,9 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://zishan-shao.github.io/lowrankarena/">
     <title>LowRankArena</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="data.js" defer></script>
-    <script src="app.js" defer></script>
+    <link rel="stylesheet" href="styles.css?v=20260826.1">
+    <script src="data.js?v=20260826.1" defer></script>
+    <script src="app.js?v=20260826.1" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
@@ -79,7 +79,7 @@
           <h2>From fragmented claims to matched evidence.</h2>
           <figure class="overview-figure">
             <img
-              src="assets/lowrankarena-overview.png"
+              src="assets/lowrankarena-overview.png?v=20260826.1"
               alt="LowRankArena overview connecting four problems in prior SVD evaluation to a standardized comparison framework and four main takeaways"
               width="1691"
               height="900"
@@ -195,12 +195,12 @@
 
           <div id="profile-tabs" class="profile-grid" role="tablist" aria-label="Inference profile"></div>
 
-          <div class="table-card inference-card">
+          <div class="table-card serving-card">
             <div class="table-scroll" tabindex="0" aria-label="Scrollable inference results">
-              <table id="inference-table" class="data-table inference-table"></table>
+              <table id="serving-table" class="data-table serving-table"></table>
             </div>
             <div class="table-note">
-              <p id="inference-status" aria-live="polite"></p>
+              <p id="serving-status" aria-live="polite"></p>
               <p>
                 TTFT and E2E report p50 milliseconds. Throughput is tokens per
                 second. †Pruning rows come from a separate recovered-artifact,

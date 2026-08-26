@@ -99,7 +99,7 @@ window.LOWRANKARENA_DATA = {
       }
     }
   },
-  inference: {
+  serving: {
     profiles: {
       prefill: { label: "Prefill-heavy", tokens: "4096 → 32" },
       balanced: { label: "Balanced", tokens: "2048 → 128" },

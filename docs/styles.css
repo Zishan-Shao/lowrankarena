@@ -663,29 +663,29 @@ h3 {
   color: #b9dfe5;
 }
 
-.inference-table {
+.serving-table {
   min-width: 720px;
 }
 
-.inference-table th:nth-child(1),
-.inference-table td:nth-child(1) {
+.serving-table th:nth-child(1),
+.serving-table td:nth-child(1) {
   min-width: 155px;
 }
 
-.inference-table th:nth-child(2),
-.inference-table td:nth-child(2) {
+.serving-table th:nth-child(2),
+.serving-table td:nth-child(2) {
   position: static;
   min-width: initial;
   border-right: 1px solid #edf1f3;
   text-align: right;
 }
 
-.inference-table tbody tr.audit-row td {
+.serving-table tbody tr.audit-row td {
   color: #6d5c38;
   background: #fffaf0;
 }
 
-.inference-table tbody tr.audit-row td:nth-child(1) {
+.serving-table tbody tr.audit-row td:nth-child(1) {
   background: #fffaf0;
 }
 
