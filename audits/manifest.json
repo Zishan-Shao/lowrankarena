@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "artifact_repository": "Duke-CEI-SVD/LowRankArena",
+  "audits": [
+    {
+      "id": "calibration_rank_stability_math",
+      "category": "calibration_data_sensitivity",
+      "path": "audits/calibration_data_sensitivity/rank_stability",
+      "reproduction": "python audits/calibration_data_sensitivity/rank_stability/analyze.py <downloaded-results-dir>",
+      "source_revision": "221e1809a8054b08788d477f7a732fcbfaa7c456"
+    },
+    {
+      "id": "calibration_source_indexed_v1",
+      "category": "calibration_data_sensitivity",
+      "path": "audits/calibration_data_sensitivity/calibration_source",
+      "reproduction": "python audits/calibration_data_sensitivity/calibration_source/verify.py <downloaded-calibration-root>",
+      "source_revision": "221e1809a8054b08788d477f7a732fcbfaa7c456"
+    },
+    {
+      "id": "modegpt_boolq_floor",
+      "category": "inference_sensitivity",
+      "path": "audits/inference_sensitivity/modegpt_boolq",
+      "reproduction": "python audits/inference_sensitivity/modegpt_boolq/extract.py <downloaded-mcq-results-dir>",
+      "source_revision": "db12fe2017e9075d5c0c46f80b6ce2c9ccb431dd"
+    }
+  ]
+}

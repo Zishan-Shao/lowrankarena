@@ -1,0 +1,7 @@
+model,method,keep_ratio,mcq_macro,boolq_acc,boolq_stderr,boolq_n,random_baseline,majority_baseline,result_revision,result_path
+Llama-3.1-8B,dense,1.0,0.7154697982,0.8305810398,0.0065609171,3270,0.5,0.6217125382,db12fe2017e9075d5c0c46f80b6ce2c9ccb431dd,results/evaluation/llama31_8b/mcq/llama31-8b-dense.json
+Llama-3.1-8B,MoDeGPT,0.4,0.3813876174,0.3987767584,0.0085639740,3270,0.5,0.6217125382,db12fe2017e9075d5c0c46f80b6ce2c9ccb431dd,results/evaluation/llama31_8b/mcq/llama31-8b-modegpt-0.4.json
+Llama-3.1-8B,MoDeGPT,0.5,0.4393571400,0.5822629969,0.0086258839,3270,0.5,0.6217125382,db12fe2017e9075d5c0c46f80b6ce2c9ccb431dd,results/evaluation/llama31_8b/mcq/llama31-8b-modegpt-0.5.json
+Llama-3.1-8B,MoDeGPT,0.6,0.5037690641,0.6217125382,0.0084820011,3270,0.5,0.6217125382,db12fe2017e9075d5c0c46f80b6ce2c9ccb431dd,results/evaluation/llama31_8b/mcq/llama31-8b-modegpt-0.6.json
+Llama-3.1-8B,MoDeGPT,0.7,0.5667707547,0.6217125382,0.0084820011,3270,0.5,0.6217125382,db12fe2017e9075d5c0c46f80b6ce2c9ccb431dd,results/evaluation/llama31_8b/mcq/llama31-8b-modegpt-0.7.json
+Llama-3.1-8B,MoDeGPT,0.8,0.5896199140,0.4116207951,0.0086073577,3270,0.5,0.6217125382,db12fe2017e9075d5c0c46f80b6ce2c9ccb431dd,results/evaluation/llama31_8b/mcq/llama31-8b-modegpt-0.8.json
