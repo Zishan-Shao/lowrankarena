@@ -32,7 +32,7 @@
         <a href="#overview">Overview</a>
         <a href="#leaderboard">Leaderboard</a>
         <a href="#comparison">Comparison</a>
-        <a href="#serving">Serving</a>
+        <a href="#inference">Inference</a>
         <a href="#reproduce">Reproduce</a>
         <a href="#citation">Citation</a>
       </nav>
@@ -66,43 +66,21 @@
 
           <p class="tldr">
             LowRankArena aligns models, tasks, keep-ratio budgets, precision, and
-            serving protocols so low-rank compression methods can be compared on
+            inference protocols so low-rank compression methods can be compared on
             the same ground.
           </p>
-        </div>
-
-        <div class="wrap protocol-visual" aria-label="LowRankArena benchmark flow">
-          <div class="protocol-input">
-            <span class="protocol-kicker">Released artifacts</span>
-            <strong>Low-rank checkpoints</strong>
-            <small>ASVD · SVD-LLM · DoBi-SVD · Basis Sharing · MoDeGPT</small>
-          </div>
-          <div class="protocol-arrow" aria-hidden="true">→</div>
-          <div class="protocol-core">
-            <span class="protocol-kicker">Matched protocol</span>
-            <strong>LowRankArena</strong>
-            <div class="protocol-tags">
-              <span>Same tasks</span><span>Same budgets</span><span>Same stack</span>
-            </div>
-          </div>
-          <div class="protocol-arrow" aria-hidden="true">→</div>
-          <div class="protocol-output">
-            <article><span>01</span><strong>Accuracy</strong></article>
-            <article><span>02</span><strong>Memory</strong></article>
-            <article><span>03</span><strong>Serving</strong></article>
-          </div>
         </div>
 
         <div class="wrap stat-grid" aria-label="Benchmark summary">
           <article><strong>8</strong><span>model variants</span></article>
           <article><strong>9</strong><span>method tracks</span></article>
           <article><strong>329</strong><span>checkpoint artifacts</span></article>
-          <article><strong>7.9 TiB</strong><span>hosted artifacts</span></article>
+          <article><strong>5 TiB+</strong><span>hosted artifacts</span></article>
         </div>
       </section>
 
       <section id="overview" class="section">
-        <div class="wrap">
+        <div class="wrap wide-wrap">
           <p class="eyebrow">Why LowRankArena</p>
           <h2>From fragmented claims to matched evidence.</h2>
           <figure class="overview-figure">
@@ -115,7 +93,7 @@
             >
             <figcaption>
               LowRankArena aligns comparison regimes, broadens tasks and models,
-              measures end-to-end serving, and releases an open checkpoint zoo.
+              measures end-to-end inference, and releases an open checkpoint zoo.
             </figcaption>
           </figure>
         </div>
@@ -211,24 +189,24 @@
         </div>
       </section>
 
-      <section id="serving" class="section alt">
+      <section id="inference" class="section alt">
         <div class="wrap wide-wrap">
           <p class="eyebrow">End-to-end inference</p>
-          <h2>Serving gains depend on the workload phase.</h2>
+          <h2>Inference gains depend on the workload phase.</h2>
           <p class="section-lead">
-            A100 serving results for Llama-3.1-8B at 80% keep in BF16. Each SVD
+            A100 inference results for Llama-3.1-8B at 80% keep in BF16. Each SVD
             row uses the same vLLM request profile and scheduler settings as the
             dense reference.
           </p>
 
-          <div id="profile-tabs" class="profile-grid" role="tablist" aria-label="Serving profile"></div>
+          <div id="profile-tabs" class="profile-grid" role="tablist" aria-label="Inference profile"></div>
 
-          <div class="table-card serving-card">
-            <div class="table-scroll" tabindex="0" aria-label="Scrollable serving results">
-              <table id="serving-table" class="data-table serving-table"></table>
+          <div class="table-card inference-card">
+            <div class="table-scroll" tabindex="0" aria-label="Scrollable inference results">
+              <table id="inference-table" class="data-table inference-table"></table>
             </div>
             <div class="table-note">
-              <p id="serving-status" aria-live="polite"></p>
+              <p id="inference-status" aria-live="polite"></p>
               <p>
                 TTFT and E2E report p50 milliseconds. Throughput is tokens per
                 second. †Pruning rows come from a separate recovered-artifact,
@@ -236,24 +214,6 @@
                 with the dense/SVD full-sweep rows.
               </p>
             </div>
-          </div>
-
-          <div class="evidence-grid">
-            <article>
-              <p class="eyebrow">Quality</p>
-              <h3>Rankings are conditional.</h3>
-              <p>Backbone, compression budget, and metric group can each change which recipe looks strongest.</p>
-            </article>
-            <article>
-              <p class="eyebrow">Stability</p>
-              <h3>MCQ can hide perplexity collapse.</h3>
-              <p>Answer-selection accuracy may remain plausible after the model's generative distribution degrades sharply.</p>
-            </article>
-            <article>
-              <p class="eyebrow">Systems</p>
-              <h3>Nominal savings are not endpoint speed.</h3>
-              <p>Factorized operators help some compute-bound stages but can lose ground once decode and backend overhead dominate.</p>
-            </article>
           </div>
         </div>
       </section>
@@ -265,7 +225,7 @@
             <h2>Start with a registered checkpoint, then run one shared path.</h2>
             <p>
               The repository exposes separate accuracy, active-memory, and vLLM
-              serving entrypoints. Normalized outputs share one project-owned
+              inference entrypoints. Normalized outputs share one project-owned
               top-level schema.
             </p>
             <div class="artifact-links">

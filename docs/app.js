@@ -219,7 +219,7 @@
   const buildProfileTabs = () => {
     const container = document.querySelector("#profile-tabs");
 
-    Object.entries(data.serving.profiles).forEach(([key, profile]) => {
+    Object.entries(data.inference.profiles).forEach(([key, profile]) => {
       const active = key === state.profile;
       const button = document.createElement("button");
       button.type = "button";
@@ -233,15 +233,15 @@
       button.addEventListener("click", () => {
         state.profile = key;
         setPressed([...container.querySelectorAll("button")], button);
-        renderServing();
+        renderInference();
       });
       container.append(button);
     });
   };
 
-  const renderServing = () => {
-    const table = document.querySelector("#serving-table");
-    const rows = data.serving.rows;
+  const renderInference = () => {
+    const table = document.querySelector("#inference-table");
+    const rows = data.inference.rows;
     const directions = ["min", "min", "max", "max"];
     const svdRows = rows.filter((row) => row.group === "svd");
     const best = directions.map((direction, index) => {
@@ -270,9 +270,9 @@
       })
       .join("");
 
-    const profile = data.serving.profiles[state.profile];
+    const profile = data.inference.profiles[state.profile];
     table.innerHTML = `
-      <caption>${escapeHtml(profile.label)} serving results, ${escapeHtml(profile.tokens)}</caption>
+      <caption>${escapeHtml(profile.label)} inference results, ${escapeHtml(profile.tokens)}</caption>
       <thead>
         <tr>
           <th scope="col">Method</th>
@@ -284,7 +284,7 @@
       </thead>
       <tbody>${body}</tbody>
     `;
-    document.querySelector("#serving-status").textContent =
+    document.querySelector("#inference-status").textContent =
       `${profile.label} · ${profile.tokens} tokens · A100 / BF16`;
   };
 
@@ -348,6 +348,6 @@
   bindSegmentedControls();
   renderAccuracy();
   renderComparison();
-  renderServing();
+  renderInference();
   document.querySelector("#copy-citation").addEventListener("click", copyCitation);
 })();
