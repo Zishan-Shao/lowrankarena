@@ -214,7 +214,7 @@ h3 {
   flex-wrap: wrap;
   justify-content: center;
   gap: 12px;
-  margin-bottom: 22px;
+  margin-bottom: 0;
 }
 
 .button {
@@ -249,13 +249,6 @@ h3 {
   border-color: var(--blue);
   background: var(--blue);
   color: #ffffff;
-}
-
-.tldr {
-  max-width: 870px;
-  margin: 0 auto;
-  color: #40515e;
-  font-size: 1.08rem;
 }
 
 .stat-grid {
