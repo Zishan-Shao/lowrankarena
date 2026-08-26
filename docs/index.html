@@ -94,48 +94,30 @@
         </div>
 
         <div class="wrap stat-grid" aria-label="Benchmark summary">
-          <article><strong>3</strong><span>anchor backbones</span></article>
-          <article><strong>5</strong><span>open SVD methods</span></article>
-          <article><strong>3</strong><span>benchmark paths</span></article>
-          <article><strong>3+ TiB</strong><span>hosted artifacts</span></article>
+          <article><strong>8</strong><span>model variants</span></article>
+          <article><strong>9</strong><span>method tracks</span></article>
+          <article><strong>329</strong><span>checkpoint artifacts</span></article>
+          <article><strong>7.9 TiB</strong><span>hosted artifacts</span></article>
         </div>
       </section>
 
       <section id="overview" class="section">
-        <div class="wrap two-col">
-          <div>
-            <p class="eyebrow">Why LowRankArena</p>
-            <h2>Compression claims need a shared coordinate system.</h2>
-            <p>
-              Low-rank studies often differ in model vintage, task versions,
-              budget definitions, precision, and inference setup. LowRankArena
-              fixes those axes and releases the checkpoints and normalized
-              outputs needed to audit each comparison.
-            </p>
-            <p class="muted">
-              The primary leaderboard focuses on uniform-precision SVD. Hybrid,
-              remapping, runtime-adaptive, and structured-pruning results are
-              separated into clearly labeled comparison or audit tracks.
-            </p>
-          </div>
-
-          <div class="takeaway-list">
-            <article>
-              <span class="card-index">01</span>
-              <h3>Matched quality</h3>
-              <p>Fixed task versions, scripts, aggregation rules, and dense references.</p>
-            </article>
-            <article>
-              <span class="card-index">02</span>
-              <h3>Matched efficiency</h3>
-              <p>Active-memory and end-to-end vLLM measurements, beyond nominal FLOPs.</p>
-            </article>
-            <article>
-              <span class="card-index">03</span>
-              <h3>Released evidence</h3>
-              <p>Hosted checkpoints, normalized results, manifests, and small audit reproductions.</p>
-            </article>
-          </div>
+        <div class="wrap">
+          <p class="eyebrow">Why LowRankArena</p>
+          <h2>From fragmented claims to matched evidence.</h2>
+          <figure class="overview-figure">
+            <img
+              src="assets/lowrankarena-overview.png"
+              alt="LowRankArena overview connecting four problems in prior SVD evaluation to a standardized comparison framework and four main takeaways"
+              width="1691"
+              height="900"
+              loading="lazy"
+            >
+            <figcaption>
+              LowRankArena aligns comparison regimes, broadens tasks and models,
+              measures end-to-end serving, and releases an open checkpoint zoo.
+            </figcaption>
+          </figure>
         </div>
       </section>
 

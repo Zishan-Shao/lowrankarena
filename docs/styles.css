@@ -53,6 +53,12 @@ a {
   color: inherit;
 }
 
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 sup {
   font-size: 0.68em;
 }
@@ -412,6 +418,26 @@ h3 {
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: 48px;
   align-items: center;
+}
+
+.overview-figure {
+  margin: 28px 0 0;
+}
+
+.overview-figure img {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.overview-figure figcaption {
+  max-width: 880px;
+  margin: 13px auto 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 .takeaway-list,
