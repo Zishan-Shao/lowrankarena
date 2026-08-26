@@ -225,25 +225,35 @@ def load_from_record(
     except ImportError as exc:  # pragma: no cover - depends on optional runtime packages.
         raise CheckpointLoadError("transformers is required to load Hugging Face checkpoints.") from exc
 
-    hf_kwargs = build_hf_kwargs(
-        record,
-        token=resolved_token,
-        trust_remote_code=trust_remote_code,
-        cache_dir=cache_dir,
-        local_files_only=local_files_only,
-    )
+    if local_path is not None:
+        pretrained_source = local_path
+        hf_kwargs: dict[str, Any] = {
+            "trust_remote_code": trust_remote_code,
+            "local_files_only": True,
+        }
+        metadata["loading_mode"] = "snapshot_then_local"
+    else:
+        pretrained_source = record.repo_id
+        hf_kwargs = build_hf_kwargs(
+            record,
+            token=resolved_token,
+            trust_remote_code=trust_remote_code,
+            cache_dir=cache_dir,
+            local_files_only=local_files_only,
+        )
+        metadata["loading_mode"] = "repo_subfolder"
 
     config = None
     tokenizer = None
     model = None
     try:
         if load_config:
-            config = AutoConfig.from_pretrained(record.repo_id, **hf_kwargs)
+            config = AutoConfig.from_pretrained(pretrained_source, **hf_kwargs)
         if load_tokenizer:
-            tokenizer = AutoTokenizer.from_pretrained(record.repo_id, **hf_kwargs)
+            tokenizer = AutoTokenizer.from_pretrained(pretrained_source, **hf_kwargs)
         if load_model:
             model = AutoModelForCausalLM.from_pretrained(
-                record.repo_id,
+                pretrained_source,
                 device_map=device_map,
                 torch_dtype=torch_dtype,
                 **hf_kwargs,

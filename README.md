@@ -117,6 +117,42 @@ The hosted artifact source of truth is
 on Hugging Face. The repository is publicly discoverable; downloading gated
 artifacts may require accepting their access conditions and signing in.
 
+## Loading a Hosted Checkpoint
+
+The universal loading path first snapshots one self-contained checkpoint
+directory and then asks Transformers to load that local directory. This keeps
+each checkpoint paired with its own remote-code files and avoids downloading
+the multi-terabyte repository in full.
+
+```python
+from pathlib import Path
+
+from huggingface_hub import snapshot_download
+from transformers import AutoModelForCausalLM
+
+repo_id = "Duke-CEI-SVD/LowRankArena"
+checkpoint = "checkpoints/low_rank/llama31_8b/basis_sharing/default_0.6"
+snapshot = Path(
+    snapshot_download(
+        repo_id=repo_id,
+        revision="main",  # Pin a release tag or commit for exact reproduction.
+        allow_patterns=[f"{checkpoint}/**"],
+    )
+)
+model = AutoModelForCausalLM.from_pretrained(
+    snapshot / checkpoint,
+    trust_remote_code=True,
+    local_files_only=True,
+    device_map="auto",
+)
+```
+
+The self-contained Llama-3.1 and Qwen3 Basis Sharing exports additionally
+support direct `repo_id` plus `subfolder` loading. See the
+[Hugging Face model card](https://huggingface.co/Duke-CEI-SVD/LowRankArena#checkpoint-zoo)
+for the direct form and the current support boundary. Inspect remote code and
+pin `revision` before setting `trust_remote_code=True` in reproducible runs.
+
 ## Environment
 
 Recommended environment on this machine:
