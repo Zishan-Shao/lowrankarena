@@ -191,7 +191,6 @@ Observed stack in the active environment:
 ```text
 lowrankarena/
 ├── README.md
-├── TODO.md
 ├── audits/
 ├── benchmark/
 ├── checkpoints/
