@@ -17,6 +17,8 @@ The files here are not intended to form one monolithic runtime. Their job is to 
 
 Several upstream low-rank projects are vendored or mirrored here as reference baselines:
 
+- [`SAES-SVD-reproduction/`](./SAES-SVD-reproduction/README.md): unofficial,
+  paper-based reproduction attempt with commands and observed results.
 - [`ASVD/`](./ASVD/README.md)
 - [`Basis_Sharing/`](./Basis_Sharing/README.md)
 - [`Dobi-SVD/`](./Dobi-SVD/readme.md)

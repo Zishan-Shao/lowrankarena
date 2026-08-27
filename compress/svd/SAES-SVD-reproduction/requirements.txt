@@ -1,0 +1,12 @@
+# Environment observed when preparing this release snapshot on 2026-08-27.
+# The exact environment used for the 2026-03-05 measurement was not archived.
+torch==2.10.0
+transformers==4.57.0
+datasets==2.19.2
+lm-eval==0.4.11
+accelerate==1.10.1
+huggingface-hub==0.35.3
+safetensors==0.6.2
+sentencepiece==0.2.1
+numpy==2.2.6
+tqdm==4.67.1
