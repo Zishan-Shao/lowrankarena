@@ -1,0 +1,7 @@
+type: hf_pretrained
+task: causal_lm
+name: Qwen/Qwen2.5-32B
+
+dtype: bfloat16
+device_map: cuda
+revision: main

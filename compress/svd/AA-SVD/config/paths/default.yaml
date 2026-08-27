@@ -1,0 +1,2 @@
+data_dir: ${hydra:runtime.cwd}/data
+output_dir: ${hydra:runtime.cwd}/logs

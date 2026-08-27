@@ -1,0 +1,11 @@
+hydra-core
+torch
+wandb
+numpy
+transformers==4.55
+datasets==3.6.0
+bitsandbytes
+lm-eval==0.4.9.1
+hydra-colorlog
+rich
+sentencepiece

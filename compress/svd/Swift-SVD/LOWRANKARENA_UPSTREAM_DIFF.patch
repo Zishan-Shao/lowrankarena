@@ -1,0 +1,349 @@
+diff --git a/ModelLoader.py b/ModelLoader.py
+index b2ecda2..7491a66 100644
+--- a/ModelLoader.py
++++ b/ModelLoader.py
+@@ -201,6 +201,7 @@ class ModelLoader:
+         tokenizer = AutoTokenizer.from_pretrained(
+             model_name_or_path,
+             trust_remote_code=True,
++            use_fast=False,
+             fix_mistral_regex=True,
+             **kwargs
+         )
+@@ -241,4 +242,4 @@ def load_tokenizer(model_name_or_path, **kwargs):
+ 
+ def load_model_and_tokenizer(model_name_or_path, **kwargs):
+     """Load model and tokenizer."""
+-    return ModelLoader.load_model_and_tokenizer(model_name_or_path, **kwargs)
+\ No newline at end of file
++    return ModelLoader.load_model_and_tokenizer(model_name_or_path, **kwargs)
+diff --git a/train_svd.py b/train_svd.py
+index c5ffa29..5d12a3a 100644
+--- a/train_svd.py
++++ b/train_svd.py
+@@ -41,6 +41,39 @@ parser.add_argument('--seed', type=int, default=42,
+ args = parser.parse_args()
+ 
+ 
++def load_shared_calibration(tokenizer, max_samples, seqlen):
++    """Load LowRankArena's token-identical calibration manifest when set."""
++    path = os.environ.get("LOWRANKARENA_CALIBRATION_FILE", "").strip()
++    if not path:
++        return None
++    payload = torch.load(path, map_location="cpu", weights_only=False)
++    if payload.get("format") != "lowrankarena_shared_calibration_v1":
++        raise ValueError(f"Unsupported shared calibration format in {path}")
++    input_ids = payload["input_ids"]
++    if input_ids.ndim != 2 or input_ids.shape[1] != seqlen:
++        raise ValueError(
++            f"Shared calibration shape {tuple(input_ids.shape)} does not match seqlen={seqlen}"
++        )
++    if input_ids.shape[0] < max_samples:
++        raise ValueError(
++            f"Shared calibration has {input_ids.shape[0]} samples, requested {max_samples}"
++        )
++    recorded_vocab = payload.get("tokenizer_vocab_size")
++    if recorded_vocab is not None and int(recorded_vocab) != int(tokenizer.vocab_size):
++        raise ValueError(
++            f"Shared calibration tokenizer vocab {recorded_vocab} != active vocab {tokenizer.vocab_size}"
++        )
++    selected = input_ids[:max_samples].to(torch.long)
++    print(
++        f"Using shared calibration {path}: dataset={payload.get('dataset')} "
++        f"samples={max_samples} seqlen={seqlen} sha256={payload.get('input_ids_sha256')}"
++    )
++    return [
++        {"input_ids": row.unsqueeze(0), "attention_mask": torch.ones_like(row).unsqueeze(0)}
++        for row in selected
++    ]
++
++
+ def is_continuous_dataset(dataset_name):
+     """
+     Check if dataset is continuous text type (WikiText2, C4)
+@@ -115,6 +148,11 @@ if __name__=="__main__":
+         model_name,
+         local_files_only=True,
+         trust_remote_code=True,
++        # transformers 4.57's slow-to-fast conversion for the legacy Llama-1
++        # tokenizer can return ``False`` rather than a tokenizer instance.
++        # The paper model ships a native SentencePiece tokenizer, so using it
++        # directly is both stable and token-identical.
++        use_fast=False,
+         fix_mistral_regex=True
+     )
+ 
+@@ -141,13 +179,34 @@ if __name__=="__main__":
+     is_acc_dataset = data_name in ["openbookqa", "arc_challenge", "arc_easy", "hellaswag", "winogrande", "piqa", "mathqa"]
+     print(f"Dataset type: {data_name} | Mode: {'ACC' if is_acc_dataset else ('Continuous' if is_continuous else 'Conversation')}")
+     
+-    if is_continuous:
++    shared_calibration = load_shared_calibration(tokenizer, args.max_samples, args.seqlen)
++    if shared_calibration is not None:
++        dataset_to_process = shared_calibration
++        is_continuous = True
++    elif is_continuous:
+         # For continuous datasets (WikiText2, C4): load locally, merge all text, then sample
+         from datasets import load_dataset
+         
+         if data_name == "WikiText2":
+             local_data_dir = os.path.join(args.data_root, "wikitext-2-raw-v1")
+             train_path = os.path.join(local_data_dir, "wikitext-train.arrow")
++            if not os.path.isfile(train_path):
++                # Hugging Face stores cached Arrow files one or more version/hash
++                # directories below the dataset root.  Accept that standard
++                # layout so the official WikiText recipe can run fully offline.
++                import glob
++                cached = sorted(
++                    glob.glob(
++                        os.path.join(args.data_root, "**", "wikitext-train.arrow"),
++                        recursive=True,
++                    )
++                )
++                if not cached:
++                    raise FileNotFoundError(
++                        f"No wikitext-train.arrow found under {args.data_root}"
++                    )
++                train_path = cached[0]
++                print(f"Using cached WikiText-2 train split: {train_path}")
+             data_files = {"train": train_path}
+             traindata = load_dataset("arrow", data_files=data_files)["train"]
+             separator = "\n\n"  # WikiText2 uses double newline
+@@ -170,19 +229,36 @@ if __name__=="__main__":
+             dataset_to_process = tokenized_samples   
+ 
+         elif data_name == "C4":
+-            # C4 has multiple shard files
++            # C4 normally has multiple Arrow shards.  LowRankArena also keeps
++            # a pinned JSON sample from the same English training split, so
++            # accept that representation without changing Swift-SVD's joining
++            # or sampling procedure below.
+             train_dir = args.data_root
+             import glob
+-            train_files = sorted(glob.glob(os.path.join(train_dir, "c4-train-*.arrow")))
+-            print(f"Found {len(train_files)} C4 training files: {[os.path.basename(f) for f in train_files]}")
++            if os.path.isfile(train_dir):
++                train_files = [train_dir]
++            else:
++                train_files = sorted(glob.glob(os.path.join(train_dir, "c4-train-*.arrow")))
++                if not train_files:
++                    train_files = sorted(glob.glob(os.path.join(train_dir, "c4-train*.json")))
++            if not train_files:
++                raise FileNotFoundError(
++                    f"No c4-train-*.arrow or c4-train*.json files found under {train_dir}"
++                )
++            loader = "arrow" if all(path.endswith(".arrow") for path in train_files) else "json"
++            print(
++                f"Found {len(train_files)} C4 training files ({loader}): "
++                f"{[os.path.basename(f) for f in train_files]}"
++            )
+             data_files = {"train": train_files}
+-            traindata = load_dataset("arrow", data_files=data_files)["train"]
++            traindata = load_dataset(loader, data_files=data_files)["train"]
+             separator = "\n\n"  # C4 uses double newline
+             # Merge all text with appropriate separator (following reference code)
+             print(f"Merging {len(traindata)} text samples with separator '{repr(separator)}'...")
+             tot_text = separator.join(traindata["text"])
+             print(f"Total text length: {len(tot_text)} chars")
+             tokenized_samples = []
++            random.seed(args.seed)
+             for _ in range(args.max_samples):
+                 i = random.randint(0, len(tot_text) - args.seqlen * 10 - 1)
+                 j = i + args.seqlen * 10
+diff --git a/uniform_rank_allocation.py b/uniform_rank_allocation.py
+index b3c51d0..e54474a 100644
+--- a/uniform_rank_allocation.py
++++ b/uniform_rank_allocation.py
+@@ -11,16 +11,58 @@ import matplotlib.pyplot as plt
+ from transformers import AutoConfig
+ 
+ 
+-parser = argparse.ArgumentParser()
+-parser.add_argument('--local_model_path', type=str, required=True,
+-                    help='Path to local model directory')
+-parser.add_argument('--svd_file', type=str, required=True,
+-                    help='Path to SVD results file (.pk)')
+-parser.add_argument('--compression_ratio', type=float, required=True,
+-                    help='Compression ratio for Key projections (e.g., 0.5 for 50% compression)')
+-parser.add_argument('--output_file', type=str, default='rank_allocation_uniform.pk',
+-                    help='Output file for rank allocation')
+-args = parser.parse_args()
++def parse_args():
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--local_model_path', type=str, required=True,
++                        help='Path to local model directory')
++    parser.add_argument('--svd_file', type=str, required=True,
++                        help='Path to SVD results file (.pk)')
++    parser.add_argument('--compression_ratio', type=float, required=True,
++                        help='Fraction of factor parameters retained (e.g., 0.8 keeps 80%)')
++    parser.add_argument('--output_file', type=str, default='rank_allocation_uniform.pk',
++                        help='Output file for rank allocation')
++    return parser.parse_args()
++
++
++def rank_from_keep_ratio(out_features, in_features, keep_ratio):
++    """Return r such that r*(out+in) <= keep_ratio*out*in.
++
++    Swift-SVD originally used ``hidden_size * ratio / 2`` for every
++    attention projection.  That is correct for square LLaMA-1 matrices but
++    over-allocates the rectangular K/V projections used by GQA models such
++    as Llama-3.1.  Computing the rank from each matrix shape preserves the
++    benchmark's parameter-count keep-ratio contract.
++    """
++    if not 0.0 < float(keep_ratio) <= 1.0:
++        raise ValueError(f"keep_ratio must be in (0, 1], got {keep_ratio}")
++    out_features = int(out_features)
++    in_features = int(in_features)
++    rank = int(float(keep_ratio) * out_features * in_features / (out_features + in_features))
++    return max(1, min(rank, out_features, in_features))
++
++
++def projection_shapes(config):
++    """Canonical (out_features, in_features) shapes for one decoder block."""
++    hidden = int(config.hidden_size)
++    model_type = getattr(config, "model_type", "").lower()
++    if model_type == "opt":
++        ffn = int(config.ffn_dim)
++        return {
++            "query": (hidden, hidden), "key": (hidden, hidden),
++            "value": (hidden, hidden), "output": (hidden, hidden),
++            "fc1": (ffn, hidden), "fc2": (hidden, ffn),
++        }
++
++    intermediate = int(config.intermediate_size)
++    head_dim = int(getattr(config, "head_dim", hidden // int(config.num_attention_heads)))
++    q_out = int(config.num_attention_heads) * head_dim
++    kv_out = int(getattr(config, "num_key_value_heads", config.num_attention_heads)) * head_dim
++    return {
++        "query": (q_out, hidden), "key": (kv_out, hidden),
++        "value": (kv_out, hidden), "output": (hidden, q_out),
++        "gate": (intermediate, hidden), "up": (intermediate, hidden),
++        "down": (hidden, intermediate),
++    }
+ 
+ 
+ def compute_frobenius_loss_at_rank(svd_module, rank):
+@@ -64,27 +106,17 @@ def uniform_allocation(svd_list, compression_ratio, config):
+     n_layers = len(svd_list)
+     
+     # 1. Get dimensions from config (supports Llama, OPT, Phi-3, etc.)
+-    hidden_size = config.hidden_size
+-    # Auto-handle different intermediate_size naming
+-    intermediate_size = getattr(config, "intermediate_size", 
+-                        getattr(config, "ffn_dim", 
+-                        getattr(config, "d_ff", None)))
+-    
+-    if intermediate_size is None:
+-        # Fallback: infer from SVD matrix
+-        intermediate_size = svd_list[0]['gate'].V.shape[0]
+-
+-    # 2. Compute truncated ranks
+-    # k, v, o, q logic
+-    rank_attn = max(1, int(hidden_size * compression_ratio / 2))
+-    # gate, up, down logic
+-    rank_mlp = max(1, int(intermediate_size * hidden_size * compression_ratio / (intermediate_size + hidden_size)))
++    shapes = projection_shapes(config)
++    target_ranks = {
++        name: rank_from_keep_ratio(out_features, in_features, compression_ratio)
++        for name, (out_features, in_features) in shapes.items()
++    }
+     
+     print(f"\n{'='*60}")
+     print(f"Allocation Summary (Uniform Allocation)")
+     print(f"{'='*60}")
+-    print(f"Hidden size: {hidden_size} -> Rank: {rank_attn}")
+-    print(f"Intermediate size:  {intermediate_size} -> Rank: {rank_mlp}")
++    for name, shape in shapes.items():
++        print(f"{name:>8}: {shape[0]}x{shape[1]} -> rank {target_ranks[name]}")
+     print(f"{'='*60}\n")
+     
+     # 3. Define mappings based on model architecture
+@@ -96,17 +128,11 @@ def uniform_allocation(svd_list, compression_ratio, config):
+     
+     if is_opt:
+         # OPT model: q_proj, k_proj, v_proj, out_proj + fc1, fc2
+-        targets_config = {
+-            'query': rank_attn, 'key': rank_attn, 'value': rank_attn, 'output': rank_attn,
+-            'fc1': rank_mlp, 'fc2': rank_mlp
+-        }
++        targets_config = target_ranks
+         print(f"Detected OPT model architecture; using fc1/fc2 config\n")
+     else:
+         # LLaMA/Mistral/Phi models: q/k/v/o + gate, up, down
+-        targets_config = {
+-            'query': rank_attn, 'key': rank_attn, 'value': rank_attn, 'output': rank_attn,
+-            'gate': rank_mlp, 'up': rank_mlp, 'down': rank_mlp
+-        }
++        targets_config = target_ranks
+         print(f"Detected LLaMA/Mistral/Phi architecture; using gate/up/down config\n")
+ 
+     rank_allocation = []
+@@ -130,6 +156,7 @@ def uniform_allocation(svd_list, compression_ratio, config):
+ 
+ 
+ if __name__ == "__main__":
++    args = parse_args()
+     
+     # Load SVD results
+     print(f"Loading SVD results from: {args.svd_file}")
+diff --git a/utils/data_utils.py b/utils/data_utils.py
+index 5078c9c..743ee76 100644
+--- a/utils/data_utils.py
++++ b/utils/data_utils.py
+@@ -81,6 +81,8 @@ def get_calib_train_data(dataset_name, tokenizer, nsamples, seqlen=2048, seed=42
+ 
+ 
+ def get_test_data(name, data_root, tokenizer, seq_len=2048, batch_size=1, seed=42):
++    base_data_root = data_root
++
+     class IndexDataset(Dataset):
+         def __init__(self, tensors):
+             self.tensors = tensors
+@@ -157,12 +159,16 @@ def get_test_data(name, data_root, tokenizer, seq_len=2048, batch_size=1, seed=4
+         local_data_dir = os.path.join(data_root, "wikitext-2-raw-v1")
+         test_path = os.path.join(local_data_dir, "wikitext-test.arrow")
+         
+-        if not os.path.exists(test_path):
+-            raise FileNotFoundError(f"WikiText2 test file not found at {test_path}")
+-        
+-        data_files = {"test": test_path}
+-        raw_datasets = load_dataset("arrow", data_files=data_files)
+-        testdata = raw_datasets["test"]
++        if os.path.exists(test_path):
++            data_files = {"test": test_path}
++            raw_datasets = load_dataset("arrow", data_files=data_files)
++            testdata = raw_datasets["test"]
++        else:
++            # Use the pinned HF cache when the upstream Arrow export layout is
++            # unavailable; the split and downstream concatenation stay the same.
++            testdata = load_dataset(
++                "wikitext", "wikitext-2-raw-v1", split="test"
++            )
+         separator = "\n\n"
+         test_dataset = process_data(separator, testdata, tokenizer, seq_len, 'text', seed=seed)
+     
+@@ -170,11 +176,21 @@ def get_test_data(name, data_root, tokenizer, seq_len=2048, batch_size=1, seed=4
+         data_root = os.path.join(data_root, "C4")
+         val_path = os.path.join(data_root, "c4-validation.arrow")
+         
++        loader = "arrow"
+         if not os.path.exists(val_path):
+-            raise FileNotFoundError(f"C4 validation file not found at {val_path}")
+-        
++            json_candidates = (
++                os.path.join(base_data_root, "c4-validation.json"),
++                os.path.join(base_data_root, "C4", "c4-validation.json"),
++            )
++            val_path = next((path for path in json_candidates if os.path.exists(path)), None)
++            loader = "json"
++        if val_path is None or not os.path.exists(val_path):
++            raise FileNotFoundError(
++                f"C4 validation Arrow/JSON file not found under {base_data_root}"
++            )
++
+         data_files = {"test": val_path}
+-        raw_datasets = load_dataset("arrow", data_files=data_files)
++        raw_datasets = load_dataset(loader, data_files=data_files)
+         testdata = raw_datasets["test"]
+         if len(testdata) > 2000:
+             testdata = testdata.shuffle(seed=seed).select(range(2000))

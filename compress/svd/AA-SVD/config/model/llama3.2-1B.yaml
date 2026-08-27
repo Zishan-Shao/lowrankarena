@@ -1,0 +1,7 @@
+type: hf_pretrained
+task: causal_lm
+name: meta-llama/Llama-3.2-1B
+
+dtype: float32
+device_map: cuda
+revision: main

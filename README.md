@@ -27,10 +27,15 @@ The repository is organized around three benchmark paths:
 
 <br>
 
-**Implementation releases in progress.** We are preparing LowRankArena-compatible
-implementations and reproducibility artifacts for GFW-SVD, Swift-SVD, AA-SVD,
-and ZS-SVD. Source code, exact commands, environment specifications, and
-available outputs will be linked here as they are finalized.
+**Implementation source releases.** Source-only, provenance-pinned snapshots
+for [AA-SVD](./compress/svd/AA-SVD/LOWRANKARENA.md),
+[GFW-SVD](./compress/svd/GFW-SVD/README.md),
+[Swift-SVD](./compress/svd/Swift-SVD/LOWRANKARENA.md), and
+[ZS-SVD](./compress/svd/Zero-Sum-SVD/LOWRANKARENA.md) are now available under
+`compress/svd/`. LowRankArena commands, environment specifications, checkpoints,
+and results will be linked as they are finalized. The GFW-SVD release is
+currently an audit-oriented source snapshot because its upstream scripts
+depend on author-environment paths and precomputed artifacts.
 
 **SAES-SVD reproduction attempt.** We independently implemented SAES-SVD from
 the public paper description and evaluated it under the configuration

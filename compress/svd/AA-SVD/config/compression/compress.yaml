@@ -1,0 +1,17 @@
+method: low-rank-facrorization
+sub_method: obj2 # svd, asvd, svd-llm, svd-llm-v2, adasvd, target_aware, act_trunc, dobisvd
+include_only: null
+exclude_only: ['lm_head']
+target_param_ratio: 0.8
+save_path: ${hydra:runtime.output_dir}/weights
+need_calibration_data: true 
+batch_size: 32
+num_calibration_samples: 256
+
+finetune:
+  enabled: true
+  include: 'all'
+
+dobi_remapping: false
+
+rank_allocation_file_path: null # Path to json file containing layerwise ratios

@@ -1,0 +1,9 @@
+# Default model configuration
+
+type: hf_pretrained
+task: causal_lm  # Maps to one of AutoModel, AutoModelForCausalLM, AutoModelForSequenceClassification. Options: base, causal_lm, seq_classification, etc.
+name: jeffwan/llama-7b-hf # Hugging Face model name
+
+dtype: bfloat16  # Options: float32, float16, bfloat16
+device_map: cuda
+revision: main

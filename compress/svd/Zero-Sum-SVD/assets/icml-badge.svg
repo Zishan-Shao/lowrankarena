@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 346 64" width="346" height="64" aria-label="ICML 2026 Accepted">
+  <defs>
+    <linearGradient id="holo" gradientUnits="objectBoundingBox" x1="0" y1="0" x2="1" y2="0" spreadMethod="reflect">
+      <stop offset="0%" stop-color="#ff6a2c"/>
+      <stop offset="25%" stop-color="#ff3b8a"/>
+      <stop offset="50%" stop-color="#b66bff"/>
+      <stop offset="75%" stop-color="#2cd9ff"/>
+      <stop offset="100%" stop-color="#ff6a2c"/>
+      <animateTransform attributeName="gradientTransform" type="translate"
+                        values="0 0; 1 0; 0 0" dur="5s" repeatCount="indefinite"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-80%" width="140%" height="260%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+
+  <!-- soft halo glow underneath -->
+  <rect x="6" y="10" width="334" height="44" rx="22" fill="url(#holo)" opacity="0.35" filter="url(#glow)"/>
+
+  <!-- main pill -->
+  <rect x="6" y="10" width="334" height="44" rx="22" fill="url(#holo)"
+        stroke="rgba(255,255,255,0.45)" stroke-width="1"/>
+
+  <!-- text -->
+  <text x="173" y="39"
+        text-anchor="middle"
+        font-family="ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace"
+        font-size="18"
+        font-weight="700"
+        letter-spacing="3.2"
+        fill="white">ICML  2026  ·  ACCEPTED</text>
+</svg>

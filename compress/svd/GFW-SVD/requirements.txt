@@ -1,0 +1,6 @@
+datasets
+numpy
+safetensors
+torch
+tqdm
+transformers

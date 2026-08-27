@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.log
+*.pt
+*.pth
+*.safetensors
+*.ckpt
+*.json
+*.csv
+*.png
+*.pdf
+*.ipynb
+grads_output/
+sensitivity_results/
+results/
+outputs/
+checkpoints/

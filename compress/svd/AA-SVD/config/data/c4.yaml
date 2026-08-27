@@ -1,0 +1,12 @@
+type: huggingface
+name: c4
+subset: default
+data_path: ${paths.data_dir}
+task_type: compression_default
+sampling: sequential
+block_size: 2048
+preprocessing:
+  type: ${data.task_type}
+num_samples: ${compression.num_calibration_samples}
+num_samples_val: 64
+seed: -1

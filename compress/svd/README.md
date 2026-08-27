@@ -19,6 +19,14 @@ Several upstream low-rank projects are vendored or mirrored here as reference ba
 
 - [`SAES-SVD-reproduction/`](./SAES-SVD-reproduction/README.md): unofficial,
   paper-based reproduction attempt with commands and observed results.
+- [`AA-SVD/`](./AA-SVD/LOWRANKARENA.md): pinned source snapshot with the
+  LowRankArena calibration and Hugging Face export changes.
+- [`GFW-SVD/`](./GFW-SVD/README.md): curated, audit-oriented source snapshot;
+  this is distinct from the older FWSVD baseline.
+- [`Swift-SVD/`](./Swift-SVD/LOWRANKARENA.md): pinned source snapshot with the
+  LowRankArena calibration, rank-allocation, and export changes.
+- [`Zero-Sum-SVD/`](./Zero-Sum-SVD/LOWRANKARENA.md): ZS-SVD pinned source
+  snapshot with the LowRankArena calibration and export changes.
 - [`ASVD/`](./ASVD/README.md)
 - [`Basis_Sharing/`](./Basis_Sharing/README.md)
 - [`Dobi-SVD/`](./Dobi-SVD/readme.md)

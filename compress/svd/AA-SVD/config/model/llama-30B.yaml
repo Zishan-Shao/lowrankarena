@@ -1,0 +1,7 @@
+type: hf_pretrained
+task: causal_lm
+name: jeffwan/llama-30b-hf
+
+dtype: bfloat16
+device_map: cuda
+revision: main

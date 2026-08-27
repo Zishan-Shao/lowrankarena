@@ -1,0 +1,39 @@
+# Main configuration file using Hydra composition
+
+defaults:
+  - model: llama-7B
+  - data: wikitext2
+  - paths: default
+  - compression: compress
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+  - _self_
+
+# Base settings
+seed: 42
+
+evaluate:
+  lm_eval: 
+    tasks: ["winogrande", "arc_challenge", "piqa", "mathqa", "openbookqa", "hellaswag", "arc_easy", "boolq"]
+    num_fewshot: 0
+  ppl:
+    datasets: ["wikitext2", "ptb", "c4"]
+    batch_size: 1
+  latency: false
+  compile: false
+
+save: null
+
+wandb:
+  use: true
+  project: aa-svd
+  id: null  # for resuming runs, set to the run ID. If null, a new run will be created.
+  resume: null # choices: [null, must, allow, never]
+
+# hydra dir
+hydra:
+  run:
+    dir: ${paths.output_dir}/${model.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}/${random_id:6}
+  job:
+    chdir: true  # Change working directory to Hydra output dir so logs land there
+

@@ -1,0 +1,173 @@
+diff --git a/.gitignore b/.gitignore
+index 9e4b6ce..9b333dd 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -5,4 +5,5 @@ utils/c4-*
+ *.pt
+ *.png
+ !assets/*.png
+-!deltaL_analysis/*.png
++deltaL_analysis/*.png
++utils/TextVQA_*.json
+diff --git a/utils/data_utils.py b/utils/data_utils.py
+index 4270699..6cf86aa 100644
+--- a/utils/data_utils.py
++++ b/utils/data_utils.py
+@@ -1,4 +1,5 @@
+ import json
++import hashlib
+ import os
+ import random
+ import torch
+@@ -11,6 +12,24 @@ parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ sys.path.append(current_path)
+ 
+ 
++def _resolve_c4_json(split):
++    """Resolve pinned C4 JSON without assuming it was copied into this repo."""
++    split = str(split).lower()
++    if split not in {"train", "validation"}:
++        raise ValueError(f"Unsupported C4 split: {split}")
++    env_name = f"LOWRANKARENA_C4_{split.upper()}_FILE"
++    candidates = [
++        os.environ.get(env_name, "").strip(),
++        os.path.join(current_path, f"c4-{split}.json"),
++    ]
++    path = next((candidate for candidate in candidates if candidate and os.path.isfile(candidate)), None)
++    if path is None:
++        raise FileNotFoundError(
++            f"C4 {split} JSON not found; set {env_name} to the pinned local file"
++        )
++    return path
++
++
+ def _build_text_from_example(ex, text_fields=None):
+     """Build text string from a dataset example using specified or guessed fields."""
+     if text_fields:
+@@ -64,7 +83,53 @@ def get_calib_train_data(
+     - Any HuggingFace dataset name
+     - Local .jsonl files
+     """
+-    cache_file = f"cache/{str(name).replace('/','__')}_{nsamples}_{seqlen}_{seed}_{batch_size}.pt"
++    shared_path = os.environ.get("LOWRANKARENA_CALIBRATION_FILE", "").strip()
++    if shared_path:
++        payload = torch.load(shared_path, map_location="cpu", weights_only=False)
++        if payload.get("format") != "lowrankarena_shared_calibration_v1":
++            raise ValueError(f"Unsupported shared calibration format in {shared_path}")
++        input_ids = payload["input_ids"]
++        if input_ids.ndim != 2 or input_ids.shape[1] != seqlen:
++            raise ValueError(
++                f"Shared calibration shape {tuple(input_ids.shape)} does not match seqlen={seqlen}"
++            )
++        required = nsamples * batch_size
++        if input_ids.shape[0] < required:
++            raise ValueError(f"Shared calibration has {input_ids.shape[0]} samples, requested {required}")
++        recorded_vocab = payload.get("tokenizer_vocab_size")
++        if recorded_vocab is not None and int(recorded_vocab) != int(tokenizer.vocab_size):
++            raise ValueError(
++                f"Shared calibration tokenizer vocab {recorded_vocab} != active vocab {tokenizer.vocab_size}"
++            )
++        selected = input_ids[:required].to(torch.long)
++        print(
++            f"Using shared calibration {shared_path}: dataset={payload.get('dataset')} "
++            f"samples={required} seqlen={seqlen} sha256={payload.get('input_ids_sha256')}"
++        )
++        return [
++            {
++                "input_ids": selected[start:start + batch_size],
++                "attention_mask": torch.ones_like(selected[start:start + batch_size]),
++                "sample_id": start // batch_size,
++            }
++            for start in range(0, required, batch_size)
++        ]
++
++    tokenizer_identity = {
++        "class": tokenizer.__class__.__name__,
++        "name_or_path": str(getattr(tokenizer, "name_or_path", "")),
++        "vocab_size": int(getattr(tokenizer, "vocab_size", -1)),
++        "bos_token_id": getattr(tokenizer, "bos_token_id", None),
++        "eos_token_id": getattr(tokenizer, "eos_token_id", None),
++        "pad_token_id": getattr(tokenizer, "pad_token_id", None),
++    }
++    tokenizer_tag = hashlib.sha256(
++        json.dumps(tokenizer_identity, sort_keys=True).encode("utf-8")
++    ).hexdigest()[:12]
++    cache_file = (
++        f"cache/{str(name).replace('/','__')}_{nsamples}_{seqlen}_{seed}_{batch_size}"
++        f"_tok{tokenizer_tag}.pt"
++    )
+     print(f"\n🔍 get_calib_train_data called:")
+     print(f"   name={name}, text_fields={text_fields}, split={split}")
+     print(f"   nsamples={nsamples}, seqlen={seqlen}, seed={seed}")
+@@ -75,7 +140,12 @@ def get_calib_train_data(
+ 
+     if os.path.exists(cache_file):
+         print(f"   ✓ Loading from cache: {cache_file}")
+-        return torch.load(cache_file)
++        payload = torch.load(cache_file, map_location="cpu", weights_only=False)
++        if not isinstance(payload, dict) or payload.get("format") != "zssvd_calibration_cache_v2":
++            raise ValueError(f"Unsupported tokenizer-aware calibration cache: {cache_file}")
++        if payload.get("tokenizer_identity") != tokenizer_identity:
++            raise ValueError(f"Tokenizer identity mismatch in calibration cache: {cache_file}")
++        return payload["data"]
+ 
+     texts = []
+ 
+@@ -101,7 +171,7 @@ def get_calib_train_data(
+     # Case B: existing special datasets
+     elif name == "c4":
+         print(f"📂 [Case B] Loading special dataset: c4")
+-        traindata = load_dataset("json", data_files="utils/c4-train.json")["train"]
++        traindata = load_dataset("json", data_files=_resolve_c4_json("train"))["train"]
+         texts = list(traindata["text"])
+     elif name == "ptb":
+         print(f"📂 [Case B] Loading special dataset: ptb")
+@@ -187,7 +257,14 @@ def get_calib_train_data(
+             }
+             out.append(batch_dict)
+ 
+-    torch.save(out, cache_file)
++    torch.save(
++        {
++            "format": "zssvd_calibration_cache_v2",
++            "tokenizer_identity": tokenizer_identity,
++            "data": out,
++        },
++        cache_file,
++    )
+     return out
+ 
+ 
+@@ -231,8 +308,8 @@ def get_ptb(nsamples, seed, seqlen, tokenizer, dataset_cache_dir=None):
+     return trainloader, testenc
+ 
+ def get_c4(nsamples, seed, seqlen, tokenizer):
+-    traindata = load_dataset("json", data_files="utils/c4-train.json")['train']
+-    valdata = load_dataset("json", data_files="utils/c4-validation.json")['train']
++    traindata = load_dataset("json", data_files=_resolve_c4_json("train"))['train']
++    valdata = load_dataset("json", data_files=_resolve_c4_json("validation"))['train']
+ 
+     import random
+     random.seed(seed)
+@@ -293,8 +370,8 @@ def get_ptb_new(nsamples, seed, seqlen, tokenizer, dataset_cache_dir=None):
+     return trainloader, testenc
+ 
+ def get_c4_new(nsamples, seed, seqlen, tokenizer):
+-    traindata = load_dataset("json", data_files="utils/c4-train.json")['train']
+-    valdata = load_dataset("json", data_files="utils/c4-validation.json")['train']
++    traindata = load_dataset("json", data_files=_resolve_c4_json("train"))['train']
++    valdata = load_dataset("json", data_files=_resolve_c4_json("validation"))['train']
+ 
+     import random
+     random.seed(seed)
+@@ -415,7 +492,7 @@ def get_test_data(name, tokenizer, seq_len=2048, batch_size = 4):
+         test_data = load_dataset('ptb_text_only', 'penn_treebank', split='test')
+         test_dataset = process_data(test_data, tokenizer, seq_len, 'sentence')
+     elif 'c4' in name:
+-        test_data = load_dataset("json", data_files="utils/c4-validation.json")['train']
++        test_data = load_dataset("json", data_files=_resolve_c4_json("validation"))['train']
+         test_dataset = process_data(test_data[0:2000], tokenizer, seq_len, 'text')
+     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+-    return test_loader
+\ No newline at end of file
++    return test_loader

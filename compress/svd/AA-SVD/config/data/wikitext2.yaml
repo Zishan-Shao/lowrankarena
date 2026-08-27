@@ -1,0 +1,14 @@
+# Default data configuration
+
+type: huggingface
+name: wikitext
+subset: wikitext-2-raw-v1
+data_path: ${paths.data_dir}
+task_type: compression_default
+sampling: sequential  # other choices: {random,}
+block_size: 2048  # sequence length
+preprocessing:
+  type: ${data.task_type} # other choices: {next_token_prediction, compression_v2}
+num_samples: ${compression.num_calibration_samples}
+num_samples_val: 64
+seed: -1
