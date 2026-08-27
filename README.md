@@ -21,23 +21,30 @@ The repository is organized around three benchmark paths:
 
 ## Announcements
 
-> **Implementation releases in progress (August 2026).** We are preparing
-> LowRankArena-compatible implementations and reproducibility artifacts for
-> GFW-SVD, Swift-SVD, AA-SVD, and ZS-SVD. Source code, exact commands,
-> environment specifications, and available outputs will be linked here as
-> they are finalized.
->
-> **SAES-SVD reproduction attempt.** We independently implemented SAES-SVD
-> from the public paper description and evaluated it under the configuration
-> documented in our
-> [reproduction release](./compress/svd/SAES-SVD-reproduction/README.md).
-> Despite a good-faith effort, our implementation did not reproduce the
-> paper-reported performance in the tested LLaMA-7B setting. We therefore do
-> not treat these measurements as official SAES-SVD results or include them in
-> the main matched leaderboard. We release the implementation, commands, and
-> observed measurements for inspection. We welcome corrections or
-> clarifications from the authors and the community. This is an unofficial
-> reproduction and may differ from the authors' implementation.
+<!-- Add new announcements above older ones as separate collapsed panels. -->
+<details>
+<summary><strong>August 2026 — New implementation releases and SAES-SVD reproduction</strong></summary>
+
+<br>
+
+**Implementation releases in progress.** We are preparing LowRankArena-compatible
+implementations and reproducibility artifacts for GFW-SVD, Swift-SVD, AA-SVD,
+and ZS-SVD. Source code, exact commands, environment specifications, and
+available outputs will be linked here as they are finalized.
+
+**SAES-SVD reproduction attempt.** We independently implemented SAES-SVD from
+the public paper description and evaluated it under the configuration
+documented in our
+[reproduction release](./compress/svd/SAES-SVD-reproduction/README.md).
+Despite a good-faith effort, our implementation did not reproduce the
+paper-reported performance in the tested LLaMA-7B setting. We therefore do not
+treat these measurements as official SAES-SVD results or include them in the
+main matched leaderboard. We release the implementation, commands, and
+observed measurements for inspection. We welcome corrections or clarifications
+from the authors and the community. This is an unofficial reproduction and may
+differ from the authors' implementation.
+
+</details>
 
 ## Main Paper Results
 
