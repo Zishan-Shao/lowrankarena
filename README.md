@@ -1,5 +1,6 @@
 # LowRankArena
 
+**[Paper](https://arxiv.org/abs/2608.26389)** ·
 **[Project page](https://zishan-shao.github.io/lowrankarena/)** ·
 **[🤗 Hugging Face: checkpoints, results, and audits](https://huggingface.co/Duke-CEI-SVD/LowRankArena)**
 
@@ -414,12 +415,17 @@ CUDA_VISIBLE_DEVICES=5 python demo.py llama-7b-dobi-0.8 \
 
 ## Citation
 
+Please cite the [arXiv paper](https://arxiv.org/abs/2608.26389):
+
 ```bibtex
-@misc{shao2026lowrankarena,
-  title        = {LowRankArena: A Standardized Evaluation Platform for SVD-Based LLM Compression},
-  author       = {Shao, Zishan and Zhang, Lixun and Cui, Kangning and Wu, Wenhao and Kim, Jinhee and Wang, Yixiao and Jiang, Ting and Ye, Hancheng and Wang, Qinsi and Yang, Fan and Zhuo, Danyang and Chen, Yiran and Li, Hai},
-  year         = {2026},
-  note         = {Preprint}
+@misc{shao2026lowrankarenastandardizedevaluationplatform,
+  title         = {LowRankArena: A Standardized Evaluation Platform for SVD-Based LLM Compression},
+  author        = {Zishan Shao and Lixun Zhang and Kangning Cui and Wenhao Wu and Jinhee Kim and Yixiao Wang and Ting Jiang and Hancheng Ye and Qinsi Wang and Fan Yang and Danyang Zhuo and Yiran Chen and Hai Li},
+  year          = {2026},
+  eprint        = {2608.26389},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL},
+  url           = {https://arxiv.org/abs/2608.26389}
 }
 ```
 

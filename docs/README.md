@@ -16,5 +16,6 @@ For GitHub Pages, configure the repository to deploy from the `main` branch and
 the `/docs` folder. The expected public URL is
 <https://zishan-shao.github.io/lowrankarena/>.
 
-The public page exposes code, checkpoint, result, reproduction, and citation
-links. Citation metadata identifies the work as a 2026 preprint.
+The public page exposes paper, code, checkpoint, result, reproduction, and
+citation links. Citation metadata identifies the arXiv paper as
+[`2608.26389`](https://arxiv.org/abs/2608.26389).
