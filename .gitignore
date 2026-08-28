@@ -20,6 +20,7 @@ compress/svd/Basis_Sharing/models/__pycache__/
 compress/svd/Basis_Sharing/calib/
 compress/svd/Basis_Sharing/lora/
 compress/svd/Basis_Sharing/untrained_model/
+compress/external/
 
 # Internal author-response workspaces. Public, reproducible extracts belong in
 # audits/ instead of these working directories.

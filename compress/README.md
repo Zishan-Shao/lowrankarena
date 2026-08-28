@@ -2,6 +2,44 @@
 
 `compress/` is the optional artifact-generation layer for LowRankArena.
 
+## Unified CLI contract
+
+Install the repository-owned benchmark and compression adapter stack once:
+
+```bash
+python -m pip install -r compress/requirements.txt
+```
+
+Then inspect method capability before allocating GPUs or downloading weights:
+
+```bash
+python scripts/run_compress.py --list-methods
+python scripts/run_compress.py \
+  --family svd \
+  --method gfw_svd \
+  --model meta-llama/Llama-3.1-8B \
+  --ratio 0.5 \
+  --extra kron_factors_dir=/path/to/factors \
+  --preflight-only
+```
+
+The default command writes an auditable plan. `--execute` is accepted only for
+methods whose LowRankArena adapter has an end-to-end exporter. Unsupported
+execution is rejected during preflight instead of silently writing a plan or
+starting an upstream script that cannot produce a loadable artifact.
+
+The unified CLI is a thin wrapper, not a replacement for the recorded
+reproduction commands. Existing commands in
+`scripts/run_aasvd_keep_sweep_20260724.sh` and
+`scripts/run_new_method_keep_sweep_20260724.sh` remain valid and define the
+default numerical recipe. In particular, the wrappers retain AA-SVD's bf16
+compression, fp16 HF export, Swift-SVD's fp16 export, and ZS-SVD seed 3.
+
+Current end-to-end adapters are AA-SVD, GFW-SVD, Swift-SVD, and ZS-SVD. Every
+other public method has an importable planning adapter, but remains explicitly
+execution-gated until its native output is connected to the shared artifact
+contract.
+
 ## Intended Use
 
 LowRankArena has two clean paths:
@@ -70,15 +108,10 @@ The important unification point is the artifact contract, not the internal pruni
 
 ### `compress/quant/`
 
-`compress/quant/` stays in the tree because quantization is the most realistic family to support locally in a shared environment.
-
-In practice, quant baselines are more likely to be runnable with:
-
-- the main `lowrankarena` environment
-- modern `transformers`
-- local GPU kernels such as FlashAttention-2 and vLLM-adjacent stacks
-
-So quantization remains a first-class local path even if some pruning and SVD baselines eventually use separate plugin environments.
+`compress/quant/` keeps the planned AWQ, GPTQ, and RTN integration points in
+the same registry. None of those three wrappers is currently advertised as
+end-to-end executable: their exporters and runtime-specific loading contracts
+must be validated before `--execute` is enabled.
 
 ## Design Rules
 
@@ -90,7 +123,11 @@ So quantization remains a first-class local path even if some pruning and SVD ba
 
 ## Environment Strategy
 
-We do **not** assume that all compression methods can share one perfect environment.
+LowRankArena-owned adapters and exporters use the additive pinned stack in
+[`compress/requirements.txt`](./requirements.txt), which inherits the root
+benchmark requirements without changing them. Historical requirement files
+inside vendored upstream snapshots are provenance records and must not be
+installed over that stack.
 
 Current expectation:
 
@@ -98,7 +135,11 @@ Current expectation:
 - `prune/` methods may also need separate environments for the same reason, especially older research repos.
 - `quant/` methods are the most likely to run directly inside the main `lowrankarena` environment.
 
-This means LowRankArena should converge toward:
+Some unadapted upstream research entrypoints still document mutually
+incompatible historical environments. They are kept for source audit, while
+the unified CLI refuses end-to-end execution until compatibility work and an
+HF export path have both been validated. This means LowRankArena converges
+toward:
 
 - one stable benchmark environment for loading, eval, speed, and reporting
 - optional method-specific compression environments for artifact generation
@@ -119,11 +160,15 @@ compress/
 ├── artifacts/
 ├── svd/
 │   ├── asvd.py
+│   ├── aa_svd.py
 │   ├── basis_sharing.py
 │   ├── dobi_svd.py
 │   ├── fwsvd.py
+│   ├── gfw_svd.py
 │   ├── svd.py
-│   └── svd_llm.py
+│   ├── svd_llm.py
+│   ├── swift_svd.py
+│   └── zs_svd.py
 ├── prune/
 │   ├── bonsai.py
 │   ├── llm_pruner.py
@@ -153,7 +198,7 @@ This is deliberate. For `svd/` and `prune/`, LowRankArena should prefer:
 
 instead of pretending every method already belongs to one local framework.
 
-## Example
+## Planning-only example
 
 ```bash
 python scripts/run_compress.py \
@@ -169,7 +214,9 @@ The current scaffold writes:
 - `compression_log.json`
 - `planned_command.sh` when a command template is known
 
-This is enough to make the artifact flow explicit before wiring in each baseline end-to-end.
+This records the intended artifact flow, but does not claim that ASVD is
+end-to-end executable. Check `supports_execute` in `--list-methods` before
+adding `--execute`.
 
 ## Reviewer Guidance
 
@@ -178,5 +225,5 @@ Reviewers should usually ignore `compress/` unless they specifically want to ins
 The recommended interpretation is:
 
 - `src/` + `scripts/run_eval.py` + `scripts/run_speed.py` are the main benchmark path
-- `compress/svd/` and `compress/prune/` are extension and transparency layers
-- `compress/quant/` is kept as a practical local path because quant methods are more feasible to run in a shared local stack
+- `compress/svd/`, `compress/prune/`, and `compress/quant/` are extension and
+  transparency layers whose execution capability is reported method by method

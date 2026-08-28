@@ -33,9 +33,10 @@ for [AA-SVD](./compress/svd/AA-SVD/LOWRANKARENA.md),
 [Swift-SVD](./compress/svd/Swift-SVD/LOWRANKARENA.md), and
 [ZS-SVD](./compress/svd/Zero-Sum-SVD/LOWRANKARENA.md) are now available under
 `compress/svd/`. LowRankArena commands, environment specifications, checkpoints,
-and results will be linked as they are finalized. The GFW-SVD release is
-currently an audit-oriented source snapshot because its upstream scripts
-depend on author-environment paths and precomputed artifacts.
+and results will be linked as they are finalized. GFW-SVD keeps its upstream
+source as an audit-oriented snapshot, while LowRankArena's parameterized
+adapter removes author-environment paths, validates required Kronecker factors,
+and exports the result through the shared Hugging Face artifact contract.
 
 **SAES-SVD reproduction attempt.** We independently implemented SAES-SVD from
 the public paper description and evaluated it under the configuration

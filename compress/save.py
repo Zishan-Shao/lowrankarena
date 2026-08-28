@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ class CompressionArtifact:
     manifest: dict[str, Any]
     baseline_path: str | None = None
     command_path: str | None = None
+    execution_log_path: str | None = None
     registered_name: str | None = None
 
 
@@ -35,7 +37,7 @@ def _write_command_script(
     script_path = artifact_dir / "planned_command.sh"
     lines = ["#!/usr/bin/env bash", "set -euo pipefail"]
     if baseline and baseline.path:
-        lines.append(f"cd {baseline.path}")
+        lines.append(shell_join(["cd", baseline.path]))
     lines.append(shell_join(command))
     script_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return script_path
@@ -109,6 +111,101 @@ def save_artifact(
         manifest=manifest,
         baseline_path=baseline.path if baseline else None,
         command_path=str(command_path) if command_path else None,
+        registered_name=registered_name,
+    )
+
+
+def _is_loadable_hf_artifact(weights_dir: Path) -> bool:
+    if not (weights_dir / "config.json").is_file():
+        return False
+    weight_candidates = (
+        weights_dir / "model.safetensors",
+        weights_dir / "model.safetensors.index.json",
+        weights_dir / "pytorch_model.bin",
+        weights_dir / "pytorch_model.bin.index.json",
+    )
+    return any(path.is_file() for path in weight_candidates)
+
+
+def execute_artifact(
+    request: CompressionRequest,
+    artifact: CompressionArtifact,
+    *,
+    baseline: BaselineHandle | None = None,
+) -> CompressionArtifact:
+    """Execute a planned command and atomically update its artifact metadata."""
+
+    if not artifact.command_path:
+        raise RuntimeError(f"{request.family}/{request.method} has no executable command")
+
+    artifact_dir = Path(artifact.artifact_dir)
+    manifest_path = Path(artifact.manifest_path)
+    log_path = Path(artifact.log_path)
+    execution_log_path = artifact_dir / "execution.log"
+    manifest = dict(artifact.manifest)
+    manifest["status"] = "running"
+    manifest["ready_for_load"] = False
+    dump_json(manifest, manifest_path)
+
+    with execution_log_path.open("w", encoding="utf-8") as execution_log:
+        process = subprocess.run(
+            ["bash", artifact.command_path],
+            cwd=artifact_dir,
+            stdout=execution_log,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+
+    ready_for_load = process.returncode == 0 and _is_loadable_hf_artifact(
+        artifact_dir / "weights"
+    )
+    manifest["status"] = "completed" if ready_for_load else "failed"
+    manifest["ready_for_load"] = ready_for_load
+    manifest["returncode"] = process.returncode
+    manifest["execution_log"] = str(execution_log_path)
+    dump_json(manifest, manifest_path)
+    dump_json(
+        {
+            "status": manifest["status"],
+            "ready_for_load": ready_for_load,
+            "artifact_id": request.artifact_id,
+            "command": manifest.get("command"),
+            "baseline_path": baseline.path if baseline else artifact.baseline_path,
+            "returncode": process.returncode,
+            "execution_log": str(execution_log_path),
+        },
+        log_path,
+    )
+
+    if process.returncode != 0:
+        raise RuntimeError(
+            f"Compression command failed with exit code {process.returncode}; "
+            f"see {execution_log_path}"
+        )
+    if not ready_for_load:
+        raise RuntimeError(
+            f"Compression command completed but did not produce a loadable HF artifact in "
+            f"{artifact_dir / 'weights'}; see {execution_log_path}"
+        )
+
+    registered_name = artifact.registered_name
+    if request.register:
+        registered_name = register_artifact(
+            request,
+            artifact_dir / "weights",
+            enabled=request.enabled,
+        )
+
+    return CompressionArtifact(
+        artifact_id=artifact.artifact_id,
+        artifact_dir=artifact.artifact_dir,
+        manifest_path=artifact.manifest_path,
+        log_path=artifact.log_path,
+        manifest=manifest,
+        baseline_path=artifact.baseline_path,
+        command_path=artifact.command_path,
+        execution_log_path=str(execution_log_path),
         registered_name=registered_name,
     )
 

@@ -6,12 +6,21 @@ The files here are not intended to form one monolithic runtime. Their job is to 
 
 ## Wrappers
 
+- [`aa_svd.py`](./aa_svd.py): validated AA-SVD compression and HF export adapter.
 - [`asvd.py`](./asvd.py): adapter for ASVD-style artifact generation.
 - [`basis_sharing.py`](./basis_sharing.py): adapter for basis-sharing low-rank exports.
 - [`dobi_svd.py`](./dobi_svd.py): adapter for Dobi-SVD export planning.
 - [`fwsvd.py`](./fwsvd.py): placeholder wrapper for FWSVD integration.
+- [`gfw_svd.py`](./gfw_svd.py): parameterized GFW-SVD adapter using pinned
+  FisherKronecker helpers and precomputed Kronecker factors.
 - [`svd.py`](./svd.py): placeholder wrapper for plain SVD baselines.
 - [`svd_llm.py`](./svd_llm.py): adapter for SVD-LLM export planning.
+- [`swift_svd.py`](./swift_svd.py): validated uniform Swift-SVD HF export adapter.
+- [`zs_svd.py`](./zs_svd.py): validated one-stage ZS-SVD and HF export adapter.
+
+Each executable method keeps its unified `build(request)` entrypoint and its
+small command-line orchestrator in the same method file. Upstream source
+snapshots remain separate and provenance-clean.
 
 ## Vendored Baselines
 

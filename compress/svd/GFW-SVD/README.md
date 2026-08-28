@@ -44,6 +44,27 @@ sensitivity artifacts. Replace those paths and supply the required artifacts
 before running them. We do not claim that this snapshot alone reproduces the
 paper's reported results.
 
+## LowRankArena unified adapter
+
+Do not run the hard-coded upstream `__main__` blocks. LowRankArena exposes the
+pinned numerical helpers through [`../gfw_svd.py`](../gfw_svd.py):
+
+```bash
+python scripts/run_compress.py \
+  --family svd \
+  --method gfw_svd \
+  --model meta-llama/Llama-3.1-8B \
+  --ratio 0.5 \
+  --extra kron_factors_dir=/path/to/fisher_factors \
+  --preflight-only
+```
+
+After preflight succeeds, replace `--preflight-only` with `--execute`. The
+adapter parameterizes every path, validates all required projection factors
+before factorization, and writes a loadable LowRankArena ABLinear Hugging Face
+artifact. An optional `--extra rank_config=/path/to/ranks.json` can provide
+per-module keep ratios; otherwise the requested ratio is uniform.
+
 ## Deliberate exclusions
 
 Nested Git metadata, notebooks, logs, generated figures, model/checkpoint
