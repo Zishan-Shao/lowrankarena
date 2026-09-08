@@ -136,7 +136,7 @@ def main() -> None:
         if not args.unsafe_overwrite:
             raise FileExistsError(f"Non-empty output directory: {output_dir}")
         shutil.rmtree(output_dir)
-    output_dir.mkdir(parents=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     target_dtype = _dtype(args.target_dtype)
     compute_device = torch.device(args.compute_device)

@@ -116,7 +116,7 @@ def main():
         if not args.unsafe_overwrite:
             raise FileExistsError(f"Non-empty output directory: {output_dir}")
         shutil.rmtree(output_dir)
-    output_dir.mkdir(parents=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     target_dtype = getattr(torch, args.target_dtype)
     state = load_state_dict(args.native_checkpoint.expanduser().resolve())
