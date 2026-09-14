@@ -61,7 +61,7 @@ def main():
         if not args.unsafe_overwrite:
             raise FileExistsError(f"Non-empty output directory: {output_dir}")
         shutil.rmtree(output_dir)
-    output_dir.mkdir(parents=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     payload = torch.load(args.checkpoint.expanduser().resolve(), map_location="cpu", weights_only=False)
     model = payload["model"]
