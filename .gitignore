@@ -26,3 +26,4 @@ compress/external/
 # audits/ instead of these working directories.
 rebuttal/
 rebuttal_w_review/
+staging/

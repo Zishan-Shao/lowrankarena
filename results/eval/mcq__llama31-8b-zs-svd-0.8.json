@@ -1,0 +1,3705 @@
+{
+  "artifacts": {
+    "command": "lm-eval run --model vllm --model_args pretrained=/home/ww247/lowrankarena/local_ckpts/hf_staging/new_ckpt/llama31_8b/zs_svd/zero_sum_wikitext2_0.8 dtype=auto tokenizer=/home/ww247/lowrankarena/local_ckpts/hf_staging/new_ckpt/llama31_8b/zs_svd/zero_sum_wikitext2_0.8 tokenizer_mode=auto trust_remote_code=True --tasks boolq arc_easy arc_challenge winogrande piqa hellaswag openbookqa --output_path /home/ww247/lowrankarena/lowrankarena/results/eval/raw/mcq/llama31-8b-zs-svd-0.8 --batch_size auto --device cuda:0 --num_fewshot 0 --trust_remote_code",
+    "result_path": "/home/ww247/lowrankarena/lowrankarena/results/eval/raw/mcq/llama31-8b-zs-svd-0.8/__home__ww247__lowrankarena__local_ckpts__hf_staging__new_ckpt__llama31_8b__zs_svd__zero_sum_wikitext2_0.8/results_2026-09-13T04-52-30.911740.json"
+  },
+  "backend": {
+    "name": "lm_eval_harness",
+    "version": "0.4.11"
+  },
+  "checkpoint": {
+    "benchmarks": [
+      "main",
+      "speed",
+      "modern",
+      "quant"
+    ],
+    "enabled": true,
+    "locator": "/home/ww247/lowrankarena/local_ckpts/hf_staging/new_ckpt/llama31_8b/zs_svd/zero_sum_wikitext2_0.8",
+    "method": "zs_svd",
+    "model_family": "llama3.1",
+    "name": "llama31-8b-zs-svd-0.8",
+    "notes": "Local zs_svd llama31-8b keep-ratio 0.8 checkpoint for new-method evaluation.",
+    "repo_id": "",
+    "revision": "main",
+    "source": "local",
+    "subpath": "/home/ww247/lowrankarena/local_ckpts/low_rank/llama31_8b/zs_svd/0.8",
+    "variant": "base"
+  },
+  "config": {
+    "apply_chat_template": false,
+    "batch_size": "auto",
+    "device": "cuda:0",
+    "dtype": "auto",
+    "enforce_eager": null,
+    "fewshot_as_multiturn": null,
+    "gen_kwargs": {},
+    "gpu_memory_utilization": null,
+    "include_paths": [],
+    "limit": null,
+    "max_model_len": null,
+    "metric": "acc_norm",
+    "metric_aggregation": "macro_mean",
+    "metric_fallbacks": [
+      "acc"
+    ],
+    "model_backend": "vllm",
+    "num_fewshot": 0,
+    "solved_count_metric": null,
+    "summary_entity": null,
+    "summary_source": "results",
+    "system_instruction": null,
+    "tasks": [
+      "boolq",
+      "arc_easy",
+      "arc_challenge",
+      "winogrande",
+      "piqa",
+      "hellaswag",
+      "openbookqa"
+    ],
+    "tensor_parallel_size": null,
+    "tracked_metrics": [
+      "acc",
+      "acc_norm"
+    ]
+  },
+  "details": {
+    "counted_metric": null,
+    "group_summary": null,
+    "groups": {},
+    "summary": {
+      "aggregation": "macro_mean",
+      "by_metric": {
+        "acc": {
+          "mean": 0.5602103312912502,
+          "scored_task_count": 7
+        },
+        "acc_norm": {
+          "mean": 0.5813743133083735,
+          "scored_task_count": 5
+        }
+      },
+      "mean": 0.6093426306943419,
+      "primary_metric": "acc_norm",
+      "resolved_metrics": [
+        "acc",
+        "acc_norm"
+      ],
+      "scored_task_count": 7,
+      "task_count": 7,
+      "tracked_metrics": [
+        "acc_norm",
+        "acc"
+      ]
+    },
+    "task_summary": {
+      "aggregation": "macro_mean",
+      "by_metric": {
+        "acc": {
+          "mean": 0.5602103312912502,
+          "scored_task_count": 7
+        },
+        "acc_norm": {
+          "mean": 0.5813743133083735,
+          "scored_task_count": 5
+        }
+      },
+      "mean": 0.6093426306943419,
+      "primary_metric": "acc_norm",
+      "resolved_metrics": [
+        "acc",
+        "acc_norm"
+      ],
+      "scored_task_count": 7,
+      "task_count": 7,
+      "tracked_metrics": [
+        "acc_norm",
+        "acc"
+      ]
+    },
+    "tasks": {
+      "arc_challenge": {
+        "available_metrics": [
+          "acc",
+          "acc_norm"
+        ],
+        "filter": "none",
+        "metric": "acc_norm",
+        "metric_key": "acc_norm,none",
+        "stderr": 0.014342036483436283,
+        "tracked_metrics": {
+          "acc": {
+            "filter": "none",
+            "metric": "acc",
+            "metric_key": "acc,none",
+            "stderr": 0.014056207319068465,
+            "value": 0.363481228668942
+          },
+          "acc_norm": {
+            "filter": "none",
+            "metric": "acc_norm",
+            "metric_key": "acc_norm,none",
+            "stderr": 0.014342036483436283,
+            "value": 0.4044368600682594
+          }
+        },
+        "value": 0.4044368600682594
+      },
+      "arc_easy": {
+        "available_metrics": [
+          "acc",
+          "acc_norm"
+        ],
+        "filter": "none",
+        "metric": "acc_norm",
+        "metric_key": "acc_norm,none",
+        "stderr": 0.009547254611446178,
+        "tracked_metrics": {
+          "acc": {
+            "filter": "none",
+            "metric": "acc",
+            "metric_key": "acc,none",
+            "stderr": 0.009330705616569084,
+            "value": 0.7079124579124579
+          },
+          "acc_norm": {
+            "filter": "none",
+            "metric": "acc_norm",
+            "metric_key": "acc_norm,none",
+            "stderr": 0.009547254611446178,
+            "value": 0.6830808080808081
+          }
+        },
+        "value": 0.6830808080808081
+      },
+      "boolq": {
+        "available_metrics": [
+          "acc"
+        ],
+        "filter": "none",
+        "metric": "acc",
+        "metric_key": "acc,none",
+        "stderr": 0.00821220300380362,
+        "tracked_metrics": {
+          "acc": {
+            "filter": "none",
+            "metric": "acc",
+            "metric_key": "acc,none",
+            "stderr": 0.00821220300380362,
+            "value": 0.6718654434250765
+          },
+          "acc_norm": {
+            "filter": null,
+            "metric": "acc_norm",
+            "metric_key": null,
+            "stderr": null,
+            "value": null
+          }
+        },
+        "value": 0.6718654434250765
+      },
+      "hellaswag": {
+        "available_metrics": [
+          "acc",
+          "acc_norm"
+        ],
+        "filter": "none",
+        "metric": "acc_norm",
+        "metric_key": "acc_norm,none",
+        "stderr": 0.0047662455396069265,
+        "tracked_metrics": {
+          "acc": {
+            "filter": "none",
+            "metric": "acc",
+            "metric_key": "acc,none",
+            "stderr": 0.004970410081009439,
+            "value": 0.45598486357299345
+          },
+          "acc_norm": {
+            "filter": "none",
+            "metric": "acc_norm",
+            "metric_key": "acc_norm,none",
+            "stderr": 0.0047662455396069265,
+            "value": 0.6479784903405696
+          }
+        },
+        "value": 0.6479784903405696
+      },
+      "openbookqa": {
+        "available_metrics": [
+          "acc",
+          "acc_norm"
+        ],
+        "filter": "none",
+        "metric": "acc_norm",
+        "metric_key": "acc_norm,none",
+        "stderr": 0.022136577335085575,
+        "tracked_metrics": {
+          "acc": {
+            "filter": "none",
+            "metric": "acc",
+            "metric_key": "acc,none",
+            "stderr": 0.02039509548493655,
+            "value": 0.294
+          },
+          "acc_norm": {
+            "filter": "none",
+            "metric": "acc_norm",
+            "metric_key": "acc_norm,none",
+            "stderr": 0.022136577335085575,
+            "value": 0.426
+          }
+        },
+        "value": 0.426
+      },
+      "piqa": {
+        "available_metrics": [
+          "acc",
+          "acc_norm"
+        ],
+        "filter": "none",
+        "metric": "acc_norm",
+        "metric_key": "acc_norm,none",
+        "stderr": 0.010164432237060617,
+        "tracked_metrics": {
+          "acc": {
+            "filter": "none",
+            "metric": "acc",
+            "metric_key": "acc,none",
+            "stderr": 0.010213971636773348,
+            "value": 0.7415669205658324
+          },
+          "acc_norm": {
+            "filter": "none",
+            "metric": "acc_norm",
+            "metric_key": "acc_norm,none",
+            "stderr": 0.010164432237060617,
+            "value": 0.7453754080522307
+          }
+        },
+        "value": 0.7453754080522307
+      },
+      "winogrande": {
+        "available_metrics": [
+          "acc"
+        ],
+        "filter": "none",
+        "metric": "acc",
+        "metric_key": "acc,none",
+        "stderr": 0.013036512096748127,
+        "tracked_metrics": {
+          "acc": {
+            "filter": "none",
+            "metric": "acc",
+            "metric_key": "acc,none",
+            "stderr": 0.013036512096748127,
+            "value": 0.6866614048934491
+          },
+          "acc_norm": {
+            "filter": null,
+            "metric": "acc_norm",
+            "metric_key": null,
+            "stderr": null,
+            "value": null
+          }
+        },
+        "value": 0.6866614048934491
+      }
+    }
+  },
+  "generated_at": "2026-09-13T08:52:34.036700+00:00",
+  "kind": "eval",
+  "metrics": {
+    "aggregation": "macro_mean",
+    "by_metric": {
+      "acc": {
+        "mean": 0.5602103312912502,
+        "scored_task_count": 7
+      },
+      "acc_norm": {
+        "mean": 0.5813743133083735,
+        "scored_task_count": 5
+      }
+    },
+    "mean": 0.6093426306943419,
+    "primary_metric": "acc_norm",
+    "scored_task_count": 7,
+    "summary_entity": null,
+    "summary_source": "results",
+    "task_count": 7,
+    "tracked_metrics": [
+      "acc_norm",
+      "acc"
+    ]
+  },
+  "run": {
+    "is_leaderboard": false,
+    "is_smoke": false,
+    "label": "ad_hoc",
+    "strict_validation": true
+  },
+  "runtime": {
+    "config": {
+      "batch_size": "auto",
+      "batch_sizes": [],
+      "bootstrap_iters": 100000,
+      "device": "cuda:0",
+      "fewshot_seed": 1234,
+      "gen_kwargs": {},
+      "limit": null,
+      "model": "vllm",
+      "model_args": {
+        "dtype": "auto",
+        "pretrained": "/home/ww247/lowrankarena/local_ckpts/hf_staging/new_ckpt/llama31_8b/zs_svd/zero_sum_wikitext2_0.8",
+        "tokenizer": "/home/ww247/lowrankarena/local_ckpts/hf_staging/new_ckpt/llama31_8b/zs_svd/zero_sum_wikitext2_0.8",
+        "tokenizer_mode": "auto",
+        "trust_remote_code": true
+      },
+      "numpy_seed": 1234,
+      "random_seed": 0,
+      "torch_seed": 1234,
+      "use_cache": null
+    },
+    "model_impl": null,
+    "model_path": "/home/ww247/lowrankarena/local_ckpts/hf_staging/new_ckpt/llama31_8b/zs_svd/zero_sum_wikitext2_0.8",
+    "n_samples": {
+      "arc_challenge": {
+        "effective": 1172,
+        "original": 1172
+      },
+      "arc_easy": {
+        "effective": 2376,
+        "original": 2376
+      },
+      "boolq": {
+        "effective": 3270,
+        "original": 3270
+      },
+      "hellaswag": {
+        "effective": 10042,
+        "original": 10042
+      },
+      "openbookqa": {
+        "effective": 500,
+        "original": 500
+      },
+      "piqa": {
+        "effective": 1838,
+        "original": 1838
+      },
+      "winogrande": {
+        "effective": 1267,
+        "original": 1267
+      }
+    },
+    "preparation_kind": "direct",
+    "preparation_notes": [
+      "checkpoint is directly loadable through Transformers from the local snapshot",
+      "checkpoint looks directly loadable by vLLM"
+    ],
+    "source_model_path": "/home/ww247/lowrankarena/local_ckpts/hf_staging/new_ckpt/llama31_8b/zs_svd/zero_sum_wikitext2_0.8",
+    "tokenizer_mode": "auto",
+    "tokenizer_path": "/home/ww247/lowrankarena/local_ckpts/hf_staging/new_ckpt/llama31_8b/zs_svd/zero_sum_wikitext2_0.8"
+  },
+  "schema_version": "1.1",
+  "status": "completed",
+  "suite": {
+    "id": "mcq",
+    "name": "mcq",
+    "path": "mcq"
+  },
+  "validation": {
+    "dense_module_count": 0,
+    "dense_modules": [],
+    "expected_dense_shapes": {
+      "model.layers.0.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.0.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.0.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.0.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.0.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.1.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.1.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.1.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.1.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.1.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.10.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.10.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.10.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.10.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.10.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.11.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.11.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.11.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.11.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.11.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.12.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.12.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.12.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.12.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.13.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.13.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.13.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.13.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.13.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.13.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.14.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.14.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.14.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.14.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.14.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.15.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.15.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.15.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.15.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.16.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.16.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.16.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.16.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.17.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.17.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.17.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.17.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.17.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.18.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.18.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.18.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.18.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.18.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.19.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.19.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.19.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.19.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.19.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.19.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.2.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.2.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.2.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.2.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.20.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.20.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.20.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.20.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.20.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.20.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.21.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.21.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.21.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.21.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.21.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.22.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.22.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.22.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.22.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.22.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.22.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.23.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.23.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.23.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.23.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.23.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.23.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.23.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.24.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.24.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.24.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.24.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.24.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.24.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.25.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.25.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.25.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.25.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.25.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.26.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.26.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.26.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.26.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.26.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.26.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.27.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.27.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.27.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.27.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.27.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.28.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.28.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.28.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.28.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.28.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.28.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.29.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.29.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.29.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.29.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.29.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.3.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.3.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.3.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.30.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.30.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.30.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.31.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.31.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.4.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.4.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.5.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.5.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.5.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.6.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.6.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.6.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.7.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.7.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.7.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.8.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.8.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.8.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.8.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.9.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.9.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.9.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.9.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.9.self_attn.q_proj": [
+        4096,
+        4096
+      ]
+    },
+    "expected_low_rank_module_count": 148,
+    "expected_low_rank_modules": [
+      "model.layers.0.mlp.gate_proj",
+      "model.layers.0.mlp.up_proj",
+      "model.layers.0.self_attn.k_proj",
+      "model.layers.0.self_attn.o_proj",
+      "model.layers.0.self_attn.q_proj",
+      "model.layers.1.mlp.gate_proj",
+      "model.layers.1.mlp.up_proj",
+      "model.layers.1.self_attn.k_proj",
+      "model.layers.1.self_attn.o_proj",
+      "model.layers.1.self_attn.q_proj",
+      "model.layers.10.mlp.down_proj",
+      "model.layers.10.mlp.gate_proj",
+      "model.layers.10.self_attn.k_proj",
+      "model.layers.10.self_attn.o_proj",
+      "model.layers.10.self_attn.q_proj",
+      "model.layers.11.mlp.gate_proj",
+      "model.layers.11.mlp.up_proj",
+      "model.layers.11.self_attn.k_proj",
+      "model.layers.11.self_attn.o_proj",
+      "model.layers.11.self_attn.q_proj",
+      "model.layers.12.mlp.down_proj",
+      "model.layers.12.mlp.gate_proj",
+      "model.layers.12.self_attn.o_proj",
+      "model.layers.12.self_attn.q_proj",
+      "model.layers.13.mlp.down_proj",
+      "model.layers.13.mlp.gate_proj",
+      "model.layers.13.mlp.up_proj",
+      "model.layers.13.self_attn.k_proj",
+      "model.layers.13.self_attn.o_proj",
+      "model.layers.13.self_attn.q_proj",
+      "model.layers.14.mlp.gate_proj",
+      "model.layers.14.self_attn.k_proj",
+      "model.layers.14.self_attn.o_proj",
+      "model.layers.14.self_attn.q_proj",
+      "model.layers.14.self_attn.v_proj",
+      "model.layers.15.mlp.gate_proj",
+      "model.layers.15.mlp.up_proj",
+      "model.layers.15.self_attn.o_proj",
+      "model.layers.15.self_attn.q_proj",
+      "model.layers.16.mlp.gate_proj",
+      "model.layers.16.mlp.up_proj",
+      "model.layers.16.self_attn.o_proj",
+      "model.layers.16.self_attn.q_proj",
+      "model.layers.17.mlp.gate_proj",
+      "model.layers.17.mlp.up_proj",
+      "model.layers.17.self_attn.k_proj",
+      "model.layers.17.self_attn.o_proj",
+      "model.layers.17.self_attn.q_proj",
+      "model.layers.18.mlp.gate_proj",
+      "model.layers.18.mlp.up_proj",
+      "model.layers.18.self_attn.o_proj",
+      "model.layers.18.self_attn.q_proj",
+      "model.layers.18.self_attn.v_proj",
+      "model.layers.19.mlp.gate_proj",
+      "model.layers.19.mlp.up_proj",
+      "model.layers.19.self_attn.k_proj",
+      "model.layers.19.self_attn.o_proj",
+      "model.layers.19.self_attn.q_proj",
+      "model.layers.19.self_attn.v_proj",
+      "model.layers.2.mlp.up_proj",
+      "model.layers.2.self_attn.k_proj",
+      "model.layers.2.self_attn.o_proj",
+      "model.layers.2.self_attn.q_proj",
+      "model.layers.20.mlp.gate_proj",
+      "model.layers.20.mlp.up_proj",
+      "model.layers.20.self_attn.k_proj",
+      "model.layers.20.self_attn.o_proj",
+      "model.layers.20.self_attn.q_proj",
+      "model.layers.20.self_attn.v_proj",
+      "model.layers.21.mlp.gate_proj",
+      "model.layers.21.mlp.up_proj",
+      "model.layers.21.self_attn.k_proj",
+      "model.layers.21.self_attn.o_proj",
+      "model.layers.21.self_attn.q_proj",
+      "model.layers.22.mlp.gate_proj",
+      "model.layers.22.mlp.up_proj",
+      "model.layers.22.self_attn.k_proj",
+      "model.layers.22.self_attn.o_proj",
+      "model.layers.22.self_attn.q_proj",
+      "model.layers.22.self_attn.v_proj",
+      "model.layers.23.mlp.down_proj",
+      "model.layers.23.mlp.gate_proj",
+      "model.layers.23.mlp.up_proj",
+      "model.layers.23.self_attn.k_proj",
+      "model.layers.23.self_attn.o_proj",
+      "model.layers.23.self_attn.q_proj",
+      "model.layers.23.self_attn.v_proj",
+      "model.layers.24.mlp.gate_proj",
+      "model.layers.24.mlp.up_proj",
+      "model.layers.24.self_attn.k_proj",
+      "model.layers.24.self_attn.o_proj",
+      "model.layers.24.self_attn.q_proj",
+      "model.layers.24.self_attn.v_proj",
+      "model.layers.25.mlp.gate_proj",
+      "model.layers.25.mlp.up_proj",
+      "model.layers.25.self_attn.o_proj",
+      "model.layers.25.self_attn.q_proj",
+      "model.layers.25.self_attn.v_proj",
+      "model.layers.26.mlp.down_proj",
+      "model.layers.26.mlp.gate_proj",
+      "model.layers.26.mlp.up_proj",
+      "model.layers.26.self_attn.k_proj",
+      "model.layers.26.self_attn.o_proj",
+      "model.layers.26.self_attn.q_proj",
+      "model.layers.27.mlp.gate_proj",
+      "model.layers.27.self_attn.k_proj",
+      "model.layers.27.self_attn.o_proj",
+      "model.layers.27.self_attn.q_proj",
+      "model.layers.27.self_attn.v_proj",
+      "model.layers.28.mlp.down_proj",
+      "model.layers.28.mlp.gate_proj",
+      "model.layers.28.mlp.up_proj",
+      "model.layers.28.self_attn.o_proj",
+      "model.layers.28.self_attn.q_proj",
+      "model.layers.28.self_attn.v_proj",
+      "model.layers.29.mlp.down_proj",
+      "model.layers.29.mlp.up_proj",
+      "model.layers.29.self_attn.k_proj",
+      "model.layers.29.self_attn.o_proj",
+      "model.layers.29.self_attn.q_proj",
+      "model.layers.3.mlp.gate_proj",
+      "model.layers.3.self_attn.o_proj",
+      "model.layers.3.self_attn.q_proj",
+      "model.layers.30.self_attn.k_proj",
+      "model.layers.30.self_attn.o_proj",
+      "model.layers.30.self_attn.q_proj",
+      "model.layers.31.self_attn.o_proj",
+      "model.layers.31.self_attn.q_proj",
+      "model.layers.4.self_attn.o_proj",
+      "model.layers.4.self_attn.q_proj",
+      "model.layers.5.self_attn.k_proj",
+      "model.layers.5.self_attn.o_proj",
+      "model.layers.5.self_attn.q_proj",
+      "model.layers.6.mlp.gate_proj",
+      "model.layers.6.self_attn.o_proj",
+      "model.layers.6.self_attn.q_proj",
+      "model.layers.7.mlp.gate_proj",
+      "model.layers.7.self_attn.o_proj",
+      "model.layers.7.self_attn.q_proj",
+      "model.layers.8.mlp.gate_proj",
+      "model.layers.8.mlp.up_proj",
+      "model.layers.8.self_attn.o_proj",
+      "model.layers.8.self_attn.q_proj",
+      "model.layers.9.mlp.gate_proj",
+      "model.layers.9.mlp.up_proj",
+      "model.layers.9.self_attn.k_proj",
+      "model.layers.9.self_attn.o_proj",
+      "model.layers.9.self_attn.q_proj"
+    ],
+    "issues": [],
+    "layout_kind": "zero_sum_svd_factorized",
+    "missing_dense_or_factorized_modules": [],
+    "missing_modules": [],
+    "model_path": "/home/ww247/lowrankarena/local_ckpts/hf_staging/new_ckpt/llama31_8b/zs_svd/zero_sum_wikitext2_0.8",
+    "model_type": "lowrank_llama",
+    "observed_dense_shapes": {
+      "model.layers.0.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.0.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.0.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.0.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.0.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.1.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.1.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.1.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.1.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.1.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.10.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.10.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.10.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.10.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.10.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.11.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.11.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.11.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.11.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.11.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.12.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.12.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.12.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.12.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.13.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.13.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.13.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.13.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.13.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.13.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.14.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.14.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.14.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.14.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.14.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.15.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.15.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.15.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.15.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.16.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.16.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.16.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.16.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.17.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.17.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.17.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.17.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.17.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.18.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.18.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.18.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.18.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.18.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.19.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.19.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.19.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.19.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.19.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.19.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.2.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.2.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.2.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.2.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.20.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.20.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.20.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.20.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.20.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.20.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.21.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.21.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.21.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.21.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.21.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.22.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.22.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.22.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.22.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.22.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.22.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.23.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.23.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.23.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.23.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.23.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.23.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.23.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.24.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.24.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.24.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.24.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.24.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.24.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.25.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.25.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.25.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.25.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.25.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.26.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.26.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.26.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.26.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.26.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.26.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.27.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.27.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.27.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.27.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.27.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.28.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.28.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.28.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.28.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.28.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.28.self_attn.v_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.29.mlp.down_proj": [
+        4096,
+        14336
+      ],
+      "model.layers.29.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.29.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.29.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.29.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.3.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.3.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.3.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.30.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.30.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.30.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.31.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.31.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.4.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.4.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.5.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.5.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.5.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.6.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.6.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.6.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.7.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.7.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.7.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.8.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.8.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.8.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.8.self_attn.q_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.9.mlp.gate_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.9.mlp.up_proj": [
+        14336,
+        4096
+      ],
+      "model.layers.9.self_attn.k_proj": [
+        1024,
+        4096
+      ],
+      "model.layers.9.self_attn.o_proj": [
+        4096,
+        4096
+      ],
+      "model.layers.9.self_attn.q_proj": [
+        4096,
+        4096
+      ]
+    },
+    "observed_factor_layouts": {
+      "model.layers.0.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.0.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.0.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.0.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.0.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.1.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.1.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.1.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.1.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.1.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.10.mlp.down_proj": "out_rank__rank_in",
+      "model.layers.10.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.10.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.10.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.10.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.11.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.11.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.11.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.11.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.11.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.12.mlp.down_proj": "out_rank__rank_in",
+      "model.layers.12.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.12.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.12.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.13.mlp.down_proj": "out_rank__rank_in",
+      "model.layers.13.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.13.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.13.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.13.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.13.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.14.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.14.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.14.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.14.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.14.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.15.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.15.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.15.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.15.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.16.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.16.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.16.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.16.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.17.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.17.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.17.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.17.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.17.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.18.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.18.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.18.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.18.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.18.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.19.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.19.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.19.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.19.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.19.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.19.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.2.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.2.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.2.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.2.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.20.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.20.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.20.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.20.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.20.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.20.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.21.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.21.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.21.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.21.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.21.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.22.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.22.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.22.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.22.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.22.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.22.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.23.mlp.down_proj": "out_rank__rank_in",
+      "model.layers.23.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.23.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.23.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.23.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.23.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.23.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.24.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.24.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.24.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.24.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.24.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.24.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.25.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.25.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.25.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.25.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.25.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.26.mlp.down_proj": "out_rank__rank_in",
+      "model.layers.26.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.26.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.26.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.26.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.26.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.27.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.27.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.27.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.27.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.27.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.28.mlp.down_proj": "out_rank__rank_in",
+      "model.layers.28.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.28.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.28.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.28.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.28.self_attn.v_proj": "out_rank__rank_in",
+      "model.layers.29.mlp.down_proj": "out_rank__rank_in",
+      "model.layers.29.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.29.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.29.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.29.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.3.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.3.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.3.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.30.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.30.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.30.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.31.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.31.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.4.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.4.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.5.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.5.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.5.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.6.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.6.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.6.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.7.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.7.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.7.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.8.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.8.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.8.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.8.self_attn.q_proj": "out_rank__rank_in",
+      "model.layers.9.mlp.gate_proj": "out_rank__rank_in",
+      "model.layers.9.mlp.up_proj": "out_rank__rank_in",
+      "model.layers.9.self_attn.k_proj": "out_rank__rank_in",
+      "model.layers.9.self_attn.o_proj": "out_rank__rank_in",
+      "model.layers.9.self_attn.q_proj": "out_rank__rank_in"
+    },
+    "observed_ranks": {
+      "model.layers.0.mlp.gate_proj": 1641,
+      "model.layers.0.mlp.up_proj": 2757,
+      "model.layers.0.self_attn.k_proj": 171,
+      "model.layers.0.self_attn.o_proj": 1203,
+      "model.layers.0.self_attn.q_proj": 98,
+      "model.layers.1.mlp.gate_proj": 2780,
+      "model.layers.1.mlp.up_proj": 3167,
+      "model.layers.1.self_attn.k_proj": 410,
+      "model.layers.1.self_attn.o_proj": 1324,
+      "model.layers.1.self_attn.q_proj": 321,
+      "model.layers.10.mlp.down_proj": 3139,
+      "model.layers.10.mlp.gate_proj": 1757,
+      "model.layers.10.self_attn.k_proj": 618,
+      "model.layers.10.self_attn.o_proj": 1059,
+      "model.layers.10.self_attn.q_proj": 570,
+      "model.layers.11.mlp.gate_proj": 2476,
+      "model.layers.11.mlp.up_proj": 2661,
+      "model.layers.11.self_attn.k_proj": 478,
+      "model.layers.11.self_attn.o_proj": 1139,
+      "model.layers.11.self_attn.q_proj": 527,
+      "model.layers.12.mlp.down_proj": 2878,
+      "model.layers.12.mlp.gate_proj": 1698,
+      "model.layers.12.self_attn.o_proj": 1131,
+      "model.layers.12.self_attn.q_proj": 268,
+      "model.layers.13.mlp.down_proj": 2850,
+      "model.layers.13.mlp.gate_proj": 2033,
+      "model.layers.13.mlp.up_proj": 2793,
+      "model.layers.13.self_attn.k_proj": 320,
+      "model.layers.13.self_attn.o_proj": 1008,
+      "model.layers.13.self_attn.q_proj": 468,
+      "model.layers.14.mlp.gate_proj": 2192,
+      "model.layers.14.self_attn.k_proj": 666,
+      "model.layers.14.self_attn.o_proj": 1450,
+      "model.layers.14.self_attn.q_proj": 436,
+      "model.layers.14.self_attn.v_proj": 736,
+      "model.layers.15.mlp.gate_proj": 1425,
+      "model.layers.15.mlp.up_proj": 2872,
+      "model.layers.15.self_attn.o_proj": 1308,
+      "model.layers.15.self_attn.q_proj": 572,
+      "model.layers.16.mlp.gate_proj": 2056,
+      "model.layers.16.mlp.up_proj": 2797,
+      "model.layers.16.self_attn.o_proj": 1005,
+      "model.layers.16.self_attn.q_proj": 308,
+      "model.layers.17.mlp.gate_proj": 2224,
+      "model.layers.17.mlp.up_proj": 2753,
+      "model.layers.17.self_attn.k_proj": 232,
+      "model.layers.17.self_attn.o_proj": 604,
+      "model.layers.17.self_attn.q_proj": 339,
+      "model.layers.18.mlp.gate_proj": 2545,
+      "model.layers.18.mlp.up_proj": 2875,
+      "model.layers.18.self_attn.o_proj": 685,
+      "model.layers.18.self_attn.q_proj": 375,
+      "model.layers.18.self_attn.v_proj": 348,
+      "model.layers.19.mlp.gate_proj": 3161,
+      "model.layers.19.mlp.up_proj": 2554,
+      "model.layers.19.self_attn.k_proj": 409,
+      "model.layers.19.self_attn.o_proj": 544,
+      "model.layers.19.self_attn.q_proj": 209,
+      "model.layers.19.self_attn.v_proj": 628,
+      "model.layers.2.mlp.up_proj": 3075,
+      "model.layers.2.self_attn.k_proj": 769,
+      "model.layers.2.self_attn.o_proj": 1358,
+      "model.layers.2.self_attn.q_proj": 438,
+      "model.layers.20.mlp.gate_proj": 1996,
+      "model.layers.20.mlp.up_proj": 2683,
+      "model.layers.20.self_attn.k_proj": 231,
+      "model.layers.20.self_attn.o_proj": 490,
+      "model.layers.20.self_attn.q_proj": 217,
+      "model.layers.20.self_attn.v_proj": 599,
+      "model.layers.21.mlp.gate_proj": 2156,
+      "model.layers.21.mlp.up_proj": 2974,
+      "model.layers.21.self_attn.k_proj": 287,
+      "model.layers.21.self_attn.o_proj": 535,
+      "model.layers.21.self_attn.q_proj": 166,
+      "model.layers.22.mlp.gate_proj": 2570,
+      "model.layers.22.mlp.up_proj": 2563,
+      "model.layers.22.self_attn.k_proj": 324,
+      "model.layers.22.self_attn.o_proj": 323,
+      "model.layers.22.self_attn.q_proj": 246,
+      "model.layers.22.self_attn.v_proj": 390,
+      "model.layers.23.mlp.down_proj": 2985,
+      "model.layers.23.mlp.gate_proj": 2412,
+      "model.layers.23.mlp.up_proj": 3085,
+      "model.layers.23.self_attn.k_proj": 131,
+      "model.layers.23.self_attn.o_proj": 191,
+      "model.layers.23.self_attn.q_proj": 126,
+      "model.layers.23.self_attn.v_proj": 295,
+      "model.layers.24.mlp.gate_proj": 3144,
+      "model.layers.24.mlp.up_proj": 2314,
+      "model.layers.24.self_attn.k_proj": 106,
+      "model.layers.24.self_attn.o_proj": 209,
+      "model.layers.24.self_attn.q_proj": 218,
+      "model.layers.24.self_attn.v_proj": 372,
+      "model.layers.25.mlp.gate_proj": 2149,
+      "model.layers.25.mlp.up_proj": 2820,
+      "model.layers.25.self_attn.o_proj": 410,
+      "model.layers.25.self_attn.q_proj": 267,
+      "model.layers.25.self_attn.v_proj": 503,
+      "model.layers.26.mlp.down_proj": 2789,
+      "model.layers.26.mlp.gate_proj": 2443,
+      "model.layers.26.mlp.up_proj": 2474,
+      "model.layers.26.self_attn.k_proj": 202,
+      "model.layers.26.self_attn.o_proj": 393,
+      "model.layers.26.self_attn.q_proj": 132,
+      "model.layers.27.mlp.gate_proj": 2920,
+      "model.layers.27.self_attn.k_proj": 246,
+      "model.layers.27.self_attn.o_proj": 440,
+      "model.layers.27.self_attn.q_proj": 175,
+      "model.layers.27.self_attn.v_proj": 375,
+      "model.layers.28.mlp.down_proj": 2920,
+      "model.layers.28.mlp.gate_proj": 3161,
+      "model.layers.28.mlp.up_proj": 2871,
+      "model.layers.28.self_attn.o_proj": 554,
+      "model.layers.28.self_attn.q_proj": 155,
+      "model.layers.28.self_attn.v_proj": 576,
+      "model.layers.29.mlp.down_proj": 3054,
+      "model.layers.29.mlp.up_proj": 2734,
+      "model.layers.29.self_attn.k_proj": 322,
+      "model.layers.29.self_attn.o_proj": 419,
+      "model.layers.29.self_attn.q_proj": 203,
+      "model.layers.3.mlp.gate_proj": 3149,
+      "model.layers.3.self_attn.o_proj": 1211,
+      "model.layers.3.self_attn.q_proj": 779,
+      "model.layers.30.self_attn.k_proj": 268,
+      "model.layers.30.self_attn.o_proj": 342,
+      "model.layers.30.self_attn.q_proj": 292,
+      "model.layers.31.self_attn.o_proj": 577,
+      "model.layers.31.self_attn.q_proj": 221,
+      "model.layers.4.self_attn.o_proj": 1112,
+      "model.layers.4.self_attn.q_proj": 586,
+      "model.layers.5.self_attn.k_proj": 690,
+      "model.layers.5.self_attn.o_proj": 941,
+      "model.layers.5.self_attn.q_proj": 406,
+      "model.layers.6.mlp.gate_proj": 2393,
+      "model.layers.6.self_attn.o_proj": 1342,
+      "model.layers.6.self_attn.q_proj": 432,
+      "model.layers.7.mlp.gate_proj": 2122,
+      "model.layers.7.self_attn.o_proj": 1235,
+      "model.layers.7.self_attn.q_proj": 351,
+      "model.layers.8.mlp.gate_proj": 2449,
+      "model.layers.8.mlp.up_proj": 3069,
+      "model.layers.8.self_attn.o_proj": 1334,
+      "model.layers.8.self_attn.q_proj": 497,
+      "model.layers.9.mlp.gate_proj": 2663,
+      "model.layers.9.mlp.up_proj": 2789,
+      "model.layers.9.self_attn.k_proj": 605,
+      "model.layers.9.self_attn.o_proj": 1429,
+      "model.layers.9.self_attn.q_proj": 442
+    },
+    "observed_shapes": {
+      "model.layers.0.mlp.gate_proj": {
+        "left": [
+          14336,
+          1641
+        ],
+        "right": [
+          1641,
+          4096
+        ]
+      },
+      "model.layers.0.mlp.up_proj": {
+        "left": [
+          14336,
+          2757
+        ],
+        "right": [
+          2757,
+          4096
+        ]
+      },
+      "model.layers.0.self_attn.k_proj": {
+        "left": [
+          1024,
+          171
+        ],
+        "right": [
+          171,
+          4096
+        ]
+      },
+      "model.layers.0.self_attn.o_proj": {
+        "left": [
+          4096,
+          1203
+        ],
+        "right": [
+          1203,
+          4096
+        ]
+      },
+      "model.layers.0.self_attn.q_proj": {
+        "left": [
+          4096,
+          98
+        ],
+        "right": [
+          98,
+          4096
+        ]
+      },
+      "model.layers.1.mlp.gate_proj": {
+        "left": [
+          14336,
+          2780
+        ],
+        "right": [
+          2780,
+          4096
+        ]
+      },
+      "model.layers.1.mlp.up_proj": {
+        "left": [
+          14336,
+          3167
+        ],
+        "right": [
+          3167,
+          4096
+        ]
+      },
+      "model.layers.1.self_attn.k_proj": {
+        "left": [
+          1024,
+          410
+        ],
+        "right": [
+          410,
+          4096
+        ]
+      },
+      "model.layers.1.self_attn.o_proj": {
+        "left": [
+          4096,
+          1324
+        ],
+        "right": [
+          1324,
+          4096
+        ]
+      },
+      "model.layers.1.self_attn.q_proj": {
+        "left": [
+          4096,
+          321
+        ],
+        "right": [
+          321,
+          4096
+        ]
+      },
+      "model.layers.10.mlp.down_proj": {
+        "left": [
+          4096,
+          3139
+        ],
+        "right": [
+          3139,
+          14336
+        ]
+      },
+      "model.layers.10.mlp.gate_proj": {
+        "left": [
+          14336,
+          1757
+        ],
+        "right": [
+          1757,
+          4096
+        ]
+      },
+      "model.layers.10.self_attn.k_proj": {
+        "left": [
+          1024,
+          618
+        ],
+        "right": [
+          618,
+          4096
+        ]
+      },
+      "model.layers.10.self_attn.o_proj": {
+        "left": [
+          4096,
+          1059
+        ],
+        "right": [
+          1059,
+          4096
+        ]
+      },
+      "model.layers.10.self_attn.q_proj": {
+        "left": [
+          4096,
+          570
+        ],
+        "right": [
+          570,
+          4096
+        ]
+      },
+      "model.layers.11.mlp.gate_proj": {
+        "left": [
+          14336,
+          2476
+        ],
+        "right": [
+          2476,
+          4096
+        ]
+      },
+      "model.layers.11.mlp.up_proj": {
+        "left": [
+          14336,
+          2661
+        ],
+        "right": [
+          2661,
+          4096
+        ]
+      },
+      "model.layers.11.self_attn.k_proj": {
+        "left": [
+          1024,
+          478
+        ],
+        "right": [
+          478,
+          4096
+        ]
+      },
+      "model.layers.11.self_attn.o_proj": {
+        "left": [
+          4096,
+          1139
+        ],
+        "right": [
+          1139,
+          4096
+        ]
+      },
+      "model.layers.11.self_attn.q_proj": {
+        "left": [
+          4096,
+          527
+        ],
+        "right": [
+          527,
+          4096
+        ]
+      },
+      "model.layers.12.mlp.down_proj": {
+        "left": [
+          4096,
+          2878
+        ],
+        "right": [
+          2878,
+          14336
+        ]
+      },
+      "model.layers.12.mlp.gate_proj": {
+        "left": [
+          14336,
+          1698
+        ],
+        "right": [
+          1698,
+          4096
+        ]
+      },
+      "model.layers.12.self_attn.o_proj": {
+        "left": [
+          4096,
+          1131
+        ],
+        "right": [
+          1131,
+          4096
+        ]
+      },
+      "model.layers.12.self_attn.q_proj": {
+        "left": [
+          4096,
+          268
+        ],
+        "right": [
+          268,
+          4096
+        ]
+      },
+      "model.layers.13.mlp.down_proj": {
+        "left": [
+          4096,
+          2850
+        ],
+        "right": [
+          2850,
+          14336
+        ]
+      },
+      "model.layers.13.mlp.gate_proj": {
+        "left": [
+          14336,
+          2033
+        ],
+        "right": [
+          2033,
+          4096
+        ]
+      },
+      "model.layers.13.mlp.up_proj": {
+        "left": [
+          14336,
+          2793
+        ],
+        "right": [
+          2793,
+          4096
+        ]
+      },
+      "model.layers.13.self_attn.k_proj": {
+        "left": [
+          1024,
+          320
+        ],
+        "right": [
+          320,
+          4096
+        ]
+      },
+      "model.layers.13.self_attn.o_proj": {
+        "left": [
+          4096,
+          1008
+        ],
+        "right": [
+          1008,
+          4096
+        ]
+      },
+      "model.layers.13.self_attn.q_proj": {
+        "left": [
+          4096,
+          468
+        ],
+        "right": [
+          468,
+          4096
+        ]
+      },
+      "model.layers.14.mlp.gate_proj": {
+        "left": [
+          14336,
+          2192
+        ],
+        "right": [
+          2192,
+          4096
+        ]
+      },
+      "model.layers.14.self_attn.k_proj": {
+        "left": [
+          1024,
+          666
+        ],
+        "right": [
+          666,
+          4096
+        ]
+      },
+      "model.layers.14.self_attn.o_proj": {
+        "left": [
+          4096,
+          1450
+        ],
+        "right": [
+          1450,
+          4096
+        ]
+      },
+      "model.layers.14.self_attn.q_proj": {
+        "left": [
+          4096,
+          436
+        ],
+        "right": [
+          436,
+          4096
+        ]
+      },
+      "model.layers.14.self_attn.v_proj": {
+        "left": [
+          1024,
+          736
+        ],
+        "right": [
+          736,
+          4096
+        ]
+      },
+      "model.layers.15.mlp.gate_proj": {
+        "left": [
+          14336,
+          1425
+        ],
+        "right": [
+          1425,
+          4096
+        ]
+      },
+      "model.layers.15.mlp.up_proj": {
+        "left": [
+          14336,
+          2872
+        ],
+        "right": [
+          2872,
+          4096
+        ]
+      },
+      "model.layers.15.self_attn.o_proj": {
+        "left": [
+          4096,
+          1308
+        ],
+        "right": [
+          1308,
+          4096
+        ]
+      },
+      "model.layers.15.self_attn.q_proj": {
+        "left": [
+          4096,
+          572
+        ],
+        "right": [
+          572,
+          4096
+        ]
+      },
+      "model.layers.16.mlp.gate_proj": {
+        "left": [
+          14336,
+          2056
+        ],
+        "right": [
+          2056,
+          4096
+        ]
+      },
+      "model.layers.16.mlp.up_proj": {
+        "left": [
+          14336,
+          2797
+        ],
+        "right": [
+          2797,
+          4096
+        ]
+      },
+      "model.layers.16.self_attn.o_proj": {
+        "left": [
+          4096,
+          1005
+        ],
+        "right": [
+          1005,
+          4096
+        ]
+      },
+      "model.layers.16.self_attn.q_proj": {
+        "left": [
+          4096,
+          308
+        ],
+        "right": [
+          308,
+          4096
+        ]
+      },
+      "model.layers.17.mlp.gate_proj": {
+        "left": [
+          14336,
+          2224
+        ],
+        "right": [
+          2224,
+          4096
+        ]
+      },
+      "model.layers.17.mlp.up_proj": {
+        "left": [
+          14336,
+          2753
+        ],
+        "right": [
+          2753,
+          4096
+        ]
+      },
+      "model.layers.17.self_attn.k_proj": {
+        "left": [
+          1024,
+          232
+        ],
+        "right": [
+          232,
+          4096
+        ]
+      },
+      "model.layers.17.self_attn.o_proj": {
+        "left": [
+          4096,
+          604
+        ],
+        "right": [
+          604,
+          4096
+        ]
+      },
+      "model.layers.17.self_attn.q_proj": {
+        "left": [
+          4096,
+          339
+        ],
+        "right": [
+          339,
+          4096
+        ]
+      },
+      "model.layers.18.mlp.gate_proj": {
+        "left": [
+          14336,
+          2545
+        ],
+        "right": [
+          2545,
+          4096
+        ]
+      },
+      "model.layers.18.mlp.up_proj": {
+        "left": [
+          14336,
+          2875
+        ],
+        "right": [
+          2875,
+          4096
+        ]
+      },
+      "model.layers.18.self_attn.o_proj": {
+        "left": [
+          4096,
+          685
+        ],
+        "right": [
+          685,
+          4096
+        ]
+      },
+      "model.layers.18.self_attn.q_proj": {
+        "left": [
+          4096,
+          375
+        ],
+        "right": [
+          375,
+          4096
+        ]
+      },
+      "model.layers.18.self_attn.v_proj": {
+        "left": [
+          1024,
+          348
+        ],
+        "right": [
+          348,
+          4096
+        ]
+      },
+      "model.layers.19.mlp.gate_proj": {
+        "left": [
+          14336,
+          3161
+        ],
+        "right": [
+          3161,
+          4096
+        ]
+      },
+      "model.layers.19.mlp.up_proj": {
+        "left": [
+          14336,
+          2554
+        ],
+        "right": [
+          2554,
+          4096
+        ]
+      },
+      "model.layers.19.self_attn.k_proj": {
+        "left": [
+          1024,
+          409
+        ],
+        "right": [
+          409,
+          4096
+        ]
+      },
+      "model.layers.19.self_attn.o_proj": {
+        "left": [
+          4096,
+          544
+        ],
+        "right": [
+          544,
+          4096
+        ]
+      },
+      "model.layers.19.self_attn.q_proj": {
+        "left": [
+          4096,
+          209
+        ],
+        "right": [
+          209,
+          4096
+        ]
+      },
+      "model.layers.19.self_attn.v_proj": {
+        "left": [
+          1024,
+          628
+        ],
+        "right": [
+          628,
+          4096
+        ]
+      },
+      "model.layers.2.mlp.up_proj": {
+        "left": [
+          14336,
+          3075
+        ],
+        "right": [
+          3075,
+          4096
+        ]
+      },
+      "model.layers.2.self_attn.k_proj": {
+        "left": [
+          1024,
+          769
+        ],
+        "right": [
+          769,
+          4096
+        ]
+      },
+      "model.layers.2.self_attn.o_proj": {
+        "left": [
+          4096,
+          1358
+        ],
+        "right": [
+          1358,
+          4096
+        ]
+      },
+      "model.layers.2.self_attn.q_proj": {
+        "left": [
+          4096,
+          438
+        ],
+        "right": [
+          438,
+          4096
+        ]
+      },
+      "model.layers.20.mlp.gate_proj": {
+        "left": [
+          14336,
+          1996
+        ],
+        "right": [
+          1996,
+          4096
+        ]
+      },
+      "model.layers.20.mlp.up_proj": {
+        "left": [
+          14336,
+          2683
+        ],
+        "right": [
+          2683,
+          4096
+        ]
+      },
+      "model.layers.20.self_attn.k_proj": {
+        "left": [
+          1024,
+          231
+        ],
+        "right": [
+          231,
+          4096
+        ]
+      },
+      "model.layers.20.self_attn.o_proj": {
+        "left": [
+          4096,
+          490
+        ],
+        "right": [
+          490,
+          4096
+        ]
+      },
+      "model.layers.20.self_attn.q_proj": {
+        "left": [
+          4096,
+          217
+        ],
+        "right": [
+          217,
+          4096
+        ]
+      },
+      "model.layers.20.self_attn.v_proj": {
+        "left": [
+          1024,
+          599
+        ],
+        "right": [
+          599,
+          4096
+        ]
+      },
+      "model.layers.21.mlp.gate_proj": {
+        "left": [
+          14336,
+          2156
+        ],
+        "right": [
+          2156,
+          4096
+        ]
+      },
+      "model.layers.21.mlp.up_proj": {
+        "left": [
+          14336,
+          2974
+        ],
+        "right": [
+          2974,
+          4096
+        ]
+      },
+      "model.layers.21.self_attn.k_proj": {
+        "left": [
+          1024,
+          287
+        ],
+        "right": [
+          287,
+          4096
+        ]
+      },
+      "model.layers.21.self_attn.o_proj": {
+        "left": [
+          4096,
+          535
+        ],
+        "right": [
+          535,
+          4096
+        ]
+      },
+      "model.layers.21.self_attn.q_proj": {
+        "left": [
+          4096,
+          166
+        ],
+        "right": [
+          166,
+          4096
+        ]
+      },
+      "model.layers.22.mlp.gate_proj": {
+        "left": [
+          14336,
+          2570
+        ],
+        "right": [
+          2570,
+          4096
+        ]
+      },
+      "model.layers.22.mlp.up_proj": {
+        "left": [
+          14336,
+          2563
+        ],
+        "right": [
+          2563,
+          4096
+        ]
+      },
+      "model.layers.22.self_attn.k_proj": {
+        "left": [
+          1024,
+          324
+        ],
+        "right": [
+          324,
+          4096
+        ]
+      },
+      "model.layers.22.self_attn.o_proj": {
+        "left": [
+          4096,
+          323
+        ],
+        "right": [
+          323,
+          4096
+        ]
+      },
+      "model.layers.22.self_attn.q_proj": {
+        "left": [
+          4096,
+          246
+        ],
+        "right": [
+          246,
+          4096
+        ]
+      },
+      "model.layers.22.self_attn.v_proj": {
+        "left": [
+          1024,
+          390
+        ],
+        "right": [
+          390,
+          4096
+        ]
+      },
+      "model.layers.23.mlp.down_proj": {
+        "left": [
+          4096,
+          2985
+        ],
+        "right": [
+          2985,
+          14336
+        ]
+      },
+      "model.layers.23.mlp.gate_proj": {
+        "left": [
+          14336,
+          2412
+        ],
+        "right": [
+          2412,
+          4096
+        ]
+      },
+      "model.layers.23.mlp.up_proj": {
+        "left": [
+          14336,
+          3085
+        ],
+        "right": [
+          3085,
+          4096
+        ]
+      },
+      "model.layers.23.self_attn.k_proj": {
+        "left": [
+          1024,
+          131
+        ],
+        "right": [
+          131,
+          4096
+        ]
+      },
+      "model.layers.23.self_attn.o_proj": {
+        "left": [
+          4096,
+          191
+        ],
+        "right": [
+          191,
+          4096
+        ]
+      },
+      "model.layers.23.self_attn.q_proj": {
+        "left": [
+          4096,
+          126
+        ],
+        "right": [
+          126,
+          4096
+        ]
+      },
+      "model.layers.23.self_attn.v_proj": {
+        "left": [
+          1024,
+          295
+        ],
+        "right": [
+          295,
+          4096
+        ]
+      },
+      "model.layers.24.mlp.gate_proj": {
+        "left": [
+          14336,
+          3144
+        ],
+        "right": [
+          3144,
+          4096
+        ]
+      },
+      "model.layers.24.mlp.up_proj": {
+        "left": [
+          14336,
+          2314
+        ],
+        "right": [
+          2314,
+          4096
+        ]
+      },
+      "model.layers.24.self_attn.k_proj": {
+        "left": [
+          1024,
+          106
+        ],
+        "right": [
+          106,
+          4096
+        ]
+      },
+      "model.layers.24.self_attn.o_proj": {
+        "left": [
+          4096,
+          209
+        ],
+        "right": [
+          209,
+          4096
+        ]
+      },
+      "model.layers.24.self_attn.q_proj": {
+        "left": [
+          4096,
+          218
+        ],
+        "right": [
+          218,
+          4096
+        ]
+      },
+      "model.layers.24.self_attn.v_proj": {
+        "left": [
+          1024,
+          372
+        ],
+        "right": [
+          372,
+          4096
+        ]
+      },
+      "model.layers.25.mlp.gate_proj": {
+        "left": [
+          14336,
+          2149
+        ],
+        "right": [
+          2149,
+          4096
+        ]
+      },
+      "model.layers.25.mlp.up_proj": {
+        "left": [
+          14336,
+          2820
+        ],
+        "right": [
+          2820,
+          4096
+        ]
+      },
+      "model.layers.25.self_attn.o_proj": {
+        "left": [
+          4096,
+          410
+        ],
+        "right": [
+          410,
+          4096
+        ]
+      },
+      "model.layers.25.self_attn.q_proj": {
+        "left": [
+          4096,
+          267
+        ],
+        "right": [
+          267,
+          4096
+        ]
+      },
+      "model.layers.25.self_attn.v_proj": {
+        "left": [
+          1024,
+          503
+        ],
+        "right": [
+          503,
+          4096
+        ]
+      },
+      "model.layers.26.mlp.down_proj": {
+        "left": [
+          4096,
+          2789
+        ],
+        "right": [
+          2789,
+          14336
+        ]
+      },
+      "model.layers.26.mlp.gate_proj": {
+        "left": [
+          14336,
+          2443
+        ],
+        "right": [
+          2443,
+          4096
+        ]
+      },
+      "model.layers.26.mlp.up_proj": {
+        "left": [
+          14336,
+          2474
+        ],
+        "right": [
+          2474,
+          4096
+        ]
+      },
+      "model.layers.26.self_attn.k_proj": {
+        "left": [
+          1024,
+          202
+        ],
+        "right": [
+          202,
+          4096
+        ]
+      },
+      "model.layers.26.self_attn.o_proj": {
+        "left": [
+          4096,
+          393
+        ],
+        "right": [
+          393,
+          4096
+        ]
+      },
+      "model.layers.26.self_attn.q_proj": {
+        "left": [
+          4096,
+          132
+        ],
+        "right": [
+          132,
+          4096
+        ]
+      },
+      "model.layers.27.mlp.gate_proj": {
+        "left": [
+          14336,
+          2920
+        ],
+        "right": [
+          2920,
+          4096
+        ]
+      },
+      "model.layers.27.self_attn.k_proj": {
+        "left": [
+          1024,
+          246
+        ],
+        "right": [
+          246,
+          4096
+        ]
+      },
+      "model.layers.27.self_attn.o_proj": {
+        "left": [
+          4096,
+          440
+        ],
+        "right": [
+          440,
+          4096
+        ]
+      },
+      "model.layers.27.self_attn.q_proj": {
+        "left": [
+          4096,
+          175
+        ],
+        "right": [
+          175,
+          4096
+        ]
+      },
+      "model.layers.27.self_attn.v_proj": {
+        "left": [
+          1024,
+          375
+        ],
+        "right": [
+          375,
+          4096
+        ]
+      },
+      "model.layers.28.mlp.down_proj": {
+        "left": [
+          4096,
+          2920
+        ],
+        "right": [
+          2920,
+          14336
+        ]
+      },
+      "model.layers.28.mlp.gate_proj": {
+        "left": [
+          14336,
+          3161
+        ],
+        "right": [
+          3161,
+          4096
+        ]
+      },
+      "model.layers.28.mlp.up_proj": {
+        "left": [
+          14336,
+          2871
+        ],
+        "right": [
+          2871,
+          4096
+        ]
+      },
+      "model.layers.28.self_attn.o_proj": {
+        "left": [
+          4096,
+          554
+        ],
+        "right": [
+          554,
+          4096
+        ]
+      },
+      "model.layers.28.self_attn.q_proj": {
+        "left": [
+          4096,
+          155
+        ],
+        "right": [
+          155,
+          4096
+        ]
+      },
+      "model.layers.28.self_attn.v_proj": {
+        "left": [
+          1024,
+          576
+        ],
+        "right": [
+          576,
+          4096
+        ]
+      },
+      "model.layers.29.mlp.down_proj": {
+        "left": [
+          4096,
+          3054
+        ],
+        "right": [
+          3054,
+          14336
+        ]
+      },
+      "model.layers.29.mlp.up_proj": {
+        "left": [
+          14336,
+          2734
+        ],
+        "right": [
+          2734,
+          4096
+        ]
+      },
+      "model.layers.29.self_attn.k_proj": {
+        "left": [
+          1024,
+          322
+        ],
+        "right": [
+          322,
+          4096
+        ]
+      },
+      "model.layers.29.self_attn.o_proj": {
+        "left": [
+          4096,
+          419
+        ],
+        "right": [
+          419,
+          4096
+        ]
+      },
+      "model.layers.29.self_attn.q_proj": {
+        "left": [
+          4096,
+          203
+        ],
+        "right": [
+          203,
+          4096
+        ]
+      },
+      "model.layers.3.mlp.gate_proj": {
+        "left": [
+          14336,
+          3149
+        ],
+        "right": [
+          3149,
+          4096
+        ]
+      },
+      "model.layers.3.self_attn.o_proj": {
+        "left": [
+          4096,
+          1211
+        ],
+        "right": [
+          1211,
+          4096
+        ]
+      },
+      "model.layers.3.self_attn.q_proj": {
+        "left": [
+          4096,
+          779
+        ],
+        "right": [
+          779,
+          4096
+        ]
+      },
+      "model.layers.30.self_attn.k_proj": {
+        "left": [
+          1024,
+          268
+        ],
+        "right": [
+          268,
+          4096
+        ]
+      },
+      "model.layers.30.self_attn.o_proj": {
+        "left": [
+          4096,
+          342
+        ],
+        "right": [
+          342,
+          4096
+        ]
+      },
+      "model.layers.30.self_attn.q_proj": {
+        "left": [
+          4096,
+          292
+        ],
+        "right": [
+          292,
+          4096
+        ]
+      },
+      "model.layers.31.self_attn.o_proj": {
+        "left": [
+          4096,
+          577
+        ],
+        "right": [
+          577,
+          4096
+        ]
+      },
+      "model.layers.31.self_attn.q_proj": {
+        "left": [
+          4096,
+          221
+        ],
+        "right": [
+          221,
+          4096
+        ]
+      },
+      "model.layers.4.self_attn.o_proj": {
+        "left": [
+          4096,
+          1112
+        ],
+        "right": [
+          1112,
+          4096
+        ]
+      },
+      "model.layers.4.self_attn.q_proj": {
+        "left": [
+          4096,
+          586
+        ],
+        "right": [
+          586,
+          4096
+        ]
+      },
+      "model.layers.5.self_attn.k_proj": {
+        "left": [
+          1024,
+          690
+        ],
+        "right": [
+          690,
+          4096
+        ]
+      },
+      "model.layers.5.self_attn.o_proj": {
+        "left": [
+          4096,
+          941
+        ],
+        "right": [
+          941,
+          4096
+        ]
+      },
+      "model.layers.5.self_attn.q_proj": {
+        "left": [
+          4096,
+          406
+        ],
+        "right": [
+          406,
+          4096
+        ]
+      },
+      "model.layers.6.mlp.gate_proj": {
+        "left": [
+          14336,
+          2393
+        ],
+        "right": [
+          2393,
+          4096
+        ]
+      },
+      "model.layers.6.self_attn.o_proj": {
+        "left": [
+          4096,
+          1342
+        ],
+        "right": [
+          1342,
+          4096
+        ]
+      },
+      "model.layers.6.self_attn.q_proj": {
+        "left": [
+          4096,
+          432
+        ],
+        "right": [
+          432,
+          4096
+        ]
+      },
+      "model.layers.7.mlp.gate_proj": {
+        "left": [
+          14336,
+          2122
+        ],
+        "right": [
+          2122,
+          4096
+        ]
+      },
+      "model.layers.7.self_attn.o_proj": {
+        "left": [
+          4096,
+          1235
+        ],
+        "right": [
+          1235,
+          4096
+        ]
+      },
+      "model.layers.7.self_attn.q_proj": {
+        "left": [
+          4096,
+          351
+        ],
+        "right": [
+          351,
+          4096
+        ]
+      },
+      "model.layers.8.mlp.gate_proj": {
+        "left": [
+          14336,
+          2449
+        ],
+        "right": [
+          2449,
+          4096
+        ]
+      },
+      "model.layers.8.mlp.up_proj": {
+        "left": [
+          14336,
+          3069
+        ],
+        "right": [
+          3069,
+          4096
+        ]
+      },
+      "model.layers.8.self_attn.o_proj": {
+        "left": [
+          4096,
+          1334
+        ],
+        "right": [
+          1334,
+          4096
+        ]
+      },
+      "model.layers.8.self_attn.q_proj": {
+        "left": [
+          4096,
+          497
+        ],
+        "right": [
+          497,
+          4096
+        ]
+      },
+      "model.layers.9.mlp.gate_proj": {
+        "left": [
+          14336,
+          2663
+        ],
+        "right": [
+          2663,
+          4096
+        ]
+      },
+      "model.layers.9.mlp.up_proj": {
+        "left": [
+          14336,
+          2789
+        ],
+        "right": [
+          2789,
+          4096
+        ]
+      },
+      "model.layers.9.self_attn.k_proj": {
+        "left": [
+          1024,
+          605
+        ],
+        "right": [
+          605,
+          4096
+        ]
+      },
+      "model.layers.9.self_attn.o_proj": {
+        "left": [
+          4096,
+          1429
+        ],
+        "right": [
+          1429,
+          4096
+        ]
+      },
+      "model.layers.9.self_attn.q_proj": {
+        "left": [
+          4096,
+          442
+        ],
+        "right": [
+          442,
+          4096
+        ]
+      }
+    },
+    "passed": true,
+    "precision": {
+      "low_rank_factor_dtypes": [
+        "bfloat16"
+      ],
+      "matches_reference_torch_dtype": true,
+      "reference_torch_dtype": "bfloat16",
+      "uniform_low_rank_precision": true
+    },
+    "unexpected_low_rank_modules": [],
+    "validated_low_rank_module_count": 148,
+    "validated_low_rank_modules": [
+      "model.layers.0.mlp.gate_proj",
+      "model.layers.0.mlp.up_proj",
+      "model.layers.0.self_attn.k_proj",
+      "model.layers.0.self_attn.o_proj",
+      "model.layers.0.self_attn.q_proj",
+      "model.layers.1.mlp.gate_proj",
+      "model.layers.1.mlp.up_proj",
+      "model.layers.1.self_attn.k_proj",
+      "model.layers.1.self_attn.o_proj",
+      "model.layers.1.self_attn.q_proj",
+      "model.layers.10.mlp.down_proj",
+      "model.layers.10.mlp.gate_proj",
+      "model.layers.10.self_attn.k_proj",
+      "model.layers.10.self_attn.o_proj",
+      "model.layers.10.self_attn.q_proj",
+      "model.layers.11.mlp.gate_proj",
+      "model.layers.11.mlp.up_proj",
+      "model.layers.11.self_attn.k_proj",
+      "model.layers.11.self_attn.o_proj",
+      "model.layers.11.self_attn.q_proj",
+      "model.layers.12.mlp.down_proj",
+      "model.layers.12.mlp.gate_proj",
+      "model.layers.12.self_attn.o_proj",
+      "model.layers.12.self_attn.q_proj",
+      "model.layers.13.mlp.down_proj",
+      "model.layers.13.mlp.gate_proj",
+      "model.layers.13.mlp.up_proj",
+      "model.layers.13.self_attn.k_proj",
+      "model.layers.13.self_attn.o_proj",
+      "model.layers.13.self_attn.q_proj",
+      "model.layers.14.mlp.gate_proj",
+      "model.layers.14.self_attn.k_proj",
+      "model.layers.14.self_attn.o_proj",
+      "model.layers.14.self_attn.q_proj",
+      "model.layers.14.self_attn.v_proj",
+      "model.layers.15.mlp.gate_proj",
+      "model.layers.15.mlp.up_proj",
+      "model.layers.15.self_attn.o_proj",
+      "model.layers.15.self_attn.q_proj",
+      "model.layers.16.mlp.gate_proj",
+      "model.layers.16.mlp.up_proj",
+      "model.layers.16.self_attn.o_proj",
+      "model.layers.16.self_attn.q_proj",
+      "model.layers.17.mlp.gate_proj",
+      "model.layers.17.mlp.up_proj",
+      "model.layers.17.self_attn.k_proj",
+      "model.layers.17.self_attn.o_proj",
+      "model.layers.17.self_attn.q_proj",
+      "model.layers.18.mlp.gate_proj",
+      "model.layers.18.mlp.up_proj",
+      "model.layers.18.self_attn.o_proj",
+      "model.layers.18.self_attn.q_proj",
+      "model.layers.18.self_attn.v_proj",
+      "model.layers.19.mlp.gate_proj",
+      "model.layers.19.mlp.up_proj",
+      "model.layers.19.self_attn.k_proj",
+      "model.layers.19.self_attn.o_proj",
+      "model.layers.19.self_attn.q_proj",
+      "model.layers.19.self_attn.v_proj",
+      "model.layers.2.mlp.up_proj",
+      "model.layers.2.self_attn.k_proj",
+      "model.layers.2.self_attn.o_proj",
+      "model.layers.2.self_attn.q_proj",
+      "model.layers.20.mlp.gate_proj",
+      "model.layers.20.mlp.up_proj",
+      "model.layers.20.self_attn.k_proj",
+      "model.layers.20.self_attn.o_proj",
+      "model.layers.20.self_attn.q_proj",
+      "model.layers.20.self_attn.v_proj",
+      "model.layers.21.mlp.gate_proj",
+      "model.layers.21.mlp.up_proj",
+      "model.layers.21.self_attn.k_proj",
+      "model.layers.21.self_attn.o_proj",
+      "model.layers.21.self_attn.q_proj",
+      "model.layers.22.mlp.gate_proj",
+      "model.layers.22.mlp.up_proj",
+      "model.layers.22.self_attn.k_proj",
+      "model.layers.22.self_attn.o_proj",
+      "model.layers.22.self_attn.q_proj",
+      "model.layers.22.self_attn.v_proj",
+      "model.layers.23.mlp.down_proj",
+      "model.layers.23.mlp.gate_proj",
+      "model.layers.23.mlp.up_proj",
+      "model.layers.23.self_attn.k_proj",
+      "model.layers.23.self_attn.o_proj",
+      "model.layers.23.self_attn.q_proj",
+      "model.layers.23.self_attn.v_proj",
+      "model.layers.24.mlp.gate_proj",
+      "model.layers.24.mlp.up_proj",
+      "model.layers.24.self_attn.k_proj",
+      "model.layers.24.self_attn.o_proj",
+      "model.layers.24.self_attn.q_proj",
+      "model.layers.24.self_attn.v_proj",
+      "model.layers.25.mlp.gate_proj",
+      "model.layers.25.mlp.up_proj",
+      "model.layers.25.self_attn.o_proj",
+      "model.layers.25.self_attn.q_proj",
+      "model.layers.25.self_attn.v_proj",
+      "model.layers.26.mlp.down_proj",
+      "model.layers.26.mlp.gate_proj",
+      "model.layers.26.mlp.up_proj",
+      "model.layers.26.self_attn.k_proj",
+      "model.layers.26.self_attn.o_proj",
+      "model.layers.26.self_attn.q_proj",
+      "model.layers.27.mlp.gate_proj",
+      "model.layers.27.self_attn.k_proj",
+      "model.layers.27.self_attn.o_proj",
+      "model.layers.27.self_attn.q_proj",
+      "model.layers.27.self_attn.v_proj",
+      "model.layers.28.mlp.down_proj",
+      "model.layers.28.mlp.gate_proj",
+      "model.layers.28.mlp.up_proj",
+      "model.layers.28.self_attn.o_proj",
+      "model.layers.28.self_attn.q_proj",
+      "model.layers.28.self_attn.v_proj",
+      "model.layers.29.mlp.down_proj",
+      "model.layers.29.mlp.up_proj",
+      "model.layers.29.self_attn.k_proj",
+      "model.layers.29.self_attn.o_proj",
+      "model.layers.29.self_attn.q_proj",
+      "model.layers.3.mlp.gate_proj",
+      "model.layers.3.self_attn.o_proj",
+      "model.layers.3.self_attn.q_proj",
+      "model.layers.30.self_attn.k_proj",
+      "model.layers.30.self_attn.o_proj",
+      "model.layers.30.self_attn.q_proj",
+      "model.layers.31.self_attn.o_proj",
+      "model.layers.31.self_attn.q_proj",
+      "model.layers.4.self_attn.o_proj",
+      "model.layers.4.self_attn.q_proj",
+      "model.layers.5.self_attn.k_proj",
+      "model.layers.5.self_attn.o_proj",
+      "model.layers.5.self_attn.q_proj",
+      "model.layers.6.mlp.gate_proj",
+      "model.layers.6.self_attn.o_proj",
+      "model.layers.6.self_attn.q_proj",
+      "model.layers.7.mlp.gate_proj",
+      "model.layers.7.self_attn.o_proj",
+      "model.layers.7.self_attn.q_proj",
+      "model.layers.8.mlp.gate_proj",
+      "model.layers.8.mlp.up_proj",
+      "model.layers.8.self_attn.o_proj",
+      "model.layers.8.self_attn.q_proj",
+      "model.layers.9.mlp.gate_proj",
+      "model.layers.9.mlp.up_proj",
+      "model.layers.9.self_attn.k_proj",
+      "model.layers.9.self_attn.o_proj",
+      "model.layers.9.self_attn.q_proj"
+    ],
+    "validation_version": "1.2"
+  }
+}
