@@ -15,6 +15,7 @@ Each script is intentionally thin. It should parse arguments, resolve the reques
 - [`run_compress.py`](./run_compress.py): plan or dispatch optional artifact-generation flows from [`compress/`](../compress/README.md).
 - [`make_table.py`](./make_table.py): build lightweight table artifacts from normalized result JSON files.
 - [`add_checkpoint.py`](./add_checkpoint.py): update [`checkpoints/index.csv`](../checkpoints/index.csv) or import a sidecar manifest from [`checkpoints/manifests/`](../checkpoints/manifests/README.md).
+- [`package_lowrank_checkpoint.py`](./package_lowrank_checkpoint.py): stage an exported `lowrank_llama` checkpoint for Hugging Face upload under `staging/upload/<family>/<method>/<variant>`. It hard-links weight shards when possible, audits the factorized structure (A/B factor counts, no leftover dense target projections) and the storage dtype, and writes the upload manifest, provenance logs, and a model card.
 
 ## Design Intent
 

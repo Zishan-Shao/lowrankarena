@@ -35,6 +35,10 @@ and layer-selection scripts from the pinned upstream commit:
 
 The calibration example is preserved in [`llama/calib.sh`](./llama/calib.sh).
 
+The [`kronfwsvd/`](./kronfwsvd/) directory holds the code that produces the
+Kronecker factors consumed by the adapter. Its provenance and file roles are
+documented in [`LOWRANKARENA.md`](./LOWRANKARENA.md).
+
 ## Current limitations
 
 This is an audit-oriented source snapshot, not yet a turnkey LowRankArena
